@@ -19,6 +19,7 @@
                     animation: {
                         'fade-in': 'fadeIn 0.5s ease-out',
                         'slide-up': 'slideUp 0.3s ease-out',
+                        'slide-down': 'slideDown 0.3s ease-out',
                     },
                     keyframes: {
                         fadeIn: {
@@ -27,6 +28,10 @@
                         },
                         slideUp: {
                             '0%': { transform: 'translateY(100%)' },
+                            '100%': { transform: 'translateY(0)' },
+                        },
+                        slideDown: {
+                            '0%': { transform: 'translateY(-100%)' },
                             '100%': { transform: 'translateY(0)' },
                         }
                     }
@@ -106,7 +111,7 @@
             Dumbbell, Timer, Share2, Plus, Trash2, Save, LogOut, Play, 
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
-            TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft
+            TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell
         } from 'lucide-react';
 
         // --- CONFIGURAÇÃO FIREBASE DO MK ---
@@ -182,6 +187,27 @@
             );
         };
 
+        const NotificationToast = ({ notification, onClose }) => {
+            if (!notification) return null;
+            return (
+                <div 
+                    onClick={onClose}
+                    className="fixed top-4 left-4 right-4 z-[60] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer"
+                >
+                    {notification.photoURL ? (
+                        <img src={notification.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" />
+                    ) : (
+                        <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold">{notification.displayName?.[0]}</div>
+                    )}
+                    <div className="flex-1 overflow-hidden">
+                        <p className="text-xs font-bold text-yellow-500">Nova Mensagem de {notification.displayName}</p>
+                        <p className="text-sm truncate text-white">{notification.text}</p>
+                    </div>
+                    <button className="text-neutral-400"><X size={16}/></button>
+                </div>
+            );
+        };
+
         const ChatScreen = ({ user, onClose }) => {
             const [activeChat, setActiveChat] = useState(null); // null = lista de contatos, object = chat ativo
             const [usersList, setUsersList] = useState([]);
@@ -219,8 +245,7 @@
                     // Chat Global
                     collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
                 } else {
-                    // Chat Privado: Cria um ID único baseado nos UIDs ordenados alfabeticamente
-                    // Ex: chat_A_B (sempre na mesma ordem, não importa quem clica)
+                    // Chat Privado
                     const userIds = [user.uid, activeChat.uid].sort();
                     const chatId = `chat_${userIds[0]}_${userIds[1]}`;
                     collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages');
@@ -938,6 +963,7 @@
             const [importCode, setImportCode] = useState('');
             const [shareCode, setShareCode] = useState(null);
             const [reportData, setReportData] = useState({ current: null, previous: null });
+            const [notification, setNotification] = useState(null);
 
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -946,7 +972,42 @@
                 return () => unsubscribe();
             }, []);
 
-            // Novo: Salvar Presença do Usuário para aparecer na lista
+            // MONITOR DE NOTIFICAÇÕES GLOBAIS
+            useEffect(() => {
+                if (!user) return;
+
+                // Escuta o chat global por mensagens recentes
+                const q = query(
+                    collection(db, 'artifacts', appId, 'public', 'data', 'messages'),
+                    orderBy('createdAt', 'desc'),
+                    limit(1)
+                );
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    if (!snapshot.empty) {
+                        const msg = snapshot.docs[0].data();
+                        
+                        // Verifica se a mensagem é "nova" (criada nos últimos 10s para evitar flood ao carregar)
+                        // E se não foi eu mesmo que enviei
+                        const isRecent = msg.createdAt?.toMillis() > Date.now() - 10000;
+                        
+                        if (isRecent && msg.uid !== user.uid) {
+                            // Se a tela de chat não estiver aberta no Global, mostra o toast
+                            // (Simplificação: mostra sempre que chegar msg nova de outro)
+                            setNotification({
+                                id: snapshot.docs[0].id,
+                                ...msg
+                            });
+
+                            // Auto-hide após 4s
+                            setTimeout(() => setNotification(null), 4000);
+                        }
+                    }
+                });
+
+                return () => unsubscribe();
+            }, [user]);
+
             useEffect(() => {
                 if(user) {
                     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
@@ -1044,216 +1105,218 @@
 
             if (!user) return <LoginScreen onLogin={() => {}} />;
 
-            if (view === 'report' && reportData.current) {
-                return (
-                    <WorkoutReport 
-                        session={reportData.current} 
-                        previousSession={reportData.previous}
-                        onClose={() => setView('dashboard')} 
-                    />
-                );
-            }
-
-            if (view === 'active' && currentWorkout) {
-                return (
-                    <ActiveWorkout 
-                        workout={currentWorkout} 
-                        user={user}
-                        onFinish={(current, previous) => {
-                            setReportData({ current, previous });
-                            setView('report');
-                        }}
-                        onBack={() => setView('dashboard')} 
-                    />
-                );
-            }
-
-            if (view === 'edit') {
-                return (
-                    <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
-                        <div className="flex justify-between items-center mb-6">
-                            <button onClick={() => setView('dashboard')} className="p-2 bg-neutral-800 rounded-lg"><RotateCcw size={20} /></button>
-                            <h2 className="font-bold text-lg">{currentWorkout.id ? 'Editar Treino' : 'Novo Treino'}</h2>
-                            <button onClick={handleSaveWorkout} className="p-2 bg-yellow-500 text-black rounded-lg"><Save size={20} /></button>
-                        </div>
-                        <div className="mb-6">
-                            <label className="text-xs text-neutral-500 uppercase font-bold">Nome do Treino</label>
-                            <input 
-                                type="text" 
-                                value={currentWorkout.title} 
-                                onChange={(e) => setCurrentWorkout({...currentWorkout, title: e.target.value})}
-                                className="w-full bg-neutral-800 border-b-2 border-neutral-700 p-3 text-xl font-bold text-white focus:border-yellow-500 outline-none placeholder-neutral-600"
-                                placeholder="Ex: Treino A - Peito"
-                            />
-                        </div>
-                        <div className="space-y-4">
-                            {currentWorkout.exercises.map((ex, idx) => (
-                                <ExerciseEditor 
-                                    key={idx} 
-                                    index={idx} 
-                                    exercise={ex} 
-                                    updateExercise={(idx, field, val) => {
-                                        const newExs = [...currentWorkout.exercises];
-                                        newExs[idx] = { ...newExs[idx], [field]: val };
-                                        setCurrentWorkout({ ...currentWorkout, exercises: newExs });
-                                    }}
-                                    removeExercise={(idx) => {
-                                        const newExs = currentWorkout.exercises.filter((_, i) => i !== idx);
-                                        setCurrentWorkout({ ...currentWorkout, exercises: newExs });
-                                    }}
-                                />
-                            ))}
-                        </div>
-                        <button 
-                            onClick={() => setCurrentWorkout({
-                                ...currentWorkout, 
-                                exercises: [...currentWorkout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '' }]
-                            })}
-                            className="w-full mt-6 py-4 border-2 border-dashed border-neutral-700 rounded-xl text-neutral-400 font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 hover:text-white transition-all"
-                        >
-                            <Plus size={20} /> Adicionar Exercício
-                        </button>
-                    </div>
-                );
-            }
-
             return (
                 <div className="min-h-screen bg-neutral-950 text-white font-sans selection:bg-yellow-500 selection:text-black">
+                    
+                    {/* NOTIFICATION TOAST */}
+                    <NotificationToast notification={notification} onClose={() => setNotification(null)} />
+
                     {view === 'chat' && (
                         <ChatScreen user={user} onClose={() => setView('dashboard')} />
                     )}
 
-                    <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30">
-                        <div className="flex justify-between items-center mb-6">
-                            <div className="flex items-center gap-4">
-                                {user.photoURL ? (
-                                    <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-yellow-500 shadow-lg shadow-yellow-500/20" alt="Avatar" />
-                                ) : (
-                                    <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shadow-lg">
-                                        {user.displayName ? user.displayName[0] : 'U'}
-                                    </div>
-                                )}
-                                <div>
-                                    <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest mb-1">Bem-vindo Atleta</p>
-                                    <h1 className="font-black text-2xl leading-none tracking-tight">{user.displayName || 'Usuário'}</h1>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setView('chat')} className="bg-neutral-800 p-3 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors">
-                                    <MessageSquare size={20} />
-                                </button>
-                                <button onClick={() => signOut(auth)} className="text-neutral-600 hover:text-red-500 transition-colors p-3">
-                                    <LogOut size={24} />
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                            <button 
-                                onClick={() => setView('import')}
-                                className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-neutral-800 border border-neutral-800 hover:border-blue-500/50 transition-all group"
-                            >
-                                <Download size={18} className="text-blue-500 group-hover:scale-110 transition-transform" /> Importar
-                            </button>
-                            <button 
-                                onClick={handleCreateWorkout}
-                                className="bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg shadow-yellow-500/10 transition-all active:scale-95"
-                            >
-                                <Plus size={18} /> Novo Treino
-                            </button>
-                        </div>
-                    </div>
+                    {view === 'report' && reportData.current && (
+                        <WorkoutReport 
+                            session={reportData.current} 
+                            previousSession={reportData.previous}
+                            onClose={() => setView('dashboard')} 
+                        />
+                    )}
 
-                    {view === 'import' && (
-                        <div className="m-4 p-6 bg-neutral-900 rounded-3xl border border-blue-500/30 animate-fade-in relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-4 opacity-10"><Download size={100} className="text-blue-500"/></div>
-                            <h3 className="font-bold mb-2 flex items-center gap-2 text-blue-400 text-lg relative z-10">Importar Treino</h3>
-                            <p className="text-sm text-neutral-400 mb-4 relative z-10">Cole o código ID para sincronizar o treino do seu parceiro.</p>
-                            <div className="flex gap-2 relative z-10">
+                    {view === 'active' && currentWorkout && (
+                        <ActiveWorkout 
+                            workout={currentWorkout} 
+                            user={user}
+                            onFinish={(current, previous) => {
+                                setReportData({ current, previous });
+                                setView('report');
+                            }}
+                            onBack={() => setView('dashboard')} 
+                        />
+                    )}
+
+                    {view === 'edit' && (
+                        <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
+                            <div className="flex justify-between items-center mb-6">
+                                <button onClick={() => setView('dashboard')} className="p-2 bg-neutral-800 rounded-lg"><RotateCcw size={20} /></button>
+                                <h2 className="font-bold text-lg">{currentWorkout.id ? 'Editar Treino' : 'Novo Treino'}</h2>
+                                <button onClick={handleSaveWorkout} className="p-2 bg-yellow-500 text-black rounded-lg"><Save size={20} /></button>
+                            </div>
+                            <div className="mb-6">
+                                <label className="text-xs text-neutral-500 uppercase font-bold">Nome do Treino</label>
                                 <input 
-                                    value={importCode}
-                                    onChange={(e) => setImportCode(e.target.value)}
-                                    placeholder="Cole o ID aqui..."
-                                    className="flex-1 bg-black border border-neutral-700 rounded-xl px-4 text-white outline-none focus:border-blue-500 font-mono"
+                                    type="text" 
+                                    value={currentWorkout.title} 
+                                    onChange={(e) => setCurrentWorkout({...currentWorkout, title: e.target.value})}
+                                    className="w-full bg-neutral-800 border-b-2 border-neutral-700 p-3 text-xl font-bold text-white focus:border-yellow-500 outline-none placeholder-neutral-600"
+                                    placeholder="Ex: Treino A - Peito"
                                 />
-                                <button onClick={handleImportWorkout} className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20">OK</button>
                             </div>
-                            <button onClick={() => setView('dashboard')} className="mt-4 text-xs text-neutral-500 hover:text-white underline relative z-10">Cancelar</button>
+                            <div className="space-y-4">
+                                {currentWorkout.exercises.map((ex, idx) => (
+                                    <ExerciseEditor 
+                                        key={idx} 
+                                        index={idx} 
+                                        exercise={ex} 
+                                        updateExercise={(idx, field, val) => {
+                                            const newExs = [...currentWorkout.exercises];
+                                            newExs[idx] = { ...newExs[idx], [field]: val };
+                                            setCurrentWorkout({ ...currentWorkout, exercises: newExs });
+                                        }}
+                                        removeExercise={(idx) => {
+                                            const newExs = currentWorkout.exercises.filter((_, i) => i !== idx);
+                                            setCurrentWorkout({ ...currentWorkout, exercises: newExs });
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                            <button 
+                                onClick={() => setCurrentWorkout({
+                                    ...currentWorkout, 
+                                    exercises: [...currentWorkout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '' }]
+                                })}
+                                className="w-full mt-6 py-4 border-2 border-dashed border-neutral-700 rounded-xl text-neutral-400 font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 hover:text-white transition-all"
+                            >
+                                <Plus size={20} /> Adicionar Exercício
+                            </button>
                         </div>
                     )}
 
-                    {shareCode && (
-                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50 backdrop-blur-md animate-fade-in">
-                            <div className="bg-neutral-900 p-8 rounded-3xl w-full max-w-sm border border-neutral-800 shadow-2xl relative">
-                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-green-500 p-4 rounded-full shadow-lg shadow-green-500/30">
-                                    <Share2 size={32} className="text-black" />
-                                </div>
-                                <h3 className="text-2xl font-black text-center mb-2 mt-4 text-white">Treino Gerado!</h3>
-                                <p className="text-center text-neutral-400 text-sm mb-8">Envie este código para sua equipe importar.</p>
-                                
-                                <div className="bg-black p-6 rounded-2xl border border-neutral-800 mb-8 flex justify-between items-center group cursor-pointer" onClick={() => copyToClipboard(shareCode)}>
-                                    <span className="font-mono text-xl font-bold select-all text-green-500">{shareCode}</span>
-                                    <Copy size={20} className="text-neutral-600 group-hover:text-white transition-colors" />
-                                </div>
-                                
-                                <button 
-                                    onClick={() => setShareCode(null)} 
-                                    className="w-full bg-white hover:bg-neutral-200 text-black font-bold py-4 rounded-xl transition-colors"
-                                >
-                                    Fechar
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="p-4 space-y-4 pb-20">
-                        <h2 className="text-neutral-500 text-[10px] font-bold uppercase tracking-widest mb-4 pl-2">Meus Treinos</h2>
-                        
-                        {workouts.length === 0 && (
-                            <div className="text-center py-20 opacity-30 flex flex-col items-center">
-                                <Dumbbell size={64} className="mb-4 text-neutral-500" />
-                                <p className="text-neutral-400 font-medium">Nenhum treino criado.</p>
-                            </div>
-                        )}
-
-                        {workouts.map(workout => (
-                            <div key={workout.id} className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 shadow-lg hover:border-neutral-700 transition-all group relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
-                                    <Dumbbell size={120} />
-                                </div>
-                                
-                                <div className="relative z-10">
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div>
-                                            <h3 className="text-2xl font-black text-white group-hover:text-yellow-500 transition-colors tracking-tight">{workout.title}</h3>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <span className="bg-neutral-800 text-neutral-400 text-xs px-2 py-1 rounded-md font-bold">{workout.exercises.length} EXERCÍCIOS</span>
-                                                {workout.importedFrom && <span className="text-blue-500 text-xs font-bold px-2 py-1 bg-blue-500/10 rounded-md border border-blue-500/20">DE: {workout.importedFrom.toUpperCase()}</span>}
+                    {view === 'dashboard' && (
+                        <>
+                            <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30">
+                                <div className="flex justify-between items-center mb-6">
+                                    <div className="flex items-center gap-4">
+                                        {user.photoURL ? (
+                                            <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-yellow-500 shadow-lg shadow-yellow-500/20" alt="Avatar" />
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shadow-lg">
+                                                {user.displayName ? user.displayName[0] : 'U'}
                                             </div>
-                                        </div>
-                                        <div className="flex gap-1">
-                                            <button onClick={() => handleShareWorkout(workout)} className="p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-xl transition-all" title="Compartilhar">
-                                                <Share2 size={18} />
-                                            </button>
-                                            <button onClick={() => { setCurrentWorkout(workout); setView('edit'); }} className="p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-xl transition-all" title="Editar">
-                                                <FileText size={18} />
-                                            </button>
-                                            <button onClick={() => handleDeleteWorkout(workout.id)} className="p-3 text-neutral-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all" title="Excluir">
-                                                <Trash2 size={18} />
-                                            </button>
+                                        )}
+                                        <div>
+                                            <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest mb-1">Bem-vindo Atleta</p>
+                                            <h1 className="font-black text-2xl leading-none tracking-tight">{user.displayName || 'Usuário'}</h1>
                                         </div>
                                     </div>
-                                    
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setView('chat')} className="bg-neutral-800 p-3 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors">
+                                            <MessageSquare size={20} />
+                                        </button>
+                                        <button onClick={() => signOut(auth)} className="text-neutral-600 hover:text-red-500 transition-colors p-3">
+                                            <LogOut size={24} />
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
                                     <button 
-                                        onClick={() => { setCurrentWorkout(workout); setView('active'); }}
-                                        className="w-full bg-neutral-800 group-hover:bg-yellow-500 group-hover:text-black text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg"
+                                        onClick={() => setView('import')}
+                                        className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-neutral-800 border border-neutral-800 hover:border-blue-500/50 transition-all group"
                                     >
-                                        <Play size={20} className="fill-current" /> INICIAR TREINO
+                                        <Download size={18} className="text-blue-500 group-hover:scale-110 transition-transform" /> Importar
+                                    </button>
+                                    <button 
+                                        onClick={handleCreateWorkout}
+                                        className="bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg shadow-yellow-500/10 transition-all active:scale-95"
+                                    >
+                                        <Plus size={18} /> Novo Treino
                                     </button>
                                 </div>
                             </div>
-                        ))}
-                    </div>
+
+                            {view === 'import' && (
+                                <div className="m-4 p-6 bg-neutral-900 rounded-3xl border border-blue-500/30 animate-fade-in relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10"><Download size={100} className="text-blue-500"/></div>
+                                    <h3 className="font-bold mb-2 flex items-center gap-2 text-blue-400 text-lg relative z-10">Importar Treino</h3>
+                                    <p className="text-sm text-neutral-400 mb-4 relative z-10">Cole o código ID para sincronizar o treino do seu parceiro.</p>
+                                    <div className="flex gap-2 relative z-10">
+                                        <input 
+                                            value={importCode}
+                                            onChange={(e) => setImportCode(e.target.value)}
+                                            placeholder="Cole o ID aqui..."
+                                            className="flex-1 bg-black border border-neutral-700 rounded-xl px-4 text-white outline-none focus:border-blue-500 font-mono"
+                                        />
+                                        <button onClick={handleImportWorkout} className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20">OK</button>
+                                    </div>
+                                    <button onClick={() => setView('dashboard')} className="mt-4 text-xs text-neutral-500 hover:text-white underline relative z-10">Cancelar</button>
+                                </div>
+                            )}
+
+                            {shareCode && (
+                                <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50 backdrop-blur-md animate-fade-in">
+                                    <div className="bg-neutral-900 p-8 rounded-3xl w-full max-w-sm border border-neutral-800 shadow-2xl relative">
+                                        <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-green-500 p-4 rounded-full shadow-lg shadow-green-500/30">
+                                            <Share2 size={32} className="text-black" />
+                                        </div>
+                                        <h3 className="text-2xl font-black text-center mb-2 mt-4 text-white">Treino Gerado!</h3>
+                                        <p className="text-center text-neutral-400 text-sm mb-8">Envie este código para sua equipe importar.</p>
+                                        
+                                        <div className="bg-black p-6 rounded-2xl border border-neutral-800 mb-8 flex justify-between items-center group cursor-pointer" onClick={() => copyToClipboard(shareCode)}>
+                                            <span className="font-mono text-xl font-bold select-all text-green-500">{shareCode}</span>
+                                            <Copy size={20} className="text-neutral-600 group-hover:text-white transition-colors" />
+                                        </div>
+                                        
+                                        <button 
+                                            onClick={() => setShareCode(null)} 
+                                            className="w-full bg-white hover:bg-neutral-200 text-black font-bold py-4 rounded-xl transition-colors"
+                                        >
+                                            Fechar
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="p-4 space-y-4 pb-20">
+                                <h2 className="text-neutral-500 text-[10px] font-bold uppercase tracking-widest mb-4 pl-2">Meus Treinos</h2>
+                                
+                                {workouts.length === 0 && (
+                                    <div className="text-center py-20 opacity-30 flex flex-col items-center">
+                                        <Dumbbell size={64} className="mb-4 text-neutral-500" />
+                                        <p className="text-neutral-400 font-medium">Nenhum treino criado.</p>
+                                    </div>
+                                )}
+
+                                {workouts.map(workout => (
+                                    <div key={workout.id} className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 shadow-lg hover:border-neutral-700 transition-all group relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+                                            <Dumbbell size={120} />
+                                        </div>
+                                        
+                                        <div className="relative z-10">
+                                            <div className="flex justify-between items-start mb-6">
+                                                <div>
+                                                    <h3 className="text-2xl font-black text-white group-hover:text-yellow-500 transition-colors tracking-tight">{workout.title}</h3>
+                                                    <div className="flex items-center gap-2 mt-2">
+                                                        <span className="bg-neutral-800 text-neutral-400 text-xs px-2 py-1 rounded-md font-bold">{workout.exercises.length} EXERCÍCIOS</span>
+                                                        {workout.importedFrom && <span className="text-blue-500 text-xs font-bold px-2 py-1 bg-blue-500/10 rounded-md border border-blue-500/20">DE: {workout.importedFrom.toUpperCase()}</span>}
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-1">
+                                                    <button onClick={() => handleShareWorkout(workout)} className="p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-xl transition-all" title="Compartilhar">
+                                                        <Share2 size={18} />
+                                                    </button>
+                                                    <button onClick={() => { setCurrentWorkout(workout); setView('edit'); }} className="p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-xl transition-all" title="Editar">
+                                                        <FileText size={18} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteWorkout(workout.id)} className="p-3 text-neutral-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all" title="Excluir">
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                            <button 
+                                                onClick={() => { setCurrentWorkout(workout); setView('active'); }}
+                                                className="w-full bg-neutral-800 group-hover:bg-yellow-500 group-hover:text-black text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg"
+                                            >
+                                                <Play size={20} className="fill-current" /> INICIAR TREINO
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             );
         };
