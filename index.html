@@ -1,0 +1,1150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IronTracks - Alta Performance</title>
+    
+    <!-- 1. Motor Visual (Tailwind CSS) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Motor de Tradução (Babel) para o navegador entender React -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- 3. Configuração de Estilos Customizados (Animações) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(100%)' },
+                            '100%': { transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- 4. Mapa de Importação (Onde o app busca as bibliotecas) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.2.0",
+            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+            "lucide-react": "https://esm.sh/lucide-react@0.294.0",
+            "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+            "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+        }
+    }
+    </script>
+
+    <style>
+        /* Ajustes para Scrollbar invisível mas funcional */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        body {
+            background-color: #0a0a0a; /* neutral-950 */
+            color: white;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        /* Ajustes de Impressão */
+        @media print {
+            body { background-color: white; color: black; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <!-- O App será injetado aqui -->
+    <div id="root"></div>
+
+    <!-- O CÓDIGO DO APP (Lógica) -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { initializeApp } from 'firebase/app';
+        import { 
+            getAuth, 
+            signInWithPopup, 
+            GoogleAuthProvider, 
+            signOut, 
+            onAuthStateChanged 
+        } from 'firebase/auth';
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            setDoc, 
+            getDoc, 
+            addDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            serverTimestamp, 
+            query, 
+            orderBy, 
+            limit, 
+            where, 
+            getDocs 
+        } from 'firebase/firestore';
+        import { 
+            Dumbbell, Timer, Share2, Plus, Trash2, Save, LogOut, Play, 
+            CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
+            Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
+            TrendingDown, Printer, X, MessageSquare, Send
+        } from 'lucide-react';
+
+        // --- CONFIGURAÇÃO FIREBASE DO MK ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBfy01I69nNCABxnYSqK95e8TwGP1bSv2w",
+            authDomain: "irontracks-e6344.firebaseapp.com",
+            projectId: "irontracks-e6344",
+            storageBucket: "irontracks-e6344.firebasestorage.app",
+            messagingSenderId: "212508580918",
+            appId: "1:212508580918:web:dd55c3088fec86b8680c97"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'irontracks-production';
+
+        // --- UTILITÁRIOS ---
+        const formatDuration = (s) => {
+            const mins = Math.floor(s / 60);
+            const secs = s % 60;
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        };
+
+        const getCurrentDate = () => {
+            return new Date().toLocaleDateString('pt-BR', { 
+                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
+            });
+        };
+
+        // --- COMPONENTES ---
+
+        const LoginScreen = ({ onLogin }) => {
+            const handleGoogleLogin = async () => {
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Erro no login Google:", error);
+                    if (error.code === 'auth/unauthorized-domain') {
+                        alert("Atenção MK: Você precisa autorizar este domínio (irontracks.github.io) no painel do Firebase em Authentication > Settings > Authorized Domains.");
+                    } else {
+                        alert("Erro ao logar: " + error.message);
+                    }
+                }
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900 text-white p-6 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-10 pointer-events-none">
+                        <div className="absolute -top-24 -left-24 w-96 h-96 bg-yellow-600 rounded-full blur-3xl"></div>
+                        <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-900 rounded-full blur-3xl"></div>
+                    </div>
+
+                    <div className="relative z-10 flex flex-col items-center">
+                        <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl shadow-yellow-500/20 animate-pulse">
+                            <Dumbbell size={64} className="text-black" />
+                        </div>
+                        <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
+                        <p className="text-neutral-400 mb-10 text-center max-w-xs font-medium">
+                            Sistema de Alta Performance • v1.0
+                        </p>
+                        
+                        <button 
+                            onClick={handleGoogleLogin}
+                            className="group flex items-center gap-4 bg-white text-neutral-900 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-neutral-100 transition-all active:scale-95 shadow-xl"
+                        >
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 group-hover:scale-110 transition-transform" alt="G" />
+                            Acessar com Google
+                        </button>
+                    </div>
+                </div>
+            );
+        };
+
+        const ChatScreen = ({ user, onClose }) => {
+            const [messages, setMessages] = useState([]);
+            const [newMessage, setNewMessage] = useState('');
+            const dummy = useRef();
+
+            useEffect(() => {
+                // Sala pública global
+                const q = query(
+                    collection(db, 'artifacts', appId, 'public', 'data', 'messages'),
+                    orderBy('createdAt', 'desc'),
+                    limit(50)
+                );
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const msgs = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    })).reverse(); // Inverte para mostrar cronologicamente (antigo -> novo)
+                    setMessages(msgs);
+                });
+
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                dummy.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages]);
+
+            const sendMessage = async (e) => {
+                e.preventDefault();
+                if (!newMessage.trim()) return;
+
+                const text = newMessage;
+                setNewMessage(''); // Limpa input rápido (otimista)
+
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
+                        text: text,
+                        createdAt: serverTimestamp(),
+                        uid: user.uid,
+                        displayName: user.displayName || 'Anônimo',
+                        photoURL: user.photoURL
+                    });
+                } catch(e) {
+                    console.error(e);
+                    alert("Erro ao enviar mensagem");
+                }
+            };
+
+            return (
+                <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up">
+                    {/* Header */}
+                    <div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-yellow-500 p-2 rounded-full text-black">
+                                <MessageSquare size={20} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg">Iron Lounge</h3>
+                                <p className="text-xs text-neutral-400 flex items-center gap-1">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Online
+                                </p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600">
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    {/* Messages Area */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">
+                        {messages.length === 0 && (
+                            <div className="text-center text-neutral-500 mt-10 text-sm">
+                                <p>Nenhuma mensagem ainda.</p>
+                                <p>Mande um "Salve!" para a galera.</p>
+                            </div>
+                        )}
+                        
+                        {messages.map(msg => {
+                            const isMe = msg.uid === user.uid;
+                            return (
+                                <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                    {msg.photoURL ? (
+                                        <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" alt="User" />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">
+                                            {msg.displayName?.[0]}
+                                        </div>
+                                    )}
+                                    <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${
+                                        isMe 
+                                        ? 'bg-yellow-500 text-black rounded-tr-none' 
+                                        : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'
+                                    }`}>
+                                        {!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}
+                                        <p>{msg.text}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        <div ref={dummy}></div>
+                    </div>
+
+                    {/* Input Area */}
+                    <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2">
+                        <input 
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors"
+                            placeholder="Digite sua mensagem..."
+                        />
+                        <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <Send size={20} />
+                        </button>
+                    </form>
+                </div>
+            );
+        };
+
+        const RestTimerOverlay = ({ duration, onFinish, isActive, onClose }) => {
+            const [timeLeft, setTimeLeft] = useState(duration);
+
+            useEffect(() => {
+                if (!isActive) return;
+                setTimeLeft(duration);
+                const interval = setInterval(() => {
+                    setTimeLeft((prev) => {
+                        if (prev <= 1) {
+                            clearInterval(interval);
+                            onFinish();
+                            return 0;
+                        }
+                        return prev - 1;
+                    });
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [isActive, duration]);
+
+            if (!isActive) return null;
+
+            return (
+                <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-50 animate-slide-up">
+                    <div className="flex items-center justify-between max-w-md mx-auto">
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-yellow-500 blur-lg opacity-20 animate-pulse"></div>
+                                <Timer className="text-yellow-500 relative z-10" size={36} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Recuperação</p>
+                                <p className="text-4xl font-mono font-black text-white tabular-nums leading-none">{formatDuration(timeLeft)}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setTimeLeft(prev => prev + 10)} className="h-12 w-16 bg-neutral-800 rounded-xl text-white font-bold border border-neutral-700 active:bg-neutral-700">+10s</button>
+                            <button onClick={onClose} className="h-12 px-6 bg-yellow-500 text-black rounded-xl font-bold hover:bg-yellow-400 active:scale-95 transition-transform">BORA</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const WorkoutReport = ({ session, previousSession, onClose }) => {
+            const calculateTotalVolume = (logs) => {
+                let volume = 0;
+                Object.values(logs).forEach(log => {
+                    if (log.done && log.weight && log.reps) {
+                        volume += (parseFloat(log.weight) * parseFloat(log.reps));
+                    }
+                });
+                return volume;
+            };
+
+            const currentVolume = calculateTotalVolume(session.logs);
+            const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0;
+            const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0;
+
+            const prevLogsMap = {};
+            if (previousSession) {
+                previousSession.exercises.forEach((ex, exIdx) => {
+                    const exLogs = [];
+                    Object.keys(previousSession.logs).forEach(key => {
+                        const [eIdx, sIdx] = key.split('-');
+                        if (parseInt(eIdx) === exIdx) {
+                            exLogs.push(previousSession.logs[key]);
+                        }
+                    });
+                    prevLogsMap[ex.name] = exLogs;
+                });
+            }
+
+            const handlePrint = () => {
+                window.print();
+            };
+
+            return (
+                <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-900 text-black">
+                    <div className="fixed top-4 right-4 flex gap-2 no-print z-50">
+                        <button onClick={handlePrint} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg">
+                            <Printer size={20} /> Imprimir / PDF
+                        </button>
+                        <button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg">
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="min-h-screen bg-white p-8 max-w-4xl mx-auto">
+                        <div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end">
+                            <div>
+                                <h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1>
+                                <p className="text-sm font-bold uppercase tracking-widest text-neutral-500">Relatório de Performance</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-2xl font-bold">{session.workoutTitle}</p>
+                                <p className="text-neutral-600">{getCurrentDate()}</p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Total</p>
+                                <p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p>
+                            </div>
+                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p>
+                                <div className="flex items-baseline gap-2">
+                                    <p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>
+                                    {previousSession && (
+                                        <span className={`text-xs font-bold ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Descanso Total</p>
+                                <p className="text-3xl font-mono font-bold text-neutral-700">{formatDuration(session.totalRestTime)}</p>
+                            </div>
+                            <div className="bg-black text-white p-4 rounded-lg">
+                                <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p>
+                                <p className="text-xl font-bold uppercase italic">CONCLUÍDO</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-8">
+                            {session.exercises.map((ex, exIdx) => {
+                                const prevLogs = prevLogsMap[ex.name] || [];
+                                return (
+                                    <div key={exIdx} className="break-inside-avoid">
+                                        <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-200 pb-2">
+                                            <h3 className="text-xl font-bold uppercase flex items-center gap-2">
+                                                <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>
+                                                {ex.name}
+                                            </h3>
+                                            <div className="text-xs font-mono text-neutral-500">
+                                                Cadência: <span className="font-bold text-black">{ex.cadence || '-'}</span> | 
+                                                Descanso: <span className="font-bold text-black">{ex.restTime}s</span>
+                                            </div>
+                                        </div>
+                                        {ex.notes && (
+                                            <div className="mb-3 text-sm text-neutral-600 italic bg-neutral-50 p-2 border-l-2 border-neutral-300">
+                                                Obs: {ex.notes}
+                                            </div>
+                                        )}
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="text-neutral-500 border-b border-neutral-100">
+                                                    <th className="py-2 text-left w-16">Série</th>
+                                                    <th className="py-2 text-center w-24">Carga (Kg)</th>
+                                                    <th className="py-2 text-center w-24">Reps</th>
+                                                    <th className="py-2 text-center w-32">Evolução</th>
+                                                    <th className="py-2 text-right">Densidade</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {Array.from({ length: parseInt(ex.sets) }).map((_, sIdx) => {
+                                                    const key = `${exIdx}-${sIdx}`;
+                                                    const log = session.logs[key];
+                                                    const prevLog = prevLogs[sIdx];
+                                                    
+                                                    if (!log || !log.done) return null;
+
+                                                    let deltaLoad = 0;
+                                                    let deltaReps = 0;
+                                                    let progressionText = "-";
+                                                    let rowClass = "";
+
+                                                    if (prevLog && prevLog.weight) {
+                                                        deltaLoad = parseFloat(log.weight) - parseFloat(prevLog.weight);
+                                                        deltaReps = parseFloat(log.reps) - parseFloat(prevLog.reps);
+                                                        if (deltaLoad > 0) {
+                                                            progressionText = `+${deltaLoad}kg`;
+                                                            rowClass = "bg-green-50 text-green-900 font-bold";
+                                                        } else if (deltaLoad < 0) {
+                                                            progressionText = `${deltaLoad}kg`;
+                                                            rowClass = "text-red-600";
+                                                        } else {
+                                                            if (deltaReps > 0) {
+                                                                progressionText = `+${deltaReps} reps`;
+                                                                rowClass = "bg-blue-50 text-blue-900 font-bold";
+                                                            } else {
+                                                                progressionText = "=";
+                                                            }
+                                                        }
+                                                    }
+                                                    return (
+                                                        <tr key={sIdx} className="border-b border-neutral-100">
+                                                            <td className="py-3 font-mono text-neutral-500">#{sIdx + 1}</td>
+                                                            <td className="py-3 text-center font-bold text-lg">{log.weight}</td>
+                                                            <td className="py-3 text-center font-mono">{log.reps}</td>
+                                                            <td className={`py-3 text-center text-xs uppercase ${rowClass}`}>
+                                                                {progressionText !== '-' && progressionText !== '=' ? (
+                                                                    <span className="flex items-center justify-center gap-1">
+                                                                        {deltaLoad > 0 ? <TrendingUp size={14}/> : <TrendingDown size={14}/>}
+                                                                        {progressionText}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-neutral-300 font-bold">=</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-3 text-right font-mono text-neutral-400 text-xs">
+                                                                {(parseFloat(log.weight) * parseFloat(log.reps)).toFixed(0)}kg
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">
+                            IronTracks System • {getCurrentDate()}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const ExerciseEditor = ({ exercise, index, updateExercise, removeExercise }) => {
+            const [expanded, setExpanded] = useState(true);
+
+            return (
+                <div className="bg-neutral-800 rounded-xl p-4 mb-3 border border-neutral-700 shadow-sm">
+                    <div className="flex justify-between items-center mb-2" onClick={() => setExpanded(!expanded)}>
+                        <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                            <span className="bg-neutral-700 text-xs w-6 h-6 flex items-center justify-center rounded-full text-neutral-300">{index + 1}</span>
+                            {exercise.name || "Novo Exercício"}
+                        </h3>
+                        <div className="flex gap-2">
+                            {expanded ? <ChevronUp size={18} className="text-neutral-500"/> : <ChevronDown size={18} className="text-neutral-500"/>}
+                        </div>
+                    </div>
+
+                    {expanded && (
+                        <div className="space-y-3 mt-3 animate-fade-in">
+                            <div>
+                                <label className="text-xs text-neutral-500 uppercase font-bold">Nome do Exercício</label>
+                                <input 
+                                    type="text" 
+                                    value={exercise.name} 
+                                    onChange={(e) => updateExercise(index, 'name', e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-3 focus:border-yellow-500 outline-none placeholder-neutral-600"
+                                    placeholder="Ex: Supino Reto"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-neutral-500 uppercase font-bold">Séries</label>
+                                    <input 
+                                        type="number" 
+                                        value={exercise.sets} 
+                                        onChange={(e) => updateExercise(index, 'sets', e.target.value)}
+                                        className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center"
+                                        placeholder="4"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-neutral-500 uppercase font-bold">Repetições</label>
+                                    <input 
+                                        type="text" 
+                                        value={exercise.reps} 
+                                        onChange={(e) => updateExercise(index, 'reps', e.target.value)}
+                                        className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center"
+                                        placeholder="8-12"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-neutral-500 uppercase font-bold">Cadência</label>
+                                    <input 
+                                        type="text" 
+                                        value={exercise.cadence} 
+                                        onChange={(e) => updateExercise(index, 'cadence', e.target.value)}
+                                        className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center"
+                                        placeholder="3010"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-neutral-500 uppercase font-bold">Descanso (s)</label>
+                                    <input 
+                                        type="number" 
+                                        value={exercise.restTime} 
+                                        onChange={(e) => updateExercise(index, 'restTime', e.target.value)}
+                                        className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center"
+                                        placeholder="90"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs text-neutral-500 uppercase font-bold">Observações</label>
+                                <textarea 
+                                    value={exercise.notes} 
+                                    onChange={(e) => updateExercise(index, 'notes', e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 h-20 text-sm"
+                                    placeholder="Ex: Cuidar com o ombro esquerdo..."
+                                />
+                            </div>
+
+                            <button 
+                                onClick={() => removeExercise(index)}
+                                className="w-full flex items-center justify-center gap-2 text-red-500 py-2 hover:bg-red-500 hover:bg-opacity-10 rounded-lg text-sm"
+                            >
+                                <Trash2 size={16} /> Remover Exercício
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ActiveWorkout = ({ workout, onFinish, onBack, user }) => {
+            const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
+            const [logs, setLogs] = useState({});
+            const [restTimer, setRestTimer] = useState({ active: false, duration: 60 });
+            const [sessionDuration, setSessionDuration] = useState(0);
+            const [totalRestTime, setTotalRestTime] = useState(0);
+
+            useEffect(() => {
+                const timer = setInterval(() => setSessionDuration(p => p + 1), 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            useEffect(() => {
+                let interval;
+                if (restTimer.active) {
+                    interval = setInterval(() => {
+                        setTotalRestTime(prev => prev + 1);
+                    }, 1000);
+                }
+                return () => clearInterval(interval);
+            }, [restTimer.active]);
+
+            const toggleSet = (exIndex, setIndex, targetReps, defaultRest) => {
+                const key = `${exIndex}-${setIndex}`;
+                const currentLog = logs[key] || { weight: '', reps: targetReps, done: false };
+                
+                const newDone = !currentLog.done;
+                
+                setLogs({
+                    ...logs,
+                    [key]: { ...currentLog, done: newDone }
+                });
+
+                if (newDone) {
+                    setRestTimer({ active: true, duration: parseInt(defaultRest) || 60 });
+                }
+            };
+
+            const updateLogValue = (exIndex, setIndex, field, value) => {
+                const key = `${exIndex}-${setIndex}`;
+                const currentLog = logs[key] || { weight: '', reps: '', done: false };
+                setLogs({
+                    ...logs,
+                    [key]: { ...currentLog, [field]: value }
+                });
+            };
+
+            const handleFinish = async () => {
+                if (!confirm("Finalizar treino e gerar relatório?")) return;
+
+                const sessionData = {
+                    workoutId: workout.id,
+                    workoutTitle: workout.title,
+                    exercises: workout.exercises,
+                    logs: logs,
+                    totalTime: sessionDuration,
+                    totalRestTime: totalRestTime,
+                    date: serverTimestamp(),
+                    userId: user.uid
+                };
+
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), sessionData);
+                    
+                    const historyQuery = query(
+                        collection(db, 'artifacts', appId, 'users', user.uid, 'history'),
+                        where('workoutId', '==', workout.id),
+                        orderBy('date', 'desc'),
+                        limit(2) 
+                    );
+
+                    const historySnapshot = await getDocs(historyQuery);
+                    const historyDocs = historySnapshot.docs.map(d => d.data());
+                    
+                    const currentSession = sessionData;
+                    const previousSession = historyDocs.length > 1 ? historyDocs[1] : null;
+
+                    onFinish(currentSession, previousSession);
+
+                } catch (e) {
+                    console.error("Erro ao salvar histórico:", e);
+                    alert("Erro ao salvar treino: " + e.message);
+                    onFinish(sessionData, null);
+                }
+            };
+
+            const currentExercise = workout.exercises[activeExerciseIndex];
+
+            return (
+                <div className="pb-24 bg-black min-h-screen text-white">
+                    <div className="sticky top-0 bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 p-4 z-40 flex justify-between items-center">
+                        <div>
+                            <h2 className="text-white font-bold truncate max-w-[200px]">{workout.title}</h2>
+                            <div className="flex items-center gap-2 text-yellow-500 text-sm font-mono">
+                                <Activity size={14} />
+                                {formatDuration(sessionDuration)}
+                            </div>
+                        </div>
+                        <button onClick={handleFinish} className="bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-lg font-bold text-sm shadow-lg shadow-yellow-500/20">
+                            Finalizar
+                        </button>
+                    </div>
+
+                    <div className="flex overflow-x-auto p-4 gap-2 no-scrollbar bg-neutral-950">
+                        {workout.exercises.map((ex, idx) => (
+                            <button 
+                                key={idx}
+                                onClick={() => setActiveExerciseIndex(idx)}
+                                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${
+                                    idx === activeExerciseIndex 
+                                        ? 'bg-white text-black border-white' 
+                                        : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:border-neutral-600'
+                                }`}
+                            >
+                                {idx + 1}. {ex.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="px-4">
+                        <div className="bg-neutral-900 rounded-3xl p-6 mb-6 shadow-2xl border border-neutral-800">
+                            <div className="flex justify-between items-start mb-6">
+                                <h3 className="text-2xl font-bold text-white leading-tight">{currentExercise.name}</h3>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-3 mb-6 text-center">
+                                <div className="bg-neutral-800 p-3 rounded-xl border border-neutral-700">
+                                    <span className="text-[10px] text-neutral-400 block uppercase font-bold tracking-wider">Cadência</span>
+                                    <span className="text-white font-mono text-lg">{currentExercise.cadence || "Livre"}</span>
+                                </div>
+                                <div className="bg-neutral-800 p-3 rounded-xl border border-neutral-700">
+                                    <span className="text-[10px] text-neutral-400 block uppercase font-bold tracking-wider">Descanso</span>
+                                    <span className="text-white font-mono text-lg">{currentExercise.restTime || "60"}s</span>
+                                </div>
+                                <div className="bg-neutral-800 p-3 rounded-xl border border-neutral-700">
+                                    <span className="text-[10px] text-neutral-400 block uppercase font-bold tracking-wider">Meta</span>
+                                    <span className="text-white font-mono text-lg">{currentExercise.reps}</span>
+                                </div>
+                            </div>
+                            
+                            {currentExercise.notes && (
+                                <div className="mb-8 bg-yellow-500/5 p-4 rounded-xl border border-yellow-500/20 flex gap-3">
+                                    <div className="bg-yellow-500/20 p-2 rounded-lg h-fit">
+                                        <Music size={16} className="text-yellow-500" />
+                                    </div>
+                                    <p className="text-yellow-100 text-sm leading-relaxed italic">
+                                        "{currentExercise.notes}"
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-10 gap-3 text-[10px] text-neutral-500 uppercase font-bold text-center mb-2 tracking-widest">
+                                    <div className="col-span-1">Set</div>
+                                    <div className="col-span-3">Carga (kg)</div>
+                                    <div className="col-span-3">Reps</div>
+                                    <div className="col-span-3">Status</div>
+                                </div>
+                                {Array.from({ length: parseInt(currentExercise.sets) || 3 }).map((_, setIdx) => {
+                                    const logKey = `${activeExerciseIndex}-${setIdx}`;
+                                    const log = logs[logKey] || { done: false, weight: '', reps: '' };
+                                    
+                                    return (
+                                        <div key={setIdx} className={`grid grid-cols-10 gap-3 items-center ${log.done ? 'opacity-40 grayscale transition-all duration-500' : 'opacity-100'}`}>
+                                            <div className="col-span-1 text-center font-mono text-neutral-600 font-bold">{setIdx + 1}</div>
+                                            <div className="col-span-3">
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="Kg" 
+                                                    value={log.weight}
+                                                    onChange={(e) => updateLogValue(activeExerciseIndex, setIdx, 'weight', e.target.value)}
+                                                    className="w-full bg-black border border-neutral-700 rounded-xl p-3 text-white text-center font-bold text-lg focus:border-yellow-500 focus:outline-none transition-colors placeholder-neutral-800"
+                                                />
+                                            </div>
+                                            <div className="col-span-3">
+                                                <input 
+                                                    type="number" 
+                                                    placeholder={currentExercise.reps} 
+                                                    value={log.reps}
+                                                    onChange={(e) => updateLogValue(activeExerciseIndex, setIdx, 'reps', e.target.value)}
+                                                    className="w-full bg-black border border-neutral-700 rounded-xl p-3 text-white text-center font-bold text-lg focus:border-yellow-500 focus:outline-none transition-colors placeholder-neutral-800"
+                                                />
+                                            </div>
+                                            <button 
+                                                onClick={() => toggleSet(activeExerciseIndex, setIdx, currentExercise.reps, currentExercise.restTime)}
+                                                className={`col-span-3 h-12 rounded-xl flex items-center justify-center transition-all shadow-lg active:scale-95 ${
+                                                    log.done 
+                                                    ? 'bg-green-500 text-black' 
+                                                    : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700 border border-neutral-700'
+                                                }`}
+                                            >
+                                                {log.done ? <CheckCircle2 size={24} /> : <div className="w-6 h-6 rounded-full border-4 border-neutral-600" />}
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    <RestTimerOverlay 
+                        duration={restTimer.duration} 
+                        isActive={restTimer.active} 
+                        onFinish={() => setRestTimer(prev => ({ ...prev, active: false }))}
+                        onClose={() => setRestTimer(prev => ({ ...prev, active: false }))}
+                    />
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('dashboard');
+            const [workouts, setWorkouts] = useState([]);
+            const [currentWorkout, setCurrentWorkout] = useState(null); 
+            const [importCode, setImportCode] = useState('');
+            const [shareCode, setShareCode] = useState(null);
+            const [reportData, setReportData] = useState({ current: null, previous: null });
+
+            useEffect(() => {
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), orderBy('createdAt', 'desc'));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setWorkouts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                }, (error) => console.error("Erro ao buscar treinos:", error));
+                return () => unsubscribe();
+            }, [user]);
+
+            const handleCreateWorkout = () => {
+                setCurrentWorkout({ title: '', exercises: [] });
+                setView('edit');
+            };
+
+            const handleSaveWorkout = async () => {
+                if (!user || !currentWorkout.title) return;
+                const workoutData = {
+                    ...currentWorkout,
+                    createdAt: serverTimestamp(),
+                    authorName: user.displayName || 'Anônimo',
+                    authorId: user.uid
+                };
+                try {
+                    if (currentWorkout.id) {
+                        await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'workouts', currentWorkout.id), workoutData);
+                    } else {
+                        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), workoutData);
+                    }
+                    setView('dashboard');
+                } catch (e) {
+                    alert("Erro ao salvar treino: " + e.message);
+                }
+            };
+
+            const handleDeleteWorkout = async (id) => {
+                if (!confirm("Tem certeza que quer apagar esse treino?")) return;
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'workouts', id));
+            };
+
+            const handleShareWorkout = async (workout) => {
+                try {
+                    const shareData = { ...workout, originalAuthor: user.displayName || 'Parceiro', sharedAt: serverTimestamp() };
+                    const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_workouts'), shareData);
+                    setShareCode(docRef.id);
+                } catch (e) {
+                    alert("Erro ao compartilhar.");
+                }
+            };
+
+            const handleImportWorkout = async () => {
+                if (!importCode) return;
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_workouts', importCode.trim());
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), {
+                            title: data.title + " (Importado)",
+                            exercises: data.exercises,
+                            importedFrom: data.originalAuthor,
+                            createdAt: serverTimestamp()
+                        });
+                        setView('dashboard');
+                        setImportCode('');
+                        alert("Treino importado!");
+                    } else {
+                        alert("Código inválido.");
+                    }
+                } catch (e) {
+                    alert("Erro ao importar.");
+                }
+            };
+
+            const copyToClipboard = (text) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                alert("Código copiado!");
+            };
+
+            if (!user) return <LoginScreen onLogin={() => {}} />;
+
+            if (view === 'report' && reportData.current) {
+                return (
+                    <WorkoutReport 
+                        session={reportData.current} 
+                        previousSession={reportData.previous}
+                        onClose={() => setView('dashboard')} 
+                    />
+                );
+            }
+
+            if (view === 'active' && currentWorkout) {
+                return (
+                    <ActiveWorkout 
+                        workout={currentWorkout} 
+                        user={user}
+                        onFinish={(current, previous) => {
+                            setReportData({ current, previous });
+                            setView('report');
+                        }}
+                        onBack={() => setView('dashboard')} 
+                    />
+                );
+            }
+
+            if (view === 'edit') {
+                return (
+                    <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
+                        <div className="flex justify-between items-center mb-6">
+                            <button onClick={() => setView('dashboard')} className="p-2 bg-neutral-800 rounded-lg"><RotateCcw size={20} /></button>
+                            <h2 className="font-bold text-lg">{currentWorkout.id ? 'Editar Treino' : 'Novo Treino'}</h2>
+                            <button onClick={handleSaveWorkout} className="p-2 bg-yellow-500 text-black rounded-lg"><Save size={20} /></button>
+                        </div>
+                        <div className="mb-6">
+                            <label className="text-xs text-neutral-500 uppercase font-bold">Nome do Treino</label>
+                            <input 
+                                type="text" 
+                                value={currentWorkout.title} 
+                                onChange={(e) => setCurrentWorkout({...currentWorkout, title: e.target.value})}
+                                className="w-full bg-neutral-800 border-b-2 border-neutral-700 p-3 text-xl font-bold text-white focus:border-yellow-500 outline-none placeholder-neutral-600"
+                                placeholder="Ex: Treino A - Peito"
+                            />
+                        </div>
+                        <div className="space-y-4">
+                            {currentWorkout.exercises.map((ex, idx) => (
+                                <ExerciseEditor 
+                                    key={idx} 
+                                    index={idx} 
+                                    exercise={ex} 
+                                    updateExercise={(idx, field, val) => {
+                                        const newExs = [...currentWorkout.exercises];
+                                        newExs[idx] = { ...newExs[idx], [field]: val };
+                                        setCurrentWorkout({ ...currentWorkout, exercises: newExs });
+                                    }}
+                                    removeExercise={(idx) => {
+                                        const newExs = currentWorkout.exercises.filter((_, i) => i !== idx);
+                                        setCurrentWorkout({ ...currentWorkout, exercises: newExs });
+                                    }}
+                                />
+                            ))}
+                        </div>
+                        <button 
+                            onClick={() => setCurrentWorkout({
+                                ...currentWorkout, 
+                                exercises: [...currentWorkout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '' }]
+                            })}
+                            className="w-full mt-6 py-4 border-2 border-dashed border-neutral-700 rounded-xl text-neutral-400 font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 hover:text-white transition-all"
+                        >
+                            <Plus size={20} /> Adicionar Exercício
+                        </button>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-neutral-950 text-white font-sans selection:bg-yellow-500 selection:text-black">
+                    {view === 'chat' && (
+                        <ChatScreen user={user} onClose={() => setView('dashboard')} />
+                    )}
+
+                    <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-4">
+                                {user.photoURL ? (
+                                    <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-yellow-500 shadow-lg shadow-yellow-500/20" alt="Avatar" />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shadow-lg">
+                                        {user.displayName ? user.displayName[0] : 'U'}
+                                    </div>
+                                )}
+                                <div>
+                                    <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest mb-1">Bem-vindo Atleta</p>
+                                    <h1 className="font-black text-2xl leading-none tracking-tight">{user.displayName || 'Usuário'}</h1>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setView('chat')} className="bg-neutral-800 p-3 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors">
+                                    <MessageSquare size={20} />
+                                </button>
+                                <button onClick={() => signOut(auth)} className="text-neutral-600 hover:text-red-500 transition-colors p-3">
+                                    <LogOut size={24} />
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                            <button 
+                                onClick={() => setView('import')}
+                                className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-neutral-800 border border-neutral-800 hover:border-blue-500/50 transition-all group"
+                            >
+                                <Download size={18} className="text-blue-500 group-hover:scale-110 transition-transform" /> Importar
+                            </button>
+                            <button 
+                                onClick={handleCreateWorkout}
+                                className="bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg shadow-yellow-500/10 transition-all active:scale-95"
+                            >
+                                <Plus size={18} /> Novo Treino
+                            </button>
+                        </div>
+                    </div>
+
+                    {view === 'import' && (
+                        <div className="m-4 p-6 bg-neutral-900 rounded-3xl border border-blue-500/30 animate-fade-in relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-10"><Download size={100} className="text-blue-500"/></div>
+                            <h3 className="font-bold mb-2 flex items-center gap-2 text-blue-400 text-lg relative z-10">Importar Treino</h3>
+                            <p className="text-sm text-neutral-400 mb-4 relative z-10">Cole o código ID para sincronizar o treino do seu parceiro.</p>
+                            <div className="flex gap-2 relative z-10">
+                                <input 
+                                    value={importCode}
+                                    onChange={(e) => setImportCode(e.target.value)}
+                                    placeholder="Cole o ID aqui..."
+                                    className="flex-1 bg-black border border-neutral-700 rounded-xl px-4 text-white outline-none focus:border-blue-500 font-mono"
+                                />
+                                <button onClick={handleImportWorkout} className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-600/20">OK</button>
+                            </div>
+                            <button onClick={() => setView('dashboard')} className="mt-4 text-xs text-neutral-500 hover:text-white underline relative z-10">Cancelar</button>
+                        </div>
+                    )}
+
+                    {shareCode && (
+                        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50 backdrop-blur-md animate-fade-in">
+                            <div className="bg-neutral-900 p-8 rounded-3xl w-full max-w-sm border border-neutral-800 shadow-2xl relative">
+                                <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-green-500 p-4 rounded-full shadow-lg shadow-green-500/30">
+                                    <Share2 size={32} className="text-black" />
+                                </div>
+                                <h3 className="text-2xl font-black text-center mb-2 mt-4 text-white">Treino Gerado!</h3>
+                                <p className="text-center text-neutral-400 text-sm mb-8">Envie este código para sua equipe importar.</p>
+                                
+                                <div className="bg-black p-6 rounded-2xl border border-neutral-800 mb-8 flex justify-between items-center group cursor-pointer" onClick={() => copyToClipboard(shareCode)}>
+                                    <span className="font-mono text-xl font-bold select-all text-green-500">{shareCode}</span>
+                                    <Copy size={20} className="text-neutral-600 group-hover:text-white transition-colors" />
+                                </div>
+                                
+                                <button 
+                                    onClick={() => setShareCode(null)} 
+                                    className="w-full bg-white hover:bg-neutral-200 text-black font-bold py-4 rounded-xl transition-colors"
+                                >
+                                    Fechar
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="p-4 space-y-4 pb-20">
+                        <h2 className="text-neutral-500 text-[10px] font-bold uppercase tracking-widest mb-4 pl-2">Meus Treinos</h2>
+                        
+                        {workouts.length === 0 && (
+                            <div className="text-center py-20 opacity-30 flex flex-col items-center">
+                                <Dumbbell size={64} className="mb-4 text-neutral-500" />
+                                <p className="text-neutral-400 font-medium">Nenhum treino criado.</p>
+                            </div>
+                        )}
+
+                        {workouts.map(workout => (
+                            <div key={workout.id} className="bg-neutral-900 border border-neutral-800 rounded-3xl p-5 shadow-lg hover:border-neutral-700 transition-all group relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity">
+                                    <Dumbbell size={120} />
+                                </div>
+                                
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div>
+                                            <h3 className="text-2xl font-black text-white group-hover:text-yellow-500 transition-colors tracking-tight">{workout.title}</h3>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="bg-neutral-800 text-neutral-400 text-xs px-2 py-1 rounded-md font-bold">{workout.exercises.length} EXERCÍCIOS</span>
+                                                {workout.importedFrom && <span className="text-blue-500 text-xs font-bold px-2 py-1 bg-blue-500/10 rounded-md border border-blue-500/20">DE: {workout.importedFrom.toUpperCase()}</span>}
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <button onClick={() => handleShareWorkout(workout)} className="p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-xl transition-all" title="Compartilhar">
+                                                <Share2 size={18} />
+                                            </button>
+                                            <button onClick={() => { setCurrentWorkout(workout); setView('edit'); }} className="p-3 text-neutral-500 hover:text-white hover:bg-neutral-800 rounded-xl transition-all" title="Editar">
+                                                <FileText size={18} />
+                                            </button>
+                                            <button onClick={() => handleDeleteWorkout(workout.id)} className="p-3 text-neutral-500 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all" title="Excluir">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <button 
+                                        onClick={() => { setCurrentWorkout(workout); setView('active'); }}
+                                        className="w-full bg-neutral-800 group-hover:bg-yellow-500 group-hover:text-black text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-lg"
+                                    >
+                                        <Play size={20} className="fill-current" /> INICIAR TREINO
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
