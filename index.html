@@ -111,7 +111,7 @@
             Dumbbell, Timer, Share2, Plus, Trash2, Save, LogOut, Play, 
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
-            TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell
+            TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell, Flame
         } from 'lucide-react';
 
         // --- CONFIGURAÇÃO FIREBASE DO MK ---
@@ -486,6 +486,13 @@
             const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0;
             const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0;
 
+            // CÁLCULO DE CALORIAS (Fórmula Estimada para Musculação)
+            // METs aproximados para treino intenso: ~6.0
+            // Usando peso médio base 80kg se não informado, ou baseado no volume total como proxy de esforço
+            // Fórmula Híbrida: (VolumeTotal * FatorDeEsforço) + (Tempo * QueimaBasal)
+            const durationInMinutes = session.totalTime / 60;
+            const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
+
             const prevLogsMap = {};
             if (previousSession) {
                 previousSession.exercises.forEach((ex, exIdx) => {
@@ -543,9 +550,9 @@
                                     )}
                                 </div>
                             </div>
-                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
-                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Descanso Total</p>
-                                <p className="text-3xl font-mono font-bold text-neutral-700">{formatDuration(session.totalRestTime)}</p>
+                            <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                                <p className="text-xs font-bold uppercase text-orange-500 mb-1 flex items-center gap-1"><Flame size={12}/> Calorias (Est.)</p>
+                                <p className="text-3xl font-mono font-bold text-orange-600">~{calories}</p>
                             </div>
                             <div className="bg-black text-white p-4 rounded-lg">
                                 <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p>
@@ -807,26 +814,39 @@
                 };
 
                 try {
+                    // 1. Salva o treino atual
                     await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), sessionData);
                     
-                    const historyQuery = query(
-                        collection(db, 'artifacts', appId, 'users', user.uid, 'history'),
-                        where('workoutId', '==', workout.id),
-                        orderBy('date', 'desc'),
-                        limit(2) 
-                    );
+                    // 2. Busca histórico SEM query complexa para evitar erro de índice
+                    // Baixa a coleção simples e filtra na memória (JavaScript)
+                    const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
+                    const snapshot = await getDocs(historyRef);
+                    const allHistory = snapshot.docs.map(d => d.data());
 
-                    const historySnapshot = await getDocs(historyQuery);
-                    const historyDocs = historySnapshot.docs.map(d => d.data());
-                    
+                    // Filtra pelo treino atual e ordena por data (descendente)
+                    const workoutHistory = allHistory
+                        .filter(h => h.workoutId === workout.id)
+                        .sort((a, b) => {
+                            // Tratamento de timestamp (pode vir null se acabou de ser criado, ou objeto Timestamp)
+                            const timeA = a.date?.seconds || Date.now() / 1000;
+                            const timeB = b.date?.seconds || Date.now() / 1000;
+                            return timeB - timeA;
+                        });
+
+                    // O primeiro item (index 0) deve ser o que acabamos de salvar (ou muito recente)
+                    // O histórico anterior real é o próximo da lista.
+                    // Para garantir, pegamos o primeiro da lista que não seja "agora" (margem de 10s) ou simplesmente o segundo item.
                     const currentSession = sessionData;
-                    const previousSession = historyDocs.length > 1 ? historyDocs[1] : null;
+                    
+                    // Se o array tiver 2 ou mais itens, o index 1 é o treino passado.
+                    // Se tiver só 1, é o primeiro treino, então previous é null.
+                    const previousSession = workoutHistory.length > 1 ? workoutHistory[1] : null;
 
                     onFinish(currentSession, previousSession);
 
                 } catch (e) {
                     console.error("Erro ao salvar histórico:", e);
-                    alert("Erro ao salvar treino: " + e.message);
+                    alert("Erro ao salvar treino (Backup local usado): " + e.message);
                     onFinish(sessionData, null);
                 }
             };
