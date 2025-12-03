@@ -106,7 +106,7 @@
             Dumbbell, Timer, Share2, Plus, Trash2, Save, LogOut, Play, 
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
-            TrendingDown, Printer, X, MessageSquare, Send
+            TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft
         } from 'lucide-react';
 
         // --- CONFIGURAÇÃO FIREBASE DO MK ---
@@ -183,29 +183,63 @@
         };
 
         const ChatScreen = ({ user, onClose }) => {
+            const [activeChat, setActiveChat] = useState(null); // null = lista de contatos, object = chat ativo
+            const [usersList, setUsersList] = useState([]);
             const [messages, setMessages] = useState([]);
             const [newMessage, setNewMessage] = useState('');
             const dummy = useRef();
 
+            // 1. Carrega lista de usuários (Contatos)
             useEffect(() => {
-                // Sala pública global
+                if (activeChat) return; // Se estiver no chat, não precisa atualizar lista
+
                 const q = query(
-                    collection(db, 'artifacts', appId, 'public', 'data', 'messages'),
-                    orderBy('createdAt', 'desc'),
-                    limit(50)
+                    collection(db, 'artifacts', appId, 'public', 'data', 'users'),
+                    orderBy('lastSeen', 'desc'),
+                    limit(20)
                 );
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const users = snapshot.docs
+                        .map(doc => doc.data())
+                        .filter(u => u.uid !== user.uid); // Remove o próprio usuário
+                    setUsersList(users);
+                });
+
+                return () => unsubscribe();
+            }, [activeChat]);
+
+            // 2. Carrega Mensagens do Chat Ativo
+            useEffect(() => {
+                if (!activeChat) return;
+
+                let collectionPath;
+                
+                if (activeChat.id === 'global') {
+                    // Chat Global
+                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+                } else {
+                    // Chat Privado: Cria um ID único baseado nos UIDs ordenados alfabeticamente
+                    // Ex: chat_A_B (sempre na mesma ordem, não importa quem clica)
+                    const userIds = [user.uid, activeChat.uid].sort();
+                    const chatId = `chat_${userIds[0]}_${userIds[1]}`;
+                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages');
+                }
+
+                const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50));
 
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     const msgs = snapshot.docs.map(doc => ({
                         id: doc.id,
                         ...doc.data()
-                    })).reverse(); // Inverte para mostrar cronologicamente (antigo -> novo)
+                    })).reverse();
                     setMessages(msgs);
                 });
 
                 return () => unsubscribe();
-            }, []);
+            }, [activeChat]);
 
+            // Scroll automático
             useEffect(() => {
                 dummy.current?.scrollIntoView({ behavior: 'smooth' });
             }, [messages]);
@@ -215,10 +249,19 @@
                 if (!newMessage.trim()) return;
 
                 const text = newMessage;
-                setNewMessage(''); // Limpa input rápido (otimista)
+                setNewMessage('');
+
+                let collectionPath;
+                if (activeChat.id === 'global') {
+                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+                } else {
+                    const userIds = [user.uid, activeChat.uid].sort();
+                    const chatId = `chat_${userIds[0]}_${userIds[1]}`;
+                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages');
+                }
 
                 try {
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), {
+                    await addDoc(collectionPath, {
                         text: text,
                         createdAt: serverTimestamp(),
                         uid: user.uid,
@@ -231,18 +274,27 @@
                 }
             };
 
+            // RENDERIZAÇÃO
             return (
                 <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up">
+                    
                     {/* Header */}
                     <div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg">
                         <div className="flex items-center gap-3">
-                            <div className="bg-yellow-500 p-2 rounded-full text-black">
-                                <MessageSquare size={20} />
-                            </div>
+                            {activeChat ? (
+                                <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1">
+                                    <ArrowLeft size={20} />
+                                </button>
+                            ) : (
+                                <div className="bg-yellow-500 p-2 rounded-full text-black">
+                                    <MessageSquare size={20} />
+                                </div>
+                            )}
+                            
                             <div>
-                                <h3 className="font-bold text-lg">Iron Lounge</h3>
+                                <h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3>
                                 <p className="text-xs text-neutral-400 flex items-center gap-1">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span> Online
+                                    {activeChat ? 'Online' : 'Selecione uma conversa'}
                                 </p>
                             </div>
                         </div>
@@ -251,52 +303,102 @@
                         </button>
                     </div>
 
-                    {/* Messages Area */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">
-                        {messages.length === 0 && (
-                            <div className="text-center text-neutral-500 mt-10 text-sm">
-                                <p>Nenhuma mensagem ainda.</p>
-                                <p>Mande um "Salve!" para a galera.</p>
-                            </div>
-                        )}
-                        
-                        {messages.map(msg => {
-                            const isMe = msg.uid === user.uid;
-                            return (
-                                <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                    {msg.photoURL ? (
-                                        <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" alt="User" />
+                    {/* VISTA 1: Lista de Contatos */}
+                    {!activeChat && (
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                            {/* Opção Global */}
+                            <button 
+                                onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge (Global)', displayName: 'Iron Lounge' })}
+                                className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700"
+                            >
+                                <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold">
+                                    <Users size={24} />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-white">Iron Lounge</p>
+                                    <p className="text-xs text-neutral-400">Chat Global com todos</p>
+                                </div>
+                            </button>
+
+                            <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas Online</p>
+                            
+                            {usersList.length === 0 && (
+                                <p className="text-neutral-500 text-sm text-center py-4">Nenhum outro atleta online agora.</p>
+                            )}
+
+                            {usersList.map((u, idx) => (
+                                <button 
+                                    key={idx}
+                                    onClick={() => setActiveChat(u)}
+                                    className="w-full bg-neutral-800/50 p-3 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800"
+                                >
+                                    {u.photoURL ? (
+                                        <img src={u.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" alt={u.displayName} />
                                     ) : (
-                                        <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">
-                                            {msg.displayName?.[0]}
+                                        <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white">
+                                            {u.displayName?.[0]}
                                         </div>
                                     )}
-                                    <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${
-                                        isMe 
-                                        ? 'bg-yellow-500 text-black rounded-tr-none' 
-                                        : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'
-                                    }`}>
-                                        {!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}
-                                        <p>{msg.text}</p>
+                                    <div className="text-left">
+                                        <p className="font-bold text-white text-sm">{u.displayName}</p>
+                                        <p className="text-[10px] text-green-500 flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Disponível
+                                        </p>
                                     </div>
-                                </div>
-                            );
-                        })}
-                        <div ref={dummy}></div>
-                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
-                    {/* Input Area */}
-                    <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2">
-                        <input 
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors"
-                            placeholder="Digite sua mensagem..."
-                        />
-                        <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <Send size={20} />
-                        </button>
-                    </form>
+                    {/* VISTA 2: Chat Ativo */}
+                    {activeChat && (
+                        <>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">
+                                {messages.length === 0 && (
+                                    <div className="text-center text-neutral-500 mt-10 text-sm">
+                                        <p>Início da conversa.</p>
+                                        <p>Mande um salve!</p>
+                                    </div>
+                                )}
+                                
+                                {messages.map(msg => {
+                                    const isMe = msg.uid === user.uid;
+                                    return (
+                                        <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                            {msg.photoURL ? (
+                                                <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" alt="User" />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">
+                                                    {msg.displayName?.[0]}
+                                                </div>
+                                            )}
+                                            <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${
+                                                isMe 
+                                                ? 'bg-yellow-500 text-black rounded-tr-none' 
+                                                : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'
+                                            }`}>
+                                                {!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}
+                                                <p>{msg.text}</p>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <div ref={dummy}></div>
+                            </div>
+
+                            <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2">
+                                <input 
+                                    value={newMessage}
+                                    onChange={(e) => setNewMessage(e.target.value)}
+                                    className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors"
+                                    placeholder={`Mensagem para ${activeChat.displayName ? activeChat.displayName.split(' ')[0] : 'todos'}...`}
+                                />
+                                <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    <Send size={20} />
+                                </button>
+                            </form>
+                        </>
+                    )}
                 </div>
             );
         };
@@ -843,6 +945,19 @@
                 });
                 return () => unsubscribe();
             }, []);
+
+            // Novo: Salvar Presença do Usuário para aparecer na lista
+            useEffect(() => {
+                if(user) {
+                    const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
+                    setDoc(userRef, {
+                        uid: user.uid,
+                        displayName: user.displayName || 'Anônimo',
+                        photoURL: user.photoURL,
+                        lastSeen: serverTimestamp()
+                    }, { merge: true });
+                }
+            }, [user]);
 
             useEffect(() => {
                 if (!user) return;
