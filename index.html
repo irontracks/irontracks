@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>IronTracks - Alta Performance</title>
     
     <!-- 1. Motor Visual (Tailwind CSS) -->
@@ -75,6 +75,7 @@
             background-color: #0a0a0a; /* neutral-950 */
             color: white;
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent; /* Remove highlight azul no mobile */
         }
     </style>
 </head>
@@ -87,10 +88,12 @@
         import { initializeApp } from 'firebase/app';
         import { 
             getAuth, 
-            signInWithPopup, 
+            signInWithPopup,
+            signInWithRedirect, 
             GoogleAuthProvider, 
             signOut, 
-            onAuthStateChanged 
+            onAuthStateChanged,
+            getRedirectResult
         } from 'firebase/auth';
         import { 
             getFirestore, 
@@ -153,39 +156,87 @@
         // --- COMPONENTES ---
 
         const LoginScreen = ({ onLogin }) => {
+            const [isLoading, setIsLoading] = useState(false);
+
+            // Verifica se o usuário voltou de um redirecionamento
+            useEffect(() => {
+                const checkRedirect = async () => {
+                    try {
+                        await getRedirectResult(auth);
+                    } catch (error) {
+                        console.error("Erro no redirecionamento:", error);
+                    }
+                };
+                checkRedirect();
+            }, []);
+
             const handleGoogleLogin = async () => {
+                if (isLoading) return;
+                setIsLoading(true);
                 const provider = new GoogleAuthProvider();
+                
                 try {
+                    // Tenta primeiro o Popup (melhor para Desktop/Android Chrome)
                     await signInWithPopup(auth, provider);
                 } catch (error) {
-                    console.error("Erro no login Google:", error);
-                    alert("Erro ao logar: " + error.message);
+                    console.error("Erro no Popup, tentando redirect...", error);
+                    
+                    // Se falhar (bloqueio de popup ou mobile in-app browser), usa Redirect
+                    if (error.code === 'auth/popup-blocked' || 
+                        error.code === 'auth/cancelled-popup-request' || 
+                        error.code === 'auth/popup-closed-by-user' ||
+                        error.code === 'auth/internal-error') {
+                        try {
+                            await signInWithRedirect(auth, provider);
+                            // O código para aqui pois a página vai redirecionar
+                        } catch (redirectError) {
+                            alert("Erro ao logar: " + redirectError.message);
+                            setIsLoading(false);
+                        }
+                    } else {
+                        if (error.code === 'auth/unauthorized-domain') {
+                            alert("Atenção MK: Você precisa autorizar este domínio no painel do Firebase.");
+                        } else {
+                            alert("Erro ao logar: " + error.message);
+                        }
+                        setIsLoading(false);
+                    }
                 }
             };
 
             return (
-                <div className="flex flex-col items-center justify-center min-h-screen bg-neutral-900 text-white p-6 relative overflow-hidden">
+                <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-neutral-900 text-white p-6 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-10 pointer-events-none">
                         <div className="absolute -top-24 -left-24 w-96 h-96 bg-yellow-600 rounded-full blur-3xl"></div>
                         <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-900 rounded-full blur-3xl"></div>
                     </div>
 
-                    <div className="relative z-10 flex flex-col items-center">
+                    <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
                         <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl shadow-yellow-500/20 animate-pulse">
                             <Dumbbell size={64} className="text-black" />
                         </div>
                         <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
                         <p className="text-neutral-400 mb-10 text-center max-w-xs font-medium">
-                            Sistema de Alta Performance • v1.2
+                            Sistema de Alta Performance • v1.3 Mobile
                         </p>
                         
                         <button 
                             onClick={handleGoogleLogin}
-                            className="group flex items-center gap-4 bg-white text-neutral-900 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-neutral-100 transition-all active:scale-95 shadow-xl"
+                            disabled={isLoading}
+                            className="group w-full flex items-center justify-center gap-4 bg-white text-neutral-900 px-8 py-5 rounded-2xl font-bold text-xl hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-70"
                         >
-                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 group-hover:scale-110 transition-transform" alt="G" />
-                            Acessar com Google
+                            {isLoading ? (
+                                <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-neutral-900"></span>
+                            ) : (
+                                <>
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 group-hover:scale-110 transition-transform" alt="G" />
+                                Acessar Sistema
+                                </>
+                            )}
                         </button>
+                        <p className="mt-4 text-xs text-neutral-600 text-center">
+                            Compatível com iOS, Android e Desktop.
+                        </p>
                     </div>
                 </div>
             );
@@ -279,7 +330,7 @@
 
             return (
                 <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up">
-                    <div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg">
+                    <div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe">
                         <div className="flex items-center gap-3">
                             {activeChat ? (
                                 <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button>
@@ -298,20 +349,20 @@
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             <button 
                                 onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge (Global)', displayName: 'Iron Lounge' })}
-                                className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700"
+                                className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700 h-20"
                             >
-                                <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold"><Users size={24} /></div>
+                                <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold shrink-0"><Users size={24} /></div>
                                 <div className="text-left">
-                                    <p className="font-bold text-white">Iron Lounge</p>
+                                    <p className="font-bold text-white text-lg">Iron Lounge</p>
                                     <p className="text-xs text-neutral-400">Chat Global com todos</p>
                                 </div>
                             </button>
                             <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas Online</p>
                             {usersList.map((u, idx) => (
-                                <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-3 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">
-                                    {u.photoURL ? <img src={u.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" /> : <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white">{u.displayName?.[0]}</div>}
-                                    <div className="text-left">
-                                        <p className="font-bold text-white text-sm">{u.displayName}</p>
+                                <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-4 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">
+                                    {u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full border border-neutral-600 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white shrink-0">{u.displayName?.[0]}</div>}
+                                    <div className="text-left overflow-hidden">
+                                        <p className="font-bold text-white text-base truncate">{u.displayName}</p>
                                         <p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Disponível</p>
                                     </div>
                                 </button>
@@ -336,7 +387,7 @@
                                 })}
                                 <div ref={dummy}></div>
                             </div>
-                            <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2">
+                            <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe">
                                 <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." />
                                 <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button>
                             </form>
@@ -395,7 +446,7 @@
             }
 
             return (
-                <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-50 animate-slide-up">
+                <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-50 animate-slide-up pb-safe">
                     <div className="flex items-center justify-between max-w-md mx-auto">
                         <div className="flex items-center gap-4">
                             <div className="relative">
@@ -873,8 +924,8 @@
             const currentExercise = workout.exercises[activeExerciseIndex];
 
             return (
-                <div className="pb-24 bg-black min-h-screen text-white">
-                    <div className="sticky top-0 bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 p-4 z-40 flex justify-between items-center">
+                <div className="pb-24 bg-black min-h-[100dvh] text-white">
+                    <div className="sticky top-0 bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 p-4 z-40 flex justify-between items-center pt-safe">
                         <div>
                             <h2 className="text-white font-bold truncate max-w-[200px]">{workout.title}</h2>
                             <div className="flex items-center gap-2 text-yellow-500 text-sm font-mono">
@@ -1130,7 +1181,7 @@
             if (!user) return <LoginScreen onLogin={() => {}} />;
 
             return (
-                <div className="min-h-screen bg-neutral-950 text-white font-sans selection:bg-yellow-500 selection:text-black">
+                <div className="min-h-[100dvh] bg-neutral-950 text-white font-sans selection:bg-yellow-500 selection:text-black">
                     
                     <NotificationToast notification={notification} onClose={() => setNotification(null)} />
 
@@ -1170,8 +1221,8 @@
                     )}
 
                     {view === 'edit' && (
-                        <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
-                            <div className="flex justify-between items-center mb-6">
+                        <div className="min-h-[100dvh] bg-neutral-900 text-white p-4 pb-20">
+                            <div className="flex justify-between items-center mb-6 pt-safe">
                                 <button onClick={() => setView('dashboard')} className="p-2 bg-neutral-800 rounded-lg"><RotateCcw size={20} /></button>
                                 <h2 className="font-bold text-lg">{currentWorkout.id ? 'Editar Treino' : 'Novo Treino'}</h2>
                                 <button onClick={handleSaveWorkout} className="p-2 bg-yellow-500 text-black rounded-lg"><Save size={20} /></button>
@@ -1218,7 +1269,7 @@
 
                     {view === 'dashboard' && (
                         <>
-                            <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30">
+                            <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30 pt-safe">
                                 <div className="flex justify-between items-center mb-6">
                                     <div className="flex items-center gap-4">
                                         {user.photoURL ? (
