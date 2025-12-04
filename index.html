@@ -2,7 +2,9 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>IronTracks - Alta Performance</title>
     
     <!-- 1. Motor Visual (Tailwind CSS) -->
@@ -71,11 +73,18 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
-        body {
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
             background-color: #0a0a0a; /* neutral-950 */
             color: white;
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent; /* Remove highlight azul no mobile */
+            -webkit-tap-highlight-color: transparent;
+        }
+        #root {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
     </style>
 </head>
@@ -157,14 +166,22 @@
 
         const LoginScreen = ({ onLogin }) => {
             const [isLoading, setIsLoading] = useState(false);
+            const [statusMsg, setStatusMsg] = useState('');
 
-            // Verifica se o usuário voltou de um redirecionamento
+            // Verifica se o usuário voltou de um redirecionamento (Padrão Mobile)
             useEffect(() => {
                 const checkRedirect = async () => {
                     try {
-                        await getRedirectResult(auth);
+                        setIsLoading(true);
+                        const result = await getRedirectResult(auth);
+                        if (result) {
+                            console.log("Login via redirect sucesso");
+                        }
                     } catch (error) {
                         console.error("Erro no redirecionamento:", error);
+                        setStatusMsg("Erro ao retornar do login. Tente novamente.");
+                    } finally {
+                        setIsLoading(false);
                     }
                 };
                 checkRedirect();
@@ -173,32 +190,46 @@
             const handleGoogleLogin = async () => {
                 if (isLoading) return;
                 setIsLoading(true);
+                setStatusMsg("Iniciando acesso...");
+                
+                // Timeout de segurança: Se travar, libera o botão em 10s
+                const safetyTimeout = setTimeout(() => {
+                    setIsLoading(false);
+                    setStatusMsg("Tempo excedido. Tente novamente.");
+                }, 10000);
+
                 const provider = new GoogleAuthProvider();
                 
                 try {
-                    // Tenta primeiro o Popup (melhor para Desktop/Android Chrome)
-                    await signInWithPopup(auth, provider);
-                } catch (error) {
-                    console.error("Erro no Popup, tentando redirect...", error);
+                    // Detecção simples de Mobile para forçar Redirect (evita popup bloqueado)
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
                     
-                    // Se falhar (bloqueio de popup ou mobile in-app browser), usa Redirect
+                    if (isMobile) {
+                        setStatusMsg("Redirecionando para Google...");
+                        await signInWithRedirect(auth, provider);
+                        // Não limpamos timeout aqui porque a página vai recarregar
+                    } else {
+                        // Desktop: Tenta Popup primeiro
+                        await signInWithPopup(auth, provider);
+                        clearTimeout(safetyTimeout);
+                    }
+                } catch (error) {
+                    clearTimeout(safetyTimeout);
+                    console.error("Erro no Login:", error);
+                    
+                    // Fallback para redirect se popup falhar no desktop
                     if (error.code === 'auth/popup-blocked' || 
                         error.code === 'auth/cancelled-popup-request' || 
-                        error.code === 'auth/popup-closed-by-user' ||
-                        error.code === 'auth/internal-error') {
+                        error.code === 'auth/popup-closed-by-user') {
                         try {
+                            setStatusMsg("Popup bloqueado. Usando modo seguro...");
                             await signInWithRedirect(auth, provider);
-                            // O código para aqui pois a página vai redirecionar
                         } catch (redirectError) {
-                            alert("Erro ao logar: " + redirectError.message);
+                            setStatusMsg("Erro: " + redirectError.message);
                             setIsLoading(false);
                         }
                     } else {
-                        if (error.code === 'auth/unauthorized-domain') {
-                            alert("Atenção MK: Você precisa autorizar este domínio no painel do Firebase.");
-                        } else {
-                            alert("Erro ao logar: " + error.message);
-                        }
+                        setStatusMsg("Erro: " + error.message);
                         setIsLoading(false);
                     }
                 }
@@ -216,26 +247,36 @@
                             <Dumbbell size={64} className="text-black" />
                         </div>
                         <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
-                        <p className="text-neutral-400 mb-10 text-center max-w-xs font-medium">
-                            Sistema de Alta Performance • v1.3 Mobile
+                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">
+                            Sistema de Alta Performance • v1.4
                         </p>
                         
                         <button 
                             onClick={handleGoogleLogin}
                             disabled={isLoading}
-                            className="group w-full flex items-center justify-center gap-4 bg-white text-neutral-900 px-8 py-5 rounded-2xl font-bold text-xl hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-70"
+                            className="group w-full flex items-center justify-center gap-4 bg-white text-neutral-900 px-8 py-5 rounded-2xl font-bold text-xl hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
                         >
                             {isLoading ? (
-                                <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-neutral-900"></span>
+                                <div className="flex items-center gap-3">
+                                    <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-neutral-900"></span>
+                                    <span className="text-sm font-normal">Processando...</span>
+                                </div>
                             ) : (
                                 <>
                                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 group-hover:scale-110 transition-transform" alt="G" />
-                                Acessar Sistema
+                                Entrar com Google
                                 </>
                             )}
                         </button>
-                        <p className="mt-4 text-xs text-neutral-600 text-center">
-                            Compatível com iOS, Android e Desktop.
+                        
+                        {statusMsg && (
+                            <p className="mt-4 text-xs text-yellow-500 text-center font-mono animate-fade-in">
+                                {statusMsg}
+                            </p>
+                        )}
+                        
+                        <p className="mt-8 text-[10px] text-neutral-600 text-center uppercase tracking-widest">
+                            Otimizado para iOS & Android
                         </p>
                     </div>
                 </div>
