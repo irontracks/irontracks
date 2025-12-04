@@ -138,7 +138,7 @@
                     <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
                         <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl animate-pulse"><Dumbbell size={64} className="text-black" /></div>
                         <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
-                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v2.5.1</p>
+                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v2.5.2</p>
                         <button onClick={handleLogin} disabled={isLoading} className="group w-full flex items-center justify-center gap-4 bg-white text-neutral-900 px-8 py-5 rounded-2xl font-bold text-xl hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-70">{isLoading ? <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-neutral-900"></span> : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="G"/> Entrar com Google</>}</button>
                         {statusMsg && <p className="mt-4 text-xs text-yellow-500 text-center font-mono animate-fade-in">{statusMsg}</p>}
                     </div>
@@ -147,6 +147,60 @@
         };
 
         const NotificationToast = ({ notification, onClose }) => { if (!notification) return null; return <div onClick={onClose} className="fixed top-4 left-4 right-4 z-[60] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer">{notification.photoURL ? <img src={notification.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" /> : <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold">{notification.displayName?.[0]}</div>}<div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-yellow-500">Nova Mensagem</p><p className="text-sm truncate text-white">{notification.text}</p></div><button className="text-neutral-400"><X size={16}/></button></div>; };
+
+        // --- CHAT BLINDADO ---
+        const ChatScreen = ({ user, onClose }) => { 
+            const [activeChat, setActiveChat] = useState(null); 
+            const [usersList, setUsersList] = useState([]); 
+            const [messages, setMessages] = useState([]); 
+            const [newMessage, setNewMessage] = useState(''); 
+            const dummy = useRef(); 
+            
+            // Carrega Alunos - SEM ORDENAÇÃO NO DB (Client-Side Sort)
+            useEffect(() => { 
+                if (activeChat) return;
+                // Busca sem orderBy para evitar erro de índice
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), limit(50)); 
+                const unsubscribe = onSnapshot(q, (snapshot) => { 
+                    const users = snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid);
+                    // Ordena aqui no front (Mais recente primeiro)
+                    users.sort((a, b) => {
+                        const tA = a.lastSeen?.seconds || 0;
+                        const tB = b.lastSeen?.seconds || 0;
+                        return tB - tA;
+                    });
+                    setUsersList(users); 
+                }, (error) => console.error("Erro Users:", error)); 
+                return () => unsubscribe(); 
+            }, [activeChat]); 
+            
+            useEffect(() => { 
+                if (!activeChat) return; 
+                let collectionPath; 
+                if (activeChat.id === 'global') { collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); } 
+                else { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } 
+                
+                const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50)); 
+                const unsubscribe = onSnapshot(q, (snapshot) => { 
+                    setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse()); 
+                }, (error) => console.error("Erro Msgs:", error)); 
+                return () => unsubscribe(); 
+            }, [activeChat]); 
+            
+            useEffect(() => { dummy.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]); 
+            
+            const sendMessage = async (e) => { 
+                e.preventDefault(); if (!newMessage.trim()) return; 
+                const text = newMessage; setNewMessage(''); 
+                let collectionPath; 
+                if (activeChat && activeChat.id === 'global') collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); 
+                else if (activeChat) { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } 
+                else return; 
+                await addDoc(collectionPath, { text: text, createdAt: serverTimestamp(), uid: user.uid, displayName: user.displayName || 'Anônimo', photoURL: user.photoURL }); 
+            }; 
+            
+            return <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up"><div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe"><div className="flex items-center gap-3">{activeChat ? <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button> : <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>}<div><h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3><p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p></div></div><button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600"><X size={20} /></button></div>{!activeChat && <div className="flex-1 overflow-y-auto p-4 space-y-2"><button onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge', displayName: 'Iron Lounge' })} className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700 h-20"><div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold shrink-0"><Users size={24} /></div><div className="text-left"><p className="font-bold text-white text-lg">Iron Lounge</p><p className="text-xs text-neutral-400">Chat Global</p></div></button><p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas</p>{usersList.map((u, idx) => ( <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-4 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full border border-neutral-600 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white shrink-0">{u.displayName?.[0]}</div>}<div className="text-left overflow-hidden"><p className="font-bold text-white text-base truncate">{u.displayName}</p><p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p></div></button> ))}</div>}{activeChat && <><div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">{messages.map(msg => { const isMe = msg.uid === user.uid; return <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>{msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}<div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>{!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}<p>{msg.text}</p></div></div>; })}<div ref={dummy}></div></div><form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe"><input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." /><button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button></form></>}</div>; 
+        };
 
         // --- PAINEL ADMIN COM CLONAGEM AVANÇADA ---
         const AdminPanel = ({ user, onClose }) => { 
@@ -163,7 +217,7 @@
             const [cloneTab, setCloneTab] = useState('templates'); // 'templates' | 'personal'
 
             // 1. Carrega Dados Gerais
-            useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc')); const unsub = onSnapshot(q, snap => setUsersList(snap.docs.map(d => d.data()))); return () => unsub(); }, []); 
+            useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), limit(50)); const unsub = onSnapshot(q, snap => { const data = snap.docs.map(d => d.data()); data.sort((a,b) => (b.lastSeen?.seconds || 0) - (a.lastSeen?.seconds || 0)); setUsersList(data); }); return () => unsub(); }, []); 
             useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, []); 
             
             // 2. Carrega Treinos do ADM (Para clonagem pessoal)
@@ -179,7 +233,7 @@
             }, [user]);
 
             // 3. Carrega Treinos do Aluno Selecionado
-            useEffect(() => { if (!selectedStudent) return; const q = query(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setStudentWorkouts(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, [selectedStudent]); 
+            useEffect(() => { if (!selectedStudent) return; const q = query(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts')); const unsub = onSnapshot(q, snap => { const data = snap.docs.map(d => ({id: d.id, ...d.data()})); data.sort((a,b) => (a.title||'').localeCompare(b.title||'')); setStudentWorkouts(data); }); return () => unsub(); }, [selectedStudent]); 
 
             // --- FUNÇÕES DE AÇÃO ---
             const handleClone = async (workoutData) => {
