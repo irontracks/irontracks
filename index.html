@@ -11,7 +11,10 @@
     <!-- 2. Motor de Tradução (Babel) para o navegador entender React -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 3. Configuração de Estilos Customizados (Animações) -->
+    <!-- 3. Motor de PDF Profissional -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- 4. Configuração de Estilos Customizados (Animações) -->
     <script>
         tailwind.config = {
             theme: {
@@ -20,6 +23,7 @@
                         'fade-in': 'fadeIn 0.5s ease-out',
                         'slide-up': 'slideUp 0.3s ease-out',
                         'slide-down': 'slideDown 0.3s ease-out',
+                        'pulse-fast': 'pulseFast 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     },
                     keyframes: {
                         fadeIn: {
@@ -33,6 +37,10 @@
                         slideDown: {
                             '0%': { transform: 'translateY(-100%)' },
                             '100%': { transform: 'translateY(0)' },
+                        },
+                        pulseFast: {
+                            '0%, 100%': { opacity: '1' },
+                            '50%': { opacity: '0.5' },
                         }
                     }
                 }
@@ -40,7 +48,7 @@
         }
     </script>
     
-    <!-- 4. Mapa de Importação (Onde o app busca as bibliotecas) -->
+    <!-- 5. Mapa de Importação -->
     <script type="importmap">
     {
         "imports": {
@@ -68,18 +76,11 @@
             color: white;
             font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
-        /* Ajustes de Impressão */
-        @media print {
-            body { background-color: white; color: black; }
-            .no-print { display: none !important; }
-        }
     </style>
 </head>
 <body>
-    <!-- O App será injetado aqui -->
     <div id="root"></div>
 
-    <!-- O CÓDIGO DO APP (Lógica) -->
     <script type="text/babel" data-type="module">
         import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
@@ -111,7 +112,8 @@
             Dumbbell, Timer, Share2, Plus, Trash2, Save, LogOut, Play, 
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
-            TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell, Flame
+            TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell, Flame,
+            History, Calendar
         } from 'lucide-react';
 
         // --- CONFIGURAÇÃO FIREBASE DO MK ---
@@ -132,7 +134,7 @@
         // --- UTILITÁRIOS ---
         const formatDuration = (s) => {
             const mins = Math.floor(s / 60);
-            const secs = s % 60;
+            const secs = Math.floor(s % 60);
             return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
         };
 
@@ -140,6 +142,12 @@
             return new Date().toLocaleDateString('pt-BR', { 
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' 
             });
+        };
+
+        const formatDate = (timestamp) => {
+            if (!timestamp) return '';
+            const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+            return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit' });
         };
 
         // --- COMPONENTES ---
@@ -151,11 +159,7 @@
                     await signInWithPopup(auth, provider);
                 } catch (error) {
                     console.error("Erro no login Google:", error);
-                    if (error.code === 'auth/unauthorized-domain') {
-                        alert("Atenção MK: Você precisa autorizar este domínio (irontracks.github.io) no painel do Firebase em Authentication > Settings > Authorized Domains.");
-                    } else {
-                        alert("Erro ao logar: " + error.message);
-                    }
+                    alert("Erro ao logar: " + error.message);
                 }
             };
 
@@ -172,7 +176,7 @@
                         </div>
                         <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
                         <p className="text-neutral-400 mb-10 text-center max-w-xs font-medium">
-                            Sistema de Alta Performance • v1.0
+                            Sistema de Alta Performance • v1.2
                         </p>
                         
                         <button 
@@ -209,62 +213,44 @@
         };
 
         const ChatScreen = ({ user, onClose }) => {
-            const [activeChat, setActiveChat] = useState(null); // null = lista de contatos, object = chat ativo
+            const [activeChat, setActiveChat] = useState(null); 
             const [usersList, setUsersList] = useState([]);
             const [messages, setMessages] = useState([]);
             const [newMessage, setNewMessage] = useState('');
             const dummy = useRef();
 
-            // 1. Carrega lista de usuários (Contatos)
             useEffect(() => {
-                if (activeChat) return; // Se estiver no chat, não precisa atualizar lista
-
+                if (activeChat) return; 
                 const q = query(
                     collection(db, 'artifacts', appId, 'public', 'data', 'users'),
                     orderBy('lastSeen', 'desc'),
                     limit(20)
                 );
-
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const users = snapshot.docs
-                        .map(doc => doc.data())
-                        .filter(u => u.uid !== user.uid); // Remove o próprio usuário
+                    const users = snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid); 
                     setUsersList(users);
                 });
-
                 return () => unsubscribe();
             }, [activeChat]);
 
-            // 2. Carrega Mensagens do Chat Ativo
             useEffect(() => {
                 if (!activeChat) return;
-
                 let collectionPath;
-                
                 if (activeChat.id === 'global') {
-                    // Chat Global
                     collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
                 } else {
-                    // Chat Privado
                     const userIds = [user.uid, activeChat.uid].sort();
                     const chatId = `chat_${userIds[0]}_${userIds[1]}`;
                     collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages');
                 }
-
                 const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50));
-
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const msgs = snapshot.docs.map(doc => ({
-                        id: doc.id,
-                        ...doc.data()
-                    })).reverse();
+                    const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
                     setMessages(msgs);
                 });
-
                 return () => unsubscribe();
             }, [activeChat]);
 
-            // Scroll automático
             useEffect(() => {
                 dummy.current?.scrollIntoView({ behavior: 'smooth' });
             }, [messages]);
@@ -272,10 +258,8 @@
             const sendMessage = async (e) => {
                 e.preventDefault();
                 if (!newMessage.trim()) return;
-
                 const text = newMessage;
                 setNewMessage('');
-
                 let collectionPath;
                 if (activeChat.id === 'global') {
                     collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
@@ -284,124 +268,66 @@
                     const chatId = `chat_${userIds[0]}_${userIds[1]}`;
                     collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages');
                 }
-
-                try {
-                    await addDoc(collectionPath, {
-                        text: text,
-                        createdAt: serverTimestamp(),
-                        uid: user.uid,
-                        displayName: user.displayName || 'Anônimo',
-                        photoURL: user.photoURL
-                    });
-                } catch(e) {
-                    console.error(e);
-                    alert("Erro ao enviar mensagem");
-                }
+                await addDoc(collectionPath, {
+                    text: text,
+                    createdAt: serverTimestamp(),
+                    uid: user.uid,
+                    displayName: user.displayName || 'Anônimo',
+                    photoURL: user.photoURL
+                });
             };
 
-            // RENDERIZAÇÃO
             return (
                 <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up">
-                    
-                    {/* Header */}
                     <div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg">
                         <div className="flex items-center gap-3">
                             {activeChat ? (
-                                <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1">
-                                    <ArrowLeft size={20} />
-                                </button>
+                                <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button>
                             ) : (
-                                <div className="bg-yellow-500 p-2 rounded-full text-black">
-                                    <MessageSquare size={20} />
-                                </div>
+                                <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
                             )}
-                            
                             <div>
                                 <h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3>
-                                <p className="text-xs text-neutral-400 flex items-center gap-1">
-                                    {activeChat ? 'Online' : 'Selecione uma conversa'}
-                                </p>
+                                <p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p>
                             </div>
                         </div>
-                        <button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600">
-                            <X size={20} />
-                        </button>
+                        <button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600"><X size={20} /></button>
                     </div>
 
-                    {/* VISTA 1: Lista de Contatos */}
                     {!activeChat && (
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                            {/* Opção Global */}
                             <button 
                                 onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge (Global)', displayName: 'Iron Lounge' })}
                                 className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700"
                             >
-                                <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold">
-                                    <Users size={24} />
-                                </div>
+                                <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold"><Users size={24} /></div>
                                 <div className="text-left">
                                     <p className="font-bold text-white">Iron Lounge</p>
                                     <p className="text-xs text-neutral-400">Chat Global com todos</p>
                                 </div>
                             </button>
-
                             <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas Online</p>
-                            
-                            {usersList.length === 0 && (
-                                <p className="text-neutral-500 text-sm text-center py-4">Nenhum outro atleta online agora.</p>
-                            )}
-
                             {usersList.map((u, idx) => (
-                                <button 
-                                    key={idx}
-                                    onClick={() => setActiveChat(u)}
-                                    className="w-full bg-neutral-800/50 p-3 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800"
-                                >
-                                    {u.photoURL ? (
-                                        <img src={u.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" alt={u.displayName} />
-                                    ) : (
-                                        <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white">
-                                            {u.displayName?.[0]}
-                                        </div>
-                                    )}
+                                <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-3 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">
+                                    {u.photoURL ? <img src={u.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" /> : <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white">{u.displayName?.[0]}</div>}
                                     <div className="text-left">
                                         <p className="font-bold text-white text-sm">{u.displayName}</p>
-                                        <p className="text-[10px] text-green-500 flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Disponível
-                                        </p>
+                                        <p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Disponível</p>
                                     </div>
                                 </button>
                             ))}
                         </div>
                     )}
 
-                    {/* VISTA 2: Chat Ativo */}
                     {activeChat && (
                         <>
                             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">
-                                {messages.length === 0 && (
-                                    <div className="text-center text-neutral-500 mt-10 text-sm">
-                                        <p>Início da conversa.</p>
-                                        <p>Mande um salve!</p>
-                                    </div>
-                                )}
-                                
                                 {messages.map(msg => {
                                     const isMe = msg.uid === user.uid;
                                     return (
                                         <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                            {msg.photoURL ? (
-                                                <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" alt="User" />
-                                            ) : (
-                                                <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">
-                                                    {msg.displayName?.[0]}
-                                                </div>
-                                            )}
-                                            <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${
-                                                isMe 
-                                                ? 'bg-yellow-500 text-black rounded-tr-none' 
-                                                : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'
-                                            }`}>
+                                            {msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}
+                                            <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>
                                                 {!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}
                                                 <p>{msg.text}</p>
                                             </div>
@@ -410,17 +336,9 @@
                                 })}
                                 <div ref={dummy}></div>
                             </div>
-
                             <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2">
-                                <input 
-                                    value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
-                                    className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors"
-                                    placeholder={`Mensagem para ${activeChat.displayName ? activeChat.displayName.split(' ')[0] : 'todos'}...`}
-                                />
-                                <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed">
-                                    <Send size={20} />
-                                </button>
+                                <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." />
+                                <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button>
                             </form>
                         </>
                     )}
@@ -428,26 +346,53 @@
             );
         };
 
+        // --- SISTEMA DE TIMER "IMORTAL" ---
+        // Usa timestamp absoluto (Date.now()) para não pausar com a tela desligada
         const RestTimerOverlay = ({ duration, onFinish, isActive, onClose }) => {
             const [timeLeft, setTimeLeft] = useState(duration);
+            const [endTime, setEndTime] = useState(null);
+            const [isFinished, setIsFinished] = useState(false);
 
             useEffect(() => {
-                if (!isActive) return;
-                setTimeLeft(duration);
+                if (!isActive) {
+                    setEndTime(null);
+                    setIsFinished(false);
+                    return;
+                }
+                
+                // Define o momento exato que deve acabar
+                const targetTime = Date.now() + (duration * 1000);
+                setEndTime(targetTime);
+                setIsFinished(false);
+
                 const interval = setInterval(() => {
-                    setTimeLeft((prev) => {
-                        if (prev <= 1) {
-                            clearInterval(interval);
-                            onFinish();
-                            return 0;
-                        }
-                        return prev - 1;
-                    });
-                }, 1000);
+                    const now = Date.now();
+                    const remaining = Math.ceil((targetTime - now) / 1000);
+
+                    if (remaining <= 0) {
+                        clearInterval(interval);
+                        setTimeLeft(0);
+                        setIsFinished(true); // Ativa o modo "Alerta Visual"
+                    } else {
+                        setTimeLeft(remaining);
+                    }
+                }, 100); // Check rápido para precisão
+
                 return () => clearInterval(interval);
             }, [isActive, duration]);
 
             if (!isActive) return null;
+
+            // MODO ALERTA VISUAL (TELA VERDE)
+            if (isFinished) {
+                return (
+                    <div className="fixed inset-0 z-[100] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer" onClick={onFinish}>
+                        <Timer size={120} className="text-black mb-8 animate-bounce" />
+                        <h1 className="text-6xl font-black text-black uppercase tracking-tighter">BORA!</h1>
+                        <p className="text-black font-bold mt-4 text-xl">TOQUE PARA VOLTAR AO TREINO</p>
+                    </div>
+                );
+            }
 
             return (
                 <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-50 animate-slide-up">
@@ -463,7 +408,10 @@
                             </div>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => setTimeLeft(prev => prev + 10)} className="h-12 w-16 bg-neutral-800 rounded-xl text-white font-bold border border-neutral-700 active:bg-neutral-700">+10s</button>
+                            <button onClick={() => {
+                                // Adiciona 10s ao target time atual
+                                if (endTime) setEndTime(prev => prev + 10000);
+                            }} className="h-12 w-16 bg-neutral-800 rounded-xl text-white font-bold border border-neutral-700 active:bg-neutral-700">+10s</button>
                             <button onClick={onClose} className="h-12 px-6 bg-yellow-500 text-black rounded-xl font-bold hover:bg-yellow-400 active:scale-95 transition-transform">BORA</button>
                         </div>
                     </div>
@@ -472,6 +420,8 @@
         };
 
         const WorkoutReport = ({ session, previousSession, onClose }) => {
+            const reportRef = useRef();
+
             const calculateTotalVolume = (logs) => {
                 let volume = 0;
                 Object.values(logs).forEach(log => {
@@ -485,11 +435,7 @@
             const currentVolume = calculateTotalVolume(session.logs);
             const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0;
             const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0;
-
-            // CÁLCULO DE CALORIAS (Fórmula Estimada para Musculação)
-            // METs aproximados para treino intenso: ~6.0
-            // Usando peso médio base 80kg se não informado, ou baseado no volume total como proxy de esforço
-            // Fórmula Híbrida: (VolumeTotal * FatorDeEsforço) + (Tempo * QueimaBasal)
+            
             const durationInMinutes = session.totalTime / 60;
             const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
 
@@ -507,22 +453,32 @@
                 });
             }
 
-            const handlePrint = () => {
-                window.print();
+            const handleDownloadPDF = () => {
+                const element = reportRef.current;
+                const opt = {
+                    margin: 0,
+                    filename: `IronTracks_${session.workoutTitle.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                
+                // Usa a biblioteca html2pdf importada no head
+                html2pdf().set(opt).from(element).save();
             };
 
             return (
                 <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-900 text-black">
                     <div className="fixed top-4 right-4 flex gap-2 no-print z-50">
-                        <button onClick={handlePrint} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg">
-                            <Printer size={20} /> Imprimir / PDF
+                        <button onClick={handleDownloadPDF} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:scale-105 transition-transform">
+                            <Download size={20} /> Baixar PDF Oficial
                         </button>
-                        <button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg">
+                        <button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg hover:bg-gray-200">
                             <X size={20} />
                         </button>
                     </div>
 
-                    <div className="min-h-screen bg-white p-8 max-w-4xl mx-auto">
+                    <div ref={reportRef} className="min-h-screen bg-white p-8 max-w-4xl mx-auto">
                         <div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end">
                             <div>
                                 <h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1>
@@ -530,7 +486,7 @@
                             </div>
                             <div className="text-right">
                                 <p className="text-2xl font-bold">{session.workoutTitle}</p>
-                                <p className="text-neutral-600">{getCurrentDate()}</p>
+                                <p className="text-neutral-600">{formatDate(session.date)}</p>
                             </div>
                         </div>
 
@@ -544,7 +500,8 @@
                                 <div className="flex items-baseline gap-2">
                                     <p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>
                                     {previousSession && (
-                                        <span className={`text-xs font-bold ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        <span className={`text-xs font-bold flex items-center ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                            {volumeDelta >= 0 ? <TrendingUp size={12} className="mr-1"/> : <TrendingDown size={12} className="mr-1"/>}
                                             {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
                                         </span>
                                     )}
@@ -602,6 +559,7 @@
                                                     let deltaReps = 0;
                                                     let progressionText = "-";
                                                     let rowClass = "";
+                                                    let icon = null;
 
                                                     if (prevLog && prevLog.weight) {
                                                         deltaLoad = parseFloat(log.weight) - parseFloat(prevLog.weight);
@@ -609,13 +567,16 @@
                                                         if (deltaLoad > 0) {
                                                             progressionText = `+${deltaLoad}kg`;
                                                             rowClass = "bg-green-50 text-green-900 font-bold";
+                                                            icon = <TrendingUp size={14} />;
                                                         } else if (deltaLoad < 0) {
                                                             progressionText = `${deltaLoad}kg`;
-                                                            rowClass = "text-red-600";
+                                                            rowClass = "text-red-600 font-bold";
+                                                            icon = <TrendingDown size={14} />;
                                                         } else {
                                                             if (deltaReps > 0) {
                                                                 progressionText = `+${deltaReps} reps`;
                                                                 rowClass = "bg-blue-50 text-blue-900 font-bold";
+                                                                icon = <TrendingUp size={14} />;
                                                             } else {
                                                                 progressionText = "=";
                                                             }
@@ -629,7 +590,7 @@
                                                             <td className={`py-3 text-center text-xs uppercase ${rowClass}`}>
                                                                 {progressionText !== '-' && progressionText !== '=' ? (
                                                                     <span className="flex items-center justify-center gap-1">
-                                                                        {deltaLoad > 0 ? <TrendingUp size={14}/> : <TrendingDown size={14}/>}
+                                                                        {icon}
                                                                         {progressionText}
                                                                     </span>
                                                                 ) : (
@@ -651,6 +612,65 @@
                         <div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">
                             IronTracks System • {getCurrentDate()}
                         </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- COMPONENTE DE HISTÓRICO ---
+        const HistoryList = ({ user, onViewReport, onBack }) => {
+            const [history, setHistory] = useState([]);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                const loadHistory = async () => {
+                    try {
+                        const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
+                        const q = query(historyRef, orderBy('date', 'desc'), limit(20));
+                        const snapshot = await getDocs(q);
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setHistory(data);
+                    } catch(e) {
+                        console.error("Erro ao carregar histórico", e);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                loadHistory();
+            }, [user]);
+
+            return (
+                <div className="min-h-screen bg-neutral-900 text-white p-4">
+                    <div className="flex items-center gap-3 mb-6">
+                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg hover:bg-neutral-700"><ArrowLeft/></button>
+                        <h2 className="text-xl font-bold flex items-center gap-2"><History className="text-yellow-500"/> Histórico de Treinos</h2>
+                    </div>
+
+                    {loading && <p className="text-center text-neutral-500 animate-pulse">Carregando legado...</p>}
+
+                    {!loading && history.length === 0 && (
+                        <div className="text-center py-10 opacity-50">
+                            <p>Nenhum treino finalizado ainda.</p>
+                        </div>
+                    )}
+
+                    <div className="space-y-3">
+                        {history.map(session => (
+                            <div key={session.id} onClick={() => onViewReport(session)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 active:scale-95 transition-transform cursor-pointer hover:border-yellow-500/50">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-white">{session.workoutTitle}</h3>
+                                        <p className="text-xs text-neutral-400 flex items-center gap-1 mt-1">
+                                            <Calendar size={12}/> {formatDate(session.date)}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-yellow-500 font-mono font-bold text-sm">{formatDuration(session.totalTime)}</p>
+                                        <p className="text-xs text-neutral-500">Duração</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             );
@@ -756,14 +776,22 @@
             const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
             const [logs, setLogs] = useState({});
             const [restTimer, setRestTimer] = useState({ active: false, duration: 60 });
+            
+            // TIMER GERAL "IMORTAL"
+            const [startTime] = useState(Date.now());
             const [sessionDuration, setSessionDuration] = useState(0);
             const [totalRestTime, setTotalRestTime] = useState(0);
 
+            // Effect para atualizar a UI do tempo total (apenas visual, a conta real é Date.now - startTime)
             useEffect(() => {
-                const timer = setInterval(() => setSessionDuration(p => p + 1), 1000);
+                const timer = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    setSessionDuration(elapsed);
+                }, 1000);
                 return () => clearInterval(timer);
-            }, []);
+            }, [startTime]);
 
+            // Conta tempo de descanso acumulado (aproximado)
             useEffect(() => {
                 let interval;
                 if (restTimer.active) {
@@ -802,51 +830,42 @@
             const handleFinish = async () => {
                 if (!confirm("Finalizar treino e gerar relatório?")) return;
 
+                const finalDuration = Math.floor((Date.now() - startTime) / 1000);
+
                 const sessionData = {
                     workoutId: workout.id,
                     workoutTitle: workout.title,
                     exercises: workout.exercises,
                     logs: logs,
-                    totalTime: sessionDuration,
+                    totalTime: finalDuration,
                     totalRestTime: totalRestTime,
                     date: serverTimestamp(),
                     userId: user.uid
                 };
 
                 try {
-                    // 1. Salva o treino atual
                     await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), sessionData);
                     
-                    // 2. Busca histórico SEM query complexa para evitar erro de índice
-                    // Baixa a coleção simples e filtra na memória (JavaScript)
                     const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
                     const snapshot = await getDocs(historyRef);
                     const allHistory = snapshot.docs.map(d => d.data());
 
-                    // Filtra pelo treino atual e ordena por data (descendente)
                     const workoutHistory = allHistory
                         .filter(h => h.workoutId === workout.id)
                         .sort((a, b) => {
-                            // Tratamento de timestamp (pode vir null se acabou de ser criado, ou objeto Timestamp)
                             const timeA = a.date?.seconds || Date.now() / 1000;
                             const timeB = b.date?.seconds || Date.now() / 1000;
                             return timeB - timeA;
                         });
 
-                    // O primeiro item (index 0) deve ser o que acabamos de salvar (ou muito recente)
-                    // O histórico anterior real é o próximo da lista.
-                    // Para garantir, pegamos o primeiro da lista que não seja "agora" (margem de 10s) ou simplesmente o segundo item.
                     const currentSession = sessionData;
-                    
-                    // Se o array tiver 2 ou mais itens, o index 1 é o treino passado.
-                    // Se tiver só 1, é o primeiro treino, então previous é null.
                     const previousSession = workoutHistory.length > 1 ? workoutHistory[1] : null;
 
                     onFinish(currentSession, previousSession);
 
                 } catch (e) {
                     console.error("Erro ao salvar histórico:", e);
-                    alert("Erro ao salvar treino (Backup local usado): " + e.message);
+                    alert("Erro ao salvar treino: " + e.message);
                     onFinish(sessionData, null);
                 }
             };
@@ -995,36 +1014,21 @@
             // MONITOR DE NOTIFICAÇÕES GLOBAIS
             useEffect(() => {
                 if (!user) return;
-
-                // Escuta o chat global por mensagens recentes
                 const q = query(
                     collection(db, 'artifacts', appId, 'public', 'data', 'messages'),
                     orderBy('createdAt', 'desc'),
                     limit(1)
                 );
-
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     if (!snapshot.empty) {
                         const msg = snapshot.docs[0].data();
-                        
-                        // Verifica se a mensagem é "nova" (criada nos últimos 10s para evitar flood ao carregar)
-                        // E se não foi eu mesmo que enviei
                         const isRecent = msg.createdAt?.toMillis() > Date.now() - 10000;
-                        
                         if (isRecent && msg.uid !== user.uid) {
-                            // Se a tela de chat não estiver aberta no Global, mostra o toast
-                            // (Simplificação: mostra sempre que chegar msg nova de outro)
-                            setNotification({
-                                id: snapshot.docs[0].id,
-                                ...msg
-                            });
-
-                            // Auto-hide após 4s
+                            setNotification({ id: snapshot.docs[0].id, ...msg });
                             setTimeout(() => setNotification(null), 4000);
                         }
                     }
                 });
-
                 return () => unsubscribe();
             }, [user]);
 
@@ -1128,11 +1132,21 @@
             return (
                 <div className="min-h-screen bg-neutral-950 text-white font-sans selection:bg-yellow-500 selection:text-black">
                     
-                    {/* NOTIFICATION TOAST */}
                     <NotificationToast notification={notification} onClose={() => setNotification(null)} />
 
-                    {view === 'chat' && (
-                        <ChatScreen user={user} onClose={() => setView('dashboard')} />
+                    {view === 'chat' && <ChatScreen user={user} onClose={() => setView('dashboard')} />}
+
+                    {view === 'history' && (
+                        <HistoryList 
+                            user={user} 
+                            onViewReport={(session) => {
+                                // Para ver relatório antigo, simulamos um "previousSession" vazio ou buscamos lógica complexa
+                                // Por simplicidade, mostramos apenas os dados da sessão clicada
+                                setReportData({ current: session, previous: null });
+                                setView('report');
+                            }}
+                            onBack={() => setView('dashboard')}
+                        />
                     )}
 
                     {view === 'report' && reportData.current && (
@@ -1220,6 +1234,9 @@
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
+                                        <button onClick={() => setView('history')} className="bg-neutral-800 p-3 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors" title="Histórico">
+                                            <History size={20} />
+                                        </button>
                                         <button onClick={() => setView('chat')} className="bg-neutral-800 p-3 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors">
                                             <MessageSquare size={20} />
                                         </button>
