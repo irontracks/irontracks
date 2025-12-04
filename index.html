@@ -181,52 +181,58 @@
 
         // --- COMPONENTES ---
 
+        const LoadingScreen = () => (
+            <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-neutral-900 text-white p-6">
+                <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl animate-pulse">
+                    <Dumbbell size={64} className="text-black" />
+                </div>
+                <h1 className="text-2xl font-black mb-2 tracking-tighter italic text-center text-white animate-pulse">CARREGANDO...</h1>
+                <p className="text-xs text-neutral-500">Sincronizando frequências</p>
+            </div>
+        );
+
         const LoginScreen = ({ onLogin }) => {
             const [isLoading, setIsLoading] = useState(false);
             const [statusMsg, setStatusMsg] = useState('');
 
-            useEffect(() => {
-                const checkRedirect = async () => {
-                    try {
-                        setIsLoading(true);
-                        const result = await getRedirectResult(auth);
-                        if (result) console.log("Login sucesso");
-                    } catch (error) {
-                        console.error(error);
-                        setStatusMsg("Erro ao retornar do login.");
-                    } finally {
-                        setIsLoading(false);
-                    }
-                };
-                checkRedirect();
-            }, []);
-
+            // A lógica de redirect agora é tratada principalmente no Loading Global do App
+            // Mas mantemos aqui para garantir
+            
             const handleGoogleLogin = async () => {
                 if (isLoading) return;
                 setIsLoading(true);
                 setStatusMsg("Iniciando acesso...");
+                
+                // Timeout de segurança
                 const safetyTimeout = setTimeout(() => {
                     setIsLoading(false);
                     setStatusMsg("Tempo excedido. Tente novamente.");
                 }, 10000);
 
                 const provider = new GoogleAuthProvider();
+                
                 try {
+                    // Detecção simples de Mobile para forçar Redirect (evita popup bloqueado)
                     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    
                     if (isMobile) {
                         setStatusMsg("Redirecionando...");
                         await signInWithRedirect(auth, provider);
+                        // A página vai recarregar, o loading global assume
                     } else {
                         await signInWithPopup(auth, provider);
                         clearTimeout(safetyTimeout);
                     }
                 } catch (error) {
                     clearTimeout(safetyTimeout);
+                    console.error("Login Error:", error);
+                    
                     if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
                         try {
+                            setStatusMsg("Popup bloqueado. Usando modo seguro...");
                             await signInWithRedirect(auth, provider);
-                        } catch (e) {
-                            setStatusMsg("Erro: " + e.message);
+                        } catch (redirectError) {
+                            setStatusMsg("Erro: " + redirectError.message);
                             setIsLoading(false);
                         }
                     } else {
@@ -238,16 +244,45 @@
 
             return (
                 <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-neutral-900 text-white p-6 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-10 pointer-events-none">
+                        <div className="absolute -top-24 -left-24 w-96 h-96 bg-yellow-600 rounded-full blur-3xl"></div>
+                        <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-900 rounded-full blur-3xl"></div>
+                    </div>
+
                     <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
                         <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl animate-pulse">
                             <Dumbbell size={64} className="text-black" />
                         </div>
                         <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
-                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v1.5</p>
-                        <button onClick={handleGoogleLogin} disabled={isLoading} className="group w-full flex items-center justify-center gap-4 bg-white text-neutral-900 px-8 py-5 rounded-2xl font-bold text-xl shadow-xl disabled:opacity-70">
-                            {isLoading ? <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-neutral-900"></span> : <> <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="G" /> Entrar com Google </>}
+                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v1.6</p>
+                        
+                        <button 
+                            onClick={handleGoogleLogin}
+                            disabled={isLoading}
+                            className="group w-full flex items-center justify-center gap-4 bg-white text-neutral-900 px-8 py-5 rounded-2xl font-bold text-xl hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-70 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            {isLoading ? (
+                                <div className="flex items-center gap-3">
+                                    <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-neutral-900"></span>
+                                    <span className="text-sm font-normal">Processando...</span>
+                                </div>
+                            ) : (
+                                <>
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6 group-hover:scale-110 transition-transform" alt="G" />
+                                Entrar com Google
+                                </>
+                            )}
                         </button>
-                        {statusMsg && <p className="mt-4 text-xs text-yellow-500 text-center font-mono">{statusMsg}</p>}
+                        
+                        {statusMsg && (
+                            <p className="mt-4 text-xs text-yellow-500 text-center font-mono animate-fade-in">
+                                {statusMsg}
+                            </p>
+                        )}
+                        
+                        <p className="mt-8 text-[10px] text-neutral-600 text-center uppercase tracking-widest">
+                            Otimizado para iOS & Android
+                        </p>
                     </div>
                 </div>
             );
@@ -973,6 +1008,7 @@
 
         const App = () => {
             const [user, setUser] = useState(null);
+            const [authLoading, setAuthLoading] = useState(true); // Global loading for Auth check
             const [view, setView] = useState('dashboard');
             const [workouts, setWorkouts] = useState([]);
             const [currentWorkout, setCurrentWorkout] = useState(null); 
@@ -981,7 +1017,20 @@
             const [reportData, setReportData] = useState({ current: null, previous: null });
             const [notification, setNotification] = useState(null);
 
-            useEffect(() => { const unsubscribe = onAuthStateChanged(auth, (u) => { setUser(u); }); return () => unsubscribe(); }, []);
+            // Verifica Auth state e Redirect result antes de liberar a UI
+            useEffect(() => { 
+                const unsubscribe = onAuthStateChanged(auth, async (u) => { 
+                    // Se houver um redirect pendente, aguarda
+                    try {
+                        await getRedirectResult(auth);
+                    } catch(e) {
+                        console.error("Redirect check failed", e);
+                    }
+                    setUser(u); 
+                    setAuthLoading(false);
+                }); 
+                return () => unsubscribe(); 
+            }, []);
 
             useEffect(() => {
                 if (!user) return;
@@ -1037,6 +1086,7 @@
             };
             const copyToClipboard = (text) => { const textarea = document.createElement('textarea'); textarea.value = text; document.body.appendChild(textarea); textarea.select(); document.execCommand('copy'); document.body.removeChild(textarea); alert("Copiado!"); };
 
+            if (authLoading) return <LoadingScreen />;
             if (!user) return <LoginScreen onLogin={() => {}} />;
 
             return (
@@ -1066,20 +1116,20 @@
                         <>
                             <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30 pt-safe">
                                 <div className="flex justify-between items-center mb-6">
-                                    <div className="flex items-center gap-4">
-                                        {user.photoURL ? <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-yellow-500" /> : <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg">{user.displayName?.[0]}</div>}
-                                        <div>
+                                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        {user.photoURL ? <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-yellow-500 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shrink-0">{user.displayName?.[0]}</div>}
+                                        <div className="flex-1 min-w-0">
                                             <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest mb-1">Bem-vindo Atleta</p>
-                                            <h1 className="font-black text-2xl leading-none tracking-tight">{user.displayName || 'Usuário'}</h1>
+                                            <h1 className="font-black text-2xl leading-none tracking-tight truncate">{user.displayName || 'Usuário'}</h1>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 shrink-0">
                                         {user.email === ADMIN_EMAIL && (
-                                            <button onClick={() => setView('admin')} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 font-black border-2 border-white animate-pulse" title="Painel CMD">CMD</button>
+                                            <button onClick={() => setView('admin')} className="bg-yellow-500 text-black p-2 rounded-full hover:bg-yellow-400 font-black border-2 border-white animate-pulse text-xs flex items-center justify-center h-10 w-10" title="Painel CMD">CMD</button>
                                         )}
-                                        <button onClick={() => setView('history')} className="bg-neutral-800 p-3 rounded-full text-neutral-400 hover:text-white"><History size={20} /></button>
-                                        <button onClick={() => setView('chat')} className="bg-neutral-800 p-3 rounded-full text-neutral-400 hover:text-white"><MessageSquare size={20} /></button>
-                                        <button onClick={() => signOut(auth)} className="text-neutral-600 hover:text-red-500 p-3"><LogOut size={24} /></button>
+                                        <button onClick={() => setView('history')} className="bg-neutral-800 p-2 rounded-full text-neutral-400 hover:text-white h-10 w-10 flex items-center justify-center"><History size={18} /></button>
+                                        <button onClick={() => setView('chat')} className="bg-neutral-800 p-2 rounded-full text-neutral-400 hover:text-white h-10 w-10 flex items-center justify-center"><MessageSquare size={18} /></button>
+                                        <button onClick={() => signOut(auth)} className="text-neutral-600 hover:text-red-500 p-2 h-10 w-10 flex items-center justify-center"><LogOut size={18} /></button>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
