@@ -197,11 +197,15 @@
             const [isLoading, setIsLoading] = useState(false);
             const [statusMsg, setStatusMsg] = useState('');
 
+            // Removido o useEffect de checkRedirect aqui para evitar conflito com o App principal
+            // A lógica de redirect será tratada pelo onAuthStateChanged no componente App
+
             const handleGoogleLogin = async () => {
                 if (isLoading) return;
                 setIsLoading(true);
                 setStatusMsg("Iniciando acesso...");
                 
+                // Timeout de segurança
                 const safetyTimeout = setTimeout(() => {
                     setIsLoading(false);
                     setStatusMsg("Tempo excedido. Tente novamente.");
@@ -210,22 +214,28 @@
                 const provider = new GoogleAuthProvider();
                 
                 try {
+                    // Força persistência local antes de logar
                     await setPersistence(auth, browserLocalPersistence);
+                    
                     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
                     
                     if (isMobile) {
                         setStatusMsg("Redirecionando...");
                         await signInWithRedirect(auth, provider);
+                        // O loading continuará true até a página recarregar
                     } else {
                         await signInWithPopup(auth, provider);
                         clearTimeout(safetyTimeout);
+                        // O loading global do App vai assumir quando o user for detectado
                     }
                 } catch (error) {
                     clearTimeout(safetyTimeout);
                     console.error("Login Error:", error);
+                    
+                    // Tratamento específico para popup bloqueado
                     if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
                         try {
-                            setStatusMsg("Popup bloqueado. Redirecionando...");
+                            setStatusMsg("Popup bloqueado. Usando modo seguro...");
                             await signInWithRedirect(auth, provider);
                         } catch (redirectError) {
                             setStatusMsg("Erro: " + redirectError.message);
@@ -245,7 +255,7 @@
                             <Dumbbell size={64} className="text-black" />
                         </div>
                         <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
-                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v1.7</p>
+                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v1.8</p>
                         
                         <button 
                             onClick={handleGoogleLogin}
@@ -270,12 +280,16 @@
                                 {statusMsg}
                             </p>
                         )}
+                        
+                        <p className="mt-8 text-[10px] text-neutral-600 text-center uppercase tracking-widest">
+                            Otimizado para iOS & Android
+                        </p>
                     </div>
                 </div>
             );
         };
 
-        // --- COMPONENTE DE HISTÓRICO ---
+        // ... (HistoryList mantido igual) ...
         const HistoryList = ({ user, onViewReport, onBack }) => {
             const [history, setHistory] = useState([]);
             const [loading, setLoading] = useState(true);
@@ -283,21 +297,17 @@
             useEffect(() => {
                 const loadHistory = async () => {
                     try {
-                        // Busca TODOS os documentos e ordena no cliente para evitar erro de índice
                         const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
                         const snapshot = await getDocs(historyRef);
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        
-                        // Ordenação local (descendente por data)
                         data.sort((a, b) => {
                             const timeA = a.date?.seconds || 0;
                             const timeB = b.date?.seconds || 0;
                             return timeB - timeA;
                         });
-
-                        setHistory(data.slice(0, 50)); // Limita aos últimos 50
+                        setHistory(data.slice(0, 50));
                     } catch(e) {
-                        console.error("Erro ao carregar histórico", e);
+                        console.error("Erro histórico", e);
                     } finally {
                         setLoading(false);
                     }
@@ -308,14 +318,10 @@
             const handleDeleteHistory = async (e, sessionId) => {
                 e.stopPropagation();
                 if (!confirm("Tem certeza que quer apagar esse registro?")) return;
-
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', sessionId));
                     setHistory(prev => prev.filter(h => h.id !== sessionId));
-                } catch (error) {
-                    console.error("Erro ao excluir:", error);
-                    alert("Erro ao excluir registro.");
-                }
+                } catch (error) { alert("Erro ao excluir."); }
             };
 
             return (
@@ -324,36 +330,16 @@
                         <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg hover:bg-neutral-700"><ArrowLeft/></button>
                         <h2 className="text-xl font-bold flex items-center gap-2"><History className="text-yellow-500"/> Histórico</h2>
                     </div>
-
                     {loading && <p className="text-center text-neutral-500 animate-pulse">Carregando legado...</p>}
-
-                    {!loading && history.length === 0 && (
-                        <div className="text-center py-10 opacity-50">
-                            <p>Nenhum treino finalizado ainda.</p>
-                        </div>
-                    )}
-
+                    {!loading && history.length === 0 && <div className="text-center py-10 opacity-50"><p>Nenhum treino finalizado ainda.</p></div>}
                     <div className="space-y-3">
                         {history.map(session => (
                             <div key={session.id} onClick={() => onViewReport(session)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 active:scale-95 transition-transform cursor-pointer hover:border-yellow-500/50 relative group">
                                 <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="font-bold text-lg text-white">{session.workoutTitle}</h3>
-                                        <p className="text-xs text-neutral-400 flex items-center gap-1 mt-1">
-                                            <Calendar size={12}/> {formatDate(session.date)}
-                                        </p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-yellow-500 font-mono font-bold text-sm">{formatDuration(session.totalTime)}</p>
-                                        <p className="text-xs text-neutral-500">Duração</p>
-                                    </div>
+                                    <div><h3 className="font-bold text-lg text-white">{session.workoutTitle}</h3><p className="text-xs text-neutral-400 flex items-center gap-1 mt-1"><Calendar size={12}/> {formatDate(session.date)}</p></div>
+                                    <div className="text-right"><p className="text-yellow-500 font-mono font-bold text-sm">{formatDuration(session.totalTime)}</p><p className="text-xs text-neutral-500">Duração</p></div>
                                 </div>
-                                <button
-                                    onClick={(e) => handleDeleteHistory(e, session.id)}
-                                    className="mt-3 text-red-500 text-xs flex items-center gap-1 hover:text-red-400 p-2 -ml-2 rounded-lg hover:bg-red-500/10 transition-colors"
-                                >
-                                    <Trash2 size={14} /> Excluir Registro
-                                </button>
+                                <button onClick={(e) => handleDeleteHistory(e, session.id)} className="mt-3 text-red-500 text-xs flex items-center gap-1 hover:text-red-400 p-2 -ml-2 rounded-lg hover:bg-red-500/10 transition-colors"><Trash2 size={14} /> Excluir Registro</button>
                             </div>
                         ))}
                     </div>
@@ -361,17 +347,13 @@
             );
         };
 
-        // ... (Mantendo componentes auxiliares AdminPanel, ExerciseEditor, NotificationToast, WorkoutReport, ActiveWorkout, RestTimerOverlay iguais) ...
+        // ... (Outros componentes auxiliares mantidos iguais) ...
         const NotificationToast = ({ notification, onClose }) => {
             if (!notification) return null;
             return (
                 <div onClick={onClose} className="fixed top-4 left-4 right-4 z-[60] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer">
                     {notification.photoURL ? <img src={notification.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" /> : <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold">{notification.displayName?.[0]}</div>}
-                    <div className="flex-1 overflow-hidden">
-                        <p className="text-xs font-bold text-yellow-500">Nova Mensagem de {notification.displayName}</p>
-                        <p className="text-sm truncate text-white">{notification.text}</p>
-                    </div>
-                    <button className="text-neutral-400"><X size={16}/></button>
+                    <div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-yellow-500">Nova Mensagem</p><p className="text-sm truncate text-white">{notification.text}</p></div><button className="text-neutral-400"><X size={16}/></button>
                 </div>
             );
         };
@@ -384,75 +366,41 @@
             const dummy = useRef();
 
             useEffect(() => {
-                // Lista de usuários - ordenação simples
                 const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc'), limit(20));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const users = snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid); 
-                    setUsersList(users);
-                });
+                const unsubscribe = onSnapshot(q, (snapshot) => { setUsersList(snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid)); });
                 return () => unsubscribe();
             }, [activeChat]);
 
             useEffect(() => {
                 if (!activeChat) return;
                 let collectionPath;
-                if (activeChat.id === 'global') {
-                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
-                } else {
-                    const userIds = [user.uid, activeChat.uid].sort();
-                    const chatId = `chat_${userIds[0]}_${userIds[1]}`;
-                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages');
-                }
+                if (activeChat.id === 'global') { collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); } 
+                else { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); }
                 const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const msgs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse();
-                    setMessages(msgs);
-                });
+                const unsubscribe = onSnapshot(q, (snapshot) => { setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse()); });
                 return () => unsubscribe();
             }, [activeChat]);
 
             useEffect(() => { dummy.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
             const sendMessage = async (e) => {
-                e.preventDefault();
-                if (!newMessage.trim()) return;
-                const text = newMessage;
-                setNewMessage('');
+                e.preventDefault(); if (!newMessage.trim()) return;
+                const text = newMessage; setNewMessage('');
                 let collectionPath;
-                if (activeChat && activeChat.id === 'global') {
-                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
-                } else if (activeChat) {
-                    const userIds = [user.uid, activeChat.uid].sort();
-                    const chatId = `chat_${userIds[0]}_${userIds[1]}`;
-                    collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages');
-                } else return;
-
-                await addDoc(collectionPath, {
-                    text: text,
-                    createdAt: serverTimestamp(),
-                    uid: user.uid,
-                    displayName: user.displayName || 'Anônimo',
-                    photoURL: user.photoURL
-                });
+                if (activeChat && activeChat.id === 'global') collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages');
+                else if (activeChat) { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } else return;
+                await addDoc(collectionPath, { text: text, createdAt: serverTimestamp(), uid: user.uid, displayName: user.displayName || 'Anônimo', photoURL: user.photoURL });
             };
 
             return (
                 <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up">
                     <div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe">
                         <div className="flex items-center gap-3">
-                            {activeChat ? (
-                                <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button>
-                            ) : (
-                                <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
-                            )}
-                            <div>
-                                <h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3>
-                                <p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p>
-                            </div>
+                            {activeChat ? <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button> : <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>}
+                            <div><h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3><p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p></div>
                         </div>
                         <button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600"><X size={20} /></button>
                     </div>
-
                     {!activeChat && (
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             <button onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge', displayName: 'Iron Lounge' })} className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700 h-20">
@@ -463,43 +411,27 @@
                             {usersList.map((u, idx) => (
                                 <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-4 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">
                                     {u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full border border-neutral-600 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white shrink-0">{u.displayName?.[0]}</div>}
-                                    <div className="text-left overflow-hidden">
-                                        <p className="font-bold text-white text-base truncate">{u.displayName}</p>
-                                        <p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p>
-                                    </div>
+                                    <div className="text-left overflow-hidden"><p className="font-bold text-white text-base truncate">{u.displayName}</p><p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p></div>
                                 </button>
                             ))}
                         </div>
                     )}
-
                     {activeChat && (
                         <>
                             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">
                                 {messages.map(msg => {
                                     const isMe = msg.uid === user.uid;
-                                    return (
-                                        <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>
-                                            {msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}
-                                            <div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>
-                                                {!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}
-                                                <p>{msg.text}</p>
-                                            </div>
-                                        </div>
-                                    );
+                                    return <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>{msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}<div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>{!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}<p>{msg.text}</p></div></div>;
                                 })}
                                 <div ref={dummy}></div>
                             </div>
-                            <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe">
-                                <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." />
-                                <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button>
-                            </form>
+                            <form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe"><input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." /><button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button></form>
                         </>
                     )}
                 </div>
             );
         };
 
-        // ... (Mantendo AdminPanel, RestTimerOverlay, WorkoutReport, ExerciseEditor, ActiveWorkout iguais ao anterior, apenas integrando) ...
         const AdminPanel = ({ user, onClose }) => {
             const [tab, setTab] = useState('students');
             const [usersList, setUsersList] = useState([]);
@@ -525,7 +457,7 @@
             return (
                 <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up">
                     <div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg">
-                        <h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> IRON COMMAND</h2>
+                        <h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND</h2>
                         <button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button>
                     </div>
                     {!selectedStudent && !editingTemplate && (
@@ -587,6 +519,7 @@
             );
         };
 
+        // ... (WorkoutReport, ActiveWorkout, RestTimerOverlay e outros componentes de UI mantidos) ...
         const RestTimerOverlay = ({ duration, onFinish, isActive, onClose }) => {
             const [timeLeft, setTimeLeft] = useState(duration);
             const [endTime, setEndTime] = useState(null);
@@ -613,10 +546,130 @@
             );
         };
 
+        const ExerciseEditor = ({ exercise, index, updateExercise, removeExercise }) => {
+            const [expanded, setExpanded] = useState(true);
+            return (
+                <div className="bg-neutral-800 rounded-xl p-4 mb-3 border border-neutral-700 shadow-sm">
+                    <div className="flex justify-between items-center mb-2" onClick={() => setExpanded(!expanded)}>
+                        <h3 className="font-bold text-lg text-white flex items-center gap-2"><span className="bg-neutral-700 text-xs w-6 h-6 flex items-center justify-center rounded-full text-neutral-300">{index + 1}</span>{exercise.name || "Novo Exercício"}</h3>
+                        <div className="flex gap-2">{expanded ? <ChevronUp size={18} className="text-neutral-500"/> : <ChevronDown size={18} className="text-neutral-500"/>}</div>
+                    </div>
+                    {expanded && (
+                        <div className="space-y-3 mt-3 animate-fade-in">
+                            <div><label className="text-xs text-neutral-500 uppercase font-bold">Nome</label><input type="text" value={exercise.name} onChange={(e) => updateExercise(index, 'name', e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-3 outline-none" placeholder="Ex: Supino Reto"/></div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="text-xs text-neutral-500 uppercase font-bold">Séries</label><input type="number" value={exercise.sets} onChange={(e) => updateExercise(index, 'sets', e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center" placeholder="4"/></div>
+                                <div><label className="text-xs text-neutral-500 uppercase font-bold">Reps</label><input type="text" value={exercise.reps} onChange={(e) => updateExercise(index, 'reps', e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center" placeholder="8-12"/></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div><label className="text-xs text-neutral-500 uppercase font-bold">Cadência</label><input type="text" value={exercise.cadence} onChange={(e) => updateExercise(index, 'cadence', e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center" placeholder="3010"/></div>
+                                <div><label className="text-xs text-neutral-500 uppercase font-bold">Descanso (s)</label><input type="number" value={exercise.restTime} onChange={(e) => updateExercise(index, 'restTime', e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 text-center" placeholder="90"/></div>
+                            </div>
+                            <div><label className="text-xs text-neutral-500 uppercase font-bold">Obs</label><textarea value={exercise.notes} onChange={(e) => updateExercise(index, 'notes', e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 text-white rounded-lg p-2 h-20 text-sm"/></div>
+                            <button onClick={() => removeExercise(index)} className="w-full flex items-center justify-center gap-2 text-red-500 py-2 hover:bg-red-500 hover:bg-opacity-10 rounded-lg text-sm"><Trash2 size={16} /> Remover</button>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const ActiveWorkout = ({ workout, onFinish, onBack, user }) => {
+            const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
+            const [logs, setLogs] = useState({});
+            const [restTimer, setRestTimer] = useState({ active: false, duration: 60 });
+            const [startTime] = useState(Date.now());
+            const [sessionDuration, setSessionDuration] = useState(0);
+            const [totalRestTime, setTotalRestTime] = useState(0);
+
+            useEffect(() => { const timer = setInterval(() => { setSessionDuration(Math.floor((Date.now() - startTime) / 1000)); }, 1000); return () => clearInterval(timer); }, [startTime]);
+            useEffect(() => { let interval; if (restTimer.active) { interval = setInterval(() => { setTotalRestTime(prev => prev + 1); }, 1000); } return () => clearInterval(interval); }, [restTimer.active]);
+
+            const toggleSet = (exIndex, setIndex, targetReps, defaultRest) => {
+                const key = `${exIndex}-${setIndex}`;
+                const currentLog = logs[key] || { weight: '', reps: targetReps, done: false };
+                const newDone = !currentLog.done;
+                setLogs({ ...logs, [key]: { ...currentLog, done: newDone } });
+                if (newDone) setRestTimer({ active: true, duration: parseInt(defaultRest) || 60 });
+            };
+
+            const updateLogValue = (exIndex, setIndex, field, value) => {
+                const key = `${exIndex}-${setIndex}`;
+                const currentLog = logs[key] || { weight: '', reps: '', done: false };
+                setLogs({ ...logs, [key]: { ...currentLog, [field]: value } });
+            };
+
+            const handleFinish = async () => {
+                if (!confirm("Finalizar treino?")) return;
+                const finalDuration = Math.floor((Date.now() - startTime) / 1000);
+                const sessionData = { workoutId: workout.id, workoutTitle: workout.title, exercises: workout.exercises, logs: logs, totalTime: finalDuration, totalRestTime: totalRestTime, date: serverTimestamp(), userId: user.uid };
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), sessionData);
+                    const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
+                    const snapshot = await getDocs(historyRef);
+                    const allHistory = snapshot.docs.map(d => d.data());
+                    const workoutHistory = allHistory.filter(h => h.workoutId === workout.id).sort((a, b) => { const timeA = a.date?.seconds || 0; const timeB = b.date?.seconds || 0; return timeB - timeA; });
+                    const previousSession = workoutHistory.length > 1 ? workoutHistory[1] : null;
+                    onFinish(sessionData, previousSession);
+                } catch (e) { alert("Erro: " + e.message); onFinish(sessionData, null); }
+            };
+
+            const currentExercise = workout.exercises[activeExerciseIndex];
+
+            return (
+                <div className="pb-24 bg-black min-h-[100dvh] text-white">
+                    <div className="sticky top-0 bg-neutral-900/95 backdrop-blur-md border-b border-neutral-800 p-4 z-40 flex justify-between items-center pt-safe">
+                        <div><h2 className="text-white font-bold truncate max-w-[200px]">{workout.title}</h2><div className="flex items-center gap-2 text-yellow-500 text-sm font-mono"><Activity size={14} />{formatDuration(sessionDuration)}</div></div>
+                        <button onClick={handleFinish} className="bg-yellow-500 hover:bg-yellow-400 text-black px-4 py-2 rounded-lg font-bold text-sm shadow-lg">Finalizar</button>
+                    </div>
+                    <div className="flex overflow-x-auto p-4 gap-2 no-scrollbar bg-neutral-950">
+                        {workout.exercises.map((ex, idx) => (
+                            <button key={idx} onClick={() => setActiveExerciseIndex(idx)} className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${idx === activeExerciseIndex ? 'bg-white text-black border-white' : 'bg-neutral-900 text-neutral-400 border-neutral-800'}`}>{idx + 1}. {ex.name}</button>
+                        ))}
+                    </div>
+                    <div className="px-4">
+                        <div className="bg-neutral-900 rounded-3xl p-6 mb-6 shadow-2xl border border-neutral-800">
+                            <div className="flex justify-between items-start mb-6"><h3 className="text-2xl font-bold text-white leading-tight">{currentExercise.name}</h3></div>
+                            <div className="grid grid-cols-3 gap-3 mb-6 text-center">
+                                <div className="bg-neutral-800 p-3 rounded-xl border border-neutral-700"><span className="text-[10px] text-neutral-400 block uppercase font-bold tracking-wider">Cadência</span><span className="text-white font-mono text-lg">{currentExercise.cadence || "Livre"}</span></div>
+                                <div className="bg-neutral-800 p-3 rounded-xl border border-neutral-700"><span className="text-[10px] text-neutral-400 block uppercase font-bold tracking-wider">Descanso</span><span className="text-white font-mono text-lg">{currentExercise.restTime || "60"}s</span></div>
+                                <div className="bg-neutral-800 p-3 rounded-xl border border-neutral-700"><span className="text-[10px] text-neutral-400 block uppercase font-bold tracking-wider">Meta</span><span className="text-white font-mono text-lg">{currentExercise.reps}</span></div>
+                            </div>
+                            
+                            {/* VOZ DO COACH DISPLAY */}
+                            {currentExercise.coachNotes && (
+                                <div className="mb-4 bg-yellow-500/20 p-4 rounded-xl border border-yellow-500 animate-pulse flex gap-3">
+                                    <Megaphone size={20} className="text-yellow-500 shrink-0"/>
+                                    <p className="text-yellow-300 font-bold italic text-sm">"{currentExercise.coachNotes}"</p>
+                                </div>
+                            )}
+
+                            {currentExercise.notes && <div className="mb-8 bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex gap-3"><Music size={16} className="text-neutral-500 shrink-0"/><p className="text-neutral-400 text-sm italic">"{currentExercise.notes}"</p></div>}
+
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-10 gap-3 text-[10px] text-neutral-500 uppercase font-bold text-center mb-2 tracking-widest"><div className="col-span-1">Set</div><div className="col-span-3">Carga (kg)</div><div className="col-span-3">Reps</div><div className="col-span-3">Status</div></div>
+                                {Array.from({ length: parseInt(currentExercise.sets) || 3 }).map((_, setIdx) => {
+                                    const logKey = `${activeExerciseIndex}-${setIdx}`; const log = logs[logKey] || { done: false, weight: '', reps: '' };
+                                    return (
+                                        <div key={setIdx} className={`grid grid-cols-10 gap-3 items-center ${log.done ? 'opacity-40 grayscale transition-all duration-500' : 'opacity-100'}`}>
+                                            <div className="col-span-1 text-center font-mono text-neutral-600 font-bold">{setIdx + 1}</div>
+                                            <div className="col-span-3"><input type="number" placeholder="Kg" value={log.weight} onChange={(e) => updateLogValue(activeExerciseIndex, setIdx, 'weight', e.target.value)} className="w-full bg-black border border-neutral-700 rounded-xl p-3 text-white text-center font-bold text-lg"/></div>
+                                            <div className="col-span-3"><input type="number" placeholder={currentExercise.reps} value={log.reps} onChange={(e) => updateLogValue(activeExerciseIndex, setIdx, 'reps', e.target.value)} className="w-full bg-black border border-neutral-700 rounded-xl p-3 text-white text-center font-bold text-lg"/></div>
+                                            <button onClick={() => toggleSet(activeExerciseIndex, setIdx, currentExercise.reps, currentExercise.restTime)} className={`col-span-3 h-12 rounded-xl flex items-center justify-center transition-all shadow-lg active:scale-95 ${log.done ? 'bg-green-500 text-black' : 'bg-neutral-800 border border-neutral-700'}`}>{log.done ? <CheckCircle2 size={24} /> : <div className="w-6 h-6 rounded-full border-4 border-neutral-600" />}</button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                    <RestTimerOverlay duration={restTimer.duration} isActive={restTimer.active} onFinish={() => setRestTimer(prev => ({ ...prev, active: false }))} onClose={() => setRestTimer(prev => ({ ...prev, active: false }))}/>
+                </div>
+            );
+        };
+
         // --- COMPONENTE PRINCIPAL (APP) COM LOGIC DE AUTH CORRIGIDA ---
         const App = () => {
             const [user, setUser] = useState(null);
-            const [authLoading, setAuthLoading] = useState(true);
+            const [authLoading, setAuthLoading] = useState(true); // Default to true to show loading initially
             const [view, setView] = useState('dashboard');
             const [workouts, setWorkouts] = useState([]);
             const [currentWorkout, setCurrentWorkout] = useState(null); 
@@ -625,38 +678,36 @@
             const [reportData, setReportData] = useState({ current: null, previous: null });
             const [notification, setNotification] = useState(null);
 
-            // CORREÇÃO CRÍTICA DO LOOP DE LOGIN
+            // CORREÇÃO CRÍTICA DO LOOP DE LOGIN E CABEÇALHO
             useEffect(() => {
                 const initAuth = async () => {
-                    // 1. Primeiro tenta capturar o resultado do redirect (login vindo do Google)
+                    // Configura persistência primeiro
+                    await setPersistence(auth, browserLocalPersistence);
+
+                    // Verifica se voltou de um redirect
                     try {
-                        await getRedirectResult(auth);
+                        const result = await getRedirectResult(auth);
+                        if (result) console.log("Login via redirect completo");
                     } catch (error) {
-                        console.error("Erro no Redirect Result:", error);
+                        console.error("Erro no Redirect:", error);
                     }
 
-                    // 2. Só DEPOIS inicia o listener de estado
-                    const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    // Listener de estado
+                    onAuthStateChanged(auth, (u) => {
                         setUser(u);
-                        // Só libera o loading quando o estado for confirmado
-                        setAuthLoading(false); 
+                        setAuthLoading(false); // Só libera a UI aqui
                     });
-                    
-                    return unsubscribe;
                 };
 
-                const unsub = initAuth();
-                // Como initAuth é async e retorna uma promise que resolve pro unsub, 
-                // a limpeza precisa ser tratada com cuidado, mas neste escopo simples de App,
-                // o onAuthStateChanged é quem segura a onda.
+                initAuth();
             }, []);
 
-            // ... (Resto dos useEffects de users, notification, workouts mantidos iguais) ...
+            // ... (Resto dos useEffects mantidos iguais) ...
             useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), orderBy('createdAt', 'desc'), limit(1)); const unsub = onSnapshot(q, s => { if(!s.empty) { const m = s.docs[0].data(); if(m.createdAt?.toMillis() > Date.now()-10000 && m.uid !== user.uid) { setNotification({id: s.docs[0].id, ...m}); setTimeout(()=>setNotification(null), 4000); }}}); return () => unsub(); }, [user]);
             useEffect(() => { if(user) setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), { uid: user.uid, displayName: user.displayName || 'Anônimo', email: user.email, photoURL: user.photoURL, lastSeen: serverTimestamp() }, { merge: true }); }, [user]);
             useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [user]);
 
-            // Handlers
+            // Handlers (mantidos)
             const handleCreateWorkout = () => { setCurrentWorkout({ title: '', exercises: [] }); setView('edit'); };
             const handleSaveWorkout = async () => { if (!user || !currentWorkout.title) return; const wd = { ...currentWorkout, createdAt: serverTimestamp(), authorName: user.displayName, authorId: user.uid }; try { if (currentWorkout.id) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'workouts', currentWorkout.id), wd); else await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), wd); setView('dashboard'); } catch (e) { alert("Erro: " + e.message); } };
             const handleDeleteWorkout = async (id) => { if (!confirm("Apagar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'workouts', id)); };
@@ -691,14 +742,14 @@
                         <>
                             <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30 pt-safe">
                                 <div className="flex justify-between items-center mb-6">
-                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
                                         {user.photoURL ? <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-yellow-500 shrink-0" /> : <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shrink-0">{user.displayName?.[0]}</div>}
-                                        <div className="flex-1 min-w-0">
+                                        <div className="flex-1 min-w-0 overflow-hidden">
                                             <p className="text-[9px] text-yellow-500 uppercase font-bold tracking-widest mb-0.5">Bem-vindo</p>
-                                            <h1 className="font-black text-lg sm:text-2xl leading-none tracking-tight truncate">{user.displayName || 'Atleta'}</h1>
+                                            <h1 className="font-black text-lg sm:text-2xl leading-none tracking-tight truncate w-full">{user.displayName || 'Atleta'}</h1>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 shrink-0">
+                                    <div className="flex gap-2 shrink-0 ml-2">
                                         {user.email === ADMIN_EMAIL && <button onClick={() => setView('admin')} className="bg-yellow-500 text-black p-2 rounded-full hover:bg-yellow-400 font-black border-2 border-white animate-pulse text-[10px] h-9 w-9 flex items-center justify-center">CMD</button>}
                                         <button onClick={() => setView('history')} className="bg-neutral-800 p-2 rounded-full text-neutral-400 hover:text-white h-9 w-9 flex items-center justify-center"><History size={16} /></button>
                                         <button onClick={() => setView('chat')} className="bg-neutral-800 p-2 rounded-full text-neutral-400 hover:text-white h-9 w-9 flex items-center justify-center"><MessageSquare size={16} /></button>
