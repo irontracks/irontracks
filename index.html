@@ -731,6 +731,19 @@
                 loadHistory();
             }, [user]);
 
+            const handleDeleteHistory = async (e, sessionId) => {
+                e.stopPropagation();
+                if (!confirm("Tem certeza que quer apagar esse registro do histórico? Isso não pode ser desfeito.")) return;
+
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', sessionId));
+                    setHistory(prev => prev.filter(h => h.id !== sessionId));
+                } catch (error) {
+                    console.error("Erro ao excluir:", error);
+                    alert("Erro ao excluir registro.");
+                }
+            };
+
             return (
                 <div className="min-h-screen bg-neutral-900 text-white p-4">
                     <div className="flex items-center gap-3 mb-6">
@@ -748,7 +761,7 @@
 
                     <div className="space-y-3">
                         {history.map(session => (
-                            <div key={session.id} onClick={() => onViewReport(session)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 active:scale-95 transition-transform cursor-pointer hover:border-yellow-500/50">
+                            <div key={session.id} onClick={() => onViewReport(session)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 active:scale-95 transition-transform cursor-pointer hover:border-yellow-500/50 relative group">
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <h3 className="font-bold text-lg text-white">{session.workoutTitle}</h3>
@@ -761,6 +774,13 @@
                                         <p className="text-xs text-neutral-500">Duração</p>
                                     </div>
                                 </div>
+                                
+                                <button
+                                    onClick={(e) => handleDeleteHistory(e, session.id)}
+                                    className="mt-3 text-red-500 text-xs flex items-center gap-1 hover:text-red-400 p-2 -ml-2 rounded-lg hover:bg-red-500/10 transition-colors"
+                                >
+                                    <Trash2 size={14} /> Excluir Registro
+                                </button>
                             </div>
                         ))}
                     </div>
