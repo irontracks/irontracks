@@ -215,6 +215,339 @@
         const WorkoutReport = ({ session, previousSession, onClose }) => { const reportRef = useRef(); const calculateTotalVolume = (logs) => { let volume = 0; Object.values(logs).forEach(log => { if (log.done && log.weight && log.reps) volume += (parseFloat(log.weight) * parseFloat(log.reps)); }); return volume; }; const currentVolume = calculateTotalVolume(session.logs); const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0; const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0; const durationInMinutes = session.totalTime / 60; const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4)); const prevLogsMap = {}; if (previousSession) { previousSession.exercises.forEach((ex, exIdx) => { const exLogs = []; Object.keys(previousSession.logs).forEach(key => { const [eIdx, sIdx] = key.split('-'); if (parseInt(eIdx) === exIdx) exLogs.push(previousSession.logs[key]); }); prevLogsMap[ex.name] = exLogs; }); } const handleDownloadPDF = () => { const element = reportRef.current; const opt = { margin: 0, filename: `IronTracks_${session.workoutTitle.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }; html2pdf().set(opt).from(element).save(); }; return <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-900 text-black"><div className="fixed top-4 right-4 flex gap-2 no-print z-50"><button onClick={handleDownloadPDF} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Download size={20} /> PDF</button><button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg"><X size={20} /></button></div><div ref={reportRef} className="min-h-screen bg-white p-8 max-w-4xl mx-auto"><div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end"><div><h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1><p className="text-sm font-bold uppercase tracking-widest text-neutral-500">Relatório de Performance</p></div><div className="text-right"><p className="text-2xl font-bold">{session.workoutTitle}</p><p className="text-neutral-600">{formatDate(session.date)}</p></div></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"><div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200"><p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Total</p><p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p></div><div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200"><p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p><div className="flex items-baseline gap-2"><p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>{previousSession && <span className={`text-xs font-bold flex items-center ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>{volumeDelta >= 0 ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}{volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%</span>}</div></div><div className="bg-orange-50 p-4 rounded-lg border border-orange-200"><p className="text-xs font-bold uppercase text-orange-500 mb-1 flex items-center gap-1"><Flame size={12}/> Calorias</p><p className="text-3xl font-mono font-bold text-orange-600">~{calories}</p></div><div className="bg-black text-white p-4 rounded-lg"><p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p><p className="text-xl font-bold uppercase italic">CONCLUÍDO</p></div></div><div className="space-y-8">{session.exercises.map((ex, exIdx) => { const prevLogs = prevLogsMap[ex.name] || []; return <div key={exIdx} className="break-inside-avoid"><div className="flex justify-between items-end mb-2 border-b-2 border-neutral-200 pb-2"><h3 className="text-xl font-bold uppercase flex items-center gap-2"><span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>{ex.name}</h3><div className="text-xs font-mono text-neutral-500">Cadência: <span className="font-bold text-black">{ex.cadence || '-'}</span></div></div><table className="w-full text-sm"><thead><tr className="text-neutral-500 border-b border-neutral-100"><th className="py-2 text-left w-16">Série</th><th className="py-2 text-center w-24">Carga</th><th className="py-2 text-center w-24">Reps</th><th className="py-2 text-center w-32">Evolução</th></tr></thead><tbody>{Array.from({ length: parseInt(ex.sets) }).map((_, sIdx) => { const key = `${exIdx}-${sIdx}`; const log = session.logs[key]; const prevLog = prevLogs[sIdx]; if (!log || !log.done) return null; let progressionText = "-"; let rowClass = ""; if (prevLog && prevLog.weight) { const delta = parseFloat(log.weight) - parseFloat(prevLog.weight); if (delta > 0) { progressionText = `+${delta}kg`; rowClass = "bg-green-50 text-green-900 font-bold"; } else if (delta < 0) { progressionText = `${delta}kg`; rowClass = "text-red-600 font-bold"; } else progressionText = "="; } return <tr key={sIdx} className="border-b border-neutral-100"><td className="py-3 font-mono text-neutral-500">#{sIdx + 1}</td><td className="py-3 text-center font-bold text-lg">{log.weight}</td><td className="py-3 text-center font-mono">{log.reps}</td><td className={`py-3 text-center text-xs uppercase ${rowClass}`}>{progressionText}</td></tr>; })}</tbody></table></div>; })}</div><div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">IronTracks System • {getCurrentDate()}</div></div></div>; };
         const HistoryList = ({ user, onViewReport, onBack }) => { const [history, setHistory] = useState([]); const [loading, setLoading] = useState(true); useEffect(() => { const loadHistory = async () => { try { const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history'); const snapshot = await getDocs(historyRef); const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); data.sort((a, b) => { const timeA = a.date?.seconds || 0; const timeB = b.date?.seconds || 0; return timeB - timeA; }); setHistory(data.slice(0, 50)); } catch(e) { console.error("Erro histórico", e); } finally { setLoading(false); } }; loadHistory(); }, [user]); const handleDeleteHistory = async (e, sessionId) => { e.stopPropagation(); if (!confirm("Tem certeza que quer apagar esse registro?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', sessionId)); setHistory(prev => prev.filter(h => h.id !== sessionId)); } catch (error) { alert("Erro ao excluir."); } }; return <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20"><div className="flex items-center gap-3 mb-6 pt-safe"><button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg hover:bg-neutral-700"><ArrowLeft/></button><h2 className="text-xl font-bold flex items-center gap-2"><History className="text-yellow-500"/> Histórico</h2></div>{loading && <p className="text-center text-neutral-500 animate-pulse">Carregando legado...</p>}{!loading && history.length === 0 && <div className="text-center py-10 opacity-50"><p>Nenhum treino finalizado ainda.</p></div>}<div className="space-y-3">{history.map(session => ( <div key={session.id} onClick={() => onViewReport(session)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 active:scale-95 transition-transform cursor-pointer hover:border-yellow-500/50 relative group"><div className="flex justify-between items-start"><div><h3 className="font-bold text-lg text-white">{session.workoutTitle}</h3><p className="text-xs text-neutral-400 flex items-center gap-1 mt-1"><Calendar size={12}/> {formatDate(session.date)}</p></div><div className="text-right"><p className="text-yellow-500 font-mono font-bold text-sm">{formatDuration(session.totalTime)}</p><p className="text-xs text-neutral-500">Duração</p></div></div><button onClick={(e) => handleDeleteHistory(e, session.id)} className="mt-3 text-red-500 text-xs flex items-center gap-1 hover:text-red-400 p-2 -ml-2 rounded-lg hover:bg-red-500/10 transition-colors"><Trash2 size={14} /> Excluir Registro</button></div>))}</div></div>; };
 
+        // --- EXERCISE EDITOR ---
+        const ExerciseEditor = ({ index, exercise, updateExercise, removeExercise }) => {
+            const [expanded, setExpanded] = useState(false);
+            return (
+                <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden">
+                    <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3 flex-1">
+                                <div className="bg-yellow-500 text-black w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0">
+                                    {index + 1}
+                                </div>
+                                <input
+                                    type="text"
+                                    value={exercise.name}
+                                    onChange={(e) => updateExercise(index, 'name', e.target.value)}
+                                    className="flex-1 bg-transparent text-white font-bold text-lg outline-none border-b border-neutral-600 focus:border-yellow-500 pb-1"
+                                    placeholder="Nome do Exercício"
+                                />
+                            </div>
+                            <button
+                                onClick={() => removeExercise(index)}
+                                className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                            >
+                                <Trash2 size={18} />
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3 mb-3">
+                            <div>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Séries</label>
+                                <input
+                                    type="number"
+                                    value={exercise.sets}
+                                    onChange={(e) => updateExercise(index, 'sets', parseInt(e.target.value) || 0)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Reps</label>
+                                <input
+                                    type="text"
+                                    value={exercise.reps}
+                                    onChange={(e) => updateExercise(index, 'reps', e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
+                                    placeholder="10"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Cadência</label>
+                                <input
+                                    type="text"
+                                    value={exercise.cadence}
+                                    onChange={(e) => updateExercise(index, 'cadence', e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-mono text-sm focus:border-yellow-500 outline-none"
+                                    placeholder="3010"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Descanso</label>
+                                <input
+                                    type="number"
+                                    value={exercise.restTime}
+                                    onChange={(e) => updateExercise(index, 'restTime', parseInt(e.target.value) || 0)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setExpanded(!expanded)}
+                            className="w-full flex items-center justify-center gap-2 text-neutral-500 text-xs font-bold py-2 hover:text-white transition-colors"
+                        >
+                            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            {expanded ? 'Menos' : 'Mais'} Opções
+                        </button>
+                    </div>
+
+                    {expanded && (
+                        <div className="px-4 pb-4 space-y-3 border-t border-neutral-700 pt-3">
+                            <div>
+                                <label className="text-xs text-neutral-500 font-bold block mb-1">Notas Pessoais</label>
+                                <textarea
+                                    value={exercise.notes || ''}
+                                    onChange={(e) => updateExercise(index, 'notes', e.target.value)}
+                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500 resize-none"
+                                    rows="2"
+                                    placeholder="Ex: Foco na contração, cotovelos alinhados..."
+                                />
+                            </div>
+                            {exercise.coachNotes && (
+                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                                    <p className="text-[10px] text-yellow-500 uppercase font-bold flex items-center gap-1 mb-1">
+                                        <Megaphone size={10} /> Instrução do Coach
+                                    </p>
+                                    <p className="text-sm text-yellow-200">{exercise.coachNotes}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- ACTIVE WORKOUT ---
+        const ActiveWorkout = ({ workout, user, onFinish, onBack }) => {
+            const [logs, setLogs] = useState({});
+            const [currentExerciseIdx, setCurrentExerciseIdx] = useState(0);
+            const [startTime] = useState(Date.now());
+            const [restTimer, setRestTimer] = useState({ active: false, duration: 60 });
+
+            const currentExercise = workout.exercises[currentExerciseIdx];
+            const totalExercises = workout.exercises.length;
+
+            const updateLog = (exIdx, setIdx, field, value) => {
+                const key = `${exIdx}-${setIdx}`;
+                setLogs(prev => ({
+                    ...prev,
+                    [key]: { ...prev[key], [field]: value }
+                }));
+            };
+
+            const toggleSetDone = (exIdx, setIdx) => {
+                const key = `${exIdx}-${setIdx}`;
+                const currentLog = logs[key] || {};
+                const newDone = !currentLog.done;
+                
+                updateLog(exIdx, setIdx, 'done', newDone);
+                
+                // Se marcou como feito e tem restTime, inicia o timer
+                if (newDone && currentExercise.restTime > 0) {
+                    setRestTimer({ active: true, duration: currentExercise.restTime });
+                }
+            };
+
+            const handleFinishWorkout = async () => {
+                if (!confirm('Finalizar treino?')) return;
+
+                const totalTime = Math.floor((Date.now() - startTime) / 1000);
+                const session = {
+                    workoutTitle: workout.title,
+                    exercises: workout.exercises,
+                    logs: logs,
+                    date: serverTimestamp(),
+                    totalTime: totalTime
+                };
+
+                try {
+                    // Salvar no histórico
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), session);
+                    
+                    // Buscar sessão anterior do mesmo treino
+                    const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
+                    const q = query(
+                        historyRef,
+                        where('workoutTitle', '==', workout.title),
+                        orderBy('date', 'desc'),
+                        limit(2)
+                    );
+                    const snapshot = await getDocs(q);
+                    const previousSession = snapshot.docs.length > 1 ? snapshot.docs[1].data() : null;
+
+                    onFinish(session, previousSession);
+                } catch (error) {
+                    console.error('Erro ao salvar:', error);
+                    alert('Erro ao salvar treino. Tente novamente.');
+                }
+            };
+
+            const progress = ((currentExerciseIdx + 1) / totalExercises) * 100;
+
+            return (
+                <div className="min-h-[100dvh] bg-neutral-950 text-white flex flex-col">
+                    <RestTimerOverlay
+                        duration={restTimer.duration}
+                        isActive={restTimer.active}
+                        onFinish={() => setRestTimer({ active: false, duration: 60 })}
+                        onClose={() => setRestTimer({ active: false, duration: 60 })}
+                    />
+
+                    {/* Header */}
+                    <div className="bg-neutral-900 border-b border-neutral-800 p-4 pt-safe sticky top-0 z-20">
+                        <div className="flex items-center justify-between mb-3">
+                            <button onClick={onBack} className="p-2 hover:bg-neutral-800 rounded-lg transition-colors">
+                                <ArrowLeft size={20} />
+                            </button>
+                            <h1 className="font-black text-lg tracking-tight">{workout.title}</h1>
+                            <button onClick={handleFinishWorkout} className="bg-green-500 text-black px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-400">
+                                <CheckCircle2 size={18} />
+                            </button>
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="relative h-2 bg-neutral-800 rounded-full overflow-hidden">
+                            <div 
+                                className="absolute inset-y-0 left-0 bg-gradient-to-r from-yellow-500 to-yellow-400 transition-all duration-300"
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                        <p className="text-xs text-neutral-500 mt-1 text-center">
+                            Exercício {currentExerciseIdx + 1} de {totalExercises}
+                        </p>
+                    </div>
+
+                    {/* Exercise Navigation */}
+                    <div className="flex overflow-x-auto no-scrollbar gap-2 p-4 bg-neutral-900/50">
+                        {workout.exercises.map((ex, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => setCurrentExerciseIdx(idx)}
+                                className={`shrink-0 px-4 py-2 rounded-lg font-bold text-sm transition-all ${
+                                    idx === currentExerciseIdx
+                                        ? 'bg-yellow-500 text-black'
+                                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                                }`}
+                            >
+                                {idx + 1}. {ex.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Current Exercise */}
+                    <div className="flex-1 overflow-y-auto p-4 pb-20">
+                        <div className="max-w-2xl mx-auto">
+                            <div className="bg-neutral-900 rounded-2xl p-6 mb-6 border border-neutral-800">
+                                <h2 className="text-3xl font-black mb-2">{currentExercise.name}</h2>
+                                <div className="flex gap-4 text-sm text-neutral-400">
+                                    <span className="flex items-center gap-1">
+                                        <Activity size={14} /> {currentExercise.sets} séries
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <Clock size={14} /> {currentExercise.restTime}s descanso
+                                    </span>
+                                </div>
+                                {currentExercise.cadence && (
+                                    <div className="mt-3 bg-neutral-800 rounded-lg p-3">
+                                        <p className="text-xs text-neutral-500 mb-1">Cadência</p>
+                                        <p className="text-2xl font-mono font-bold text-yellow-500">{currentExercise.cadence}</p>
+                                    </div>
+                                )}
+                                {currentExercise.coachNotes && (
+                                    <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                                        <p className="text-xs text-yellow-500 font-bold flex items-center gap-1 mb-1">
+                                            <Megaphone size={12} /> INSTRUÇÃO DO COACH
+                                        </p>
+                                        <p className="text-sm text-yellow-200">{currentExercise.coachNotes}</p>
+                                    </div>
+                                )}
+                                {currentExercise.notes && (
+                                    <div className="mt-3 bg-neutral-800 rounded-lg p-3">
+                                        <p className="text-xs text-neutral-500 mb-1">Notas</p>
+                                        <p className="text-sm text-neutral-300">{currentExercise.notes}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Sets */}
+                            <div className="space-y-3">
+                                {Array.from({ length: parseInt(currentExercise.sets) }).map((_, setIdx) => {
+                                    const key = `${currentExerciseIdx}-${setIdx}`;
+                                    const log = logs[key] || { weight: '', reps: '', done: false };
+                                    
+                                    return (
+                                        <div
+                                            key={setIdx}
+                                            className={`bg-neutral-900 rounded-xl p-4 border-2 transition-all ${
+                                                log.done
+                                                    ? 'border-green-500 bg-green-500/10'
+                                                    : 'border-neutral-800 hover:border-neutral-700'
+                                            }`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => toggleSetDone(currentExerciseIdx, setIdx)}
+                                                    className={`shrink-0 w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold transition-all ${
+                                                        log.done
+                                                            ? 'bg-green-500 border-green-500 text-black'
+                                                            : 'border-neutral-700 text-neutral-500 hover:border-yellow-500'
+                                                    }`}
+                                                >
+                                                    {log.done ? <CheckCircle2 size={20} /> : setIdx + 1}
+                                                </button>
+                                                
+                                                <div className="flex-1 grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <label className="text-xs text-neutral-500 block mb-1">Carga (kg)</label>
+                                                        <input
+                                                            type="number"
+                                                            value={log.weight}
+                                                            onChange={(e) => updateLog(currentExerciseIdx, setIdx, 'weight', e.target.value)}
+                                                            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white font-bold text-center focus:border-yellow-500 outline-none"
+                                                            placeholder="0"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs text-neutral-500 block mb-1">Reps</label>
+                                                        <input
+                                                            type="number"
+                                                            value={log.reps}
+                                                            onChange={(e) => updateLog(currentExerciseIdx, setIdx, 'reps', e.target.value)}
+                                                            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white font-bold text-center focus:border-yellow-500 outline-none"
+                                                            placeholder={currentExercise.reps}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Navigation Buttons */}
+                            <div className="grid grid-cols-2 gap-3 mt-6">
+                                <button
+                                    onClick={() => setCurrentExerciseIdx(Math.max(0, currentExerciseIdx - 1))}
+                                    disabled={currentExerciseIdx === 0}
+                                    className="bg-neutral-800 text-white py-4 rounded-xl font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-700 transition-colors"
+                                >
+                                    ← Anterior
+                                </button>
+                                <button
+                                    onClick={() => setCurrentExerciseIdx(Math.min(totalExercises - 1, currentExerciseIdx + 1))}
+                                    disabled={currentExerciseIdx === totalExercises - 1}
+                                    className="bg-yellow-500 text-black py-4 rounded-xl font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-yellow-400 transition-colors"
+                                >
+                                    Próximo →
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         // --- APP PRINCIPAL ---
         const App = () => {
             const [user, setUser] = useState(null);
