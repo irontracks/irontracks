@@ -85,7 +85,8 @@
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
             TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell, Flame,
             History, Calendar, Crown, Database, UserCog, Megaphone, AlertCircle,
-            UserPlus, Mail, Ruler, Scale, BarChart3, Info, Eye, EyeOff
+            UserPlus, Mail, Ruler, Scale, BarChart3, Info, Eye, EyeOff,
+            Camera, Image, Zap, Target, Award, TrendingUp as TrendUp, Brain
         } from 'lucide-react';
 
         // --- CONFIG ---
@@ -120,12 +121,29 @@
             useEffect(() => {
                 localStorage.removeItem('auth_pending');
                 localStorage.removeItem('auth_in_progress');
+                
+                // Detecta Safari/iOS e força redirect
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                if (isSafari || isIOS) {
+                    setShowRedirectOption(true);
+                }
             }, []);
 
             const handlePopupLogin = async () => {
                 setIsLoading(true);
                 setErrorMsg('');
                 const provider = new GoogleAuthProvider();
+                
+                // Safari/iOS tem problemas com popup, força redirect
+                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                
+                if (isSafari || isIOS) {
+                    handleRedirectLogin();
+                    return;
+                }
+                
                 try {
                     await setPersistence(auth, browserLocalPersistence);
                     await signInWithPopup(auth, provider);
@@ -150,6 +168,7 @@
                 setErrorMsg('Redirecionando...');
                 const provider = new GoogleAuthProvider();
                 try {
+                    await setPersistence(auth, browserLocalPersistence);
                     await signInWithRedirect(auth, provider);
                 } catch (error) {
                     setIsLoading(false);
@@ -659,6 +678,636 @@
             );
         };
 
+        // --- FOTOS DE PROGRESSO ---
+        const FotosProgresso = ({ user, onBack }) => {
+            const [fotos, setFotos] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [capturando, setCapturando] = useState(false);
+            const [fotoAtual, setFotoAtual] = useState(null);
+            const videoRef = useRef(null);
+            const canvasRef = useRef(null);
+
+            useEffect(() => {
+                loadFotos();
+            }, []);
+
+            const loadFotos = async () => {
+                try {
+                    const fotosRef = collection(db, 'artifacts', appId, 'users', user.uid, 'fotos');
+                    const q = query(fotosRef, orderBy('data', 'desc'));
+                    const snapshot = await getDocs(q);
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setFotos(data);
+                } catch (error) {
+                    console.error('Erro ao carregar fotos:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const iniciarCamera = async () => {
+                setCapturando(true);
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'user', width: 1280, height: 720 } 
+                    });
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                    }
+                } catch (error) {
+                    alert('❌ Erro ao acessar câmera: ' + error.message);
+                    setCapturando(false);
+                }
+            };
+
+            const tirarFoto = () => {
+                const video = videoRef.current;
+                const canvas = canvasRef.current;
+                
+                if (video && canvas) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+                    
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                    setFotoAtual(dataUrl);
+                    
+                    // Parar câmera
+                    const stream = video.srcObject;
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                }
+            };
+
+            const salvarFoto = async () => {
+                if (!fotoAtual) return;
+
+                try {
+                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'fotos'), {
+                        dataUrl: fotoAtual,
+                        data: serverTimestamp(),
+                        tipo: 'progresso'
+                    });
+
+                    alert('✅ Foto salva com sucesso!');
+                    setFotoAtual(null);
+                    setCapturando(false);
+                    loadFotos();
+                } catch (error) {
+                    alert('❌ Erro ao salvar: ' + error.message);
+                }
+            };
+
+            const cancelar = () => {
+                setFotoAtual(null);
+                setCapturando(false);
+                if (videoRef.current && videoRef.current.srcObject) {
+                    videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+                }
+            };
+
+            const deletarFoto = async (id) => {
+                if (!confirm('Deletar esta foto?')) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'fotos', id));
+                    loadFotos();
+                } catch (error) {
+                    alert('❌ Erro ao deletar');
+                }
+            };
+
+            if (capturando && !fotoAtual) {
+                return (
+                    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+                        <div className="p-4 bg-neutral-900 flex justify-between items-center">
+                            <h2 className="font-bold text-white">Tirar Foto</h2>
+                            <button onClick={cancelar} className="text-white"><X size={24}/></button>
+                        </div>
+                        
+                        <div className="flex-1 relative flex items-center justify-center">
+                            <video ref={videoRef} autoPlay playsInline className="max-w-full max-h-full"></video>
+                            <canvas ref={canvasRef} className="hidden"></canvas>
+                        </div>
+
+                        <div className="p-6 bg-neutral-900">
+                            <button 
+                                onClick={tirarFoto}
+                                className="w-full bg-yellow-500 text-black py-4 rounded-xl font-bold text-lg"
+                            >
+                                <Camera size={24} className="inline mr-2"/> Capturar
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (fotoAtual) {
+                return (
+                    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+                        <div className="p-4 bg-neutral-900 flex justify-between items-center">
+                            <h2 className="font-bold text-white">Pré-visualização</h2>
+                            <button onClick={cancelar} className="text-white"><X size={24}/></button>
+                        </div>
+                        
+                        <div className="flex-1 flex items-center justify-center p-4">
+                            <img src={fotoAtual} alt="Preview" className="max-w-full max-h-full rounded-xl"/>
+                        </div>
+
+                        <div className="p-6 bg-neutral-900 grid grid-cols-2 gap-3">
+                            <button onClick={cancelar} className="bg-neutral-700 text-white py-4 rounded-xl font-bold">
+                                Refazer
+                            </button>
+                            <button onClick={salvarFoto} className="bg-green-500 text-black py-4 rounded-xl font-bold">
+                                Salvar
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
+                    <div className="flex items-center gap-3 mb-6 pt-safe">
+                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg">
+                            <ArrowLeft/>
+                        </button>
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <Camera className="text-yellow-500"/> Fotos de Progresso
+                        </h2>
+                    </div>
+
+                    <button 
+                        onClick={iniciarCamera}
+                        className="w-full bg-yellow-500 text-black py-4 rounded-xl font-bold text-lg mb-6 flex items-center justify-center gap-2"
+                    >
+                        <Camera size={24}/> Tirar Nova Foto
+                    </button>
+
+                    {loading && <p className="text-center text-neutral-500">Carregando...</p>}
+
+                    {!loading && fotos.length === 0 && (
+                        <div className="text-center py-20 opacity-50">
+                            <Image size={64} className="mx-auto mb-4 text-neutral-600"/>
+                            <p>Nenhuma foto ainda</p>
+                            <p className="text-sm text-neutral-500 mt-2">Tire sua primeira foto de progresso!</p>
+                        </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {fotos.map(foto => (
+                            <div key={foto.id} className="relative group">
+                                <img 
+                                    src={foto.dataUrl} 
+                                    alt="Progresso" 
+                                    className="w-full aspect-square object-cover rounded-xl border-2 border-neutral-700"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                                    <button 
+                                        onClick={() => deletarFoto(foto.id)}
+                                        className="bg-red-500 p-3 rounded-full"
+                                    >
+                                        <Trash2 size={20}/>
+                                    </button>
+                                </div>
+                                <p className="text-xs text-neutral-400 mt-1">
+                                    {foto.data?.toDate ? foto.data.toDate().toLocaleDateString('pt-BR') : 'Sem data'}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- DASHBOARD ANALYTICS ---
+        const DashboardAnalytics = ({ user, onBack }) => {
+            const [stats, setStats] = useState(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+                calcularStats();
+            }, []);
+
+            const calcularStats = async () => {
+                try {
+                    // Buscar todos os alunos
+                    const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
+                    const usersSnap = await getDocs(usersRef);
+                    const totalAlunos = usersSnap.size;
+
+                    // Alunos ativos (últimos 7 dias)
+                    const seteDiasAtras = new Date();
+                    seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+                    const alunosAtivos = usersSnap.docs.filter(doc => {
+                        const lastSeen = doc.data().lastSeen?.toDate();
+                        return lastSeen && lastSeen > seteDiasAtras;
+                    }).length;
+
+                    // Buscar treinos criados
+                    const templatesRef = collection(db, 'artifacts', appId, 'public', 'data', 'templates');
+                    const templatesSnap = await getDocs(templatesRef);
+                    const totalTemplates = templatesSnap.size;
+
+                    // Buscar avaliações
+                    const avaliacoesRef = collection(db, 'artifacts', appId, 'avaliacoes');
+                    const avaliacoesSnap = await getDocs(avaliacoesRef);
+                    const totalAvaliacoes = avaliacoesSnap.size;
+
+                    // Buscar alunos cadastrados
+                    const alunosRef = collection(db, 'artifacts', appId, 'alunos');
+                    const alunosSnap = await getDocs(alunosRef);
+                    const alunosCadastrados = alunosSnap.size;
+
+                    setStats({
+                        totalAlunos,
+                        alunosAtivos,
+                        alunosInativos: totalAlunos - alunosAtivos,
+                        taxaAtivacao: totalAlunos > 0 ? ((alunosAtivos / totalAlunos) * 100).toFixed(1) : 0,
+                        totalTemplates,
+                        totalAvaliacoes,
+                        alunosCadastrados
+                    });
+                } catch (error) {
+                    console.error('Erro ao calcular stats:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-neutral-900 text-white flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
+                            <p>Calculando métricas...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
+                    <div className="flex items-center gap-3 mb-6 pt-safe">
+                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg">
+                            <ArrowLeft/>
+                        </button>
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <BarChart3 className="text-yellow-500"/> Dashboard Analytics
+                        </h2>
+                    </div>
+
+                    {/* Cards de Métricas */}
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Users size={20}/>
+                                <p className="text-sm font-bold opacity-80">Total Alunos</p>
+                            </div>
+                            <p className="text-4xl font-black">{stats.totalAlunos}</p>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Zap size={20}/>
+                                <p className="text-sm font-bold opacity-80">Ativos</p>
+                            </div>
+                            <p className="text-4xl font-black">{stats.alunosAtivos}</p>
+                            <p className="text-xs opacity-80 mt-1">Últimos 7 dias</p>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-6 rounded-xl text-black">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Target size={20}/>
+                                <p className="text-sm font-bold opacity-80">Taxa Ativação</p>
+                            </div>
+                            <p className="text-4xl font-black">{stats.taxaAtivacao}%</p>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Dumbbell size={20}/>
+                                <p className="text-sm font-bold opacity-80">Templates</p>
+                            </div>
+                            <p className="text-4xl font-black">{stats.totalTemplates}</p>
+                        </div>
+                    </div>
+
+                    {/* Estatísticas Detalhadas */}
+                    <div className="bg-neutral-800 p-6 rounded-xl mb-4">
+                        <h3 className="font-bold text-lg mb-4">📊 Estatísticas</h3>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg">
+                                <span className="text-neutral-400">Alunos Cadastrados</span>
+                                <span className="font-bold text-xl">{stats.alunosCadastrados}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg">
+                                <span className="text-neutral-400">Avaliações Realizadas</span>
+                                <span className="font-bold text-xl">{stats.totalAvaliacoes}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg">
+                                <span className="text-neutral-400">Alunos Inativos</span>
+                                <span className="font-bold text-xl text-red-500">{stats.alunosInativos}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Insights da IA */}
+                    <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 p-6 rounded-xl">
+                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                            <Brain className="text-purple-400"/> Insights da IA
+                        </h3>
+                        <div className="space-y-3 text-sm">
+                            {stats.alunosInativos > 0 && (
+                                <div className="flex gap-3">
+                                    <AlertCircle size={20} className="text-yellow-500 shrink-0"/>
+                                    <p className="text-neutral-300">
+                                        <span className="font-bold text-yellow-500">{stats.alunosInativos} alunos</span> sem treinar há 7+ dias. 
+                                        Considere enviar mensagem motivacional.
+                                    </p>
+                                </div>
+                            )}
+                            {stats.taxaAtivacao < 70 && (
+                                <div className="flex gap-3">
+                                    <TrendingDown size={20} className="text-red-500 shrink-0"/>
+                                    <p className="text-neutral-300">
+                                        Taxa de ativação abaixo de 70%. Recomendo criar desafios semanais para engajar.
+                                    </p>
+                                </div>
+                            )}
+                            {stats.taxaAtivacao >= 80 && (
+                                <div className="flex gap-3">
+                                    <Award size={20} className="text-green-500 shrink-0"/>
+                                    <p className="text-neutral-300">
+                                        Excelente! Taxa de ativação acima de 80%. Seus alunos estão muito engajados! 🔥
+                                    </p>
+                                </div>
+                            )}
+                            {stats.totalAvaliacoes < stats.totalAlunos / 2 && (
+                                <div className="flex gap-3">
+                                    <Ruler size={20} className="text-blue-500 shrink-0"/>
+                                    <p className="text-neutral-300">
+                                        Menos de 50% dos alunos têm avaliação. Avaliações aumentam retenção em 40%!
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- IA COACH ASSISTANT (GRATUITA) ---
+        const IACoachAssistant = ({ user, onBack }) => {
+            const [pergunta, setPergunta] = useState('');
+            const [resposta, setResposta] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            const analisarPergunta = (pergunta) => {
+                const p = pergunta.toLowerCase();
+
+                // Análise de frequência
+                if (p.includes('frequência') || p.includes('quantas vezes') || p.includes('dias por semana')) {
+                    return {
+                        titulo: "Frequência de Treino",
+                        resposta: `Para hipertrofia, o ideal é treinar cada grupo muscular 2x por semana. 
+                
+Exemplo:
+• Segunda: Peito + Tríceps
+• Terça: Costas + Bíceps  
+• Quarta: Pernas
+• Quinta: Peito + Tríceps (leve)
+• Sexta: Costas + Bíceps (leve)
+• Sábado: Ombros
+
+Estudos mostram que 2x/semana pode aumentar hipertrofia em 20-30% vs 1x/semana.`,
+                        fonte: "Schoenfeld et al., 2016"
+                    };
+                }
+
+                // Análise de descanso
+                if (p.includes('descanso') || p.includes('intervalo') || p.includes('rest')) {
+                    return {
+                        titulo: "Tempo de Descanso",
+                        resposta: `O descanso ideal varia com o objetivo:
+
+🔥 Hipertrofia: 60-90 segundos
+💪 Força: 3-5 minutos
+⚡ Resistência: 30-60 segundos
+
+Para exercícios compostos (agachamento, supino), use o limite superior.
+Para isolados (rosca, tríceps), use o limite inferior.`,
+                        fonte: "ACSM Guidelines, 2021"
+                    };
+                }
+
+                // Análise de platô
+                if (p.includes('platô') || p.includes('estagn') || p.includes('não evolu')) {
+                    return {
+                        titulo: "Quebrando Platôs",
+                        resposta: `Estratégias comprovadas:
+
+1. **Deload Week**: Reduza 40% do volume por 1 semana
+2. **Variação de Rep Range**: Alterne 6-8, 8-12, 12-15 reps
+3. **Técnicas Avançadas**: Drop sets, rest-pause, cluster sets
+4. **Aumente Frequência**: Treine o grupo 3x/semana
+5. **Revise Nutrição**: Pode estar em déficit calórico
+
+Platôs são normais a cada 4-6 semanas. É o corpo se adaptando!`,
+                        fonte: "Kraemer & Ratamess, 2004"
+                    };
+                }
+
+                // Análise de volume
+                if (p.includes('volume') || p.includes('séries') || p.includes('quantas séries')) {
+                    return {
+                        titulo: "Volume de Treino",
+                        resposta: `Volume semanal ideal por grupo muscular:
+
+📊 **Iniciante**: 10-15 séries/semana
+📊 **Intermediário**: 15-20 séries/semana  
+📊 **Avançado**: 20-25 séries/semana
+
+Exemplo para Peito (intermediário):
+• Supino Reto: 4 séries
+• Supino Inclinado: 4 séries
+• Crucifixo: 3 séries
+• Flexão: 3 séries
+= 14 séries/semana ✅
+
+Mais volume NEM SEMPRE = mais resultado!`,
+                        fonte: "Schoenfeld & Grgic, 2018"
+                    };
+                }
+
+                // Análise de nutrição
+                if (p.includes('proteína') || p.includes('nutrição') || p.includes('dieta') || p.includes('comer')) {
+                    return {
+                        titulo: "Nutrição para Hipertrofia",
+                        resposta: `Macros ideais para ganho de massa:
+
+🥩 **Proteína**: 1.6-2.2g/kg de peso corporal
+🍚 **Carboidratos**: 4-7g/kg (energia para treino)
+🥑 **Gorduras**: 0.8-1g/kg (hormônios)
+
+Exemplo para 75kg:
+• Proteína: 120-165g
+• Carbos: 300-525g
+• Gorduras: 60-75g
+
+💡 Timing: Proteína a cada 3-4h (4-5 refeições/dia)
+💡 Pós-treino: Carbo + Proteína em até 2h`,
+                        fonte: "ISSN Position Stand, 2017"
+                    };
+                }
+
+                // Análise de técnica
+                if (p.includes('técnica') || p.includes('execução') || p.includes('como fazer')) {
+                    return {
+                        titulo: "Técnica de Execução",
+                        resposta: `Princípios fundamentais:
+
+✅ **Amplitude Completa**: Full ROM sempre que possível
+✅ **Controle Excêntrico**: 2-3 segundos na descida
+✅ **Contração no Topo**: Squeeze de 1 segundo
+✅ **Sem Momentum**: Movimento controlado, não balançar
+
+Cadência ideal: 3010
+• 3 seg descida (excêntrica)
+• 0 seg pausa embaixo
+• 1 seg subida (concêntrica)  
+• 0 seg pausa em cima
+
+Técnica > Carga SEMPRE!`,
+                        fonte: "Schoenfeld, 2010"
+                    };
+                }
+
+                // Resposta padrão
+                return {
+                    titulo: "Resposta Geral",
+                    resposta: `Não tenho uma resposta específica para essa pergunta, mas posso te ajudar com:
+
+• Frequência de treino
+• Tempo de descanso
+• Como quebrar platôs
+• Volume de treino (séries/semana)
+• Nutrição e proteína
+• Técnica de execução
+
+Reformule sua pergunta ou escolha um dos tópicos acima! 💪`,
+                    fonte: "IA IronTracks"
+                };
+            };
+
+            const handlePerguntar = () => {
+                if (!pergunta.trim()) {
+                    alert('❌ Digite uma pergunta!');
+                    return;
+                }
+
+                setLoading(true);
+                setTimeout(() => {
+                    const resultado = analisarPergunta(pergunta);
+                    setResposta(resultado);
+                    setLoading(false);
+                }, 1000); // Simula processamento
+            };
+
+            return (
+                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
+                    <div className="flex items-center gap-3 mb-6 pt-safe">
+                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg">
+                            <ArrowLeft/>
+                        </button>
+                        <h2 className="text-xl font-bold flex items-center gap-2">
+                            <Brain className="text-purple-500"/> IA Coach Assistant
+                        </h2>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 p-4 rounded-xl mb-6">
+                        <p className="text-sm text-neutral-300">
+                            💡 Faça perguntas sobre treino, nutrição, técnica e mais. 
+                            A IA analisa e responde baseada em estudos científicos!
+                        </p>
+                    </div>
+
+                    <div className="bg-neutral-800 p-6 rounded-xl mb-4">
+                        <label className="text-sm font-bold text-neutral-400 block mb-2">
+                            Sua Pergunta:
+                        </label>
+                        <textarea
+                            value={pergunta}
+                            onChange={(e) => setPergunta(e.target.value)}
+                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white outline-none focus:border-purple-500 resize-none"
+                            rows="4"
+                            placeholder="Ex: Quantas vezes por semana devo treinar cada músculo?"
+                        />
+                        <button
+                            onClick={handlePerguntar}
+                            disabled={loading}
+                            className="w-full mt-4 bg-purple-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-400 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    Analisando...
+                                </>
+                            ) : (
+                                <>
+                                    <Brain size={24}/> Perguntar à IA
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {resposta && (
+                        <div className="bg-neutral-800 p-6 rounded-xl animate-fade-in">
+                            <h3 className="font-bold text-xl mb-4 text-purple-400">
+                                {resposta.titulo}
+                            </h3>
+                            <div className="prose prose-invert max-w-none">
+                                <p className="text-neutral-300 whitespace-pre-line leading-relaxed">
+                                    {resposta.resposta}
+                                </p>
+                            </div>
+                            <div className="mt-6 pt-4 border-t border-neutral-700">
+                                <p className="text-xs text-neutral-500">
+                                    📚 Fonte: {resposta.fonte}
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sugestões de Perguntas */}
+                    {!resposta && (
+                        <div className="bg-neutral-800 p-6 rounded-xl">
+                            <h3 className="font-bold mb-4">💡 Sugestões de Perguntas:</h3>
+                            <div className="space-y-2">
+                                {[
+                                    "Quantas vezes por semana devo treinar?",
+                                    "Qual o tempo de descanso ideal?",
+                                    "Como quebrar um platô?",
+                                    "Quantas séries por grupo muscular?",
+                                    "Quanta proteína devo consumir?",
+                                    "Como melhorar minha técnica?"
+                                ].map((sugestao, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => setPergunta(sugestao)}
+                                        className="w-full text-left p-3 bg-neutral-900 rounded-lg hover:bg-neutral-700 transition-colors text-sm"
+                                    >
+                                        {sugestao}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
         // --- EXERCISE EDITOR ---
         const ExerciseEditor = ({ index, exercise, updateExercise, removeExercise }) => {
             const [expanded, setExpanded] = useState(false);
@@ -1042,6 +1691,9 @@
                     {view === 'history' && <HistoryList user={user} onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }} onBack={() => setView('dashboard')} />}
                     {view === 'report' && reportData.current && <WorkoutReport session={reportData.current} previousSession={reportData.previous} onClose={() => setView('dashboard')} />}
                     {view === 'active' && currentWorkout && <ActiveWorkout workout={currentWorkout} user={user} onFinish={(c, p) => { setReportData({ current: c, previous: p }); setView('report'); }} onBack={() => setView('dashboard')} />}
+                    {view === 'photos' && <FotosProgresso user={user} onBack={() => setView('dashboard')} />}
+                    {view === 'analytics' && <DashboardAnalytics user={user} onBack={() => setView('dashboard')} />}
+                    {view === 'ai' && <IACoachAssistant user={user} onBack={() => setView('dashboard')} />}
                     {view === 'edit' && (
                         <div className="min-h-[100dvh] bg-neutral-900 text-white p-4 pb-20"><div className="flex justify-between items-center mb-6 pt-safe"><button onClick={() => setView('dashboard')} className="p-2 bg-neutral-800 rounded-lg"><RotateCcw size={20} /></button><h2 className="font-bold text-lg">{currentWorkout.id ? 'Editar' : 'Novo'}</h2><button onClick={handleSaveWorkout} className="p-2 bg-yellow-500 text-black rounded-lg"><Save size={20} /></button></div><div className="mb-6"><label className="text-xs text-neutral-500 uppercase font-bold">Nome</label><input type="text" value={currentWorkout.title} onChange={(e) => setCurrentWorkout({...currentWorkout, title: e.target.value})} className="w-full bg-neutral-800 border-b-2 border-neutral-700 p-3 text-xl font-bold focus:border-yellow-500 outline-none" placeholder="Ex: Treino A"/></div><div className="space-y-4">{currentWorkout.exercises.map((ex, idx) => ( <ExerciseEditor key={idx} index={idx} exercise={ex} updateExercise={(idx, field, val) => { const newExs = [...currentWorkout.exercises]; newExs[idx] = { ...newExs[idx], [field]: val }; setCurrentWorkout({ ...currentWorkout, exercises: newExs }); }} removeExercise={(idx) => { const newExs = currentWorkout.exercises.filter((_, i) => i !== idx); setCurrentWorkout({ ...currentWorkout, exercises: newExs }); }} /> ))}</div><button onClick={() => setCurrentWorkout({...currentWorkout, exercises: [...currentWorkout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '' }]})} className="w-full mt-6 py-4 border-2 border-dashed border-neutral-700 rounded-xl text-neutral-400 font-bold hover:bg-neutral-800">+ Exercício</button></div>
                     )}
@@ -1066,6 +1718,11 @@
                                 <div className="grid grid-cols-2 gap-3">
                                     <button onClick={() => setView('import')} className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-800 hover:border-blue-500/50"><Download size={18} className="text-blue-500" /> Importar</button>
                                     <button onClick={handleCreateWorkout} className="bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg"><Plus size={18} /> Novo Treino</button>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2 mt-3">
+                                    <button onClick={() => setView('photos')} className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-sm p-3 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-bold border border-purple-500/30 hover:border-purple-500/50"><Camera size={16} className="text-purple-400" /><span>Fotos</span></button>
+                                    <button onClick={() => setView('analytics')} className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm p-3 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-bold border border-blue-500/30 hover:border-blue-500/50"><BarChart3 size={16} className="text-blue-400" /><span>Analytics</span></button>
+                                    <button onClick={() => setView('ai')} className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-sm p-3 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-bold border border-green-500/30 hover:border-green-500/50"><Brain size={16} className="text-green-400" /><span>IA Coach</span></button>
                                 </div>
                             </div>
                             {view === 'import' && (
