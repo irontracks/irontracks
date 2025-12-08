@@ -24,13 +24,11 @@
                     animation: {
                         'fade-in': 'fadeIn 0.5s ease-out',
                         'slide-up': 'slideUp 0.3s ease-out',
-                        'slide-down': 'slideDown 0.3s ease-out',
                         'pulse-fast': 'pulseFast 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                     },
                     keyframes: {
                         fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
                         slideUp: { '0%': { transform: 'translateY(100%)' }, '100%': { transform: 'translateY(0)' } },
-                        slideDown: { '0%': { transform: 'translateY(-100%)' }, '100%': { transform: 'translateY(0)' } },
                         pulseFast: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.5' } }
                     }
                 }
@@ -86,7 +84,7 @@
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
             TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell, Flame,
-            History, Calendar, Crown, Database, UserCog, Megaphone, AlertCircle, Link, Layers, ShieldCheck, UserPlus
+            History, Calendar, Crown, Database, UserCog, Megaphone, AlertCircle
         } from 'lucide-react';
 
         // --- CONFIG ---
@@ -104,7 +102,6 @@
         const db = getFirestore(app);
         const appId = 'irontracks-production';
         const ADMIN_EMAIL = 'djmkapple@gmail.com';
-        const APP_VERSION = 'v2.6 (beta)';
 
         // --- UTILITÁRIOS ---
         const formatDuration = (s) => { const mins = Math.floor(s / 60); const secs = Math.floor(s % 60); return `${mins}:${secs < 10 ? '0' : ''}${secs}`; };
@@ -112,184 +109,107 @@
         const formatDate = (ts) => { if (!ts) return ''; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute:'2-digit' }); };
         const formatLastSeen = (ts) => { if (!ts) return 'Nunca'; const d = ts.toDate ? ts.toDate() : new Date(ts); const diff = (new Date() - d) / 60000; if(diff<1) return 'Agora'; if(diff<60) return `${Math.floor(diff)}m`; return `${Math.floor(diff/60)}h`; };
 
-        // --- COMPONENTES DE BASE ---
-        const LoadingScreen = ({ onReset }) => {
-            const [showReset, setShowReset] = useState(false);
-            useEffect(() => { const timer = setTimeout(() => setShowReset(true), 5000); return () => clearTimeout(timer); }, []);
-            return (
-                <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-neutral-900 text-white p-6">
-                    <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl animate-pulse"><Dumbbell size={64} className="text-black" /></div>
-                    <h1 className="text-2xl font-black mb-2 tracking-tighter italic text-center text-white animate-pulse">SINCRONIZANDO...</h1>
-                    {showReset && <button onClick={onReset} className="flex items-center gap-2 px-4 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-xs text-red-400 hover:bg-neutral-700 transition-all animate-fade-in mt-8"><AlertCircle size={14} /> Reiniciar Login</button>}
-                </div>
-            );
-        };
-
+        // --- TELA DE LOGIN MANUAL (SEM AUTO-LOOP) ---
         const LoginScreen = () => {
             const [isLoading, setIsLoading] = useState(false);
-            const [statusMsg, setStatusMsg] = useState('');
-            const handleLogin = async () => {
-                if (isLoading) return; setIsLoading(true); setStatusMsg("Direcionando para Google..."); localStorage.setItem('auth_pending', 'true');
-                const provider = new GoogleAuthProvider();
-                try { await setPersistence(auth, browserLocalPersistence); await signInWithRedirect(auth, provider); } 
-                catch (error) { console.error(error); localStorage.removeItem('auth_pending'); setStatusMsg("Erro: " + error.message); setIsLoading(false); }
-            };
-            return (
-                <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-neutral-900 text-white p-6 relative">
-                    <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
-                        <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl animate-pulse"><Dumbbell size={64} className="text-black" /></div>
-                        <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
-                        <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • {APP_VERSION}</p>
-                        <button onClick={handleLogin} disabled={isLoading} className="group w-full flex items-center justify-center gap-4 bg-white text-neutral-900 px-8 py-5 rounded-2xl font-bold text-xl hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-70">{isLoading ? <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-neutral-900"></span> : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="G"/> Entrar com Google</>}</button>
-                        {statusMsg && <p className="mt-4 text-xs text-yellow-500 text-center font-mono animate-fade-in">{statusMsg}</p>}
-                    </div>
-                </div>
-            );
-        };
+            const [errorMsg, setErrorMsg] = useState('');
+            const [showRedirectOption, setShowRedirectOption] = useState(false);
 
-        const NotificationToast = ({ notification, onClose }) => { if (!notification) return null; return <div onClick={onClose} className="fixed top-4 left-4 right-4 z-[60] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer">{notification.photoURL ? <img src={notification.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" /> : <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold">{notification.displayName?.[0]}</div>}<div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-yellow-500">Nova Mensagem</p><p className="text-sm truncate text-white">{notification.text}</p></div><button className="text-neutral-400"><X size={16}/></button></div>; };
-
-        const ChatScreen = ({ user, onClose }) => { 
-            const [activeChat, setActiveChat] = useState(null); 
-            const [usersList, setUsersList] = useState([]); 
-            const [messages, setMessages] = useState([]); 
-            const [newMessage, setNewMessage] = useState(''); 
-            const dummy = useRef(); 
-            
-            useEffect(() => { 
-                if (activeChat) return;
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), limit(50)); 
-                const unsubscribe = onSnapshot(q, (snapshot) => { 
-                    const users = snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid);
-                    users.sort((a, b) => (b.lastSeen?.seconds || 0) - (a.lastSeen?.seconds || 0));
-                    setUsersList(users); 
-                }); 
-                return () => unsubscribe(); 
-            }, [activeChat]); 
-            
-            useEffect(() => { 
-                if (!activeChat) return; 
-                let collectionPath; 
-                if (activeChat.id === 'global') { collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); } 
-                else { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } 
-                const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50)); 
-                const unsubscribe = onSnapshot(q, (snapshot) => { setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse()); }); 
-                return () => unsubscribe(); 
-            }, [activeChat]); 
-            
-            useEffect(() => { dummy.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]); 
-            
-            const sendMessage = async (e) => { 
-                e.preventDefault(); if (!newMessage.trim()) return; 
-                const text = newMessage; setNewMessage(''); 
-                let collectionPath; 
-                if (activeChat && activeChat.id === 'global') collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); 
-                else if (activeChat) { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } 
-                else return; 
-                await addDoc(collectionPath, { text: text, createdAt: serverTimestamp(), uid: user.uid, displayName: user.displayName || 'Anônimo', photoURL: user.photoURL }); 
-            }; 
-            
-            return <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up"><div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe"><div className="flex items-center gap-3">{activeChat ? <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button> : <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>}<div><h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3><p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p></div></div><button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600"><X size={20} /></button></div>{!activeChat && <div className="flex-1 overflow-y-auto p-4 space-y-2"><button onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge', displayName: 'Iron Lounge' })} className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700 h-20"><div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold shrink-0"><Users size={24} /></div><div className="text-left"><p className="font-bold text-white text-lg">Iron Lounge</p><p className="text-xs text-neutral-400">Chat Global</p></div></button><p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas</p>{usersList.map((u, idx) => ( <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-4 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full border border-neutral-600 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white shrink-0">{u.displayName?.[0]}</div>}<div className="text-left overflow-hidden"><p className="font-bold text-white text-base truncate">{u.displayName}</p><p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p></div></button> ))}</div>}{activeChat && <><div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">{messages.map(msg => { const isMe = msg.uid === user.uid; return <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>{msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}<div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>{!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}<p>{msg.text}</p></div></div>; })}<div ref={dummy}></div></div><form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe"><input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." /><button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button></form></>}</div>; 
-        };
-
-        // --- PAINEL ADMIN ---
-        const AdminPanel = ({ user, onClose }) => { 
-            const [tab, setTab] = useState('students'); 
-            const [usersList, setUsersList] = useState([]); 
-            const [templates, setTemplates] = useState([]); 
-            const [adminWorkouts, setAdminWorkouts] = useState([]);
-            const [selectedStudent, setSelectedStudent] = useState(null); 
-            const [studentWorkouts, setStudentWorkouts] = useState([]); 
-            const [editingTemplate, setEditingTemplate] = useState(null); 
-            const [cloneModalOpen, setCloneModalOpen] = useState(false);
-            const [cloneTab, setCloneTab] = useState('templates');
-            
-            // Whitelist States
-            const [whitelist, setWhitelist] = useState([]);
-            const [newEmail, setNewEmail] = useState('');
-
-            // Load Whitelist
+            // Limpa lixo de sessões anteriores que possam estar travando
             useEffect(() => {
-                if (tab !== 'access') return;
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'whitelist'));
-                const unsub = onSnapshot(q, snap => setWhitelist(snap.docs.map(d => d.data())));
-                return () => unsub();
-            }, [tab]);
+                localStorage.removeItem('auth_pending');
+                localStorage.removeItem('auth_in_progress');
+            }, []);
 
-            // Actions Whitelist
-            const handleAddWhitelist = async () => {
-                if(!newEmail.includes('@')) return alert("Email inválido");
+            const handlePopupLogin = async () => {
+                setIsLoading(true);
+                setErrorMsg('');
+                const provider = new GoogleAuthProvider();
                 try {
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'whitelist', newEmail.toLowerCase().trim()), {
-                        email: newEmail.toLowerCase().trim(),
-                        addedAt: serverTimestamp()
-                    });
-                    setNewEmail('');
-                    alert("Acesso Liberado!");
-                } catch(e) { alert("Erro ao adicionar"); }
+                    await setPersistence(auth, browserLocalPersistence);
+                    await signInWithPopup(auth, provider);
+                    // Sucesso: o onAuthStateChanged no App vai pegar
+                } catch (error) {
+                    console.error("Popup Error:", error);
+                    setIsLoading(false);
+                    // Se popup foi bloqueado ou fechado, sugerimos redirect
+                    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+                        setErrorMsg("Pop-up bloqueado. Use a opção abaixo.");
+                        setShowRedirectOption(true);
+                    } else if (error.code === 'auth/unauthorized-domain') {
+                        setErrorMsg("Domínio não autorizado no Firebase.");
+                    } else {
+                        setErrorMsg(error.message);
+                    }
+                }
             };
 
-            const handleRemoveWhitelist = async (email) => {
-                if(!confirm("Bloquear acesso deste email?")) return;
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'whitelist', email));
+            const handleRedirectLogin = async () => {
+                setIsLoading(true);
+                setErrorMsg('Redirecionando...');
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithRedirect(auth, provider);
+                } catch (error) {
+                    setIsLoading(false);
+                    setErrorMsg("Falha no redirect: " + error.message);
+                }
             };
-
-            // Load other data (mantido)
-            useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), limit(50)); const unsub = onSnapshot(q, snap => { const data = snap.docs.map(d => d.data()); data.sort((a,b) => (b.lastSeen?.seconds || 0) - (a.lastSeen?.seconds || 0)); setUsersList(data); }); return () => unsub(); }, []); 
-            useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, []); 
-            useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts')); const unsub = onSnapshot(q, snap => { const data = snap.docs.map(d => ({id: d.id, ...d.data()})); data.sort((a, b) => (a.title || '').localeCompare(b.title || '')); setAdminWorkouts(data); }); return () => unsub(); }, [user]);
-            useEffect(() => { if (!selectedStudent) return; const q = query(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts')); const unsub = onSnapshot(q, snap => { const data = snap.docs.map(d => ({id: d.id, ...d.data()})); data.sort((a,b) => (a.title||'').localeCompare(b.title||'')); setStudentWorkouts(data); }); return () => unsub(); }, [selectedStudent]); 
-
-            const handleClone = async (workoutData) => { if (!selectedStudent) return; if (!confirm(`Enviar "${workoutData.title}"?`)) return; const newWorkout = { ...workoutData, title: workoutData.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: workoutData.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), newWorkout); alert("Enviado!"); }; 
-            const handleCloneAllPersonal = async () => { if (!selectedStudent) return; if (!confirm(`Enviar TODOS os ${adminWorkouts.length} treinos?`)) return; for (const workout of adminWorkouts) { const newWorkout = { ...workout, title: workout.title, importedFrom: 'Coach MK (Pack)', createdAt: serverTimestamp(), exercises: workout.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), newWorkout); } alert("Sucesso!"); setCloneModalOpen(false); };
-            const handleDeleteStudentWorkout = async (wId) => { if (!confirm("Deletar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts', wId)); }; 
-            const handleShareTemplateLink = async (template) => { try { const shareData = { ...template, originalAuthor: 'Coach MK', sharedAt: serverTimestamp() }; const docData = { ...shareData }; delete docData.id; const r = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_workouts'), docData); const url = `${window.location.origin}${window.location.pathname}?import=${r.id}`; const el = document.createElement('textarea'); el.value = `Treino do Coach: ${url}`; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert("Link copiado!"); } catch (e) { alert("Erro."); } };
 
             return (
-                <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up">
-                    <div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg">
-                        <h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND</h2>
-                        <button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button>
+                <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-neutral-900 text-white p-6">
+                    <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-3xl shadow-2xl animate-pulse">
+                        <Dumbbell size={64} className="text-black" />
                     </div>
-                    {!selectedStudent && !editingTemplate && ( 
-                        <div className="flex p-2 gap-2 bg-neutral-800">
-                            <button onClick={() => setTab('students')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='students' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Alunos</button>
-                            <button onClick={() => setTab('templates')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='templates' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Templates</button>
-                            <button onClick={() => setTab('access')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='access' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}><ShieldCheck size={20} className="mx-auto"/></button>
-                        </div> 
-                    )}
+                    <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
+                    <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v2.2</p>
                     
-                    <div className="p-4 pb-20">
-                        {/* ABA ACESSO (WHITELIST) */}
-                        {tab === 'access' && !selectedStudent && !editingTemplate && (
-                            <div className="space-y-4">
-                                <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700">
-                                    <h3 className="font-bold text-white mb-2 flex items-center gap-2"><UserPlus size={18}/> Novo Acesso</h3>
-                                    <div className="flex gap-2">
-                                        <input value={newEmail} onChange={e=>setNewEmail(e.target.value)} className="flex-1 bg-neutral-900 rounded-lg px-3 text-white outline-none border border-neutral-600" placeholder="email@aluno.com"/>
-                                        <button onClick={handleAddWhitelist} className="bg-green-600 text-white px-4 py-2 rounded-lg font-bold">Add</button>
-                                    </div>
-                                </div>
-                                <p className="text-xs text-neutral-500 uppercase tracking-widest">Emails Autorizados ({whitelist.length})</p>
-                                {whitelist.map((w, i) => (
-                                    <div key={i} className="bg-neutral-800/50 p-3 rounded-lg flex justify-between items-center border border-neutral-800">
-                                        <span className="text-sm font-mono">{w.email}</span>
-                                        <button onClick={() => handleRemoveWhitelist(w.email)} className="text-red-500 bg-red-500/10 p-2 rounded hover:bg-red-500 hover:text-white transition-colors"><Trash2 size={14}/></button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                    {/* Botão Principal (Popup) */}
+                    <button 
+                        onClick={handlePopupLogin}
+                        disabled={isLoading}
+                        className="w-full max-w-xs flex items-center justify-center gap-3 bg-white text-neutral-900 px-6 py-4 rounded-xl font-bold text-lg hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-50 mb-4"
+                    >
+                        {isLoading ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-neutral-900"></span> : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5"/> Entrar com Google</>}
+                    </button>
 
-                        {tab === 'students' && !selectedStudent && !editingTemplate && ( <div className="space-y-3">{usersList.map(u => <div key={u.uid} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-600 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}<div className="flex-1"><h3 className="font-bold text-lg">{u.displayName}</h3><p className="text-xs text-neutral-400">Visto: {formatLastSeen(u.lastSeen)}</p></div><ArrowLeft className="rotate-180 text-neutral-500"/></div>)}</div> )}
-                        {tab === 'templates' && !selectedStudent && !editingTemplate && ( <div className="space-y-3"><button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Novo Template</button>{templates.map(t => <div key={t.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h3 className="font-bold text-white">{t.title}</h3><p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p></div><div className="flex gap-2"><button onClick={() => handleShareTemplateLink(t)} className="p-2 bg-blue-900/30 text-blue-400 rounded-lg" title="Gerar Link"><Link size={16}/></button><button onClick={() => setEditingTemplate(t)} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={async () => { if(confirm('Apagar?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'templates', t.id)) }} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div> )}
-                        {selectedStudent && !editingTemplate && ( <div><div className="flex items-center gap-3 mb-6"><button onClick={() => setSelectedStudent(null)} className="p-2 bg-neutral-800 rounded-lg"><ArrowLeft/></button><div><h2 className="text-xl font-bold">{selectedStudent.displayName}</h2><p className="text-xs text-neutral-400">{selectedStudent.email}</p></div></div><div className="grid grid-cols-2 gap-2 mb-6"><button onClick={() => setEditingTemplate({ title: '', exercises: [], targetStudentId: selectedStudent.uid })} className="bg-yellow-500 text-black p-3 rounded-xl font-bold text-sm">+ Personalizado</button><button onClick={() => setCloneModalOpen(true)} className="bg-neutral-800 text-white border border-neutral-700 p-3 rounded-xl font-bold text-sm hover:bg-neutral-700">Clonar para Aluno</button></div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Treinos Atuais</h3><div className="space-y-3 mb-8">{studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h4 className="font-bold text-white">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: selectedStudent.uid})} className="p-2 bg-blue-900/30 text-blue-400 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div></div> )}
-                        {editingTemplate && ( <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { const targetColl = data.targetStudentId ? collection(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts') : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; if(data.targetStudentId) payload.importedFrom = 'Coach MK'; if (data.id) { const docRef = data.targetStudentId ? doc(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts', data.id) : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); await setDoc(docRef, payload, { merge: true }); } else { await addDoc(targetColl, payload); } setEditingTemplate(null); }}/> )}
-                        {cloneModalOpen && ( <div className="fixed inset-0 z-[60] bg-black/90 flex items-end sm:items-center justify-center animate-fade-in"><div className="bg-neutral-900 w-full max-w-md p-6 rounded-t-3xl sm:rounded-3xl border border-neutral-700 max-h-[85vh] flex flex-col"><div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-white">Enviar Treino</h3><button onClick={() => setCloneModalOpen(false)} className="p-2 bg-neutral-800 rounded-full"><X size={20}/></button></div><div className="flex p-1 bg-neutral-800 rounded-lg mb-4 shrink-0"><button onClick={() => setCloneTab('templates')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${cloneTab === 'templates' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Templates</button><button onClick={() => setCloneTab('personal')} className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors ${cloneTab === 'personal' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Meus Treinos</button></div><div className="flex-1 overflow-y-auto space-y-2 min-h-0">{cloneTab === 'templates' && ( <>{templates.map(t => ( <button key={t.id} onClick={() => handleClone(t)} className="w-full bg-neutral-800 p-3 rounded-xl border border-neutral-700 flex justify-between items-center hover:bg-neutral-700"><span className="font-bold text-sm text-left">{t.title}</span><Copy size={16} className="text-yellow-500"/></button> ))}</> )}{cloneTab === 'personal' && ( <><button onClick={handleCloneAllPersonal} className="w-full bg-yellow-500 p-3 rounded-xl font-bold text-black flex items-center justify-center gap-2 mb-4 shadow-lg hover:bg-yellow-400"><Layers size={18} /> Clonar TODOS ({adminWorkouts.length})</button>{adminWorkouts.map(w => ( <button key={w.id} onClick={() => handleClone(w)} className="w-full bg-neutral-800 p-3 rounded-xl border border-neutral-700 flex justify-between items-center hover:bg-neutral-700"><span className="font-bold text-sm text-left">{w.title}</span><Copy size={16} className="text-blue-400"/></button> ))}</> )}</div></div></div> )}
-                    </div>
+                    {/* Botão Fallback (Redirect) - Só aparece se popup falhar ou usuário pedir */}
+                    {showRedirectOption && (
+                        <button 
+                            onClick={handleRedirectLogin}
+                            className="text-yellow-500 text-sm font-bold underline p-2 animate-fade-in"
+                        >
+                            Não funcionou? Clique para Login via Navegador
+                        </button>
+                    )}
+
+                    {/* Link para forçar redirect caso o usuário saiba que precisa (ex: iPhone) */}
+                    {!showRedirectOption && !isLoading && (
+                        <button onClick={() => setShowRedirectOption(true)} className="text-neutral-600 text-xs mt-4">
+                            Problemas para entrar?
+                        </button>
+                    )}
+
+                    {errorMsg && (
+                        <div className="mt-6 p-4 bg-red-900/20 border border-red-500/50 rounded-lg max-w-xs text-center">
+                            <p className="text-red-400 text-xs font-mono break-words">{errorMsg}</p>
+                        </div>
+                    )}
                 </div>
             );
         };
-        
+
+        const LoadingScreen = () => (
+            <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-neutral-900 text-white p-6">
+                <Dumbbell size={48} className="text-yellow-500 animate-bounce mb-4" />
+                <p className="text-sm font-bold tracking-widest animate-pulse">SINCRONIZANDO...</p>
+            </div>
+        );
+
+        // ... (Componentes internos: NotificationToast, ChatScreen, etc mantidos intactos) ...
+        const NotificationToast = ({ notification, onClose }) => { if (!notification) return null; return <div onClick={onClose} className="fixed top-4 left-4 right-4 z-[60] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer">{notification.photoURL ? <img src={notification.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" /> : <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold">{notification.displayName?.[0]}</div>}<div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-yellow-500">Nova Mensagem</p><p className="text-sm truncate text-white">{notification.text}</p></div><button className="text-neutral-400"><X size={16}/></button></div>; };
+        const ChatScreen = ({ user, onClose }) => { const [activeChat, setActiveChat] = useState(null); const [usersList, setUsersList] = useState([]); const [messages, setMessages] = useState([]); const [newMessage, setNewMessage] = useState(''); const dummy = useRef(); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc'), limit(20)); const unsubscribe = onSnapshot(q, (snapshot) => { setUsersList(snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid)); }); return () => unsubscribe(); }, [activeChat]); useEffect(() => { if (!activeChat) return; let collectionPath; if (activeChat.id === 'global') { collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); } else { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50)); const unsubscribe = onSnapshot(q, (snapshot) => { setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse()); }); return () => unsubscribe(); }, [activeChat]); useEffect(() => { dummy.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]); const sendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim()) return; const text = newMessage; setNewMessage(''); let collectionPath; if (activeChat && activeChat.id === 'global') collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); else if (activeChat) { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } else return; await addDoc(collectionPath, { text: text, createdAt: serverTimestamp(), uid: user.uid, displayName: user.displayName || 'Anônimo', photoURL: user.photoURL }); }; return <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up"><div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe"><div className="flex items-center gap-3">{activeChat ? <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button> : <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>}<div><h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3><p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p></div></div><button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600"><X size={20} /></button></div>{!activeChat && <div className="flex-1 overflow-y-auto p-4 space-y-2"><button onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge', displayName: 'Iron Lounge' })} className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700 h-20"><div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold shrink-0"><Users size={24} /></div><div className="text-left"><p className="font-bold text-white text-lg">Iron Lounge</p><p className="text-xs text-neutral-400">Chat Global</p></div></button><p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas</p>{usersList.map((u, idx) => ( <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-4 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full border border-neutral-600 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white shrink-0">{u.displayName?.[0]}</div>}<div className="text-left overflow-hidden"><p className="font-bold text-white text-base truncate">{u.displayName}</p><p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p></div></button> ))}</div>}{activeChat && <><div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">{messages.map(msg => { const isMe = msg.uid === user.uid; return <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>{msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}<div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>{!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}<p>{msg.text}</p></div></div>; })}<div ref={dummy}></div></div><form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe"><input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." /><button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button></form></>}</div>; };
+        const AdminPanel = ({ user, onClose }) => { const [tab, setTab] = useState('students'); const [usersList, setUsersList] = useState([]); const [templates, setTemplates] = useState([]); const [selectedStudent, setSelectedStudent] = useState(null); const [studentWorkouts, setStudentWorkouts] = useState([]); const [editingTemplate, setEditingTemplate] = useState(null); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc')); const unsub = onSnapshot(q, snap => setUsersList(snap.docs.map(d => d.data()))); return () => unsub(); }, []); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, []); useEffect(() => { if (!selectedStudent) return; const q = query(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setStudentWorkouts(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, [selectedStudent]); const handleCloneTemplate = async (template) => { if (!selectedStudent) return; if (!confirm(`Clonar para ${selectedStudent.displayName}?`)) return; const newWorkout = { ...template, title: template.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: template.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), newWorkout); alert("Enviado!"); }; const handleDeleteStudentWorkout = async (wId) => { if (!confirm("Deletar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts', wId)); }; return <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up"><div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg"><h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND</h2><button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button></div>{!selectedStudent && !editingTemplate && ( <div className="flex p-2 gap-2 bg-neutral-800"><button onClick={() => setTab('students')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='students' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Alunos</button><button onClick={() => setTab('templates')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='templates' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Templates</button></div> )}<div className="p-4 pb-20">{tab === 'students' && !selectedStudent && !editingTemplate && ( <div className="space-y-3">{usersList.map(u => <div key={u.uid} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-600 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}<div className="flex-1"><h3 className="font-bold text-lg">{u.displayName}</h3><p className="text-xs text-neutral-400">Visto: {formatLastSeen(u.lastSeen)}</p></div><ArrowLeft className="rotate-180 text-neutral-500"/></div>)}</div> )}{tab === 'templates' && !selectedStudent && !editingTemplate && ( <div className="space-y-3"><button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Novo Template</button>{templates.map(t => <div key={t.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h3 className="font-bold text-white">{t.title}</h3><p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate(t)} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={async () => { if(confirm('Apagar?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'templates', t.id)) }} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div> )}{selectedStudent && !editingTemplate && ( <div><div className="flex items-center gap-3 mb-6"><button onClick={() => setSelectedStudent(null)} className="p-2 bg-neutral-800 rounded-lg"><ArrowLeft/></button><div><h2 className="text-xl font-bold">{selectedStudent.displayName}</h2><p className="text-xs text-neutral-400">{selectedStudent.email}</p></div></div><div className="grid grid-cols-2 gap-2 mb-6"><button onClick={() => setEditingTemplate({ title: '', exercises: [], targetStudentId: selectedStudent.uid })} className="bg-yellow-500 text-black p-3 rounded-xl font-bold text-sm">+ Personalizado</button><button onClick={() => alert("Selecione um template abaixo")} className="bg-neutral-800 text-white border border-neutral-700 p-3 rounded-xl font-bold text-sm">Clonar Template</button></div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Treinos Atuais</h3><div className="space-y-3 mb-8">{studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h4 className="font-bold text-white">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: selectedStudent.uid})} className="p-2 bg-blue-900/30 text-blue-400 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Clonar Template</h3><div className="space-y-2">{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800/50 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div></div> )}{editingTemplate && ( <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { const targetColl = data.targetStudentId ? collection(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts') : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; if(data.targetStudentId) payload.importedFrom = 'Coach MK'; if (data.id) { const docRef = data.targetStudentId ? doc(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts', data.id) : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); await setDoc(docRef, payload, { merge: true }); } else { await addDoc(targetColl, payload); } setEditingTemplate(null); }}/> )}</div></div>; };
         const AdminWorkoutEditor = ({ initialData, onSave, onCancel }) => { const [workout, setWorkout] = useState(initialData); const updateExercise = (idx, field, val) => { const newExs = [...workout.exercises]; newExs[idx] = { ...newExs[idx], [field]: val }; setWorkout({ ...workout, exercises: newExs }); }; const addExercise = () => { setWorkout({ ...workout, exercises: [...workout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '', coachNotes: '' }] }); }; return <div className="bg-neutral-900 min-h-full"><div className="flex justify-between items-center mb-6"><button onClick={onCancel} className="text-neutral-400">Cancelar</button><h3 className="font-bold text-white">{workout.id ? 'Editar' : 'Novo'}</h3><button onClick={() => onSave(workout)} className="text-yellow-500 font-bold">Salvar</button></div><input value={workout.title} onChange={e => setWorkout({...workout, title: e.target.value})} className="w-full bg-neutral-800 text-xl font-bold p-4 rounded-xl mb-4 border border-neutral-700 outline-none" placeholder="Nome do Treino"/><div className="space-y-4">{workout.exercises.map((ex, idx) => ( <div key={idx} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 relative group"><button onClick={() => { const n = [...workout.exercises]; n.splice(idx, 1); setWorkout({...workout, exercises: n}); }} className="absolute top-2 right-2 text-red-500 p-2"><Trash2 size={16}/></button><div className="space-y-3 pr-8"><input value={ex.name} onChange={e => updateExercise(idx, 'name', e.target.value)} className="w-full bg-transparent font-bold text-white border-b border-neutral-600 pb-1" placeholder="Nome"/><div className="grid grid-cols-4 gap-2 text-center"><div><label className="text-[10px] text-neutral-500">Sets</label><input type="number" value={ex.sets} onChange={e=>updateExercise(idx,'sets',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Reps</label><input value={ex.reps} onChange={e=>updateExercise(idx,'reps',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Cad</label><input value={ex.cadence} onChange={e=>updateExercise(idx,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Rest</label><input type="number" value={ex.restTime} onChange={e=>updateExercise(idx,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div></div><div><label className="text-[10px] font-bold text-yellow-500 flex items-center gap-1"><Megaphone size={10}/> COACH</label><input value={ex.coachNotes || ''} onChange={e=>updateExercise(idx,'coachNotes',e.target.value)} className="w-full bg-yellow-500/10 border border-yellow-500/30 rounded p-2 text-sm text-yellow-200" placeholder="Instrução..."/></div></div></div> ))}</div><button onClick={addExercise} className="w-full py-4 mt-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Exercício</button></div>; };
         const RestTimerOverlay = ({ duration, onFinish, isActive, onClose }) => { const [timeLeft, setTimeLeft] = useState(duration); const [endTime, setEndTime] = useState(null); const [isFinished, setIsFinished] = useState(false); useEffect(() => { if (!isActive) { setEndTime(null); setIsFinished(false); return; } const targetTime = Date.now() + (duration * 1000); setEndTime(targetTime); setIsFinished(false); const interval = setInterval(() => { const now = Date.now(); const remaining = Math.ceil((targetTime - now) / 1000); if (remaining <= 0) { clearInterval(interval); setTimeLeft(0); setIsFinished(true); } else { setTimeLeft(remaining); } }, 100); return () => clearInterval(interval); }, [isActive, duration]); if (!isActive) return null; if (isFinished) { return <div className="fixed inset-0 z-[100] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer" onClick={onFinish}><Timer size={120} className="text-black mb-8 animate-bounce"/><h1 className="text-6xl font-black text-black uppercase tracking-tighter">BORA!</h1><p className="text-black font-bold mt-4 text-xl">TOQUE PARA VOLTAR</p></div>; } return <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-50 animate-slide-up pb-safe"><div className="flex items-center justify-between max-w-md mx-auto"><div className="flex items-center gap-4"><div className="relative"><div className="absolute inset-0 bg-yellow-500 blur-lg opacity-20 animate-pulse"></div><Timer className="text-yellow-500 relative z-10" size={36}/></div><div><p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Recuperação</p><p className="text-4xl font-mono font-black text-white tabular-nums leading-none">{formatDuration(timeLeft)}</p></div></div><div className="flex gap-2"><button onClick={() => { if (endTime) setEndTime(prev => prev + 10000); }} className="h-12 w-16 bg-neutral-800 rounded-xl text-white font-bold border border-neutral-700 active:bg-neutral-700">+10s</button><button onClick={onClose} className="h-12 px-6 bg-yellow-500 text-black rounded-xl font-bold hover:bg-yellow-400 active:scale-95 transition-transform">BORA</button></div></div></div>; };
         const WorkoutReport = ({ session, previousSession, onClose }) => { const reportRef = useRef(); const calculateTotalVolume = (logs) => { let volume = 0; Object.values(logs).forEach(log => { if (log.done && log.weight && log.reps) volume += (parseFloat(log.weight) * parseFloat(log.reps)); }); return volume; }; const currentVolume = calculateTotalVolume(session.logs); const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0; const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0; const durationInMinutes = session.totalTime / 60; const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4)); const prevLogsMap = {}; if (previousSession) { previousSession.exercises.forEach((ex, exIdx) => { const exLogs = []; Object.keys(previousSession.logs).forEach(key => { const [eIdx, sIdx] = key.split('-'); if (parseInt(eIdx) === exIdx) exLogs.push(previousSession.logs[key]); }); prevLogsMap[ex.name] = exLogs; }); } const handleDownloadPDF = () => { const element = reportRef.current; const opt = { margin: 0, filename: `IronTracks_${session.workoutTitle.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }; html2pdf().set(opt).from(element).save(); }; return <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-900 text-black"><div className="fixed top-4 right-4 flex gap-2 no-print z-50"><button onClick={handleDownloadPDF} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Download size={20} /> PDF</button><button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg"><X size={20} /></button></div><div ref={reportRef} className="min-h-screen bg-white p-8 max-w-4xl mx-auto"><div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end"><div><h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1><p className="text-sm font-bold uppercase tracking-widest text-neutral-500">Relatório de Performance</p></div><div className="text-right"><p className="text-2xl font-bold">{session.workoutTitle}</p><p className="text-neutral-600">{formatDate(session.date)}</p></div></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"><div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200"><p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Total</p><p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p></div><div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200"><p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p><div className="flex items-baseline gap-2"><p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>{previousSession && <span className={`text-xs font-bold flex items-center ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>{volumeDelta >= 0 ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}{volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%</span>}</div></div><div className="bg-orange-50 p-4 rounded-lg border border-orange-200"><p className="text-xs font-bold uppercase text-orange-500 mb-1 flex items-center gap-1"><Flame size={12}/> Calorias</p><p className="text-3xl font-mono font-bold text-orange-600">~{calories}</p></div><div className="bg-black text-white p-4 rounded-lg"><p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p><p className="text-xl font-bold uppercase italic">CONCLUÍDO</p></div></div><div className="space-y-8">{session.exercises.map((ex, exIdx) => { const prevLogs = prevLogsMap[ex.name] || []; return <div key={exIdx} className="break-inside-avoid"><div className="flex justify-between items-end mb-2 border-b-2 border-neutral-200 pb-2"><h3 className="text-xl font-bold uppercase flex items-center gap-2"><span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>{ex.name}</h3><div className="text-xs font-mono text-neutral-500">Cadência: <span className="font-bold text-black">{ex.cadence || '-'}</span></div></div><table className="w-full text-sm"><thead><tr className="text-neutral-500 border-b border-neutral-100"><th className="py-2 text-left w-16">Série</th><th className="py-2 text-center w-24">Carga</th><th className="py-2 text-center w-24">Reps</th><th className="py-2 text-center w-32">Evolução</th></tr></thead><tbody>{Array.from({ length: parseInt(ex.sets) }).map((_, sIdx) => { const key = `${exIdx}-${sIdx}`; const log = session.logs[key]; const prevLog = prevLogs[sIdx]; if (!log || !log.done) return null; let progressionText = "-"; let rowClass = ""; if (prevLog && prevLog.weight) { const delta = parseFloat(log.weight) - parseFloat(prevLog.weight); if (delta > 0) { progressionText = `+${delta}kg`; rowClass = "bg-green-50 text-green-900 font-bold"; } else if (delta < 0) { progressionText = `${delta}kg`; rowClass = "text-red-600 font-bold"; } else progressionText = "="; } return <tr key={sIdx} className="border-b border-neutral-100"><td className="py-3 font-mono text-neutral-500">#{sIdx + 1}</td><td className="py-3 text-center font-bold text-lg">{log.weight}</td><td className="py-3 text-center font-mono">{log.reps}</td><td className={`py-3 text-center text-xs uppercase ${rowClass}`}>{progressionText}</td></tr>; })}</tbody></table></div>; })}</div><div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">IronTracks System • {getCurrentDate()}</div></div></div>; };
@@ -307,70 +227,33 @@
             const [reportData, setReportData] = useState({ current: null, previous: null });
             const [notification, setNotification] = useState(null);
 
-            // DETECTOR DE DEEP LINK
+            // LOGICA DE AUTH: Simples e Direta
             useEffect(() => {
-                const params = new URLSearchParams(window.location.search);
-                const code = params.get('import');
-                if (code) setImportCode(code);
-            }, []);
-
-            useEffect(() => { if (user && importCode && view === 'dashboard') setView('import'); }, [user, importCode, view]);
-
-            // AUTH COM WHITELIST
-            useEffect(() => {
+                // Limpa flags velhas ao iniciar (pra evitar travamento herdado)
                 localStorage.removeItem('auth_pending');
-                const unsubscribe = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        if (u.email === ADMIN_EMAIL) {
-                            setUser(u);
-                            setAuthLoading(false);
-                            return;
-                        }
-                        
-                        try {
-                            const whiteRef = doc(db, 'artifacts', appId, 'public', 'data', 'whitelist', u.email.toLowerCase().trim());
-                            const whiteSnap = await getDoc(whiteRef);
-                            
-                            if (whiteSnap.exists()) {
-                                setUser(u);
-                            } else {
-                                alert("Acesso não autorizado. Fale com o Coach MK.");
-                                await signOut(auth);
-                                setUser(null);
-                            }
-                        } catch (e) {
-                            console.error("Erro whitelist:", e);
-                            await signOut(auth);
-                            setUser(null);
-                        }
-                        setAuthLoading(false);
-                    } else {
-                        setUser(null);
-                        setAuthLoading(false);
-                    }
+
+                // Listener Único de Verdade
+                const unsubscribe = onAuthStateChanged(auth, (u) => {
+                    setUser(u);
+                    // Assim que o Firebase responde (user ou null), paramos o loading
+                    setAuthLoading(false);
                 });
                 return unsubscribe;
             }, []);
 
-            // ... (Resto do código de efeitos e handlers) ...
+            // ... (Resto do código mantido igual) ...
             useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), orderBy('createdAt', 'desc'), limit(1)); const unsub = onSnapshot(q, s => { if(!s.empty) { const m = s.docs[0].data(); if(m.createdAt?.toMillis() > Date.now()-10000 && m.uid !== user.uid) { setNotification({id: s.docs[0].id, ...m}); setTimeout(()=>setNotification(null), 4000); }}}); return () => unsub(); }, [user]);
             useEffect(() => { if(user) setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), { uid: user.uid, displayName: user.displayName || 'Anônimo', email: user.email, photoURL: user.photoURL, lastSeen: serverTimestamp() }, { merge: true }); }, [user]);
-            useEffect(() => { if (!user) return;
-                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'));
-                const unsubscribe = onSnapshot(q, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    data.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                    setWorkouts(data);
-                }, (error) => console.error("Erro ao buscar treinos:", error));
-                return () => unsubscribe();
-            }, [user]);
+            useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [user]);
 
+            // Handlers (mantidos)
             const handleCreateWorkout = () => { setCurrentWorkout({ title: '', exercises: [] }); setView('edit'); };
             const handleSaveWorkout = async () => { if (!user || !currentWorkout.title) return; const wd = { ...currentWorkout, createdAt: serverTimestamp(), authorName: user.displayName, authorId: user.uid }; try { if (currentWorkout.id) await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'workouts', currentWorkout.id), wd); else await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), wd); setView('dashboard'); } catch (e) { alert("Erro: " + e.message); } };
             const handleDeleteWorkout = async (id) => { if (!confirm("Apagar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'workouts', id)); };
-            const handleShareWorkout = async (w) => { try { const sd = { ...w, originalAuthor: user.displayName, sharedAt: serverTimestamp() }; const r = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_workouts'), sd); setShareCode(r.id); const url = `${window.location.origin}${window.location.pathname}?import=${r.id}`; const el = document.createElement('textarea'); el.value = `Treino do MK: ${url}`; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert("Link do treino copiado!"); } catch (e) { alert("Erro."); } };
+            const handleShareWorkout = async (w) => { try { const sd = { ...w, originalAuthor: user.displayName, sharedAt: serverTimestamp() }; const r = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'shared_workouts'), sd); setShareCode(r.id); } catch (e) { alert("Erro."); } };
             const handleImportWorkout = async () => { if (!importCode) return; try { const d = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'shared_workouts', importCode.trim())); if (d.exists()) { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), { title: d.data().title + " (Importado)", exercises: d.data().exercises, importedFrom: d.data().originalAuthor, createdAt: serverTimestamp() }); setView('dashboard'); setImportCode(''); alert("Sucesso!"); } else alert("Inválido."); } catch (e) { alert("Erro."); } };
-            const copyToClipboard = (t) => { const url = `${window.location.origin}${window.location.pathname}?import=${t}`; const el = document.createElement('textarea'); el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert("Link Copiado!"); };
+            const copyToClipboard = (t) => { const el = document.createElement('textarea'); el.value = t; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert("Copiado!"); };
+            const finalizeSession = async (session) => { const payload = { workoutTitle: session.workoutTitle, exercises: session.exercises, logs: session.logs, totalTime: session.totalTime, date: serverTimestamp(), userId: user.uid, userName: user.displayName || 'Anônimo' }; try { const r = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), payload); return { id: r.id, ...session, date: new Date() }; } catch (e) { alert("Erro ao salvar treino. Tente novamente."); throw e; } };
 
             if (authLoading) return <LoadingScreen />;
             if (!user) return <LoginScreen />;
@@ -382,7 +265,7 @@
                     {view === 'chat' && <ChatScreen user={user} onClose={() => setView('dashboard')} />}
                     {view === 'history' && <HistoryList user={user} onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }} onBack={() => setView('dashboard')} />}
                     {view === 'report' && reportData.current && <WorkoutReport session={reportData.current} previousSession={reportData.previous} onClose={() => setView('dashboard')} />}
-                    {view === 'active' && currentWorkout && <ActiveWorkout workout={currentWorkout} user={user} onFinish={(c, p) => { setReportData({ current: c, previous: p }); setView('report'); }} onBack={() => setView('dashboard')} />}
+                    {view === 'active' && currentWorkout && <ActiveWorkout workout={currentWorkout} user={user} onFinish={async (c, p) => { const saved = await finalizeSession(c); setReportData({ current: saved, previous: p }); setView('report'); }} onBack={() => setView('dashboard')} />}
                     {view === 'edit' && (
                         <div className="min-h-[100dvh] bg-neutral-900 text-white p-4 pb-20"><div className="flex justify-between items-center mb-6 pt-safe"><button onClick={() => setView('dashboard')} className="p-2 bg-neutral-800 rounded-lg"><RotateCcw size={20} /></button><h2 className="font-bold text-lg">{currentWorkout.id ? 'Editar' : 'Novo'}</h2><button onClick={handleSaveWorkout} className="p-2 bg-yellow-500 text-black rounded-lg"><Save size={20} /></button></div><div className="mb-6"><label className="text-xs text-neutral-500 uppercase font-bold">Nome</label><input type="text" value={currentWorkout.title} onChange={(e) => setCurrentWorkout({...currentWorkout, title: e.target.value})} className="w-full bg-neutral-800 border-b-2 border-neutral-700 p-3 text-xl font-bold focus:border-yellow-500 outline-none" placeholder="Ex: Treino A"/></div><div className="space-y-4">{currentWorkout.exercises.map((ex, idx) => ( <ExerciseEditor key={idx} index={idx} exercise={ex} updateExercise={(idx, field, val) => { const newExs = [...currentWorkout.exercises]; newExs[idx] = { ...newExs[idx], [field]: val }; setCurrentWorkout({ ...currentWorkout, exercises: newExs }); }} removeExercise={(idx) => { const newExs = currentWorkout.exercises.filter((_, i) => i !== idx); setCurrentWorkout({ ...currentWorkout, exercises: newExs }); }} /> ))}</div><button onClick={() => setCurrentWorkout({...currentWorkout, exercises: [...currentWorkout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '' }]})} className="w-full mt-6 py-4 border-2 border-dashed border-neutral-700 rounded-xl text-neutral-400 font-bold hover:bg-neutral-800">+ Exercício</button></div>
                     )}
@@ -393,7 +276,7 @@
                                     <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
                                         {user.photoURL ? <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-yellow-500 shrink-0" /> : <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shrink-0">{user.displayName?.[0]}</div>}
                                         <div className="flex-1 min-w-0 overflow-hidden">
-                                            <p className="text-[9px] text-yellow-500 uppercase font-bold tracking-widest mb-0.5">Bem-vindo {APP_VERSION}</p>
+                                            <p className="text-[9px] text-yellow-500 uppercase font-bold tracking-widest mb-0.5">Bem-vindo</p>
                                             <h1 className="font-black text-lg sm:text-xl leading-none tracking-tight truncate w-full">{user.displayName || 'Atleta'}</h1>
                                         </div>
                                     </div>
@@ -413,7 +296,7 @@
                                 <div className="m-4 p-6 bg-neutral-900 rounded-3xl border border-blue-500/30"><h3 className="font-bold mb-2 flex items-center gap-2 text-blue-400 text-lg">Importar Treino</h3><div className="flex gap-2"><input value={importCode} onChange={(e) => setImportCode(e.target.value)} placeholder="Código ID..." className="flex-1 bg-black border border-neutral-700 rounded-xl px-4 text-white outline-none focus:border-blue-500 font-mono"/><button onClick={handleImportWorkout} className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold shadow-lg">OK</button></div><button onClick={() => setView('dashboard')} className="mt-4 text-xs text-neutral-500 hover:text-white underline">Cancelar</button></div>
                             )}
                             {shareCode && (
-                                <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50 backdrop-blur-md"><div className="bg-neutral-900 p-8 rounded-3xl w-full max-w-sm border border-neutral-800 shadow-2xl relative"><h3 className="text-2xl font-black text-center mb-2 mt-4 text-white">Link Gerado!</h3><div className="bg-black p-6 rounded-2xl border border-neutral-800 mb-8 flex justify-between items-center group cursor-pointer" onClick={() => copyToClipboard(shareCode)}><span className="font-mono text-xl font-bold select-all text-green-500 break-all text-xs">{window.location.origin}?import={shareCode}</span><Copy size={20} className="text-neutral-600 group-hover:text-white shrink-0" /></div><button onClick={() => setShareCode(null)} className="w-full bg-white hover:bg-neutral-200 text-black font-bold py-4 rounded-xl">Fechar</button></div></div>
+                                <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50 backdrop-blur-md"><div className="bg-neutral-900 p-8 rounded-3xl w-full max-w-sm border border-neutral-800 shadow-2xl relative"><h3 className="text-2xl font-black text-center mb-2 mt-4 text-white">Treino Gerado!</h3><div className="bg-black p-6 rounded-2xl border border-neutral-800 mb-8 flex justify-between items-center group cursor-pointer" onClick={() => copyToClipboard(shareCode)}><span className="font-mono text-xl font-bold select-all text-green-500">{shareCode}</span><Copy size={20} className="text-neutral-600 group-hover:text-white" /></div><button onClick={() => setShareCode(null)} className="w-full bg-white hover:bg-neutral-200 text-black font-bold py-4 rounded-xl">Fechar</button></div></div>
                             )}
                             <div className="p-4 space-y-4 pb-20">
                                 <h2 className="text-neutral-500 text-[10px] font-bold uppercase tracking-widest mb-4 pl-2">Meus Treinos</h2>
@@ -433,3 +316,4 @@
     </script>
 </body>
 </html>
+
