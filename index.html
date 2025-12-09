@@ -1106,7 +1106,7 @@
             // ... (Resto do código mantido igual) ...
             useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), orderBy('createdAt', 'desc'), limit(1)); const unsub = onSnapshot(q, s => { if(!s.empty) { const m = s.docs[0].data(); if(m.createdAt?.toMillis() > Date.now()-10000 && m.uid !== user.uid) { setNotification({id: s.docs[0].id, ...m}); setTimeout(()=>setNotification(null), 4000); }}}); return () => unsub(); }, [user]);
             useEffect(() => { if(user) setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), { uid: user.uid, displayName: user.displayName || 'Anônimo', email: user.email, photoURL: user.photoURL, lastSeen: serverTimestamp() }, { merge: true }).catch(e=>console.warn("Error updating presence:",e)); }, [user]);
-            useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [user]);
+            useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts')); const unsub = onSnapshot(q, s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.title || '').localeCompare(b.title || '', undefined, { numeric: true, sensitivity: 'base' })))); return () => unsub(); }, [user]);
 
             // Handlers (mantidos)
             const handleCreateWorkout = () => { setCurrentWorkout({ title: '', exercises: [] }); setView('edit'); };
