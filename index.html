@@ -121,64 +121,53 @@
             const [errorMsg, setErrorMsg] = useState('');
             const [showRedirectOption, setShowRedirectOption] = useState(false);
 
-            // Limpa lixo de sessões anteriores que possam estar travando
+            // Limpa lixo de sessões e verifica erros de redirect
             useEffect(() => {
                 localStorage.removeItem('auth_pending');
                 localStorage.removeItem('auth_in_progress');
+                
+                const lastErr = localStorage.getItem('last_auth_error');
+                if (lastErr) {
+                    setErrorMsg("Erro no retorno do login: " + lastErr);
+                    setShowRedirectOption(true);
+                    localStorage.removeItem('last_auth_error');
+                }
             }, []);
 
-            const handlePopupLogin = async () => {
+            const handleLogin = async (method) => {
                 setIsLoading(true);
                 setErrorMsg('');
                 
-                // Timeout de segurança para destravar a tela caso o Google não responda
+                // Timeout de segurança
                 const timer = setTimeout(() => {
                     if (isLoading) {
                         setIsLoading(false);
-                        setErrorMsg("O login demorou muito. Tente novamente.");
+                        setErrorMsg("O login demorou muito. Tente a outra opção.");
+                        setShowRedirectOption(true);
                     }
-                }, 15000); // 15 segundos
+                }, 15000);
 
                 const provider = new GoogleAuthProvider();
                 try {
                     await setPersistence(auth, browserLocalPersistence);
                     
-                    // Detecção simples de dispositivo móvel/iOS para evitar Popups que travam em PWA
-                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                    
-                    if (isMobile) {
-                        // Em mobile/PWA, Redirect é mais seguro que Popup
+                    if (method === 'redirect') {
                         await signInWithRedirect(auth, provider);
                     } else {
                         await signInWithPopup(auth, provider);
                     }
-                    
-                    // Se der certo, o onAuthStateChanged resolve.
                 } catch (error) {
                     clearTimeout(timer);
                     console.error("Login Error:", error);
                     setIsLoading(false);
-                    
-                    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-                        setErrorMsg("Pop-up bloqueado. Tentando método alternativo...");
-                        setShowRedirectOption(true);
-                    } else {
-                        setErrorMsg(error.message);
-                    }
+                    setErrorMsg(error.message);
+                    setShowRedirectOption(true);
                 }
             };
 
+
             const handleRedirectLogin = async () => {
-                setIsLoading(true);
-                setErrorMsg('Redirecionando...');
-                const provider = new GoogleAuthProvider();
-                try {
-                    await setPersistence(auth, browserLocalPersistence);
-                    await signInWithRedirect(auth, provider);
-                } catch (error) {
-                    setIsLoading(false);
-                    setErrorMsg("Falha no redirect: " + error.message);
-                }
+                 // Removido - agora usa handleLogin('redirect')
             };
 
             return (
@@ -189,16 +178,16 @@
                     <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
                     <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v2.3</p>
                     
-                    {/* Botão Principal (Popup) */}
+                    {/* Botão Principal (Automático/Popup) */}
                     <button 
-                        onClick={handlePopupLogin}
+                        onClick={() => handleLogin(navigator.userAgent.match(/iPhone|iPad|iPod|Android/i) ? 'redirect' : 'popup')}
                         disabled={isLoading}
                         className="w-full max-w-xs flex items-center justify-center gap-3 bg-white text-neutral-900 px-6 py-4 rounded-xl font-bold text-lg hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-50 mb-4"
                     >
                         {isLoading ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-neutral-900"></span> : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5"/> Entrar com Google</>}
                     </button>
 
-                    {/* Botão Cancelar (Só aparece se estiver carregando) */}
+                    {/* Botão Cancelar */}
                     {isLoading && (
                         <button 
                             onClick={() => setIsLoading(false)}
@@ -208,17 +197,26 @@
                         </button>
                     )}
 
-                    {/* Botão Fallback (Redirect) - Só aparece se popup falhar ou usuário pedir */}
-                    {showRedirectOption && (
-                        <button 
-                            onClick={handleRedirectLogin}
-                            className="text-yellow-500 text-sm font-bold underline p-2 animate-fade-in"
-                        >
-                            Não funcionou? Clique para Login via Navegador
-                        </button>
+                    {/* Opções Alternativas (Aparecem em erro ou clique) */}
+                    {showRedirectOption && !isLoading && (
+                        <div className="flex flex-col gap-3 w-full max-w-xs animate-fade-in">
+                            <p className="text-center text-xs text-neutral-400">Tente um método alternativo:</p>
+                            <button 
+                                onClick={() => handleLogin('popup')}
+                                className="bg-neutral-800 border border-neutral-700 text-white p-3 rounded-lg font-bold text-sm hover:bg-neutral-700"
+                            >
+                                Opção 1: Usar Pop-up (Janela)
+                            </button>
+                            <button 
+                                onClick={() => handleLogin('redirect')}
+                                className="bg-neutral-800 border border-neutral-700 text-white p-3 rounded-lg font-bold text-sm hover:bg-neutral-700"
+                            >
+                                Opção 2: Usar Redirecionamento (Navegador)
+                            </button>
+                        </div>
                     )}
 
-                    {/* Link para forçar redirect caso o usuário saiba que precisa (ex: iPhone) */}
+                    {/* Link Ajuda */}
                     {!showRedirectOption && !isLoading && (
                         <button onClick={() => setShowRedirectOption(true)} className="text-neutral-600 text-xs mt-4">
                             Problemas para entrar?
@@ -1012,9 +1010,14 @@
                 const initAuth = async () => {
                     // Tenta processar o resultado do redirecionamento (Vital para Safari/iOS)
                     try {
-                        await getRedirectResult(auth);
+                        await setPersistence(auth, browserLocalPersistence);
+                        const result = await getRedirectResult(auth);
+                        if (result?.user) {
+                            console.log("Usuário recuperado do redirect:", result.user.email);
+                        }
                     } catch (e) {
-                        console.log("Redirect result info:", e);
+                        console.error("Erro no Redirect:", e);
+                        localStorage.setItem('last_auth_error', e.message);
                     }
 
                     unsubscribe = onAuthStateChanged(auth, async (u) => {
