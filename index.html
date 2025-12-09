@@ -442,7 +442,7 @@
                 } catch (e) { alert("Erro: " + e.message + "\n\nNota: O Firebase bloqueia a exclusão de dados de outros usuários por segurança. Apenas o próprio usuário pode se remover, a menos que as Regras de Segurança sejam alteradas no console."); }
             };
 
-            const TAB_LABELS = { 'dashboard': 'VISÃO GERAL', 'students': 'ALUNOS', 'templates': 'TREINOS', 'register': 'CADASTRAR ALUNO' };
+            const TAB_LABELS = { 'dashboard': 'VISÃO GERAL', 'students': 'ALUNOS', 'templates': 'TREINOS' };
             if (isSuperAdmin) TAB_LABELS['coaches'] = 'PROFESSORES';
             if (isSuperAdmin) TAB_LABELS['system'] = 'SISTEMA';
 
@@ -478,25 +478,28 @@
                                     </div>
                                 )}
                                 {tab === 'students' && (
-                                    <div className="space-y-3">
-                                        {usersList.map(u => (
-                                            <div key={u.id} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">
-                                                {u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}
-                                                <div><h3 className="font-bold">{u.displayName}</h3><p className="text-xs text-neutral-400">{u.email}</p></div>
+                                    <div className="space-y-6">
+                                        <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700">
+                                            <h3 className="font-bold text-lg mb-4 text-yellow-500">Novo Aluno</h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                                <input className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="Nome Completo" value={newStudent.name} onChange={e=>setNewStudent({...newStudent, name:e.target.value})}/>
+                                                <input className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="Email" value={newStudent.email} onChange={e=>setNewStudent({...newStudent, email:e.target.value})}/>
+                                                <input type="number" className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="Idade" value={newStudent.age} onChange={e=>setNewStudent({...newStudent, age:e.target.value})}/>
+                                                <input type="tel" className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="WhatsApp / Tel" value={newStudent.phone} onChange={e=>setNewStudent({...newStudent, phone:e.target.value})}/>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-                                {tab === 'register' && (
-                                    <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700">
-                                        <h3 className="font-bold text-lg mb-4">Novo Aluno</h3>
-                                        <input className="w-full bg-neutral-900 p-3 rounded-lg mb-3 outline-none focus:border-yellow-500 border border-transparent" placeholder="Nome Completo" value={newStudent.name} onChange={e=>setNewStudent({...newStudent, name:e.target.value})}/>
-                                        <input className="w-full bg-neutral-900 p-3 rounded-lg mb-3 outline-none focus:border-yellow-500 border border-transparent" placeholder="Email" value={newStudent.email} onChange={e=>setNewStudent({...newStudent, email:e.target.value})}/>
-                                        <div className="grid grid-cols-2 gap-3 mb-4">
-                                            <input type="number" className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="Idade" value={newStudent.age} onChange={e=>setNewStudent({...newStudent, age:e.target.value})}/>
-                                            <input type="tel" className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="WhatsApp / Tel" value={newStudent.phone} onChange={e=>setNewStudent({...newStudent, phone:e.target.value})}/>
+                                            <button onClick={handleRegister} className="w-full bg-yellow-500 text-black font-bold p-3 rounded-lg hover:bg-yellow-400">CADASTRAR ALUNO</button>
                                         </div>
-                                        <button onClick={handleRegister} className="w-full bg-yellow-500 text-black font-bold p-4 rounded-xl hover:bg-yellow-400">CADASTRAR ALUNO</button>
+
+                                        <div className="space-y-3">
+                                            <h3 className="font-bold text-white uppercase text-xs tracking-widest">Alunos Ativos</h3>
+                                            {usersList.length === 0 && <p className="text-neutral-500 text-sm">Nenhum aluno cadastrado.</p>}
+                                            {usersList.map(u => (
+                                                <div key={u.id} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">
+                                                    {u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}
+                                                    <div><h3 className="font-bold">{u.displayName}</h3><p className="text-xs text-neutral-400">{u.email}</p></div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                                 {tab === 'templates' && (
