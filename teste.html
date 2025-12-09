@@ -78,7 +78,7 @@
         } from 'firebase/auth';
         import { 
             getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, 
-            onSnapshot, serverTimestamp, query, orderBy, limit, where, getDocs 
+            onSnapshot, serverTimestamp, query, orderBy, limit, where, getDocs, collectionGroup
         } from 'firebase/firestore';
         import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
         import { 
@@ -881,11 +881,40 @@
                 }
             }, [activeSession]);
 
-            // LOGICA DE AUTH: Simples e Direta
+            // LOGICA DE AUTH: Proteção de Acesso
             useEffect(() => {
                 localStorage.removeItem('auth_pending');
-                const unsubscribe = onAuthStateChanged(auth, (u) => {
-                    setUser(u);
+                const unsubscribe = onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        // 1. Admin sempre liberado
+                        if (u.email === ADMIN_EMAIL) {
+                            setUser(u);
+                            setAuthLoading(false);
+                            return;
+                        }
+
+                        // 2. Verificar se é aluno cadastrado (em qualquer lista de clientes)
+                        try {
+                            const email = u.email.toLowerCase().trim();
+                            const q = query(collectionGroup(db, 'clients'), where('email', '==', email));
+                            const snapshot = await getDocs(q);
+
+                            if (!snapshot.empty) {
+                                setUser(u);
+                            } else {
+                                alert("ACESSO NEGADO: Email não cadastrado no sistema.");
+                                await signOut(auth);
+                                setUser(null);
+                            }
+                        } catch (error) {
+                            console.error("Erro verificação:", error);
+                            alert("Erro ao verificar permissão. Contate o administrador.");
+                            await signOut(auth);
+                            setUser(null);
+                        }
+                    } else {
+                        setUser(null);
+                    }
                     setAuthLoading(false);
                 });
                 return unsubscribe;
