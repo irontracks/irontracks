@@ -45,7 +45,8 @@
             "lucide-react": "https://esm.sh/lucide-react@0.294.0",
             "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
             "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+            "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
+            "firebase/storage": "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js"
         }
     }
     </script>
@@ -79,6 +80,7 @@
             getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, 
             onSnapshot, serverTimestamp, query, orderBy, limit, where, getDocs 
         } from 'firebase/firestore';
+        import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
         import { 
             Dumbbell, Timer, Share2, Plus, Trash2, Save, LogOut, Play, 
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
@@ -100,6 +102,7 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
         const appId = 'irontracks-production';
         const ADMIN_EMAIL = 'djmkapple@gmail.com';
 
@@ -211,6 +214,231 @@
         const ChatScreen = ({ user, onClose }) => { const [activeChat, setActiveChat] = useState(null); const [usersList, setUsersList] = useState([]); const [messages, setMessages] = useState([]); const [newMessage, setNewMessage] = useState(''); const dummy = useRef(); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc'), limit(20)); const unsubscribe = onSnapshot(q, (snapshot) => { setUsersList(snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid)); }); return () => unsubscribe(); }, [activeChat]); useEffect(() => { if (!activeChat) return; let collectionPath; if (activeChat.id === 'global') { collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); } else { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50)); const unsubscribe = onSnapshot(q, (snapshot) => { setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse()); }); return () => unsubscribe(); }, [activeChat]); useEffect(() => { dummy.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]); const sendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim()) return; const text = newMessage; setNewMessage(''); let collectionPath; if (activeChat && activeChat.id === 'global') collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); else if (activeChat) { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } else return; await addDoc(collectionPath, { text: text, createdAt: serverTimestamp(), uid: user.uid, displayName: user.displayName || 'Anônimo', photoURL: user.photoURL }); }; return <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up"><div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe"><div className="flex items-center gap-3">{activeChat ? <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button> : <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>}<div><h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3><p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p></div></div><button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600"><X size={20} /></button></div>{!activeChat && <div className="flex-1 overflow-y-auto p-4 space-y-2"><button onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge', displayName: 'Iron Lounge' })} className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700 h-20"><div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold shrink-0"><Users size={24} /></div><div className="text-left"><p className="font-bold text-white text-lg">Iron Lounge</p><p className="text-xs text-neutral-400">Chat Global</p></div></button><p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas</p>{usersList.map((u, idx) => ( <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-4 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full border border-neutral-600 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white shrink-0">{u.displayName?.[0]}</div>}<div className="text-left overflow-hidden"><p className="font-bold text-white text-base truncate">{u.displayName}</p><p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p></div></button> ))}</div>}{activeChat && <><div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">{messages.map(msg => { const isMe = msg.uid === user.uid; return <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>{msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}<div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>{!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}<p>{msg.text}</p></div></div>; })}<div ref={dummy}></div></div><form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe"><input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." /><button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button></form></>}</div>; };
         const AdminPanel = ({ user, onClose }) => { const [tab, setTab] = useState('students'); const [usersList, setUsersList] = useState([]); const [templates, setTemplates] = useState([]); const [selectedStudent, setSelectedStudent] = useState(null); const [studentWorkouts, setStudentWorkouts] = useState([]); const [editingTemplate, setEditingTemplate] = useState(null); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc')); const unsub = onSnapshot(q, snap => setUsersList(snap.docs.map(d => d.data()))); return () => unsub(); }, []); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, []); useEffect(() => { if (!selectedStudent) return; const q = query(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setStudentWorkouts(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, [selectedStudent]); const handleCloneTemplate = async (template) => { if (!selectedStudent) return; if (!confirm(`Clonar para ${selectedStudent.displayName}?`)) return; const newWorkout = { ...template, title: template.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: template.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), newWorkout); alert("Enviado!"); }; const handleDeleteStudentWorkout = async (wId) => { if (!confirm("Deletar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts', wId)); }; return <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up"><div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg"><h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND</h2><button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button></div>{!selectedStudent && !editingTemplate && ( <div className="flex p-2 gap-2 bg-neutral-800"><button onClick={() => setTab('students')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='students' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Alunos</button><button onClick={() => setTab('templates')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='templates' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Templates</button></div> )}<div className="p-4 pb-20">{tab === 'students' && !selectedStudent && !editingTemplate && ( <div className="space-y-3">{usersList.map(u => <div key={u.uid} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-600 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}<div className="flex-1"><h3 className="font-bold text-lg">{u.displayName}</h3><p className="text-xs text-neutral-400">Visto: {formatLastSeen(u.lastSeen)}</p></div><ArrowLeft className="rotate-180 text-neutral-500"/></div>)}</div> )}{tab === 'templates' && !selectedStudent && !editingTemplate && ( <div className="space-y-3"><button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Novo Template</button>{templates.map(t => <div key={t.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h3 className="font-bold text-white">{t.title}</h3><p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate(t)} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={async () => { if(confirm('Apagar?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'templates', t.id)) }} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div> )}{selectedStudent && !editingTemplate && ( <div><div className="flex items-center gap-3 mb-6"><button onClick={() => setSelectedStudent(null)} className="p-2 bg-neutral-800 rounded-lg"><ArrowLeft/></button><div><h2 className="text-xl font-bold">{selectedStudent.displayName}</h2><p className="text-xs text-neutral-400">{selectedStudent.email}</p></div></div><div className="grid grid-cols-2 gap-2 mb-6"><button onClick={() => setEditingTemplate({ title: '', exercises: [], targetStudentId: selectedStudent.uid })} className="bg-yellow-500 text-black p-3 rounded-xl font-bold text-sm">+ Personalizado</button><button onClick={() => alert("Selecione um template abaixo")} className="bg-neutral-800 text-white border border-neutral-700 p-3 rounded-xl font-bold text-sm">Clonar Template</button></div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Treinos Atuais</h3><div className="space-y-3 mb-8">{studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h4 className="font-bold text-white">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: selectedStudent.uid})} className="p-2 bg-blue-900/30 text-blue-400 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Clonar Template</h3><div className="space-y-2">{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800/50 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div></div> )}{editingTemplate && ( <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { const targetColl = data.targetStudentId ? collection(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts') : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; if(data.targetStudentId) payload.importedFrom = 'Coach MK'; if (data.id) { const docRef = data.targetStudentId ? doc(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts', data.id) : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); await setDoc(docRef, payload, { merge: true }); } else { await addDoc(targetColl, payload); } setEditingTemplate(null); }}/> )}</div></div>; };
         const AdminWorkoutEditor = ({ initialData, onSave, onCancel }) => { const [workout, setWorkout] = useState(initialData); const updateExercise = (idx, field, val) => { const newExs = [...workout.exercises]; newExs[idx] = { ...newExs[idx], [field]: val }; setWorkout({ ...workout, exercises: newExs }); }; const addExercise = () => { setWorkout({ ...workout, exercises: [...workout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '', coachNotes: '' }] }); }; return <div className="bg-neutral-900 min-h-full"><div className="flex justify-between items-center mb-6"><button onClick={onCancel} className="text-neutral-400">Cancelar</button><h3 className="font-bold text-white">{workout.id ? 'Editar' : 'Novo'}</h3><button onClick={() => onSave(workout)} className="text-yellow-500 font-bold">Salvar</button></div><input value={workout.title} onChange={e => setWorkout({...workout, title: e.target.value})} className="w-full bg-neutral-800 text-xl font-bold p-4 rounded-xl mb-4 border border-neutral-700 outline-none" placeholder="Nome do Treino"/><div className="space-y-4">{workout.exercises.map((ex, idx) => ( <div key={idx} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 relative group"><button onClick={() => { const n = [...workout.exercises]; n.splice(idx, 1); setWorkout({...workout, exercises: n}); }} className="absolute top-2 right-2 text-red-500 p-2"><Trash2 size={16}/></button><div className="space-y-3 pr-8"><input value={ex.name} onChange={e => updateExercise(idx, 'name', e.target.value)} className="w-full bg-transparent font-bold text-white border-b border-neutral-600 pb-1" placeholder="Nome"/><div className="grid grid-cols-4 gap-2 text-center"><div><label className="text-[10px] text-neutral-500">Sets</label><input type="number" value={ex.sets} onChange={e=>updateExercise(idx,'sets',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Reps</label><input value={ex.reps} onChange={e=>updateExercise(idx,'reps',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Cad</label><input value={ex.cadence} onChange={e=>updateExercise(idx,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Rest</label><input type="number" value={ex.restTime} onChange={e=>updateExercise(idx,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div></div><div><label className="text-[10px] font-bold text-yellow-500 flex items-center gap-1"><Megaphone size={10}/> COACH</label><input value={ex.coachNotes || ''} onChange={e=>updateExercise(idx,'coachNotes',e.target.value)} className="w-full bg-yellow-500/10 border border-yellow-500/30 rounded p-2 text-sm text-yellow-200" placeholder="Instrução..."/></div></div></div> ))}</div><button onClick={addExercise} className="w-full py-4 mt-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Exercício</button></div>; };
+        const AdminPanelV2 = ({ user, onClose }) => {
+            const [tab, setTab] = useState('dashboard');
+            const [usersList, setUsersList] = useState([]);
+            const [templates, setTemplates] = useState([]);
+            const [selectedStudent, setSelectedStudent] = useState(null);
+            const [subTab, setSubTab] = useState('workouts');
+            const [studentWorkouts, setStudentWorkouts] = useState([]);
+            const [assessments, setAssessments] = useState([]);
+            const [photos, setPhotos] = useState([]);
+            const [editingTemplate, setEditingTemplate] = useState(null);
+            const [newStudent, setNewStudent] = useState({ name: '', email: '' });
+            const [assessmentForm, setAssessmentForm] = useState(null);
+            const [uploading, setUploading] = useState(false);
+
+            useEffect(() => {
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc'));
+                const unsub = onSnapshot(q, snap => setUsersList(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+                return () => unsub();
+            }, []);
+
+            useEffect(() => {
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc'));
+                const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+                return () => unsub();
+            }, []);
+
+            useEffect(() => {
+                if (!selectedStudent) return;
+                const uid = selectedStudent.uid || selectedStudent.id;
+                const unsub1 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'workouts'), orderBy('createdAt', 'desc')), s => setStudentWorkouts(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                const unsub2 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'assessments'), orderBy('date', 'desc')), s => setAssessments(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                const unsub3 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'photos'), orderBy('date', 'desc')), s => setPhotos(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                return () => { unsub1(); unsub2(); unsub3(); };
+            }, [selectedStudent]);
+
+            const handleRegister = async () => {
+                if (!newStudent.email || !newStudent.name) return alert("Preencha campos");
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newStudent.email), {
+                        uid: newStudent.email, displayName: newStudent.name, email: newStudent.email,
+                        role: 'student', lastSeen: serverTimestamp(), isManual: true, photoURL: null
+                    });
+                    alert("Cadastrado!"); setNewStudent({name:'',email:''});
+                } catch(e) { alert(e.message); }
+            };
+
+            const handleSaveAssessment = async (data) => {
+                const uid = selectedStudent.uid || selectedStudent.id;
+                const s7 = Number(data.triceps)+Number(data.subscapular)+Number(data.chest)+Number(data.axillary)+Number(data.suprailiac)+Number(data.abdominal)+Number(data.thigh);
+                const age = Number(data.age);
+                const dens = data.gender === 'male' ? 1.112 - 0.00043499*s7 + 0.00000055*s7*s7 - 0.00028826*age : 1.097 - 0.00046971*s7 + 0.00000056*s7*s7 - 0.00012828*age;
+                const bf = ((495/dens)-450).toFixed(1);
+                await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'assessments'), {...data, sum7: s7, bf, date: serverTimestamp()});
+                setAssessmentForm(null);
+            };
+
+            const handleUploadPhoto = async (e) => {
+                const file = e.target.files[0];
+                if(!file) return;
+                setUploading(true);
+                const reader = new FileReader();
+                reader.onload = async (evt) => {
+                    try {
+                        const uid = selectedStudent.uid || selectedStudent.id;
+                        const sRef = ref(storage, `users/${uid}/photos/${Date.now()}_${file.name}`);
+                        await uploadString(sRef, evt.target.result, 'data_url');
+                        const url = await getDownloadURL(sRef);
+                        await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'photos'), {url, date: serverTimestamp()});
+                    } catch(e) { alert("Erro upload: " + e.message); } finally { setUploading(false); }
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const generateInsights = () => {
+                if (!selectedStudent) return [];
+                const tips = [];
+                if (assessments.length > 1) {
+                    const last = assessments[0]; const prev = assessments[1];
+                    if (Number(last.bf) < Number(prev.bf)) tips.push(`📉 BF caiu de ${prev.bf}% para ${last.bf}%! Ótimo progresso.`);
+                    else tips.push(`⚠️ BF aumentou ligeiramente. Revisar dieta.`);
+                }
+                if (studentWorkouts.length > 0) {
+                    const lastW = studentWorkouts[0];
+                    tips.push(`💪 Último treino: ${lastW.title} (${new Date(lastW.createdAt?.seconds * 1000).toLocaleDateString()})`);
+                }
+                return tips;
+            };
+
+            const handleCloneTemplate = async (template) => { if (!selectedStudent) return; if (!confirm(`Clonar para ${selectedStudent.displayName}?`)) return; const newWorkout = { ...template, title: template.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: template.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', (selectedStudent.uid||selectedStudent.id), 'workouts'), newWorkout); alert("Enviado!"); };
+            const handleDeleteStudentWorkout = async (wId) => { if (!confirm("Deletar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', (selectedStudent.uid||selectedStudent.id), 'workouts', wId)); };
+
+            return (
+                <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up text-white">
+                    <div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg">
+                        <h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND CENTER</h2>
+                        <button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button>
+                    </div>
+                     <div className="p-4 pb-20">
+                        {!selectedStudent && (
+                            <>
+                                <div className="flex p-2 gap-2 bg-neutral-800 rounded-xl mb-4 overflow-x-auto">
+                                    {['dashboard', 'students', 'templates', 'register'].map(t => (
+                                        <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 rounded-lg font-bold whitespace-nowrap ${tab===t ? 'bg-yellow-500 text-black' : 'text-neutral-400'}`}>{t.toUpperCase()}</button>
+                                    ))}
+                                </div>
+                                {tab === 'dashboard' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700">
+                                            <h3 className="text-neutral-500 text-xs font-bold uppercase">Total Alunos</h3>
+                                            <p className="text-3xl font-black text-white">{usersList.length}</p>
+                                        </div>
+                                        <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700">
+                                            <h3 className="text-neutral-500 text-xs font-bold uppercase">Templates</h3>
+                                            <p className="text-3xl font-black text-yellow-500">{templates.length}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {tab === 'students' && (
+                                    <div className="space-y-3">
+                                        {usersList.map(u => (
+                                            <div key={u.id} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">
+                                                {u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}
+                                                <div><h3 className="font-bold">{u.displayName}</h3><p className="text-xs text-neutral-400">{u.email}</p></div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {tab === 'register' && (
+                                    <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700">
+                                        <h3 className="font-bold text-lg mb-4">Novo Aluno</h3>
+                                        <input className="w-full bg-neutral-900 p-3 rounded-lg mb-3 outline-none focus:border-yellow-500 border border-transparent" placeholder="Nome" value={newStudent.name} onChange={e=>setNewStudent({...newStudent, name:e.target.value})}/>
+                                        <input className="w-full bg-neutral-900 p-3 rounded-lg mb-4 outline-none focus:border-yellow-500 border border-transparent" placeholder="Email" value={newStudent.email} onChange={e=>setNewStudent({...newStudent, email:e.target.value})}/>
+                                        <button onClick={handleRegister} className="w-full bg-yellow-500 text-black font-bold p-4 rounded-xl hover:bg-yellow-400">CADASTRAR</button>
+                                    </div>
+                                )}
+                                {tab === 'templates' && (
+                                    <div className="space-y-3">
+                                        <button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold hover:bg-neutral-800">+ Novo Template</button>
+                                        {templates.map(t => (
+                                            <div key={t.id} className="bg-neutral-800 p-4 rounded-xl flex justify-between border border-neutral-700">
+                                                <span className="font-bold">{t.title}</span>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => setEditingTemplate(t)} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+
+                        {selectedStudent && (
+                            <div className="animate-slide-up">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <button onClick={() => setSelectedStudent(null)} className="p-2 bg-neutral-800 rounded-lg"><ArrowLeft/></button>
+                                    <h2 className="text-xl font-bold">{selectedStudent.displayName}</h2>
+                                </div>
+                                <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl mb-6">
+                                    <h3 className="text-blue-400 font-bold text-xs uppercase flex items-center gap-2 mb-2"><Megaphone size={14}/> IA Coach Insights</h3>
+                                    {generateInsights().length > 0 ? generateInsights().map((tip, i) => <p key={i} className="text-sm mb-1">{tip}</p>) : <p className="text-sm text-neutral-500">Sem dados suficientes para análise.</p>}
+                                </div>
+                                <div className="flex gap-2 mb-6">
+                                    {['workouts', 'assessments', 'photos'].map(st => (
+                                        <button key={st} onClick={() => setSubTab(st)} className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase ${subTab===st ? 'bg-white text-black' : 'bg-neutral-800 text-neutral-400'}`}>{st}</button>
+                                    ))}
+                                </div>
+                                {subTab === 'workouts' && (
+                                    <div className="space-y-3">
+                                        {studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between"><div><h4 className="font-bold">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: (selectedStudent.uid||selectedStudent.id)})} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}
+                                        <div className="mt-4"><h4 className="text-xs font-bold text-neutral-500 mb-2 uppercase">Clonar Template</h4>{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800 mb-2 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div>
+                                    </div>
+                                )}
+                                {subTab === 'assessments' && (
+                                    <div>
+                                        <button onClick={() => setAssessmentForm({ gender: 'male', age: 25, triceps:0, subscapular:0, chest:0, axillary:0, suprailiac:0, abdominal:0, thigh:0 })} className="w-full bg-yellow-500 text-black font-bold p-3 rounded-xl mb-4 shadow-lg hover:bg-yellow-400">NOVA AVALIAÇÃO</button>
+                                        {assessmentForm && (
+                                            <div className="bg-neutral-800 p-4 rounded-xl border border-yellow-500 mb-4 animate-fade-in">
+                                                <h4 className="font-bold mb-3">Dados da Avaliação (7 Dobras)</h4>
+                                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                                    <div><label className="text-[10px] text-neutral-400">Idade</label><input type="number" value={assessmentForm.age} onChange={e=>setAssessmentForm({...assessmentForm, age: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
+                                                    <div><label className="text-[10px] text-neutral-400">Gênero</label><select value={assessmentForm.gender} onChange={e=>setAssessmentForm({...assessmentForm, gender: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"><option value="male">Masculino</option><option value="female">Feminino</option></select></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2 mb-4">
+                                                    {['triceps', 'subscapular', 'chest', 'axillary', 'suprailiac', 'abdominal', 'thigh'].map(f => (
+                                                        <div key={f}><label className="text-[10px] uppercase text-neutral-400">{f}</label><input type="number" value={assessmentForm[f]} onChange={e=>setAssessmentForm({...assessmentForm, [f]: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
+                                                    ))}
+                                                </div>
+                                                <button onClick={() => handleSaveAssessment(assessmentForm)} className="w-full bg-green-600 hover:bg-green-500 p-3 rounded-lg font-bold text-white shadow-lg">SALVAR RESULTADO</button>
+                                            </div>
+                                        )}
+                                        <div className="space-y-2">
+                                            {assessments.map(a => (
+                                                <div key={a.id} className="bg-neutral-800 p-3 rounded-xl flex justify-between items-center border border-neutral-700">
+                                                    <div><p className="font-black text-2xl text-yellow-500">{a.bf}% <span className="text-xs text-white font-normal">GORDURA</span></p><p className="text-xs text-neutral-500">{new Date(a.date?.seconds * 1000).toLocaleDateString()}</p></div>
+                                                    <div className="text-right"><p className="text-xs text-neutral-400 font-mono">Σ7: {a.sum7}mm</p></div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {subTab === 'photos' && (
+                                    <div>
+                                        <label className="w-full bg-neutral-800 border-2 border-dashed border-neutral-700 p-6 rounded-xl flex flex-col items-center justify-center cursor-pointer mb-6 hover:bg-neutral-800/80 transition-colors">
+                                            <Plus size={32} className="mb-2 text-neutral-500"/>
+                                            <span className="text-xs font-bold text-neutral-400">{uploading ? 'ENVIANDO...' : 'ADICIONAR FOTO'}</span>
+                                            <input type="file" accept="image/*" className="hidden" onChange={handleUploadPhoto} disabled={uploading}/>
+                                        </label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {photos.map(p => (
+                                                <div key={p.id} className="aspect-square bg-neutral-800 rounded-xl overflow-hidden relative border border-neutral-700">
+                                                    <img src={p.url} className="w-full h-full object-cover"/>
+                                                    <div className="absolute bottom-0 inset-x-0 bg-black/60 p-1 text-[10px] text-center font-mono">{new Date(p.date?.seconds*1000).toLocaleDateString()}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                        {editingTemplate && <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { const targetColl = data.targetStudentId ? collection(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts') : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; if(data.targetStudentId) payload.importedFrom = 'Coach MK'; if (data.id) { const docRef = data.targetStudentId ? doc(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts', data.id) : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); await setDoc(docRef, payload, { merge: true }); } else { await addDoc(targetColl, payload); } setEditingTemplate(null); }}/>}
+                     </div>
+                </div>
+            );
+        };
+
         const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
             const [timeLeft, setTimeLeft] = useState(0);
             const [isFinished, setIsFinished] = useState(false);
@@ -263,6 +491,72 @@
                             <button onClick={onClose} className="h-12 w-12 bg-neutral-800 rounded-xl text-neutral-400 border border-neutral-700 hover:text-white hover:bg-neutral-700 flex items-center justify-center"><X size={20}/></button>
                         </div>
                     </div>
+                </div>
+            );
+        };
+
+        const StudentEvolution = ({ user, onClose }) => {
+            const [mode, setMode] = useState('simple');
+            const [assessments, setAssessments] = useState([]);
+            const [photos, setPhotos] = useState([]);
+            useEffect(() => {
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'assessments'), orderBy('date', 'desc'));
+                onSnapshot(q, s => setAssessments(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                const q2 = query(collection(db, 'artifacts', appId, 'users', user.uid, 'photos'), orderBy('date', 'desc'));
+                onSnapshot(q2, s => setPhotos(s.docs.map(d => ({id: d.id, ...d.data()}))));
+            }, [user]);
+            const latest = assessments[0];
+            return (
+                <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up p-6 pb-20 text-white">
+                     <div className="flex justify-between items-center mb-6 pt-safe">
+                        <h2 className="text-2xl font-black text-yellow-500 flex gap-2"><Flame/> EVOLUÇÃO</h2>
+                        <button onClick={onClose} className="bg-neutral-800 p-2 rounded-full"><X/></button>
+                     </div>
+                     <div className="flex bg-neutral-800 p-1 rounded-xl mb-8">
+                        <button onClick={()=>setMode('simple')} className={`flex-1 py-3 rounded-lg font-bold text-xs uppercase ${mode==='simple'?'bg-yellow-500 text-black':'text-neutral-500'}`}>Resumo</button>
+                        <button onClick={()=>setMode('complete')} className={`flex-1 py-3 rounded-lg font-bold text-xs uppercase ${mode==='complete'?'bg-yellow-500 text-black':'text-neutral-500'}`}>Detalhado</button>
+                     </div>
+                     {mode === 'simple' && (
+                        <div className="text-center py-10">
+                            {latest ? (
+                                <div className="animate-fade-in">
+                                    <div className="w-48 h-48 rounded-full border-4 border-yellow-500 flex flex-col items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(234,179,8,0.2)] bg-neutral-800">
+                                        <span className="text-6xl font-black text-white tracking-tighter">{latest.bf}</span>
+                                        <span className="text-sm font-bold text-yellow-500 uppercase tracking-widest">% GORDURA</span>
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-white mb-2">Resultado Incrível!</h3>
+                                    <p className="text-neutral-400 text-sm">Avaliação feita em {new Date(latest.date?.seconds*1000).toLocaleDateString()}</p>
+                                </div>
+                            ) : (
+                                <div className="py-20 opacity-50"><Activity size={64} className="mx-auto mb-4"/><p>Ainda sem avaliações.</p></div>
+                            )}
+                        </div>
+                     )}
+                     {mode === 'complete' && (
+                        <div className="space-y-6 animate-slide-up">
+                             <div className="bg-neutral-800 p-6 rounded-3xl border border-neutral-700">
+                                <h3 className="font-bold mb-6 text-yellow-500 text-sm uppercase tracking-widest">Histórico Corporal</h3>
+                                {assessments.map(a => (
+                                    <div key={a.id} className="flex justify-between items-center border-b border-neutral-700 py-4 last:border-0">
+                                        <span className="font-mono text-neutral-400">{new Date(a.date?.seconds*1000).toLocaleDateString()}</span>
+                                        <div className="text-right"><span className="font-black text-xl text-white block">{a.bf}%</span><span className="text-[10px] text-neutral-500 uppercase">Gordura</span></div>
+                                    </div>
+                                ))}
+                             </div>
+                             <div className="bg-neutral-800 p-6 rounded-3xl border border-neutral-700">
+                                <h3 className="font-bold mb-6 text-yellow-500 text-sm uppercase tracking-widest">Galeria</h3>
+                                {photos.length===0 && <p className="text-neutral-500 text-sm">Nenhuma foto.</p>}
+                                <div className="grid grid-cols-2 gap-3">
+                                    {photos.map(p => (
+                                        <div key={p.id} className="aspect-square bg-black rounded-2xl overflow-hidden border border-neutral-700 relative">
+                                            <img src={p.url} className="w-full h-full object-cover"/>
+                                            <div className="absolute bottom-0 inset-x-0 bg-black/60 p-2 text-[10px] text-center text-white">{new Date(p.date?.seconds*1000).toLocaleDateString()}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
+                        </div>
+                     )}
                 </div>
             );
         };
@@ -535,9 +829,10 @@
                         />
                     )}
 
-                    {view === 'admin' && <AdminPanel user={user} onClose={() => setView('dashboard')} />}
+                    {view === 'admin' && <AdminPanelV2 user={user} onClose={() => setView('dashboard')} />}
                     {view === 'chat' && <ChatScreen user={user} onClose={() => setView('dashboard')} />}
                     {view === 'history' && <HistoryList user={user} onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }} onBack={() => setView('dashboard')} />}
+                    {view === 'evolution' && <StudentEvolution user={user} onClose={() => setView('dashboard')} />}
                     {view === 'report' && reportData.current && <WorkoutReport session={reportData.current} previousSession={reportData.previous} onClose={() => setView('dashboard')} />}
                     
                     {view === 'active' && activeSession && (
@@ -573,8 +868,9 @@
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
+                                    <button onClick={() => setView('evolution')} className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-800 hover:border-yellow-500/50"><Flame size={18} className="text-yellow-500" /> Evolução</button>
                                     <button onClick={() => setView('import')} className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-800 hover:border-blue-500/50"><Download size={18} className="text-blue-500" /> Importar</button>
-                                    <button onClick={handleCreateWorkout} className="bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg"><Plus size={18} /> Novo Treino</button>
+                                    <button onClick={handleCreateWorkout} className="col-span-2 bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg"><Plus size={18} /> Novo Treino</button>
                                 </div>
                             </div>
                             {view === 'import' && (
