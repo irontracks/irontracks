@@ -692,7 +692,12 @@
             const [isFinished, setIsFinished] = useState(false);
 
             useEffect(() => {
-                if (!targetTime) return;
+                if (!targetTime) {
+                    setIsFinished(false);
+                    return;
+                }
+                
+                setIsFinished(false); // Resetar estado ao iniciar novo timer
                 
                 const updateTimer = () => {
                     const now = Date.now();
@@ -923,8 +928,9 @@
                 
                 onUpdateLog(key, { ...current, done: isDone });
 
-                if (isDone && restTime > 0) {
-                    onStartTimer(restTime);
+                const time = parseInt(restTime);
+                if (isDone && !isNaN(time) && time > 0) {
+                    onStartTimer(time);
                 }
             };
 
