@@ -85,7 +85,7 @@
             browserLocalPersistence
         } from 'firebase/auth';
         import { 
-            getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, 
+            getFirestore, collection, doc, setDoc, getDoc, addDoc, deleteDoc, updateDoc, 
             onSnapshot, serverTimestamp, query, orderBy, limit, where, getDocs, collectionGroup
         } from 'firebase/firestore';
         import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
@@ -261,7 +261,7 @@
             const [photos, setPhotos] = useState([]);
             const [editingTemplate, setEditingTemplate] = useState(null);
             const [newStudent, setNewStudent] = useState({ name: '', email: '', age: '', phone: '' });
-            const [newCoachEmail, setNewCoachEmail] = useState('');
+            const [newCoach, setNewCoach] = useState({ name: '', email: '', phone: '', status: 'pendente' });
             const [assessmentForm, setAssessmentForm] = useState(null);
             const [uploading, setUploading] = useState(false);
             const isSuperAdmin = user.email === ADMIN_EMAIL;
@@ -386,17 +386,24 @@
             };
 
             const handleAddCoach = async () => {
-                if (!newCoachEmail.trim()) return;
-                const email = newCoachEmail.trim().toLowerCase();
+                if (!newCoach.email.trim() || !newCoach.name.trim()) return alert("Preencha Nome e Email.");
+                const email = newCoach.email.trim().toLowerCase();
                 try {
                     await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'coaches', email), {
+                        ...newCoach,
                         email,
                         addedBy: user.email,
                         createdAt: serverTimestamp()
                     });
-                    setNewCoachEmail('');
+                    setNewCoach({ name: '', email: '', phone: '', status: 'pendente' });
                     alert("Professor adicionado com sucesso!");
                 } catch (e) { alert("Erro ao adicionar professor: " + e.message); }
+            };
+
+            const handleUpdateCoachStatus = async (id, newStatus) => {
+                try {
+                    await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'coaches', id), { status: newStatus });
+                } catch (e) { alert("Erro ao atualizar: " + e.message); }
             };
 
             const handleRemoveCoach = async (id) => {
@@ -509,28 +516,46 @@
                                     <div className="space-y-6">
                                         <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700">
                                             <h3 className="font-bold text-lg mb-4 text-yellow-500">Adicionar Professor</h3>
-                                            <p className="text-xs text-neutral-400 mb-4">O professor terá acesso ao painel CMD para gerenciar seus próprios alunos.</p>
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    className="flex-1 bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" 
-                                                    placeholder="Email do Professor (Google)" 
-                                                    value={newCoachEmail} 
-                                                    onChange={e=>setNewCoachEmail(e.target.value)}
-                                                />
-                                                <button onClick={handleAddCoach} className="bg-yellow-500 text-black font-bold px-6 rounded-lg hover:bg-yellow-400">ADD</button>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                                                <input className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="Nome Completo" value={newCoach.name} onChange={e=>setNewCoach({...newCoach, name:e.target.value})}/>
+                                                <input className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="Email Google" value={newCoach.email} onChange={e=>setNewCoach({...newCoach, email:e.target.value})}/>
+                                                <input className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent" placeholder="Telefone / WhatsApp" value={newCoach.phone} onChange={e=>setNewCoach({...newCoach, phone:e.target.value})}/>
+                                                <select className="w-full bg-neutral-900 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent text-white" value={newCoach.status} onChange={e=>setNewCoach({...newCoach, status:e.target.value})}>
+                                                    <option value="pendente">Pendente</option>
+                                                    <option value="testando">Testando</option>
+                                                    <option value="pago">Pago</option>
+                                                </select>
                                             </div>
+                                            <button onClick={handleAddCoach} className="w-full bg-yellow-500 text-black font-bold p-3 rounded-lg hover:bg-yellow-400">ADICIONAR ACESSO</button>
                                         </div>
 
                                         <div className="space-y-3">
                                             <h3 className="font-bold text-white uppercase text-xs tracking-widest">Professores Ativos</h3>
                                             {coaches.length === 0 && <p className="text-neutral-500 text-sm">Nenhum professor cadastrado.</p>}
                                             {coaches.map(c => (
-                                                <div key={c.id} className="bg-neutral-800 p-4 rounded-xl flex justify-between items-center border border-neutral-700">
-                                                    <div>
-                                                        <span className="font-bold block text-white">{c.email}</span>
-                                                        <span className="text-[10px] text-neutral-500">Adicionado em: {new Date(c.createdAt?.seconds * 1000).toLocaleDateString()}</span>
+                                                <div key={c.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h4 className="font-bold text-white text-lg">{c.name || 'Sem nome'}</h4>
+                                                            <p className="text-sm text-neutral-400">{c.email}</p>
+                                                            <p className="text-xs text-neutral-500">{c.phone}</p>
+                                                        </div>
+                                                        <button onClick={() => handleRemoveCoach(c.id)} className="p-2 bg-red-900/20 text-red-500 rounded-lg hover:bg-red-900/40"><Trash2 size={16}/></button>
                                                     </div>
-                                                    <button onClick={() => handleRemoveCoach(c.id)} className="p-2 bg-red-900/20 text-red-500 rounded-lg hover:bg-red-900/40"><Trash2 size={16}/></button>
+                                                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-700">
+                                                        <span className="text-[10px] text-neutral-500">Status:</span>
+                                                        <div className="flex gap-2">
+                                                            {['pendente', 'testando', 'pago'].map(st => (
+                                                                <button 
+                                                                    key={st} 
+                                                                    onClick={() => handleUpdateCoachStatus(c.id, st)}
+                                                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition-colors ${c.status === st ? (st === 'pago' ? 'bg-green-500 text-black' : st === 'testando' ? 'bg-blue-500 text-white' : 'bg-yellow-500 text-black') : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'}`}
+                                                                >
+                                                                    {st}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
