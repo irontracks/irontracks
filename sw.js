@@ -1,8 +1,14 @@
-const CACHE_NAME = 'irontracks-v1';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'irontracks-v2';
+
+// 1. Arquivos Essenciais (Locais) - Se falhar, o app não instala
+const CORE_ASSETS = [
   './index.html',
   './icone.png',
-  'https://cdn.tailwindcss.com',
+  './manifest.json'
+];
+
+// 2. Assets Externos que suportam CORS (Modules)
+const CORS_ASSETS = [
   'https://unpkg.com/@babel/standalone/babel.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
   'https://esm.sh/react@18.2.0',
@@ -14,10 +20,40 @@ const ASSETS_TO_CACHE = [
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js'
 ];
 
+// 3. Assets que podem precisar de no-cors (Scripts globais)
+const NO_CORS_ASSETS = [
+  'https://cdn.tailwindcss.com'
+];
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Passo 1: Cachear essenciais (Critical Path)
+      await cache.addAll(CORE_ASSETS);
+
+      // Passo 2: Cachear assets CORS (tentar um por um para não quebrar tudo)
+      const corsPromises = CORS_ASSETS.map(async (url) => {
+        try {
+          const request = new Request(url, { mode: 'cors' });
+          const response = await fetch(request);
+          if (response.ok) await cache.put(request, response);
+        } catch (e) {
+          console.warn('Falha ao cachear asset CORS (não-crítico):', url, e);
+        }
+      });
+
+      // Passo 3: Cachear assets NO-CORS (Tailwind)
+      const noCorsPromises = NO_CORS_ASSETS.map(async (url) => {
+        try {
+          const request = new Request(url, { mode: 'no-cors' });
+          const response = await fetch(request);
+          await cache.put(request, response);
+        } catch (e) {
+          console.warn('Falha ao cachear asset NO-CORS:', url, e);
+        }
+      });
+
+      await Promise.all([...corsPromises, ...noCorsPromises]);
     })
   );
 });
