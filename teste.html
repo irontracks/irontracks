@@ -229,10 +229,12 @@
             const [uploading, setUploading] = useState(false);
 
             useEffect(() => {
-                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc'));
-                const unsub = onSnapshot(q, snap => setUsersList(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'clients'));
+                const unsub = onSnapshot(q, s => {
+                    setUsersList(s.docs.map(d => ({id: d.id, ...d.data()})));
+                });
                 return () => unsub();
-            }, []);
+            }, [user]);
 
             useEffect(() => {
                 const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc'));
@@ -243,29 +245,31 @@
             useEffect(() => {
                 if (!selectedStudent) return;
                 const uid = selectedStudent.uid || selectedStudent.id;
-                const unsub1 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'workouts'), orderBy('createdAt', 'desc')), s => setStudentWorkouts(s.docs.map(d => ({id: d.id, ...d.data()}))));
-                const unsub2 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'assessments'), orderBy('date', 'desc')), s => setAssessments(s.docs.map(d => ({id: d.id, ...d.data()}))));
-                const unsub3 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', uid, 'photos'), orderBy('date', 'desc')), s => setPhotos(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                const unsub1 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', user.uid, 'clients', uid, 'workouts'), orderBy('createdAt', 'desc')), s => setStudentWorkouts(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                const unsub2 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', user.uid, 'clients', uid, 'assessments'), orderBy('date', 'desc')), s => setAssessments(s.docs.map(d => ({id: d.id, ...d.data()}))));
+                const unsub3 = onSnapshot(query(collection(db, 'artifacts', appId, 'users', user.uid, 'clients', uid, 'photos'), orderBy('date', 'desc')), s => setPhotos(s.docs.map(d => ({id: d.id, ...d.data()}))));
                 return () => { unsub1(); unsub2(); unsub3(); };
-            }, [selectedStudent]);
+            }, [selectedStudent, user]);
 
             const handleRegister = async () => {
                 if (!newStudent.email || !newStudent.name) return alert("Preencha nome e email");
+                const email = newStudent.email.trim().toLowerCase();
                 try {
-                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newStudent.email), {
-                        uid: newStudent.email, 
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', email), {
+                        uid: email, 
                         displayName: newStudent.name, 
-                        email: newStudent.email,
+                        email: email,
                         age: newStudent.age,
                         phone: newStudent.phone,
                         role: 'student', 
                         lastSeen: serverTimestamp(), 
                         isManual: true, 
-                        photoURL: null
+                        photoURL: null,
+                        coachId: user.uid
                     });
                     alert("Aluno Cadastrado!"); 
                     setNewStudent({name:'', email:'', age: '', phone: ''});
-                } catch(e) { alert(e.message); }
+                } catch(e) { alert("Erro ao cadastrar: " + e.message); }
             };
 
             const handleSaveAssessment = async (data) => {
@@ -274,7 +278,7 @@
                 const age = Number(data.age);
                 const dens = data.gender === 'male' ? 1.112 - 0.00043499*s7 + 0.00000055*s7*s7 - 0.00028826*age : 1.097 - 0.00046971*s7 + 0.00000056*s7*s7 - 0.00012828*age;
                 const bf = ((495/dens)-450).toFixed(1);
-                await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'assessments'), {...data, sum7: s7, bf, date: serverTimestamp()});
+                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'clients', uid, 'assessments'), {...data, sum7: s7, bf, date: serverTimestamp()});
                 setAssessmentForm(null);
             };
 
@@ -296,10 +300,10 @@
                 reader.onload = async (evt) => {
                     try {
                         const uid = selectedStudent.uid || selectedStudent.id;
-                        const sRef = ref(storage, `users/${uid}/photos/${Date.now()}_${file.name}`);
+                        const sRef = ref(storage, `users/${user.uid}/clients/${uid}/photos/${Date.now()}_${file.name}`);
                         await uploadString(sRef, evt.target.result, 'data_url');
                         const url = await getDownloadURL(sRef);
-                        await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'photos'), {url, date: serverTimestamp()});
+                        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'clients', uid, 'photos'), {url, date: serverTimestamp()});
                     } catch(e) { alert("Erro upload: " + e.message); } finally { setUploading(false); }
                 };
                 reader.readAsDataURL(file);
@@ -320,8 +324,18 @@
                 return tips;
             };
 
-            const handleCloneTemplate = async (template) => { if (!selectedStudent) return; if (!confirm(`Clonar para ${selectedStudent.displayName}?`)) return; const newWorkout = { ...template, title: template.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: template.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', (selectedStudent.uid||selectedStudent.id), 'workouts'), newWorkout); alert("Enviado!"); };
-            const handleDeleteStudentWorkout = async (wId) => { if (!confirm("Deletar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', (selectedStudent.uid||selectedStudent.id), 'workouts', wId)); };
+            const handleCloneTemplate = async (template) => { 
+                if (!selectedStudent) return; 
+                if (!confirm(`Clonar para ${selectedStudent.displayName}?`)) return; 
+                const newWorkout = { ...template, title: template.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: template.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; 
+                delete newWorkout.id; 
+                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'clients', (selectedStudent.uid||selectedStudent.id), 'workouts'), newWorkout); 
+                alert("Enviado!"); 
+            };
+            const handleDeleteStudentWorkout = async (wId) => { 
+                if (!confirm("Deletar?")) return; 
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', (selectedStudent.uid||selectedStudent.id), 'workouts', wId)); 
+            };
 
             const TAB_LABELS = { 'dashboard': 'VISÃO GERAL', 'students': 'ALUNOS', 'templates': 'TREINOS', 'register': 'CADASTRAR ALUNO' };
 
@@ -473,7 +487,24 @@
                                 )}
                             </div>
                         )}
-                        {editingTemplate && <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { const targetColl = data.targetStudentId ? collection(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts') : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; if(data.targetStudentId) payload.importedFrom = 'Coach MK'; if (data.id) { const docRef = data.targetStudentId ? doc(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts', data.id) : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); await setDoc(docRef, payload, { merge: true }); } else { await addDoc(targetColl, payload); } setEditingTemplate(null); }}/>}
+                        {editingTemplate && <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { 
+                            const targetColl = data.targetStudentId 
+                                ? collection(db, 'artifacts', appId, 'users', user.uid, 'clients', data.targetStudentId, 'workouts') 
+                                : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); 
+                            
+                            const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; 
+                            if(data.targetStudentId) payload.importedFrom = 'Coach MK'; 
+                            
+                            if (data.id) { 
+                                const docRef = data.targetStudentId 
+                                    ? doc(db, 'artifacts', appId, 'users', user.uid, 'clients', data.targetStudentId, 'workouts', data.id) 
+                                    : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); 
+                                await setDoc(docRef, payload, { merge: true }); 
+                            } else { 
+                                await addDoc(targetColl, payload); 
+                            } 
+                            setEditingTemplate(null); 
+                        }}/>}
                      </div>
                 </div>
             );
@@ -901,7 +932,7 @@
 
             // ... (Resto do código mantido igual) ...
             useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'messages'), orderBy('createdAt', 'desc'), limit(1)); const unsub = onSnapshot(q, s => { if(!s.empty) { const m = s.docs[0].data(); if(m.createdAt?.toMillis() > Date.now()-10000 && m.uid !== user.uid) { setNotification({id: s.docs[0].id, ...m}); setTimeout(()=>setNotification(null), 4000); }}}); return () => unsub(); }, [user]);
-            useEffect(() => { if(user) setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), { uid: user.uid, displayName: user.displayName || 'Anônimo', email: user.email, photoURL: user.photoURL, lastSeen: serverTimestamp() }, { merge: true }); }, [user]);
+            useEffect(() => { if(user) setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), { uid: user.uid, displayName: user.displayName || 'Anônimo', email: user.email, photoURL: user.photoURL, lastSeen: serverTimestamp() }, { merge: true }).catch(e=>console.warn("Error updating presence:",e)); }, [user]);
             useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [user]);
 
             // Handlers (mantidos)
