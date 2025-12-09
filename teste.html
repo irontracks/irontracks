@@ -165,7 +165,7 @@
                         <Dumbbell size={64} className="text-black" />
                     </div>
                     <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
-                    <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v2.2</p>
+                    <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v2.3</p>
                     
                     {/* Botão Principal (Popup) */}
                     <button 
@@ -276,6 +276,16 @@
                 const bf = ((495/dens)-450).toFixed(1);
                 await addDoc(collection(db, 'artifacts', appId, 'users', uid, 'assessments'), {...data, sum7: s7, bf, date: serverTimestamp()});
                 setAssessmentForm(null);
+            };
+
+            const handleShareAssessment = (assessment, type) => {
+                const text = `*Avaliação Física - IronTracks*\nAluno: ${selectedStudent.displayName}\nData: ${new Date(assessment.date.seconds * 1000).toLocaleDateString()}\n\n*Composição*\nBF: ${assessment.bf}%\nΣ7 Dobras: ${assessment.sum7}mm\n\n*Medidas*\nPeso: ${assessment.weight||'-'}kg | Alt: ${assessment.height||'-'}cm\nCintura: ${assessment.waist||'-'}cm | Quadril: ${assessment.hips||'-'}cm\nBraço: ${assessment.arm||'-'}cm | Perna: ${assessment.thigh_c||'-'}cm\n\nConfira o relatório completo no App!`;
+                if (type === 'whatsapp') {
+                    const phone = selectedStudent.phone ? selectedStudent.phone.replace(/\D/g, '') : '';
+                    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+                } else {
+                    window.location.href = `mailto:${selectedStudent.email}?subject=Resultado da Avaliação&body=${encodeURIComponent(text)}`;
+                }
             };
 
             const handleUploadPhoto = async (e) => {
@@ -402,14 +412,24 @@
                                 )}
                                 {subTab === 'assessments' && (
                                     <div>
-                                        <button onClick={() => setAssessmentForm({ gender: 'male', age: 25, triceps:0, subscapular:0, chest:0, axillary:0, suprailiac:0, abdominal:0, thigh:0 })} className="w-full bg-yellow-500 text-black font-bold p-3 rounded-xl mb-4 shadow-lg hover:bg-yellow-400">NOVA AVALIAÇÃO</button>
+                                        <button onClick={() => setAssessmentForm({ gender: 'male', age: 25, weight:'', height:'', waist:'', hips:'', arm:'', thigh_c:'', triceps:0, subscapular:0, chest:0, axillary:0, suprailiac:0, abdominal:0, thigh:0 })} className="w-full bg-yellow-500 text-black font-bold p-3 rounded-xl mb-4 shadow-lg hover:bg-yellow-400">NOVA AVALIAÇÃO</button>
                                         {assessmentForm && (
                                             <div className="bg-neutral-800 p-4 rounded-xl border border-yellow-500 mb-4 animate-fade-in">
-                                                <h4 className="font-bold mb-3">Dados da Avaliação (7 Dobras)</h4>
+                                                <h4 className="font-bold mb-3 text-yellow-500">Dados Gerais</h4>
                                                 <div className="grid grid-cols-2 gap-3 mb-3">
                                                     <div><label className="text-[10px] text-neutral-400">Idade</label><input type="number" value={assessmentForm.age} onChange={e=>setAssessmentForm({...assessmentForm, age: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
                                                     <div><label className="text-[10px] text-neutral-400">Gênero</label><select value={assessmentForm.gender} onChange={e=>setAssessmentForm({...assessmentForm, gender: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"><option value="male">Masculino</option><option value="female">Feminino</option></select></div>
+                                                    <div><label className="text-[10px] text-neutral-400">Peso (kg)</label><input type="number" value={assessmentForm.weight} onChange={e=>setAssessmentForm({...assessmentForm, weight: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
+                                                    <div><label className="text-[10px] text-neutral-400">Altura (cm)</label><input type="number" value={assessmentForm.height} onChange={e=>setAssessmentForm({...assessmentForm, height: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
                                                 </div>
+                                                <h4 className="font-bold mb-3 text-yellow-500">Perimetria (cm)</h4>
+                                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                                    <div><label className="text-[10px] text-neutral-400">Cintura</label><input type="number" value={assessmentForm.waist} onChange={e=>setAssessmentForm({...assessmentForm, waist: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
+                                                    <div><label className="text-[10px] text-neutral-400">Quadril</label><input type="number" value={assessmentForm.hips} onChange={e=>setAssessmentForm({...assessmentForm, hips: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
+                                                    <div><label className="text-[10px] text-neutral-400">Braço</label><input type="number" value={assessmentForm.arm} onChange={e=>setAssessmentForm({...assessmentForm, arm: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
+                                                    <div><label className="text-[10px] text-neutral-400">Perna</label><input type="number" value={assessmentForm.thigh_c} onChange={e=>setAssessmentForm({...assessmentForm, thigh_c: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
+                                                </div>
+                                                <h4 className="font-bold mb-3 text-yellow-500">Dobras Cutâneas (mm)</h4>
                                                 <div className="grid grid-cols-2 gap-2 mb-4">
                                                     {['triceps', 'subscapular', 'chest', 'axillary', 'suprailiac', 'abdominal', 'thigh'].map(f => (
                                                         <div key={f}><label className="text-[10px] uppercase text-neutral-400">{f}</label><input type="number" value={assessmentForm[f]} onChange={e=>setAssessmentForm({...assessmentForm, [f]: e.target.value})} className="w-full bg-neutral-900 p-2 rounded text-white"/></div>
@@ -420,9 +440,15 @@
                                         )}
                                         <div className="space-y-2">
                                             {assessments.map(a => (
-                                                <div key={a.id} className="bg-neutral-800 p-3 rounded-xl flex justify-between items-center border border-neutral-700">
-                                                    <div><p className="font-black text-2xl text-yellow-500">{a.bf}% <span className="text-xs text-white font-normal">GORDURA</span></p><p className="text-xs text-neutral-500">{new Date(a.date?.seconds * 1000).toLocaleDateString()}</p></div>
-                                                    <div className="text-right"><p className="text-xs text-neutral-400 font-mono">Σ7: {a.sum7}mm</p></div>
+                                                <div key={a.id} className="bg-neutral-800 p-3 rounded-xl flex flex-col gap-2 border border-neutral-700">
+                                                    <div className="flex justify-between items-center w-full">
+                                                        <div><p className="font-black text-2xl text-yellow-500">{a.bf}% <span className="text-xs text-white font-normal">GORDURA</span></p><p className="text-xs text-neutral-500">{new Date(a.date?.seconds * 1000).toLocaleDateString()}</p></div>
+                                                        <div className="text-right"><p className="text-xs text-neutral-400 font-mono">Σ7: {a.sum7}mm</p></div>
+                                                    </div>
+                                                    <div className="flex gap-2 pt-2 border-t border-neutral-700/50">
+                                                        <button onClick={() => handleShareAssessment(a, 'whatsapp')} className="flex-1 bg-green-600/20 text-green-500 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-green-600 hover:text-white transition-colors"><MessageSquare size={14}/> WhatsApp</button>
+                                                        <button onClick={() => handleShareAssessment(a, 'email')} className="flex-1 bg-blue-600/20 text-blue-500 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 hover:bg-blue-600 hover:text-white transition-colors"><Send size={14}/> Email</button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -551,9 +577,17 @@
                              <div className="bg-neutral-800 p-6 rounded-3xl border border-neutral-700">
                                 <h3 className="font-bold mb-6 text-yellow-500 text-sm uppercase tracking-widest">Histórico Corporal</h3>
                                 {assessments.map(a => (
-                                    <div key={a.id} className="flex justify-between items-center border-b border-neutral-700 py-4 last:border-0">
-                                        <span className="font-mono text-neutral-400">{new Date(a.date?.seconds*1000).toLocaleDateString()}</span>
-                                        <div className="text-right"><span className="font-black text-xl text-white block">{a.bf}%</span><span className="text-[10px] text-neutral-500 uppercase">Gordura</span></div>
+                                    <div key={a.id} className="border-b border-neutral-700 py-4 last:border-0">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="font-mono text-neutral-400">{new Date(a.date?.seconds*1000).toLocaleDateString()}</span>
+                                            <div className="text-right"><span className="font-black text-xl text-white block">{a.bf}%</span><span className="text-[10px] text-neutral-500 uppercase">Gordura</span></div>
+                                        </div>
+                                        <div className="grid grid-cols-4 gap-2 text-[10px] text-neutral-400 bg-neutral-900/50 p-2 rounded-lg">
+                                            <div className="text-center"><span className="block font-bold text-white">{a.weight||'-'}kg</span>Peso</div>
+                                            <div className="text-center"><span className="block font-bold text-white">{a.waist||'-'}cm</span>Cintura</div>
+                                            <div className="text-center"><span className="block font-bold text-white">{a.arm||'-'}cm</span>Braço</div>
+                                            <div className="text-center"><span className="block font-bold text-white">{a.sum7||'-'}mm</span>Dobras</div>
+                                        </div>
                                     </div>
                                 ))}
                              </div>
