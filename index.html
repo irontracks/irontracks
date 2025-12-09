@@ -674,6 +674,9 @@
                     if (remaining <= 0) {
                         setTimeLeft(0);
                         setIsFinished(true);
+                        if (Notification.permission === 'granted') {
+                            new Notification("⏰ Tempo Esgotado!", { body: "Hora de voltar para o treino!", icon: 'icone.png' });
+                        }
                     } else {
                         setTimeLeft(remaining);
                     }
@@ -954,16 +957,18 @@
             return (
                 <div className="flex flex-col h-[100dvh] bg-neutral-900 overflow-hidden">
                     {/* Header Fixo */}
-                    <div className="bg-neutral-900/95 backdrop-blur z-20 p-4 border-b border-neutral-800 flex justify-between items-center pt-safe shrink-0">
-                        <button onClick={onBack} className="p-2 rounded-full bg-neutral-800 text-white"><ArrowLeft size={20}/></button>
-                        <div className="text-center">
-                            <h2 className="font-black text-white leading-none text-sm">{workout.title}</h2>
-                            <p className="text-[10px] text-yellow-500 font-mono flex items-center justify-center gap-1 mt-1">
-                                <Clock className="w-3 h-3"/>
-                                <span>{formatTime(elapsed)}</span>
-                            </p>
+                    <div className="bg-neutral-900/95 backdrop-blur z-20 border-b border-neutral-800 pt-safe shrink-0">
+                        <div className="p-4 flex justify-between items-center">
+                            <button onClick={onBack} className="p-2 rounded-full bg-neutral-800 text-white"><ArrowLeft size={20}/></button>
+                            <div className="text-center">
+                                <h2 className="font-black text-white leading-none text-sm">{workout.title}</h2>
+                                <p className="text-[10px] text-yellow-500 font-mono flex items-center justify-center gap-1 mt-1">
+                                    <Clock className="w-3 h-3"/>
+                                    <span>{formatTime(elapsed)}</span>
+                                </p>
+                            </div>
+                            <button onClick={handleFinish} className="bg-green-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-green-500 shadow-lg shadow-green-900/20">FIM</button>
                         </div>
-                        <button onClick={handleFinish} className="bg-green-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-green-500 shadow-lg shadow-green-900/20">FIM</button>
                     </div>
 
                     {/* Barra de Progresso */}
@@ -1199,6 +1204,7 @@
 
             // Handlers de Sessão
             const handleStartSession = (workout) => {
+                if (Notification.permission === 'default') { Notification.requestPermission(); }
                 setActiveSession({
                     workout,
                     logs: {},
