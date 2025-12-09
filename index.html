@@ -130,20 +130,38 @@
             const handlePopupLogin = async () => {
                 setIsLoading(true);
                 setErrorMsg('');
+                
+                // Timeout de segurança para destravar a tela caso o Google não responda
+                const timer = setTimeout(() => {
+                    if (isLoading) {
+                        setIsLoading(false);
+                        setErrorMsg("O login demorou muito. Tente novamente.");
+                    }
+                }, 15000); // 15 segundos
+
                 const provider = new GoogleAuthProvider();
                 try {
                     await setPersistence(auth, browserLocalPersistence);
-                    await signInWithPopup(auth, provider);
-                    // Sucesso: o onAuthStateChanged no App vai pegar
+                    
+                    // Detecção simples de dispositivo móvel/iOS para evitar Popups que travam em PWA
+                    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                    
+                    if (isMobile) {
+                        // Em mobile/PWA, Redirect é mais seguro que Popup
+                        await signInWithRedirect(auth, provider);
+                    } else {
+                        await signInWithPopup(auth, provider);
+                    }
+                    
+                    // Se der certo, o onAuthStateChanged resolve.
                 } catch (error) {
-                    console.error("Popup Error:", error);
+                    clearTimeout(timer);
+                    console.error("Login Error:", error);
                     setIsLoading(false);
-                    // Se popup foi bloqueado ou fechado, sugerimos redirect
-                    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
-                        setErrorMsg("Pop-up bloqueado. Use a opção abaixo.");
+                    
+                    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+                        setErrorMsg("Pop-up bloqueado. Tentando método alternativo...");
                         setShowRedirectOption(true);
-                    } else if (error.code === 'auth/unauthorized-domain') {
-                        setErrorMsg("Domínio não autorizado no Firebase.");
                     } else {
                         setErrorMsg(error.message);
                     }
@@ -179,6 +197,16 @@
                     >
                         {isLoading ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-neutral-900"></span> : <><img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5"/> Entrar com Google</>}
                     </button>
+
+                    {/* Botão Cancelar (Só aparece se estiver carregando) */}
+                    {isLoading && (
+                        <button 
+                            onClick={() => setIsLoading(false)}
+                            className="text-red-500 text-xs font-bold underline mt-4 mb-2 animate-fade-in"
+                        >
+                            Cancelar / Destravar Tela
+                        </button>
+                    )}
 
                     {/* Botão Fallback (Redirect) - Só aparece se popup falhar ou usuário pedir */}
                     {showRedirectOption && (
