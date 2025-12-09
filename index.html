@@ -84,9 +84,7 @@
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
             TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell, Flame,
-            History, Calendar, Crown, Database, UserCog, Megaphone, AlertCircle,
-            UserPlus, Mail, Ruler, Scale, BarChart3, Info, Eye, EyeOff,
-            Camera, Image, Zap, Target, Award, TrendingUp as TrendUp, Brain
+            History, Calendar, Crown, Database, UserCog, Megaphone, AlertCircle
         } from 'lucide-react';
 
         // --- CONFIG ---
@@ -121,29 +119,12 @@
             useEffect(() => {
                 localStorage.removeItem('auth_pending');
                 localStorage.removeItem('auth_in_progress');
-                
-                // Detecta Safari/iOS e força redirect
-                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                if (isSafari || isIOS) {
-                    setShowRedirectOption(true);
-                }
             }, []);
 
             const handlePopupLogin = async () => {
                 setIsLoading(true);
                 setErrorMsg('');
                 const provider = new GoogleAuthProvider();
-                
-                // Safari/iOS tem problemas com popup, força redirect
-                const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                
-                if (isSafari || isIOS) {
-                    handleRedirectLogin();
-                    return;
-                }
-                
                 try {
                     await setPersistence(auth, browserLocalPersistence);
                     await signInWithPopup(auth, provider);
@@ -168,7 +149,6 @@
                 setErrorMsg('Redirecionando...');
                 const provider = new GoogleAuthProvider();
                 try {
-                    await setPersistence(auth, browserLocalPersistence);
                     await signInWithRedirect(auth, provider);
                 } catch (error) {
                     setIsLoading(false);
@@ -229,1413 +209,159 @@
         // ... (Componentes internos: NotificationToast, ChatScreen, etc mantidos intactos) ...
         const NotificationToast = ({ notification, onClose }) => { if (!notification) return null; return <div onClick={onClose} className="fixed top-4 left-4 right-4 z-[60] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer">{notification.photoURL ? <img src={notification.photoURL} className="w-10 h-10 rounded-full border border-neutral-600" /> : <div className="w-10 h-10 rounded-full bg-neutral-700 flex items-center justify-center font-bold">{notification.displayName?.[0]}</div>}<div className="flex-1 overflow-hidden"><p className="text-xs font-bold text-yellow-500">Nova Mensagem</p><p className="text-sm truncate text-white">{notification.text}</p></div><button className="text-neutral-400"><X size={16}/></button></div>; };
         const ChatScreen = ({ user, onClose }) => { const [activeChat, setActiveChat] = useState(null); const [usersList, setUsersList] = useState([]); const [messages, setMessages] = useState([]); const [newMessage, setNewMessage] = useState(''); const dummy = useRef(); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc'), limit(20)); const unsubscribe = onSnapshot(q, (snapshot) => { setUsersList(snapshot.docs.map(doc => doc.data()).filter(u => u.uid !== user.uid)); }); return () => unsubscribe(); }, [activeChat]); useEffect(() => { if (!activeChat) return; let collectionPath; if (activeChat.id === 'global') { collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); } else { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } const q = query(collectionPath, orderBy('createdAt', 'desc'), limit(50)); const unsubscribe = onSnapshot(q, (snapshot) => { setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).reverse()); }); return () => unsubscribe(); }, [activeChat]); useEffect(() => { dummy.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]); const sendMessage = async (e) => { e.preventDefault(); if (!newMessage.trim()) return; const text = newMessage; setNewMessage(''); let collectionPath; if (activeChat && activeChat.id === 'global') collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'messages'); else if (activeChat) { const userIds = [user.uid, activeChat.uid].sort(); const chatId = `chat_${userIds[0]}_${userIds[1]}`; collectionPath = collection(db, 'artifacts', appId, 'public', 'data', 'chats', chatId, 'messages'); } else return; await addDoc(collectionPath, { text: text, createdAt: serverTimestamp(), uid: user.uid, displayName: user.displayName || 'Anônimo', photoURL: user.photoURL }); }; return <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up"><div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe"><div className="flex items-center gap-3">{activeChat ? <button onClick={() => setActiveChat(null)} className="p-1 rounded-full hover:bg-neutral-600 mr-1"><ArrowLeft size={20} /></button> : <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>}<div><h3 className="font-bold text-lg">{activeChat ? (activeChat.displayName || activeChat.title) : 'Mensagens'}</h3><p className="text-xs text-neutral-400 flex items-center gap-1">{activeChat ? 'Online' : 'Selecione uma conversa'}</p></div></div><button onClick={onClose} className="p-2 bg-neutral-700 rounded-full hover:bg-neutral-600"><X size={20} /></button></div>{!activeChat && <div className="flex-1 overflow-y-auto p-4 space-y-2"><button onClick={() => setActiveChat({ id: 'global', title: 'Iron Lounge', displayName: 'Iron Lounge' })} className="w-full bg-neutral-800 p-4 rounded-xl flex items-center gap-4 hover:bg-neutral-700 transition-colors border border-neutral-700 h-20"><div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold shrink-0"><Users size={24} /></div><div className="text-left"><p className="font-bold text-white text-lg">Iron Lounge</p><p className="text-xs text-neutral-400">Chat Global</p></div></button><p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mt-6 mb-2">Atletas</p>{usersList.map((u, idx) => ( <button key={idx} onClick={() => setActiveChat(u)} className="w-full bg-neutral-800/50 p-4 rounded-xl flex items-center gap-3 hover:bg-neutral-800 transition-colors border border-neutral-800">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full border border-neutral-600 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-white shrink-0">{u.displayName?.[0]}</div>}<div className="text-left overflow-hidden"><p className="font-bold text-white text-base truncate">{u.displayName}</p><p className="text-[10px] text-green-500 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span> Online</p></div></button> ))}</div>}{activeChat && <><div className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/50">{messages.map(msg => { const isMe = msg.uid === user.uid; return <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''}`}>{msg.photoURL ? <img src={msg.photoURL} className="w-8 h-8 rounded-full border border-neutral-700" /> : <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center text-xs font-bold">{msg.displayName?.[0]}</div>}<div className={`max-w-[80%] rounded-2xl p-3 text-sm ${isMe ? 'bg-yellow-500 text-black rounded-tr-none' : 'bg-neutral-800 text-white rounded-tl-none border border-neutral-700'}`}>{!isMe && <p className="text-[10px] font-bold text-neutral-400 mb-1">{msg.displayName}</p>}<p>{msg.text}</p></div></div>; })}<div ref={dummy}></div></div><form onSubmit={sendMessage} className="p-4 bg-neutral-800 border-t border-neutral-700 flex gap-2 pb-safe"><input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." /><button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50"><Send size={20} /></button></form></>}</div>; };
-        const AdminPanel = ({ user, onClose }) => { const [tab, setTab] = useState('students'); const [usersList, setUsersList] = useState([]); const [templates, setTemplates] = useState([]); const [selectedStudent, setSelectedStudent] = useState(null); const [studentWorkouts, setStudentWorkouts] = useState([]); const [editingTemplate, setEditingTemplate] = useState(null); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc')); const unsub = onSnapshot(q, snap => setUsersList(snap.docs.map(d => d.data()))); return () => unsub(); }, []); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, []); useEffect(() => { if (!selectedStudent) return; const q = query(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setStudentWorkouts(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, [selectedStudent]); const handleCloneTemplate = async (template) => { if (!selectedStudent) return; if (!confirm(`Clonar para ${selectedStudent.displayName}?`)) return; const newWorkout = { ...template, title: template.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: template.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), newWorkout); alert("Enviado!"); }; const handleDeleteStudentWorkout = async (wId) => { if (!confirm("Deletar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts', wId)); }; if (tab === 'cadastrar') return <CadastrarAluno coach={user} onBack={() => setTab('students')} />; if (tab === 'avaliacao') return <AvaliacaoFisica coach={user} onBack={() => setTab('students')} />; return <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up"><div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg"><h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND</h2><button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button></div>{!selectedStudent && !editingTemplate && ( <div className="flex p-2 gap-1 bg-neutral-800 overflow-x-auto"><button onClick={() => setTab('students')} className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm whitespace-nowrap ${tab==='students' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Alunos</button><button onClick={() => setTab('templates')} className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm whitespace-nowrap ${tab==='templates' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Templates</button><button onClick={() => setTab('cadastrar')} className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm whitespace-nowrap ${tab==='cadastrar' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Cadastrar</button><button onClick={() => setTab('avaliacao')} className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm whitespace-nowrap ${tab==='avaliacao' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Avaliação</button></div> )}<div className="p-4 pb-20">{tab === 'students' && !selectedStudent && !editingTemplate && ( <div className="space-y-3">{usersList.map(u => <div key={u.uid} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-600 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}<div className="flex-1"><h3 className="font-bold text-lg">{u.displayName}</h3><p className="text-xs text-neutral-400">Visto: {formatLastSeen(u.lastSeen)}</p></div><ArrowLeft className="rotate-180 text-neutral-500"/></div>)}</div> )}{tab === 'templates' && !selectedStudent && !editingTemplate && ( <div className="space-y-3"><button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Novo Template</button>{templates.map(t => <div key={t.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h3 className="font-bold text-white">{t.title}</h3><p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate(t)} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={async () => { if(confirm('Apagar?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'templates', t.id)) }} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div> )}{selectedStudent && !editingTemplate && ( <div><div className="flex items-center gap-3 mb-6"><button onClick={() => setSelectedStudent(null)} className="p-2 bg-neutral-800 rounded-lg"><ArrowLeft/></button><div><h2 className="text-xl font-bold">{selectedStudent.displayName}</h2><p className="text-xs text-neutral-400">{selectedStudent.email}</p></div></div><div className="grid grid-cols-2 gap-2 mb-6"><button onClick={() => setEditingTemplate({ title: '', exercises: [], targetStudentId: selectedStudent.uid })} className="bg-yellow-500 text-black p-3 rounded-xl font-bold text-sm">+ Personalizado</button><button onClick={() => alert("Selecione um template abaixo")} className="bg-neutral-800 text-white border border-neutral-700 p-3 rounded-xl font-bold text-sm">Clonar Template</button></div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Treinos Atuais</h3><div className="space-y-3 mb-8">{studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h4 className="font-bold text-white">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: selectedStudent.uid})} className="p-2 bg-blue-900/30 text-blue-400 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Clonar Template</h3><div className="space-y-2">{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800/50 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div></div> )}{editingTemplate && ( <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { const targetColl = data.targetStudentId ? collection(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts') : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; if(data.targetStudentId) payload.importedFrom = 'Coach MK'; if (data.id) { const docRef = data.targetStudentId ? doc(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts', data.id) : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); await setDoc(docRef, payload, { merge: true }); } else { await addDoc(targetColl, payload); } setEditingTemplate(null); }}/> )}</div></div>; };
+        const AdminPanel = ({ user, onClose }) => { const [tab, setTab] = useState('students'); const [usersList, setUsersList] = useState([]); const [templates, setTemplates] = useState([]); const [selectedStudent, setSelectedStudent] = useState(null); const [studentWorkouts, setStudentWorkouts] = useState([]); const [editingTemplate, setEditingTemplate] = useState(null); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), orderBy('lastSeen', 'desc')); const unsub = onSnapshot(q, snap => setUsersList(snap.docs.map(d => d.data()))); return () => unsub(); }, []); useEffect(() => { const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'templates'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, []); useEffect(() => { if (!selectedStudent) return; const q = query(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, snap => setStudentWorkouts(snap.docs.map(d => ({id: d.id, ...d.data()})))); return () => unsub(); }, [selectedStudent]); const handleCloneTemplate = async (template) => { if (!selectedStudent) return; if (!confirm(`Clonar para ${selectedStudent.displayName}?`)) return; const newWorkout = { ...template, title: template.title, importedFrom: 'Coach MK', createdAt: serverTimestamp(), exercises: template.exercises.map(ex => ({...ex, notes: ex.notes || ''})) }; delete newWorkout.id; await addDoc(collection(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts'), newWorkout); alert("Enviado!"); }; const handleDeleteStudentWorkout = async (wId) => { if (!confirm("Deletar?")) return; await deleteDoc(doc(db, 'artifacts', appId, 'users', selectedStudent.uid, 'workouts', wId)); }; return <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up"><div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg"><h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND</h2><button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button></div>{!selectedStudent && !editingTemplate && ( <div className="flex p-2 gap-2 bg-neutral-800"><button onClick={() => setTab('students')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='students' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Alunos</button><button onClick={() => setTab('templates')} className={`flex-1 py-3 rounded-lg font-bold ${tab==='templates' ? 'bg-neutral-700 text-white' : 'text-neutral-500'}`}>Templates</button></div> )}<div className="p-4 pb-20">{tab === 'students' && !selectedStudent && !editingTemplate && ( <div className="space-y-3">{usersList.map(u => <div key={u.uid} onClick={() => setSelectedStudent(u)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">{u.photoURL ? <img src={u.photoURL} className="w-12 h-12 rounded-full"/> : <div className="w-12 h-12 bg-neutral-600 rounded-full flex items-center justify-center font-bold">{u.displayName?.[0]}</div>}<div className="flex-1"><h3 className="font-bold text-lg">{u.displayName}</h3><p className="text-xs text-neutral-400">Visto: {formatLastSeen(u.lastSeen)}</p></div><ArrowLeft className="rotate-180 text-neutral-500"/></div>)}</div> )}{tab === 'templates' && !selectedStudent && !editingTemplate && ( <div className="space-y-3"><button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Novo Template</button>{templates.map(t => <div key={t.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h3 className="font-bold text-white">{t.title}</h3><p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate(t)} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={async () => { if(confirm('Apagar?')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'templates', t.id)) }} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div> )}{selectedStudent && !editingTemplate && ( <div><div className="flex items-center gap-3 mb-6"><button onClick={() => setSelectedStudent(null)} className="p-2 bg-neutral-800 rounded-lg"><ArrowLeft/></button><div><h2 className="text-xl font-bold">{selectedStudent.displayName}</h2><p className="text-xs text-neutral-400">{selectedStudent.email}</p></div></div><div className="grid grid-cols-2 gap-2 mb-6"><button onClick={() => setEditingTemplate({ title: '', exercises: [], targetStudentId: selectedStudent.uid })} className="bg-yellow-500 text-black p-3 rounded-xl font-bold text-sm">+ Personalizado</button><button onClick={() => alert("Selecione um template abaixo")} className="bg-neutral-800 text-white border border-neutral-700 p-3 rounded-xl font-bold text-sm">Clonar Template</button></div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Treinos Atuais</h3><div className="space-y-3 mb-8">{studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center"><div><h4 className="font-bold text-white">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: selectedStudent.uid})} className="p-2 bg-blue-900/30 text-blue-400 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}</div><h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Clonar Template</h3><div className="space-y-2">{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800/50 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div></div> )}{editingTemplate && ( <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { const targetColl = data.targetStudentId ? collection(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts') : collection(db, 'artifacts', appId, 'public', 'data', 'templates'); const payload = { title: data.title, exercises: data.exercises, createdAt: serverTimestamp(), lastEditedBy: 'Coach MK' }; if(data.targetStudentId) payload.importedFrom = 'Coach MK'; if (data.id) { const docRef = data.targetStudentId ? doc(db, 'artifacts', appId, 'users', data.targetStudentId, 'workouts', data.id) : doc(db, 'artifacts', appId, 'public', 'data', 'templates', data.id); await setDoc(docRef, payload, { merge: true }); } else { await addDoc(targetColl, payload); } setEditingTemplate(null); }}/> )}</div></div>; };
         const AdminWorkoutEditor = ({ initialData, onSave, onCancel }) => { const [workout, setWorkout] = useState(initialData); const updateExercise = (idx, field, val) => { const newExs = [...workout.exercises]; newExs[idx] = { ...newExs[idx], [field]: val }; setWorkout({ ...workout, exercises: newExs }); }; const addExercise = () => { setWorkout({ ...workout, exercises: [...workout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '', coachNotes: '' }] }); }; return <div className="bg-neutral-900 min-h-full"><div className="flex justify-between items-center mb-6"><button onClick={onCancel} className="text-neutral-400">Cancelar</button><h3 className="font-bold text-white">{workout.id ? 'Editar' : 'Novo'}</h3><button onClick={() => onSave(workout)} className="text-yellow-500 font-bold">Salvar</button></div><input value={workout.title} onChange={e => setWorkout({...workout, title: e.target.value})} className="w-full bg-neutral-800 text-xl font-bold p-4 rounded-xl mb-4 border border-neutral-700 outline-none" placeholder="Nome do Treino"/><div className="space-y-4">{workout.exercises.map((ex, idx) => ( <div key={idx} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 relative group"><button onClick={() => { const n = [...workout.exercises]; n.splice(idx, 1); setWorkout({...workout, exercises: n}); }} className="absolute top-2 right-2 text-red-500 p-2"><Trash2 size={16}/></button><div className="space-y-3 pr-8"><input value={ex.name} onChange={e => updateExercise(idx, 'name', e.target.value)} className="w-full bg-transparent font-bold text-white border-b border-neutral-600 pb-1" placeholder="Nome"/><div className="grid grid-cols-4 gap-2 text-center"><div><label className="text-[10px] text-neutral-500">Sets</label><input type="number" value={ex.sets} onChange={e=>updateExercise(idx,'sets',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Reps</label><input value={ex.reps} onChange={e=>updateExercise(idx,'reps',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Cad</label><input value={ex.cadence} onChange={e=>updateExercise(idx,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div><div><label className="text-[10px] text-neutral-500">Rest</label><input type="number" value={ex.restTime} onChange={e=>updateExercise(idx,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-1 text-center"/></div></div><div><label className="text-[10px] font-bold text-yellow-500 flex items-center gap-1"><Megaphone size={10}/> COACH</label><input value={ex.coachNotes || ''} onChange={e=>updateExercise(idx,'coachNotes',e.target.value)} className="w-full bg-yellow-500/10 border border-yellow-500/30 rounded p-2 text-sm text-yellow-200" placeholder="Instrução..."/></div></div></div> ))}</div><button onClick={addExercise} className="w-full py-4 mt-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Exercício</button></div>; };
         const RestTimerOverlay = ({ duration, onFinish, isActive, onClose }) => { const [timeLeft, setTimeLeft] = useState(duration); const [endTime, setEndTime] = useState(null); const [isFinished, setIsFinished] = useState(false); useEffect(() => { if (!isActive) { setEndTime(null); setIsFinished(false); return; } const targetTime = Date.now() + (duration * 1000); setEndTime(targetTime); setIsFinished(false); const interval = setInterval(() => { const now = Date.now(); const remaining = Math.ceil((targetTime - now) / 1000); if (remaining <= 0) { clearInterval(interval); setTimeLeft(0); setIsFinished(true); } else { setTimeLeft(remaining); } }, 100); return () => clearInterval(interval); }, [isActive, duration]); if (!isActive) return null; if (isFinished) { return <div className="fixed inset-0 z-[100] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer" onClick={onFinish}><Timer size={120} className="text-black mb-8 animate-bounce"/><h1 className="text-6xl font-black text-black uppercase tracking-tighter">BORA!</h1><p className="text-black font-bold mt-4 text-xl">TOQUE PARA VOLTAR</p></div>; } return <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-50 animate-slide-up pb-safe"><div className="flex items-center justify-between max-w-md mx-auto"><div className="flex items-center gap-4"><div className="relative"><div className="absolute inset-0 bg-yellow-500 blur-lg opacity-20 animate-pulse"></div><Timer className="text-yellow-500 relative z-10" size={36}/></div><div><p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Recuperação</p><p className="text-4xl font-mono font-black text-white tabular-nums leading-none">{formatDuration(timeLeft)}</p></div></div><div className="flex gap-2"><button onClick={() => { if (endTime) setEndTime(prev => prev + 10000); }} className="h-12 w-16 bg-neutral-800 rounded-xl text-white font-bold border border-neutral-700 active:bg-neutral-700">+10s</button><button onClick={onClose} className="h-12 px-6 bg-yellow-500 text-black rounded-xl font-bold hover:bg-yellow-400 active:scale-95 transition-transform">BORA</button></div></div></div>; };
         const WorkoutReport = ({ session, previousSession, onClose }) => { const reportRef = useRef(); const calculateTotalVolume = (logs) => { let volume = 0; Object.values(logs).forEach(log => { if (log.done && log.weight && log.reps) volume += (parseFloat(log.weight) * parseFloat(log.reps)); }); return volume; }; const currentVolume = calculateTotalVolume(session.logs); const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0; const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0; const durationInMinutes = session.totalTime / 60; const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4)); const prevLogsMap = {}; if (previousSession) { previousSession.exercises.forEach((ex, exIdx) => { const exLogs = []; Object.keys(previousSession.logs).forEach(key => { const [eIdx, sIdx] = key.split('-'); if (parseInt(eIdx) === exIdx) exLogs.push(previousSession.logs[key]); }); prevLogsMap[ex.name] = exLogs; }); } const handleDownloadPDF = () => { const element = reportRef.current; const opt = { margin: 0, filename: `IronTracks_${session.workoutTitle.replace(/\s+/g, '_')}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } }; html2pdf().set(opt).from(element).save(); }; return <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-900 text-black"><div className="fixed top-4 right-4 flex gap-2 no-print z-50"><button onClick={handleDownloadPDF} className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Download size={20} /> PDF</button><button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg"><X size={20} /></button></div><div ref={reportRef} className="min-h-screen bg-white p-8 max-w-4xl mx-auto"><div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end"><div><h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1><p className="text-sm font-bold uppercase tracking-widest text-neutral-500">Relatório de Performance</p></div><div className="text-right"><p className="text-2xl font-bold">{session.workoutTitle}</p><p className="text-neutral-600">{formatDate(session.date)}</p></div></div><div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"><div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200"><p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Total</p><p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p></div><div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200"><p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p><div className="flex items-baseline gap-2"><p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>{previousSession && <span className={`text-xs font-bold flex items-center ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>{volumeDelta >= 0 ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}{volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%</span>}</div></div><div className="bg-orange-50 p-4 rounded-lg border border-orange-200"><p className="text-xs font-bold uppercase text-orange-500 mb-1 flex items-center gap-1"><Flame size={12}/> Calorias</p><p className="text-3xl font-mono font-bold text-orange-600">~{calories}</p></div><div className="bg-black text-white p-4 rounded-lg"><p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p><p className="text-xl font-bold uppercase italic">CONCLUÍDO</p></div></div><div className="space-y-8">{session.exercises.map((ex, exIdx) => { const prevLogs = prevLogsMap[ex.name] || []; return <div key={exIdx} className="break-inside-avoid"><div className="flex justify-between items-end mb-2 border-b-2 border-neutral-200 pb-2"><h3 className="text-xl font-bold uppercase flex items-center gap-2"><span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>{ex.name}</h3><div className="text-xs font-mono text-neutral-500">Cadência: <span className="font-bold text-black">{ex.cadence || '-'}</span></div></div><table className="w-full text-sm"><thead><tr className="text-neutral-500 border-b border-neutral-100"><th className="py-2 text-left w-16">Série</th><th className="py-2 text-center w-24">Carga</th><th className="py-2 text-center w-24">Reps</th><th className="py-2 text-center w-32">Evolução</th></tr></thead><tbody>{Array.from({ length: parseInt(ex.sets) }).map((_, sIdx) => { const key = `${exIdx}-${sIdx}`; const log = session.logs[key]; const prevLog = prevLogs[sIdx]; if (!log || !log.done) return null; let progressionText = "-"; let rowClass = ""; if (prevLog && prevLog.weight) { const delta = parseFloat(log.weight) - parseFloat(prevLog.weight); if (delta > 0) { progressionText = `+${delta}kg`; rowClass = "bg-green-50 text-green-900 font-bold"; } else if (delta < 0) { progressionText = `${delta}kg`; rowClass = "text-red-600 font-bold"; } else progressionText = "="; } return <tr key={sIdx} className="border-b border-neutral-100"><td className="py-3 font-mono text-neutral-500">#{sIdx + 1}</td><td className="py-3 text-center font-bold text-lg">{log.weight}</td><td className="py-3 text-center font-mono">{log.reps}</td><td className={`py-3 text-center text-xs uppercase ${rowClass}`}>{progressionText}</td></tr>; })}</tbody></table></div>; })}</div><div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">IronTracks System • {getCurrentDate()}</div></div></div>; };
         const HistoryList = ({ user, onViewReport, onBack }) => { const [history, setHistory] = useState([]); const [loading, setLoading] = useState(true); useEffect(() => { const loadHistory = async () => { try { const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history'); const snapshot = await getDocs(historyRef); const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); data.sort((a, b) => { const timeA = a.date?.seconds || 0; const timeB = b.date?.seconds || 0; return timeB - timeA; }); setHistory(data.slice(0, 50)); } catch(e) { console.error("Erro histórico", e); } finally { setLoading(false); } }; loadHistory(); }, [user]); const handleDeleteHistory = async (e, sessionId) => { e.stopPropagation(); if (!confirm("Tem certeza que quer apagar esse registro?")) return; try { await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'history', sessionId)); setHistory(prev => prev.filter(h => h.id !== sessionId)); } catch (error) { alert("Erro ao excluir."); } }; return <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20"><div className="flex items-center gap-3 mb-6 pt-safe"><button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg hover:bg-neutral-700"><ArrowLeft/></button><h2 className="text-xl font-bold flex items-center gap-2"><History className="text-yellow-500"/> Histórico</h2></div>{loading && <p className="text-center text-neutral-500 animate-pulse">Carregando legado...</p>}{!loading && history.length === 0 && <div className="text-center py-10 opacity-50"><p>Nenhum treino finalizado ainda.</p></div>}<div className="space-y-3">{history.map(session => ( <div key={session.id} onClick={() => onViewReport(session)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 active:scale-95 transition-transform cursor-pointer hover:border-yellow-500/50 relative group"><div className="flex justify-between items-start"><div><h3 className="font-bold text-lg text-white">{session.workoutTitle}</h3><p className="text-xs text-neutral-400 flex items-center gap-1 mt-1"><Calendar size={12}/> {formatDate(session.date)}</p></div><div className="text-right"><p className="text-yellow-500 font-mono font-bold text-sm">{formatDuration(session.totalTime)}</p><p className="text-xs text-neutral-500">Duração</p></div></div><button onClick={(e) => handleDeleteHistory(e, session.id)} className="mt-3 text-red-500 text-xs flex items-center gap-1 hover:text-red-400 p-2 -ml-2 rounded-lg hover:bg-red-500/10 transition-colors"><Trash2 size={14} /> Excluir Registro</button></div>))}</div></div>; };
 
-        // --- CADASTRO DE ALUNOS ---
-        const CadastrarAluno = ({ coach, onBack }) => {
-            const [nome, setNome] = useState('');
-            const [email, setEmail] = useState('');
-            const [telefone, setTelefone] = useState('');
-            const [loading, setLoading] = useState(false);
-
-            const handleCadastro = async () => {
-                if (!nome || !email) {
-                    alert('❌ Preencha nome e email!');
-                    return;
-                }
-
-                if (!email.includes('@')) {
-                    alert('❌ Email inválido!');
-                    return;
-                }
-
-                setLoading(true);
-                try {
-                    await setDoc(doc(db, 'artifacts', appId, 'alunos', email), {
-                        email: email,
-                        nome: nome,
-                        telefone: telefone || '',
-                        coachId: coach.uid,
-                        coachName: coach.displayName,
-                        status: 'pendente',
-                        dataCadastro: serverTimestamp(),
-                        primeiroAcesso: false
-                    });
-
-                    alert(`✅ Aluno ${nome} cadastrado!\n\nEnvie o link do app para: ${email}`);
-                    setNome('');
-                    setEmail('');
-                    setTelefone('');
-                } catch (error) {
-                    alert('❌ Erro ao cadastrar: ' + error.message);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            return (
-                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
-                    <div className="flex items-center gap-3 mb-6 pt-safe">
-                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg hover:bg-neutral-700">
-                            <ArrowLeft/>
-                        </button>
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <UserPlus className="text-yellow-500"/> Cadastrar Aluno
-                        </h2>
-                    </div>
-
-                    <div className="bg-neutral-800 p-6 rounded-xl mb-6">
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-sm font-bold text-neutral-400 block mb-2">Nome Completo *</label>
-                                <input
-                                    type="text"
-                                    value={nome}
-                                    onChange={(e) => setNome(e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white outline-none focus:border-yellow-500"
-                                    placeholder="Ex: João Silva"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-bold text-neutral-400 block mb-2">Email *</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white outline-none focus:border-yellow-500"
-                                    placeholder="joao@email.com"
-                                />
-                                <p className="text-xs text-neutral-500 mt-1">
-                                    O aluno usará este email para fazer login
-                                </p>
-                            </div>
-
-                            <div>
-                                <label className="text-sm font-bold text-neutral-400 block mb-2">Telefone (opcional)</label>
-                                <input
-                                    type="tel"
-                                    value={telefone}
-                                    onChange={(e) => setTelefone(e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white outline-none focus:border-yellow-500"
-                                    placeholder="(11) 99999-9999"
-                                />
-                            </div>
-
-                            <button
-                                onClick={handleCadastro}
-                                disabled={loading}
-                                className="w-full bg-yellow-500 text-black py-4 rounded-xl font-bold text-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {loading ? <span className="animate-spin">⏳</span> : <Mail size={20}/>}
-                                {loading ? 'Cadastrando...' : 'Cadastrar Aluno'}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="bg-blue-900/30 border border-blue-500/30 p-4 rounded-xl">
-                        <h3 className="font-bold text-blue-400 mb-2 flex items-center gap-2">
-                            <Info size={16}/> Como funciona?
-                        </h3>
-                        <ol className="text-sm text-neutral-300 space-y-2 list-decimal list-inside">
-                            <li>Cadastre o aluno com nome e email</li>
-                            <li>Envie o link do app para o email dele</li>
-                            <li>Aluno faz login com Google (mesmo email)</li>
-                            <li>Sistema vincula automaticamente ao coach</li>
-                            <li>Você pode enviar treinos para ele!</li>
-                        </ol>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- AVALIAÇÃO FÍSICA ---
-        const calcularPercentualGordura = (dados) => {
-            const { idade, sexo, peso, dobras } = dados;
-            const soma = Object.values(dobras).reduce((a, b) => a + parseFloat(b || 0), 0);
-            
-            let densidadeCorporal;
-            if (sexo === 'M') {
-                densidadeCorporal = 1.112 - (0.00043499 * soma) + (0.00000055 * Math.pow(soma, 2)) - (0.00028826 * idade);
-            } else {
-                densidadeCorporal = 1.097 - (0.00046971 * soma) + (0.00000056 * Math.pow(soma, 2)) - (0.00012828 * idade);
-            }
-            
-            const percentualGordura = ((4.95 / densidadeCorporal) - 4.5) * 100;
-            const massaGorda = (peso * percentualGordura / 100);
-            const massaMagra = peso - massaGorda;
-            
-            return {
-                somaDobras: soma.toFixed(1),
-                densidadeCorporal: densidadeCorporal.toFixed(4),
-                percentualGordura: percentualGordura.toFixed(1),
-                massaGorda: massaGorda.toFixed(1),
-                massaMagra: massaMagra.toFixed(1)
-            };
-        };
-
-        const AvaliacaoFisica = ({ coach, onBack }) => {
-            const [modo, setModo] = useState('completo'); // 'completo' ou 'simplificado'
-            const [alunoEmail, setAlunoEmail] = useState('');
-            const [dados, setDados] = useState({
-                idade: '',
-                sexo: 'M',
-                peso: '',
-                altura: '',
-                dobras: {
-                    triceps: '',
-                    subescapular: '',
-                    biceps: '',
-                    torax: '',
-                    axilarMedia: '',
-                    suprailiaca: '',
-                    abdominal: '',
-                    coxa: '',
-                    panturrilha: ''
-                },
-                circunferencias: {
-                    braco: '',
-                    antebraco: '',
-                    torax: '',
-                    cintura: '',
-                    quadril: '',
-                    coxa: '',
-                    panturrilha: ''
-                },
-                observacoes: ''
-            });
-
-            const [resultados, setResultados] = useState(null);
-            const [mostrarInfo, setMostrarInfo] = useState({});
-
-            const calcular = () => {
-                if (!dados.idade || !dados.peso || !dados.altura) {
-                    alert('❌ Preencha idade, peso e altura!');
-                    return;
-                }
-
-                const dobrasPreenchidas = Object.values(dados.dobras).filter(v => v).length;
-                if (dobrasPreenchidas < 7) {
-                    alert('❌ Preencha todas as 7 dobras cutâneas!');
-                    return;
-                }
-
-                const calc = calcularPercentualGordura(dados);
-                setResultados(calc);
-            };
-
-            const salvar = async () => {
-                if (!alunoEmail) {
-                    alert('❌ Digite o email do aluno!');
-                    return;
-                }
-
-                if (!resultados) {
-                    alert('❌ Calcule a avaliação primeiro!');
-                    return;
-                }
-
-                try {
-                    const avaliacaoData = {
-                        ...dados,
-                        ...resultados,
-                        alunoEmail: alunoEmail,
-                        coachUid: coach.uid,
-                        coachName: coach.displayName,
-                        data: serverTimestamp()
-                    };
-
-                    await addDoc(collection(db, 'artifacts', appId, 'avaliacoes'), avaliacaoData);
-                    alert(`✅ Avaliação salva e enviada para ${alunoEmail}!`);
-                    
-                    // Reset
-                    setDados({
-                        idade: '', sexo: 'M', peso: '', altura: '',
-                        dobras: { triceps: '', subescapular: '', biceps: '', torax: '', axilarMedia: '', suprailiaca: '', abdominal: '', coxa: '', panturrilha: '' },
-                        circunferencias: { braco: '', antebraco: '', torax: '', cintura: '', quadril: '', coxa: '', panturrilha: '' },
-                        observacoes: ''
-                    });
-                    setResultados(null);
-                    setAlunoEmail('');
-                } catch (error) {
-                    alert('❌ Erro ao salvar: ' + error.message);
-                }
-            };
-
-            const InfoDobra = ({ nome, descricao }) => (
-                <div className="absolute z-10 bg-neutral-900 border border-yellow-500 p-3 rounded-lg shadow-xl text-xs max-w-xs -top-2 left-0">
-                    <p className="font-bold text-yellow-500 mb-1">{nome}</p>
-                    <p className="text-neutral-300">{descricao}</p>
-                </div>
-            );
-
-            return (
-                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
-                    <div className="flex items-center justify-between mb-6 pt-safe">
-                        <div className="flex items-center gap-3">
-                            <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg hover:bg-neutral-700">
-                                <ArrowLeft/>
-                            </button>
-                            <h2 className="text-xl font-bold flex items-center gap-2">
-                                <Ruler className="text-yellow-500"/> Avaliação Física
-                            </h2>
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => setModo('completo')}
-                                className={`px-4 py-2 rounded-lg font-bold text-sm ${modo === 'completo' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}
-                            >
-                                Completo
-                            </button>
-                            <button
-                                onClick={() => setModo('simplificado')}
-                                className={`px-4 py-2 rounded-lg font-bold text-sm ${modo === 'simplificado' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}
-                            >
-                                Simples
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Dados Pessoais */}
-                    <div className="bg-neutral-800 p-6 rounded-xl mb-4">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <Users size={20}/> Dados Pessoais
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs text-neutral-400 block mb-1">Idade *</label>
-                                <input
-                                    type="number"
-                                    value={dados.idade}
-                                    onChange={(e) => setDados({...dados, idade: e.target.value})}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white"
-                                    placeholder="25"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs text-neutral-400 block mb-1">Sexo *</label>
-                                <select
-                                    value={dados.sexo}
-                                    onChange={(e) => setDados({...dados, sexo: e.target.value})}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white"
-                                >
-                                    <option value="M">Masculino</option>
-                                    <option value="F">Feminino</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs text-neutral-400 block mb-1">Peso (kg) *</label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    value={dados.peso}
-                                    onChange={(e) => setDados({...dados, peso: e.target.value})}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white"
-                                    placeholder="75.5"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs text-neutral-400 block mb-1">Altura (cm) *</label>
-                                <input
-                                    type="number"
-                                    value={dados.altura}
-                                    onChange={(e) => setDados({...dados, altura: e.target.value})}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white"
-                                    placeholder="175"
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Dobras Cutâneas */}
-                    <div className="bg-neutral-800 p-6 rounded-xl mb-4">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <Ruler size={20}/> Dobras Cutâneas (mm) - Protocolo 7 Dobras
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            {[
-                                { key: 'triceps', label: 'Tríceps', info: 'Ponto médio entre acrômio e olécrano, face posterior do braço' },
-                                { key: 'subescapular', label: 'Subescapular', info: 'Abaixo do ângulo inferior da escápula, diagonal' },
-                                { key: 'biceps', label: 'Bíceps', info: 'Ponto médio da face anterior do braço' },
-                                { key: 'torax', label: 'Tórax', info: 'Diagonal entre linha axilar anterior e mamilo (homens)' },
-                                { key: 'axilarMedia', label: 'Axilar Média', info: 'Linha axilar média na altura do apêndice xifoide' },
-                                { key: 'suprailiaca', label: 'Suprailíaca', info: 'Diagonal acima da crista ilíaca' },
-                                { key: 'abdominal', label: 'Abdominal', info: '2cm à direita da cicatriz umbilical' },
-                                { key: 'coxa', label: 'Coxa', info: 'Ponto médio entre ligamento inguinal e patela' },
-                                { key: 'panturrilha', label: 'Panturrilha', info: 'Maior circunferência da panturrilha medial' }
-                            ].map(dobra => (
-                                <div key={dobra.key} className="relative">
-                                    <label className="text-xs text-neutral-400 flex items-center gap-1 mb-1">
-                                        {dobra.label}
-                                        <button
-                                            onMouseEnter={() => setMostrarInfo({...mostrarInfo, [dobra.key]: true})}
-                                            onMouseLeave={() => setMostrarInfo({...mostrarInfo, [dobra.key]: false})}
-                                            className="text-blue-500"
-                                        >
-                                            <Info size={12}/>
-                                        </button>
-                                    </label>
-                                    {mostrarInfo[dobra.key] && <InfoDobra nome={dobra.label} descricao={dobra.info} />}
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        value={dados.dobras[dobra.key]}
-                                        onChange={(e) => setDados({...dados, dobras: {...dados.dobras, [dobra.key]: e.target.value}})}
-                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white"
-                                        placeholder="0.0"
-                                    />
-                                </div>
-                            ))}
-                        </div>
-
-                        {resultados && (
-                            <div className="mt-4 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                                <p className="text-sm font-bold text-yellow-500 mb-2">✓ Cálculos Automáticos:</p>
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                    <p className="text-neutral-300">Soma das dobras: <span className="font-bold text-white">{resultados.somaDobras}mm</span></p>
-                                    <p className="text-neutral-300">% Gordura: <span className="font-bold text-white">{resultados.percentualGordura}%</span></p>
-                                    <p className="text-neutral-300">Massa Gorda: <span className="font-bold text-white">{resultados.massaGorda}kg</span></p>
-                                    <p className="text-neutral-300">Massa Magra: <span className="font-bold text-white">{resultados.massaMagra}kg</span></p>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {modo === 'completo' && (
-                        <>
-                            {/* Circunferências */}
-                            <div className="bg-neutral-800 p-6 rounded-xl mb-4">
-                                <h3 className="font-bold text-lg mb-4">📐 Circunferências (cm) - Opcional</h3>
-                                <div className="grid grid-cols-3 gap-4">
-                                    {Object.keys(dados.circunferencias).map(key => (
-                                        <div key={key}>
-                                            <label className="text-xs text-neutral-400 block mb-1 capitalize">{key}</label>
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                value={dados.circunferencias[key]}
-                                                onChange={(e) => setDados({...dados, circunferencias: {...dados.circunferencias, [key]: e.target.value}})}
-                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white"
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Observações */}
-                            <div className="bg-neutral-800 p-6 rounded-xl mb-4">
-                                <h3 className="font-bold text-lg mb-4">📝 Observações</h3>
-                                <textarea
-                                    value={dados.observacoes}
-                                    onChange={(e) => setDados({...dados, observacoes: e.target.value})}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white outline-none focus:border-yellow-500 resize-none"
-                                    rows="4"
-                                    placeholder="Ex: Cliente iniciante, objetivo hipertrofia, histórico de lesões..."
-                                />
-                            </div>
-                        </>
-                    )}
-
-                    {/* Vincular ao Aluno */}
-                    <div className="bg-neutral-800 p-6 rounded-xl mb-4">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <Mail size={20}/> Vincular ao Aluno
-                        </h3>
-                        <input
-                            type="email"
-                            value={alunoEmail}
-                            onChange={(e) => setAlunoEmail(e.target.value)}
-                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white outline-none focus:border-yellow-500"
-                            placeholder="email@aluno.com"
-                        />
-                        <p className="text-xs text-neutral-400 mt-2">
-                            A avaliação será enviada automaticamente para o aluno
-                        </p>
-                    </div>
-
-                    {/* Botões de Ação */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            onClick={calcular}
-                            className="bg-blue-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-400 flex items-center justify-center gap-2"
-                        >
-                            <BarChart3 size={20}/> Calcular
-                        </button>
-                        <button
-                            onClick={salvar}
-                            disabled={!resultados}
-                            className="bg-green-500 text-black py-4 rounded-xl font-bold text-lg hover:bg-green-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                            <Save size={20}/> Salvar e Enviar
-                        </button>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- FOTOS DE PROGRESSO ---
-        const FotosProgresso = ({ user, onBack }) => {
-            const [fotos, setFotos] = useState([]);
-            const [loading, setLoading] = useState(true);
-            const [capturando, setCapturando] = useState(false);
-            const [fotoAtual, setFotoAtual] = useState(null);
-            const videoRef = useRef(null);
-            const canvasRef = useRef(null);
-
-            useEffect(() => {
-                loadFotos();
-            }, []);
-
-            const loadFotos = async () => {
-                try {
-                    const fotosRef = collection(db, 'artifacts', appId, 'users', user.uid, 'fotos');
-                    const q = query(fotosRef, orderBy('data', 'desc'));
-                    const snapshot = await getDocs(q);
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setFotos(data);
-                } catch (error) {
-                    console.error('Erro ao carregar fotos:', error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            const iniciarCamera = async () => {
-                setCapturando(true);
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: 'user', width: 1280, height: 720 } 
-                    });
-                    if (videoRef.current) {
-                        videoRef.current.srcObject = stream;
-                    }
-                } catch (error) {
-                    alert('❌ Erro ao acessar câmera: ' + error.message);
-                    setCapturando(false);
-                }
-            };
-
-            const tirarFoto = () => {
-                const video = videoRef.current;
-                const canvas = canvasRef.current;
-                
-                if (video && canvas) {
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0);
-                    
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                    setFotoAtual(dataUrl);
-                    
-                    // Parar câmera
-                    const stream = video.srcObject;
-                    if (stream) {
-                        stream.getTracks().forEach(track => track.stop());
-                    }
-                }
-            };
-
-            const salvarFoto = async () => {
-                if (!fotoAtual) return;
-
-                try {
-                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'fotos'), {
-                        dataUrl: fotoAtual,
-                        data: serverTimestamp(),
-                        tipo: 'progresso'
-                    });
-
-                    alert('✅ Foto salva com sucesso!');
-                    setFotoAtual(null);
-                    setCapturando(false);
-                    loadFotos();
-                } catch (error) {
-                    alert('❌ Erro ao salvar: ' + error.message);
-                }
-            };
-
-            const cancelar = () => {
-                setFotoAtual(null);
-                setCapturando(false);
-                if (videoRef.current && videoRef.current.srcObject) {
-                    videoRef.current.srcObject.getTracks().forEach(track => track.stop());
-                }
-            };
-
-            const deletarFoto = async (id) => {
-                if (!confirm('Deletar esta foto?')) return;
-                try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'fotos', id));
-                    loadFotos();
-                } catch (error) {
-                    alert('❌ Erro ao deletar');
-                }
-            };
-
-            if (capturando && !fotoAtual) {
-                return (
-                    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-                        <div className="p-4 bg-neutral-900 flex justify-between items-center">
-                            <h2 className="font-bold text-white">Tirar Foto</h2>
-                            <button onClick={cancelar} className="text-white"><X size={24}/></button>
-                        </div>
-                        
-                        <div className="flex-1 relative flex items-center justify-center">
-                            <video ref={videoRef} autoPlay playsInline className="max-w-full max-h-full"></video>
-                            <canvas ref={canvasRef} className="hidden"></canvas>
-                        </div>
-
-                        <div className="p-6 bg-neutral-900">
-                            <button 
-                                onClick={tirarFoto}
-                                className="w-full bg-yellow-500 text-black py-4 rounded-xl font-bold text-lg"
-                            >
-                                <Camera size={24} className="inline mr-2"/> Capturar
-                            </button>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (fotoAtual) {
-                return (
-                    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-                        <div className="p-4 bg-neutral-900 flex justify-between items-center">
-                            <h2 className="font-bold text-white">Pré-visualização</h2>
-                            <button onClick={cancelar} className="text-white"><X size={24}/></button>
-                        </div>
-                        
-                        <div className="flex-1 flex items-center justify-center p-4">
-                            <img src={fotoAtual} alt="Preview" className="max-w-full max-h-full rounded-xl"/>
-                        </div>
-
-                        <div className="p-6 bg-neutral-900 grid grid-cols-2 gap-3">
-                            <button onClick={cancelar} className="bg-neutral-700 text-white py-4 rounded-xl font-bold">
-                                Refazer
-                            </button>
-                            <button onClick={salvarFoto} className="bg-green-500 text-black py-4 rounded-xl font-bold">
-                                Salvar
-                            </button>
-                        </div>
-                    </div>
-                );
-            }
-
-            return (
-                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
-                    <div className="flex items-center gap-3 mb-6 pt-safe">
-                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg">
-                            <ArrowLeft/>
-                        </button>
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <Camera className="text-yellow-500"/> Fotos de Progresso
-                        </h2>
-                    </div>
-
-                    <button 
-                        onClick={iniciarCamera}
-                        className="w-full bg-yellow-500 text-black py-4 rounded-xl font-bold text-lg mb-6 flex items-center justify-center gap-2"
-                    >
-                        <Camera size={24}/> Tirar Nova Foto
-                    </button>
-
-                    {loading && <p className="text-center text-neutral-500">Carregando...</p>}
-
-                    {!loading && fotos.length === 0 && (
-                        <div className="text-center py-20 opacity-50">
-                            <Image size={64} className="mx-auto mb-4 text-neutral-600"/>
-                            <p>Nenhuma foto ainda</p>
-                            <p className="text-sm text-neutral-500 mt-2">Tire sua primeira foto de progresso!</p>
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                        {fotos.map(foto => (
-                            <div key={foto.id} className="relative group">
-                                <img 
-                                    src={foto.dataUrl} 
-                                    alt="Progresso" 
-                                    className="w-full aspect-square object-cover rounded-xl border-2 border-neutral-700"
-                                />
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                                    <button 
-                                        onClick={() => deletarFoto(foto.id)}
-                                        className="bg-red-500 p-3 rounded-full"
-                                    >
-                                        <Trash2 size={20}/>
-                                    </button>
-                                </div>
-                                <p className="text-xs text-neutral-400 mt-1">
-                                    {foto.data?.toDate ? foto.data.toDate().toLocaleDateString('pt-BR') : 'Sem data'}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        };
-
-        // --- DASHBOARD ANALYTICS ---
-        const DashboardAnalytics = ({ user, onBack }) => {
-            const [stats, setStats] = useState(null);
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => {
-                calcularStats();
-            }, []);
-
-            const calcularStats = async () => {
-                try {
-                    // Buscar todos os alunos
-                    const usersRef = collection(db, 'artifacts', appId, 'public', 'data', 'users');
-                    const usersSnap = await getDocs(usersRef);
-                    const totalAlunos = usersSnap.size;
-
-                    // Alunos ativos (últimos 7 dias)
-                    const seteDiasAtras = new Date();
-                    seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
-                    const alunosAtivos = usersSnap.docs.filter(doc => {
-                        const lastSeen = doc.data().lastSeen?.toDate();
-                        return lastSeen && lastSeen > seteDiasAtras;
-                    }).length;
-
-                    // Buscar treinos criados
-                    const templatesRef = collection(db, 'artifacts', appId, 'public', 'data', 'templates');
-                    const templatesSnap = await getDocs(templatesRef);
-                    const totalTemplates = templatesSnap.size;
-
-                    // Buscar avaliações
-                    const avaliacoesRef = collection(db, 'artifacts', appId, 'avaliacoes');
-                    const avaliacoesSnap = await getDocs(avaliacoesRef);
-                    const totalAvaliacoes = avaliacoesSnap.size;
-
-                    // Buscar alunos cadastrados
-                    const alunosRef = collection(db, 'artifacts', appId, 'alunos');
-                    const alunosSnap = await getDocs(alunosRef);
-                    const alunosCadastrados = alunosSnap.size;
-
-                    setStats({
-                        totalAlunos,
-                        alunosAtivos,
-                        alunosInativos: totalAlunos - alunosAtivos,
-                        taxaAtivacao: totalAlunos > 0 ? ((alunosAtivos / totalAlunos) * 100).toFixed(1) : 0,
-                        totalTemplates,
-                        totalAvaliacoes,
-                        alunosCadastrados
-                    });
-                } catch (error) {
-                    console.error('Erro ao calcular stats:', error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            if (loading) {
-                return (
-                    <div className="min-h-screen bg-neutral-900 text-white flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-                            <p>Calculando métricas...</p>
-                        </div>
-                    </div>
-                );
-            }
-
-            return (
-                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
-                    <div className="flex items-center gap-3 mb-6 pt-safe">
-                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg">
-                            <ArrowLeft/>
-                        </button>
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <BarChart3 className="text-yellow-500"/> Dashboard Analytics
-                        </h2>
-                    </div>
-
-                    {/* Cards de Métricas */}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Users size={20}/>
-                                <p className="text-sm font-bold opacity-80">Total Alunos</p>
-                            </div>
-                            <p className="text-4xl font-black">{stats.totalAlunos}</p>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Zap size={20}/>
-                                <p className="text-sm font-bold opacity-80">Ativos</p>
-                            </div>
-                            <p className="text-4xl font-black">{stats.alunosAtivos}</p>
-                            <p className="text-xs opacity-80 mt-1">Últimos 7 dias</p>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-6 rounded-xl text-black">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Target size={20}/>
-                                <p className="text-sm font-bold opacity-80">Taxa Ativação</p>
-                            </div>
-                            <p className="text-4xl font-black">{stats.taxaAtivacao}%</p>
-                        </div>
-
-                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-xl">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Dumbbell size={20}/>
-                                <p className="text-sm font-bold opacity-80">Templates</p>
-                            </div>
-                            <p className="text-4xl font-black">{stats.totalTemplates}</p>
-                        </div>
-                    </div>
-
-                    {/* Estatísticas Detalhadas */}
-                    <div className="bg-neutral-800 p-6 rounded-xl mb-4">
-                        <h3 className="font-bold text-lg mb-4">📊 Estatísticas</h3>
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg">
-                                <span className="text-neutral-400">Alunos Cadastrados</span>
-                                <span className="font-bold text-xl">{stats.alunosCadastrados}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg">
-                                <span className="text-neutral-400">Avaliações Realizadas</span>
-                                <span className="font-bold text-xl">{stats.totalAvaliacoes}</span>
-                            </div>
-                            <div className="flex justify-between items-center p-3 bg-neutral-900 rounded-lg">
-                                <span className="text-neutral-400">Alunos Inativos</span>
-                                <span className="font-bold text-xl text-red-500">{stats.alunosInativos}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Insights da IA */}
-                    <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 p-6 rounded-xl">
-                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                            <Brain className="text-purple-400"/> Insights da IA
-                        </h3>
-                        <div className="space-y-3 text-sm">
-                            {stats.alunosInativos > 0 && (
-                                <div className="flex gap-3">
-                                    <AlertCircle size={20} className="text-yellow-500 shrink-0"/>
-                                    <p className="text-neutral-300">
-                                        <span className="font-bold text-yellow-500">{stats.alunosInativos} alunos</span> sem treinar há 7+ dias. 
-                                        Considere enviar mensagem motivacional.
-                                    </p>
-                                </div>
-                            )}
-                            {stats.taxaAtivacao < 70 && (
-                                <div className="flex gap-3">
-                                    <TrendingDown size={20} className="text-red-500 shrink-0"/>
-                                    <p className="text-neutral-300">
-                                        Taxa de ativação abaixo de 70%. Recomendo criar desafios semanais para engajar.
-                                    </p>
-                                </div>
-                            )}
-                            {stats.taxaAtivacao >= 80 && (
-                                <div className="flex gap-3">
-                                    <Award size={20} className="text-green-500 shrink-0"/>
-                                    <p className="text-neutral-300">
-                                        Excelente! Taxa de ativação acima de 80%. Seus alunos estão muito engajados! 🔥
-                                    </p>
-                                </div>
-                            )}
-                            {stats.totalAvaliacoes < stats.totalAlunos / 2 && (
-                                <div className="flex gap-3">
-                                    <Ruler size={20} className="text-blue-500 shrink-0"/>
-                                    <p className="text-neutral-300">
-                                        Menos de 50% dos alunos têm avaliação. Avaliações aumentam retenção em 40%!
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- IA COACH ASSISTANT (GRATUITA) ---
-        const IACoachAssistant = ({ user, onBack }) => {
-            const [pergunta, setPergunta] = useState('');
-            const [resposta, setResposta] = useState('');
-            const [loading, setLoading] = useState(false);
-
-            const analisarPergunta = (pergunta) => {
-                const p = pergunta.toLowerCase();
-
-                // Análise de frequência
-                if (p.includes('frequência') || p.includes('quantas vezes') || p.includes('dias por semana')) {
-                    return {
-                        titulo: "Frequência de Treino",
-                        resposta: `Para hipertrofia, o ideal é treinar cada grupo muscular 2x por semana. 
-                
-Exemplo:
-• Segunda: Peito + Tríceps
-• Terça: Costas + Bíceps  
-• Quarta: Pernas
-• Quinta: Peito + Tríceps (leve)
-• Sexta: Costas + Bíceps (leve)
-• Sábado: Ombros
-
-Estudos mostram que 2x/semana pode aumentar hipertrofia em 20-30% vs 1x/semana.`,
-                        fonte: "Schoenfeld et al., 2016"
-                    };
-                }
-
-                // Análise de descanso
-                if (p.includes('descanso') || p.includes('intervalo') || p.includes('rest')) {
-                    return {
-                        titulo: "Tempo de Descanso",
-                        resposta: `O descanso ideal varia com o objetivo:
-
-🔥 Hipertrofia: 60-90 segundos
-💪 Força: 3-5 minutos
-⚡ Resistência: 30-60 segundos
-
-Para exercícios compostos (agachamento, supino), use o limite superior.
-Para isolados (rosca, tríceps), use o limite inferior.`,
-                        fonte: "ACSM Guidelines, 2021"
-                    };
-                }
-
-                // Análise de platô
-                if (p.includes('platô') || p.includes('estagn') || p.includes('não evolu')) {
-                    return {
-                        titulo: "Quebrando Platôs",
-                        resposta: `Estratégias comprovadas:
-
-1. **Deload Week**: Reduza 40% do volume por 1 semana
-2. **Variação de Rep Range**: Alterne 6-8, 8-12, 12-15 reps
-3. **Técnicas Avançadas**: Drop sets, rest-pause, cluster sets
-4. **Aumente Frequência**: Treine o grupo 3x/semana
-5. **Revise Nutrição**: Pode estar em déficit calórico
-
-Platôs são normais a cada 4-6 semanas. É o corpo se adaptando!`,
-                        fonte: "Kraemer & Ratamess, 2004"
-                    };
-                }
-
-                // Análise de volume
-                if (p.includes('volume') || p.includes('séries') || p.includes('quantas séries')) {
-                    return {
-                        titulo: "Volume de Treino",
-                        resposta: `Volume semanal ideal por grupo muscular:
-
-📊 **Iniciante**: 10-15 séries/semana
-📊 **Intermediário**: 15-20 séries/semana  
-📊 **Avançado**: 20-25 séries/semana
-
-Exemplo para Peito (intermediário):
-• Supino Reto: 4 séries
-• Supino Inclinado: 4 séries
-• Crucifixo: 3 séries
-• Flexão: 3 séries
-= 14 séries/semana ✅
-
-Mais volume NEM SEMPRE = mais resultado!`,
-                        fonte: "Schoenfeld & Grgic, 2018"
-                    };
-                }
-
-                // Análise de nutrição
-                if (p.includes('proteína') || p.includes('nutrição') || p.includes('dieta') || p.includes('comer')) {
-                    return {
-                        titulo: "Nutrição para Hipertrofia",
-                        resposta: `Macros ideais para ganho de massa:
-
-🥩 **Proteína**: 1.6-2.2g/kg de peso corporal
-🍚 **Carboidratos**: 4-7g/kg (energia para treino)
-🥑 **Gorduras**: 0.8-1g/kg (hormônios)
-
-Exemplo para 75kg:
-• Proteína: 120-165g
-• Carbos: 300-525g
-• Gorduras: 60-75g
-
-💡 Timing: Proteína a cada 3-4h (4-5 refeições/dia)
-💡 Pós-treino: Carbo + Proteína em até 2h`,
-                        fonte: "ISSN Position Stand, 2017"
-                    };
-                }
-
-                // Análise de técnica
-                if (p.includes('técnica') || p.includes('execução') || p.includes('como fazer')) {
-                    return {
-                        titulo: "Técnica de Execução",
-                        resposta: `Princípios fundamentais:
-
-✅ **Amplitude Completa**: Full ROM sempre que possível
-✅ **Controle Excêntrico**: 2-3 segundos na descida
-✅ **Contração no Topo**: Squeeze de 1 segundo
-✅ **Sem Momentum**: Movimento controlado, não balançar
-
-Cadência ideal: 3010
-• 3 seg descida (excêntrica)
-• 0 seg pausa embaixo
-• 1 seg subida (concêntrica)  
-• 0 seg pausa em cima
-
-Técnica > Carga SEMPRE!`,
-                        fonte: "Schoenfeld, 2010"
-                    };
-                }
-
-                // Resposta padrão
-                return {
-                    titulo: "Resposta Geral",
-                    resposta: `Não tenho uma resposta específica para essa pergunta, mas posso te ajudar com:
-
-• Frequência de treino
-• Tempo de descanso
-• Como quebrar platôs
-• Volume de treino (séries/semana)
-• Nutrição e proteína
-• Técnica de execução
-
-Reformule sua pergunta ou escolha um dos tópicos acima! 💪`,
-                    fonte: "IA IronTracks"
-                };
-            };
-
-            const handlePerguntar = () => {
-                if (!pergunta.trim()) {
-                    alert('❌ Digite uma pergunta!');
-                    return;
-                }
-
-                setLoading(true);
-                setTimeout(() => {
-                    const resultado = analisarPergunta(pergunta);
-                    setResposta(resultado);
-                    setLoading(false);
-                }, 1000); // Simula processamento
-            };
-
-            return (
-                <div className="min-h-screen bg-neutral-900 text-white p-4 pb-20">
-                    <div className="flex items-center gap-3 mb-6 pt-safe">
-                        <button onClick={onBack} className="p-2 bg-neutral-800 rounded-lg">
-                            <ArrowLeft/>
-                        </button>
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <Brain className="text-purple-500"/> IA Coach Assistant
-                        </h2>
-                    </div>
-
-                    <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 p-4 rounded-xl mb-6">
-                        <p className="text-sm text-neutral-300">
-                            💡 Faça perguntas sobre treino, nutrição, técnica e mais. 
-                            A IA analisa e responde baseada em estudos científicos!
-                        </p>
-                    </div>
-
-                    <div className="bg-neutral-800 p-6 rounded-xl mb-4">
-                        <label className="text-sm font-bold text-neutral-400 block mb-2">
-                            Sua Pergunta:
-                        </label>
-                        <textarea
-                            value={pergunta}
-                            onChange={(e) => setPergunta(e.target.value)}
-                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-4 py-3 text-white outline-none focus:border-purple-500 resize-none"
-                            rows="4"
-                            placeholder="Ex: Quantas vezes por semana devo treinar cada músculo?"
-                        />
-                        <button
-                            onClick={handlePerguntar}
-                            disabled={loading}
-                            className="w-full mt-4 bg-purple-500 text-white py-4 rounded-xl font-bold text-lg hover:bg-purple-400 disabled:opacity-50 flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                <>
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    Analisando...
-                                </>
-                            ) : (
-                                <>
-                                    <Brain size={24}/> Perguntar à IA
-                                </>
-                            )}
-                        </button>
-                    </div>
-
-                    {resposta && (
-                        <div className="bg-neutral-800 p-6 rounded-xl animate-fade-in">
-                            <h3 className="font-bold text-xl mb-4 text-purple-400">
-                                {resposta.titulo}
-                            </h3>
-                            <div className="prose prose-invert max-w-none">
-                                <p className="text-neutral-300 whitespace-pre-line leading-relaxed">
-                                    {resposta.resposta}
-                                </p>
-                            </div>
-                            <div className="mt-6 pt-4 border-t border-neutral-700">
-                                <p className="text-xs text-neutral-500">
-                                    📚 Fonte: {resposta.fonte}
-                                </p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Sugestões de Perguntas */}
-                    {!resposta && (
-                        <div className="bg-neutral-800 p-6 rounded-xl">
-                            <h3 className="font-bold mb-4">💡 Sugestões de Perguntas:</h3>
-                            <div className="space-y-2">
-                                {[
-                                    "Quantas vezes por semana devo treinar?",
-                                    "Qual o tempo de descanso ideal?",
-                                    "Como quebrar um platô?",
-                                    "Quantas séries por grupo muscular?",
-                                    "Quanta proteína devo consumir?",
-                                    "Como melhorar minha técnica?"
-                                ].map((sugestao, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => setPergunta(sugestao)}
-                                        className="w-full text-left p-3 bg-neutral-900 rounded-lg hover:bg-neutral-700 transition-colors text-sm"
-                                    >
-                                        {sugestao}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        // --- EXERCISE EDITOR ---
         const ExerciseEditor = ({ index, exercise, updateExercise, removeExercise }) => {
-            const [expanded, setExpanded] = useState(false);
             return (
-                <div className="bg-neutral-800 rounded-xl border border-neutral-700 overflow-hidden">
-                    <div className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3 flex-1">
-                                <div className="bg-yellow-500 text-black w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0">
-                                    {index + 1}
-                                </div>
-                                <input
-                                    type="text"
-                                    value={exercise.name}
-                                    onChange={(e) => updateExercise(index, 'name', e.target.value)}
-                                    className="flex-1 bg-transparent text-white font-bold text-lg outline-none border-b border-neutral-600 focus:border-yellow-500 pb-1"
-                                    placeholder="Nome do Exercício"
-                                />
-                            </div>
-                            <button
-                                onClick={() => removeExercise(index)}
-                                className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                            >
-                                <Trash2 size={18} />
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-3 mb-3">
+                <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 relative group">
+                    <button onClick={() => removeExercise(index)} className="absolute top-2 right-2 text-red-500 p-2 opacity-50 hover:opacity-100">
+                        <Trash2 size={16}/>
+                    </button>
+                    <div className="space-y-3 pr-8">
+                        <input 
+                            value={exercise.name} 
+                            onChange={e => updateExercise(index, 'name', e.target.value)} 
+                            className="w-full bg-transparent font-bold text-white border-b border-neutral-600 pb-1 focus:border-yellow-500 outline-none placeholder-neutral-600" 
+                            placeholder="Nome do exercício"
+                        />
+                        <div className="grid grid-cols-4 gap-2 text-center">
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Séries</label>
-                                <input
-                                    type="number"
-                                    value={exercise.sets}
-                                    onChange={(e) => updateExercise(index, 'sets', parseInt(e.target.value) || 0)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
-                                />
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Sets</label>
+                                <input type="number" value={exercise.sets} onChange={e=>updateExercise(index,'sets',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Reps</label>
-                                <input
-                                    type="text"
-                                    value={exercise.reps}
-                                    onChange={(e) => updateExercise(index, 'reps', e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
-                                    placeholder="10"
-                                />
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
+                                <input type="text" value={exercise.reps} onChange={e=>updateExercise(index,'reps',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Cadência</label>
-                                <input
-                                    type="text"
-                                    value={exercise.cadence}
-                                    onChange={(e) => updateExercise(index, 'cadence', e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-mono text-sm focus:border-yellow-500 outline-none"
-                                    placeholder="3010"
-                                />
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Cadência</label>
+                                <input type="text" value={exercise.cadence} onChange={e=>updateExercise(index,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Descanso</label>
-                                <input
-                                    type="number"
-                                    value={exercise.restTime}
-                                    onChange={(e) => updateExercise(index, 'restTime', parseInt(e.target.value) || 0)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-center text-white font-bold focus:border-yellow-500 outline-none"
-                                />
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Descanso</label>
+                                <input type="number" value={exercise.restTime} onChange={e=>updateExercise(index,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
                         </div>
-
-                        <button
-                            onClick={() => setExpanded(!expanded)}
-                            className="w-full flex items-center justify-center gap-2 text-neutral-500 text-xs font-bold py-2 hover:text-white transition-colors"
-                        >
-                            {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            {expanded ? 'Menos' : 'Mais'} Opções
-                        </button>
+                        <div>
+                            <label className="text-[10px] text-neutral-500 uppercase font-bold">Notas</label>
+                            <textarea value={exercise.notes} onChange={e=>updateExercise(index,'notes',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-sm outline-none focus:ring-1 ring-yellow-500 min-h-[60px]" placeholder="Dicas de execução..."></textarea>
+                        </div>
                     </div>
-
-                    {expanded && (
-                        <div className="px-4 pb-4 space-y-3 border-t border-neutral-700 pt-3">
-                            <div>
-                                <label className="text-xs text-neutral-500 font-bold block mb-1">Notas Pessoais</label>
-                                <textarea
-                                    value={exercise.notes || ''}
-                                    onChange={(e) => updateExercise(index, 'notes', e.target.value)}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-yellow-500 resize-none"
-                                    rows="2"
-                                    placeholder="Ex: Foco na contração, cotovelos alinhados..."
-                                />
-                            </div>
-                            {exercise.coachNotes && (
-                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-                                    <p className="text-[10px] text-yellow-500 uppercase font-bold flex items-center gap-1 mb-1">
-                                        <Megaphone size={10} /> Instrução do Coach
-                                    </p>
-                                    <p className="text-sm text-yellow-200">{exercise.coachNotes}</p>
-                                </div>
-                            )}
-                        </div>
-                    )}
                 </div>
             );
         };
 
-        // --- ACTIVE WORKOUT ---
         const ActiveWorkout = ({ workout, user, onFinish, onBack }) => {
+            const [startedAt] = useState(Date.now());
             const [logs, setLogs] = useState({});
-            const [currentExerciseIdx, setCurrentExerciseIdx] = useState(0);
-            const [startTime] = useState(Date.now());
-            const [restTimer, setRestTimer] = useState({ active: false, duration: 60 });
+            const [timerDuration, setTimerDuration] = useState(0);
+            const [isTimerActive, setIsTimerActive] = useState(false);
+            const [expandedExercise, setExpandedExercise] = useState(0);
 
-            const currentExercise = workout.exercises[currentExerciseIdx];
-            const totalExercises = workout.exercises.length;
-
-            const updateLog = (exIdx, setIdx, field, value) => {
+            const toggleSet = (exIdx, setIdx, restTime) => {
                 const key = `${exIdx}-${setIdx}`;
-                setLogs(prev => ({
-                    ...prev,
-                    [key]: { ...prev[key], [field]: value }
-                }));
-            };
-
-            const toggleSetDone = (exIdx, setIdx) => {
-                const key = `${exIdx}-${setIdx}`;
-                const currentLog = logs[key] || {};
-                const newDone = !currentLog.done;
-                
-                updateLog(exIdx, setIdx, 'done', newDone);
-                
-                // Se marcou como feito e tem restTime, inicia o timer
-                if (newDone && currentExercise.restTime > 0) {
-                    setRestTimer({ active: true, duration: currentExercise.restTime });
+                const current = logs[key] || {};
+                const isDone = !current.done;
+                setLogs({ ...logs, [key]: { ...current, done: isDone } });
+                if (isDone && restTime > 0) {
+                    setTimerDuration(restTime);
+                    setIsTimerActive(true);
                 }
             };
 
-            const handleFinishWorkout = async () => {
-                if (!confirm('Finalizar treino?')) return;
+            const updateLog = (exIdx, setIdx, field, val) => {
+                const key = `${exIdx}-${setIdx}`;
+                setLogs(prev => ({ ...prev, [key]: { ...prev[key], [field]: val } }));
+            };
 
-                const totalTime = Math.floor((Date.now() - startTime) / 1000);
-                const session = {
-                    workoutTitle: workout.title,
-                    exercises: workout.exercises,
-                    logs: logs,
-                    date: serverTimestamp(),
-                    totalTime: totalTime
-                };
-
+            const handleFinish = async () => {
+                if (!confirm("Finalizar treino?")) return;
+                
                 try {
-                    // Salvar no histórico
-                    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), session);
-                    
-                    // Buscar sessão anterior do mesmo treino
-                    const historyRef = collection(db, 'artifacts', appId, 'users', user.uid, 'history');
-                    const q = query(
-                        historyRef,
-                        where('workoutTitle', '==', workout.title),
-                        orderBy('date', 'desc'),
-                        limit(2)
-                    );
-                    const snapshot = await getDocs(q);
-                    const previousSession = snapshot.docs.length > 1 ? snapshot.docs[1].data() : null;
+                    // Sanitização de dados para evitar erros de 'undefined' no Firestore
+                    const cleanExercises = workout.exercises.map(ex => ({
+                        name: ex.name || 'Sem nome',
+                        sets: Number(ex.sets) || 0,
+                        reps: String(ex.reps || ''),
+                        restTime: Number(ex.restTime) || 0,
+                        notes: ex.notes || '',
+                        cadence: ex.cadence || ''
+                    }));
 
-                    onFinish(session, previousSession);
-                } catch (error) {
-                    console.error('Erro ao salvar:', error);
-                    alert('Erro ao salvar treino. Tente novamente.');
+                    // Sanitização dos logs
+                    const cleanLogs = {};
+                    Object.keys(logs).forEach(key => {
+                        if (logs[key]) {
+                            cleanLogs[key] = {
+                                weight: logs[key].weight || '',
+                                reps: logs[key].reps || '',
+                                done: !!logs[key].done
+                            };
+                        }
+                    });
+
+                    const session = {
+                        workoutId: workout.id,
+                        workoutTitle: workout.title,
+                        date: serverTimestamp(),
+                        totalTime: (Date.now() - startedAt) / 1000,
+                        logs: cleanLogs,
+                        exercises: cleanExercises
+                    };
+
+                    const docRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), session);
+                    onFinish({ ...session, id: docRef.id }, null); 
+                } catch (e) {
+                    console.error("Erro detalhado ao salvar:", e);
+                    alert(`Ocorreu um erro ao salvar o treino:\n${e.message}\n\nVerifique o console para mais detalhes.`);
                 }
             };
-
-            const progress = ((currentExerciseIdx + 1) / totalExercises) * 100;
 
             return (
-                <div className="min-h-[100dvh] bg-neutral-950 text-white flex flex-col">
-                    <RestTimerOverlay
-                        duration={restTimer.duration}
-                        isActive={restTimer.active}
-                        onFinish={() => setRestTimer({ active: false, duration: 60 })}
-                        onClose={() => setRestTimer({ active: false, duration: 60 })}
-                    />
-
-                    {/* Header */}
-                    <div className="bg-neutral-900 border-b border-neutral-800 p-4 pt-safe sticky top-0 z-20">
-                        <div className="flex items-center justify-between mb-3">
-                            <button onClick={onBack} className="p-2 hover:bg-neutral-800 rounded-lg transition-colors">
-                                <ArrowLeft size={20} />
-                            </button>
-                            <h1 className="font-black text-lg tracking-tight">{workout.title}</h1>
-                            <button onClick={handleFinishWorkout} className="bg-green-500 text-black px-4 py-2 rounded-lg font-bold text-sm hover:bg-green-400">
-                                <CheckCircle2 size={18} />
-                            </button>
+                <div className="pb-24 pt-safe min-h-screen bg-neutral-900">
+                    <RestTimerOverlay duration={timerDuration} isActive={isTimerActive} onFinish={() => setIsTimerActive(false)} onClose={() => setIsTimerActive(false)} />
+                    <div className="fixed top-0 left-0 right-0 bg-neutral-900/90 backdrop-blur z-20 p-4 border-b border-neutral-800 flex justify-between items-center pt-safe">
+                        <button onClick={onBack} className="p-2 rounded-full bg-neutral-800 text-white"><ArrowLeft size={20}/></button>
+                        <div className="text-center">
+                            <h2 className="font-black text-white leading-none">{workout.title}</h2>
+                            <p className="text-[10px] text-yellow-500 font-mono"><Clock className="inline w-3 h-3 mr-1"/>EM ANDAMENTO</p>
                         </div>
-                        
-                        {/* Progress Bar */}
-                        <div className="relative h-2 bg-neutral-800 rounded-full overflow-hidden">
-                            <div 
-                                className="absolute inset-y-0 left-0 bg-gradient-to-r from-yellow-500 to-yellow-400 transition-all duration-300"
-                                style={{ width: `${progress}%` }}
-                            />
-                        </div>
-                        <p className="text-xs text-neutral-500 mt-1 text-center">
-                            Exercício {currentExerciseIdx + 1} de {totalExercises}
-                        </p>
+                        <button onClick={handleFinish} className="bg-green-500 text-black font-bold px-4 py-2 rounded-xl text-sm hover:bg-green-400 shadow-lg shadow-green-900/20">CONCLUIR</button>
                     </div>
-
-                    {/* Exercise Navigation */}
-                    <div className="flex overflow-x-auto no-scrollbar gap-2 p-4 bg-neutral-900/50">
-                        {workout.exercises.map((ex, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => setCurrentExerciseIdx(idx)}
-                                className={`shrink-0 px-4 py-2 rounded-lg font-bold text-sm transition-all ${
-                                    idx === currentExerciseIdx
-                                        ? 'bg-yellow-500 text-black'
-                                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
-                                }`}
-                            >
-                                {idx + 1}. {ex.name}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Current Exercise */}
-                    <div className="flex-1 overflow-y-auto p-4 pb-20">
-                        <div className="max-w-2xl mx-auto">
-                            <div className="bg-neutral-900 rounded-2xl p-6 mb-6 border border-neutral-800">
-                                <h2 className="text-3xl font-black mb-2">{currentExercise.name}</h2>
-                                <div className="flex gap-4 text-sm text-neutral-400">
-                                    <span className="flex items-center gap-1">
-                                        <Activity size={14} /> {currentExercise.sets} séries
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <Clock size={14} /> {currentExercise.restTime}s descanso
-                                    </span>
+                    <div className="p-4 mt-16 space-y-6">
+                        {workout.exercises.map((ex, exIdx) => (
+                            <div key={exIdx} className={`bg-neutral-800 rounded-3xl overflow-hidden border transition-all ${expandedExercise === exIdx ? 'border-yellow-500 shadow-lg shadow-yellow-900/10' : 'border-neutral-700'}`}>
+                                <div onClick={() => setExpandedExercise(expandedExercise === exIdx ? null : exIdx)} className="p-5 flex justify-between items-center cursor-pointer bg-neutral-800">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-white">{ex.name}</h3>
+                                        <p className="text-xs text-neutral-400 mt-1 flex gap-3"><span>{ex.sets} séries</span><span>{ex.reps} reps</span><span>{ex.restTime}s descanso</span></p>
+                                    </div>
+                                    {expandedExercise === exIdx ? <ChevronUp size={20} className="text-neutral-500"/> : <ChevronDown size={20} className="text-neutral-500"/>}
                                 </div>
-                                {currentExercise.cadence && (
-                                    <div className="mt-3 bg-neutral-800 rounded-lg p-3">
-                                        <p className="text-xs text-neutral-500 mb-1">Cadência</p>
-                                        <p className="text-2xl font-mono font-bold text-yellow-500">{currentExercise.cadence}</p>
-                                    </div>
-                                )}
-                                {currentExercise.coachNotes && (
-                                    <div className="mt-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
-                                        <p className="text-xs text-yellow-500 font-bold flex items-center gap-1 mb-1">
-                                            <Megaphone size={12} /> INSTRUÇÃO DO COACH
-                                        </p>
-                                        <p className="text-sm text-yellow-200">{currentExercise.coachNotes}</p>
-                                    </div>
-                                )}
-                                {currentExercise.notes && (
-                                    <div className="mt-3 bg-neutral-800 rounded-lg p-3">
-                                        <p className="text-xs text-neutral-500 mb-1">Notas</p>
-                                        <p className="text-sm text-neutral-300">{currentExercise.notes}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Sets */}
-                            <div className="space-y-3">
-                                {Array.from({ length: parseInt(currentExercise.sets) }).map((_, setIdx) => {
-                                    const key = `${currentExerciseIdx}-${setIdx}`;
-                                    const log = logs[key] || { weight: '', reps: '', done: false };
-                                    
-                                    return (
-                                        <div
-                                            key={setIdx}
-                                            className={`bg-neutral-900 rounded-xl p-4 border-2 transition-all ${
-                                                log.done
-                                                    ? 'border-green-500 bg-green-500/10'
-                                                    : 'border-neutral-800 hover:border-neutral-700'
-                                            }`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <button
-                                                    onClick={() => toggleSetDone(currentExerciseIdx, setIdx)}
-                                                    className={`shrink-0 w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold transition-all ${
-                                                        log.done
-                                                            ? 'bg-green-500 border-green-500 text-black'
-                                                            : 'border-neutral-700 text-neutral-500 hover:border-yellow-500'
-                                                    }`}
-                                                >
-                                                    {log.done ? <CheckCircle2 size={20} /> : setIdx + 1}
-                                                </button>
-                                                
-                                                <div className="flex-1 grid grid-cols-2 gap-3">
-                                                    <div>
-                                                        <label className="text-xs text-neutral-500 block mb-1">Carga (kg)</label>
-                                                        <input
-                                                            type="number"
-                                                            value={log.weight}
-                                                            onChange={(e) => updateLog(currentExerciseIdx, setIdx, 'weight', e.target.value)}
-                                                            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white font-bold text-center focus:border-yellow-500 outline-none"
-                                                            placeholder="0"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-xs text-neutral-500 block mb-1">Reps</label>
-                                                        <input
-                                                            type="number"
-                                                            value={log.reps}
-                                                            onChange={(e) => updateLog(currentExerciseIdx, setIdx, 'reps', e.target.value)}
-                                                            className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-2 text-white font-bold text-center focus:border-yellow-500 outline-none"
-                                                            placeholder={currentExercise.reps}
-                                                        />
-                                                    </div>
+                                {expandedExercise === exIdx && (
+                                    <div className="p-4 bg-black/20 space-y-2">
+                                        {ex.notes && <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-xl mb-4 text-xs text-yellow-200">{ex.notes}</div>}
+                                        <div className="grid grid-cols-[30px_1fr_1fr_40px] gap-2 mb-2 text-[10px] uppercase font-bold text-neutral-500 text-center"><span>#</span><span>KG</span><span>REPS</span><span>OK</span></div>
+                                        {Array.from({ length: parseInt(ex.sets) || 1 }).map((_, setIdx) => {
+                                            const key = `${exIdx}-${setIdx}`;
+                                            const log = logs[key] || {};
+                                            return (
+                                                <div key={setIdx} className={`grid grid-cols-[30px_1fr_1fr_40px] gap-2 items-center ${log.done ? 'opacity-50' : ''}`}>
+                                                    <span className="text-center font-mono text-neutral-500 font-bold">{setIdx + 1}</span>
+                                                    <input type="number" placeholder="kg" className="bg-neutral-900 rounded-lg p-3 text-center font-bold text-white outline-none focus:ring-1 ring-yellow-500" value={log.weight || ''} onChange={e => updateLog(exIdx, setIdx, 'weight', e.target.value)}/>
+                                                    <input type="number" placeholder={ex.reps} className="bg-neutral-900 rounded-lg p-3 text-center font-bold text-white outline-none focus:ring-1 ring-yellow-500" value={log.reps || ''} onChange={e => updateLog(exIdx, setIdx, 'reps', e.target.value)}/>
+                                                    <button onClick={() => toggleSet(exIdx, setIdx, ex.restTime)} className={`h-10 w-10 rounded-xl flex items-center justify-center transition-all ${log.done ? 'bg-green-500 text-black' : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'}`}><CheckCircle2 size={20} /></button>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
-
-                            {/* Navigation Buttons */}
-                            <div className="grid grid-cols-2 gap-3 mt-6">
-                                <button
-                                    onClick={() => setCurrentExerciseIdx(Math.max(0, currentExerciseIdx - 1))}
-                                    disabled={currentExerciseIdx === 0}
-                                    className="bg-neutral-800 text-white py-4 rounded-xl font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-700 transition-colors"
-                                >
-                                    ← Anterior
-                                </button>
-                                <button
-                                    onClick={() => setCurrentExerciseIdx(Math.min(totalExercises - 1, currentExerciseIdx + 1))}
-                                    disabled={currentExerciseIdx === totalExercises - 1}
-                                    className="bg-yellow-500 text-black py-4 rounded-xl font-bold disabled:opacity-30 disabled:cursor-not-allowed hover:bg-yellow-400 transition-colors"
-                                >
-                                    Próximo →
-                                </button>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
             );
@@ -1691,9 +417,6 @@ Reformule sua pergunta ou escolha um dos tópicos acima! 💪`,
                     {view === 'history' && <HistoryList user={user} onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }} onBack={() => setView('dashboard')} />}
                     {view === 'report' && reportData.current && <WorkoutReport session={reportData.current} previousSession={reportData.previous} onClose={() => setView('dashboard')} />}
                     {view === 'active' && currentWorkout && <ActiveWorkout workout={currentWorkout} user={user} onFinish={(c, p) => { setReportData({ current: c, previous: p }); setView('report'); }} onBack={() => setView('dashboard')} />}
-                    {view === 'photos' && <FotosProgresso user={user} onBack={() => setView('dashboard')} />}
-                    {view === 'analytics' && <DashboardAnalytics user={user} onBack={() => setView('dashboard')} />}
-                    {view === 'ai' && <IACoachAssistant user={user} onBack={() => setView('dashboard')} />}
                     {view === 'edit' && (
                         <div className="min-h-[100dvh] bg-neutral-900 text-white p-4 pb-20"><div className="flex justify-between items-center mb-6 pt-safe"><button onClick={() => setView('dashboard')} className="p-2 bg-neutral-800 rounded-lg"><RotateCcw size={20} /></button><h2 className="font-bold text-lg">{currentWorkout.id ? 'Editar' : 'Novo'}</h2><button onClick={handleSaveWorkout} className="p-2 bg-yellow-500 text-black rounded-lg"><Save size={20} /></button></div><div className="mb-6"><label className="text-xs text-neutral-500 uppercase font-bold">Nome</label><input type="text" value={currentWorkout.title} onChange={(e) => setCurrentWorkout({...currentWorkout, title: e.target.value})} className="w-full bg-neutral-800 border-b-2 border-neutral-700 p-3 text-xl font-bold focus:border-yellow-500 outline-none" placeholder="Ex: Treino A"/></div><div className="space-y-4">{currentWorkout.exercises.map((ex, idx) => ( <ExerciseEditor key={idx} index={idx} exercise={ex} updateExercise={(idx, field, val) => { const newExs = [...currentWorkout.exercises]; newExs[idx] = { ...newExs[idx], [field]: val }; setCurrentWorkout({ ...currentWorkout, exercises: newExs }); }} removeExercise={(idx) => { const newExs = currentWorkout.exercises.filter((_, i) => i !== idx); setCurrentWorkout({ ...currentWorkout, exercises: newExs }); }} /> ))}</div><button onClick={() => setCurrentWorkout({...currentWorkout, exercises: [...currentWorkout.exercises, { name: '', sets: 4, reps: '10', cadence: '3010', restTime: 60, notes: '' }]})} className="w-full mt-6 py-4 border-2 border-dashed border-neutral-700 rounded-xl text-neutral-400 font-bold hover:bg-neutral-800">+ Exercício</button></div>
                     )}
@@ -1718,11 +441,6 @@ Reformule sua pergunta ou escolha um dos tópicos acima! 💪`,
                                 <div className="grid grid-cols-2 gap-3">
                                     <button onClick={() => setView('import')} className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-800 hover:border-blue-500/50"><Download size={18} className="text-blue-500" /> Importar</button>
                                     <button onClick={handleCreateWorkout} className="bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg"><Plus size={18} /> Novo Treino</button>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 mt-3">
-                                    <button onClick={() => setView('photos')} className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-sm p-3 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-bold border border-purple-500/30 hover:border-purple-500/50"><Camera size={16} className="text-purple-400" /><span>Fotos</span></button>
-                                    <button onClick={() => setView('analytics')} className="bg-gradient-to-br from-blue-500/20 to-cyan-500/20 backdrop-blur-sm p-3 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-bold border border-blue-500/30 hover:border-blue-500/50"><BarChart3 size={16} className="text-blue-400" /><span>Analytics</span></button>
-                                    <button onClick={() => setView('ai')} className="bg-gradient-to-br from-green-500/20 to-emerald-500/20 backdrop-blur-sm p-3 rounded-xl flex flex-col items-center justify-center gap-1 text-xs font-bold border border-green-500/30 hover:border-green-500/50"><Brain size={16} className="text-green-400" /><span>IA Coach</span></button>
                                 </div>
                             </div>
                             {view === 'import' && (
