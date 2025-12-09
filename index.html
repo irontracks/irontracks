@@ -57,6 +57,10 @@
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .pt-safe { padding-top: env(safe-area-inset-top); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        .mt-safe { margin-top: env(safe-area-inset-top); }
+        .mb-safe { margin-bottom: env(safe-area-inset-bottom); }
         html, body { height: 100%; overflow-x: hidden; background-color: #0a0a0a; color: white; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
         #root { height: 100%; display: flex; flex-direction: column; }
     </style>
@@ -1155,35 +1159,35 @@
                     )}
                     {view === 'dashboard' && (
                         <>
-                            <div className="p-6 bg-gradient-to-b from-neutral-900 to-neutral-950 border-b border-neutral-800 sticky top-0 z-30 pt-safe">
+                            {/* Header Principal - Fixo e Estilizado */}
+                            <div className="fixed top-0 left-0 right-0 z-40 bg-neutral-950/95 backdrop-blur-xl border-b border-white/5 shadow-2xl rounded-b-[2.5rem] pt-safe pb-6 px-6 transition-all">
+                                {/* Espaçamento extra para a ilha dinâmica */}
+                                <div className="h-4 w-full"></div>
+                                
                                 <div className="flex justify-between items-center mb-6">
                                     <div className="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
-                                        {user.photoURL ? <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-yellow-500 shrink-0" /> : <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shrink-0">{user.displayName?.[0]}</div>}
+                                        {user.photoURL ? <img src={user.photoURL} className="w-12 h-12 rounded-full border-2 border-yellow-500 shrink-0" /> : <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-lg shrink-0">{user.displayName?.[0]}</div>}
                                         <div className="flex-1 min-w-0 overflow-hidden">
-                                            <p className="text-[9px] text-yellow-500 uppercase font-bold tracking-widest mb-0.5">Bem-vindo</p>
-                                            <h1 className="font-black text-lg sm:text-xl leading-none tracking-tight truncate w-full">{user.displayName || 'Atleta'}</h1>
+                                            <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest mb-0.5">Bem-vindo</p>
+                                            <h1 className="font-black text-xl leading-none tracking-tight truncate w-full text-white">{user.displayName || 'Atleta'}</h1>
                                         </div>
                                     </div>
                                     <div className="flex gap-2 shrink-0 ml-2">
-                                        {user.email === ADMIN_EMAIL && <button onClick={() => setView('admin')} className="bg-yellow-500 text-black p-2 rounded-full hover:bg-yellow-400 font-black border-2 border-white animate-pulse text-[10px] h-9 w-9 flex items-center justify-center">CMD</button>}
-                                        <button onClick={() => setView('history')} className="bg-neutral-800 p-2 rounded-full text-neutral-400 hover:text-white h-9 w-9 flex items-center justify-center"><History size={16} /></button>
-                                        <button onClick={() => setView('chat')} className="bg-neutral-800 p-2 rounded-full text-neutral-400 hover:text-white h-9 w-9 flex items-center justify-center"><MessageSquare size={16} /></button>
-                                        <button onClick={() => signOut(auth)} className="text-neutral-600 hover:text-red-500 p-2 h-9 w-9 flex items-center justify-center"><LogOut size={16} /></button>
+                                        {user.email === ADMIN_EMAIL && <button onClick={() => setView('admin')} className="bg-yellow-500 text-black p-2 rounded-full hover:bg-yellow-400 font-black border-2 border-white animate-pulse text-[10px] h-10 w-10 flex items-center justify-center">CMD</button>}
+                                        <button onClick={() => setView('history')} className="bg-neutral-800 p-2.5 rounded-full text-neutral-400 hover:text-white h-10 w-10 flex items-center justify-center border border-white/5"><History size={18} /></button>
+                                        <button onClick={() => setView('chat')} className="bg-neutral-800 p-2.5 rounded-full text-neutral-400 hover:text-white h-10 w-10 flex items-center justify-center border border-white/5"><MessageSquare size={18} /></button>
+                                        <button onClick={() => signOut(auth)} className="text-neutral-600 hover:text-red-500 p-2.5 h-10 w-10 flex items-center justify-center"><LogOut size={18} /></button>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <button onClick={() => setView('evolution')} className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-800 hover:border-yellow-500/50"><Flame size={18} className="text-yellow-500" /> Evolução</button>
-                                    <button onClick={() => setView('import')} className="bg-neutral-800/50 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-800 hover:border-blue-500/50"><Download size={18} className="text-blue-500" /> Importar</button>
-                                    <button onClick={handleCreateWorkout} className="col-span-2 bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg"><Plus size={18} /> Novo Treino</button>
+                                    <button onClick={() => setView('evolution')} className="bg-neutral-800/80 p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-700 hover:border-yellow-500/50 active:scale-95 transition-transform"><Flame size={18} className="text-yellow-500" /> Evolução</button>
+                                    <button onClick={() => setView('import')} className="bg-neutral-800/80 p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold border border-neutral-700 hover:border-blue-500/50 active:scale-95 transition-transform"><Download size={18} className="text-blue-500" /> Importar</button>
+                                    <button onClick={handleCreateWorkout} className="col-span-2 bg-yellow-500 text-black p-4 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold hover:bg-yellow-400 shadow-lg shadow-yellow-900/20 active:scale-95 transition-transform"><Plus size={18} /> Novo Treino</button>
                                 </div>
                             </div>
-                            {view === 'import' && (
-                                <div className="m-4 p-6 bg-neutral-900 rounded-3xl border border-blue-500/30"><h3 className="font-bold mb-2 flex items-center gap-2 text-blue-400 text-lg">Importar Treino</h3><div className="flex gap-2"><input value={importCode} onChange={(e) => setImportCode(e.target.value)} placeholder="Código ID..." className="flex-1 bg-black border border-neutral-700 rounded-xl px-4 text-white outline-none focus:border-blue-500 font-mono"/><button onClick={handleImportWorkout} className="bg-blue-600 hover:bg-blue-500 px-6 py-3 rounded-xl font-bold shadow-lg">OK</button></div><button onClick={() => setView('dashboard')} className="mt-4 text-xs text-neutral-500 hover:text-white underline">Cancelar</button></div>
-                            )}
-                            {shareCode && (
-                                <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-6 z-50 backdrop-blur-md"><div className="bg-neutral-900 p-8 rounded-3xl w-full max-w-sm border border-neutral-800 shadow-2xl relative"><h3 className="text-2xl font-black text-center mb-2 mt-4 text-white">Treino Gerado!</h3><div className="bg-black p-6 rounded-2xl border border-neutral-800 mb-8 flex justify-between items-center group cursor-pointer" onClick={() => copyToClipboard(shareCode)}><span className="font-mono text-xl font-bold select-all text-green-500">{shareCode}</span><Copy size={20} className="text-neutral-600 group-hover:text-white" /></div><button onClick={() => setShareCode(null)} className="w-full bg-white hover:bg-neutral-200 text-black font-bold py-4 rounded-xl">Fechar</button></div></div>
-                            )}
-                            <div className="p-4 space-y-4 pb-20">
+
+                            {/* Conteúdo Principal com Padding Top para compensar o Header Fixo */}
+                            <div className="px-4 space-y-4 pb-32 pt-[320px]">
                                 <h2 className="text-neutral-500 text-[10px] font-bold uppercase tracking-widest mb-4 pl-2">Meus Treinos</h2>
                                 {workouts.length === 0 && <div className="text-center py-20 opacity-30"><Dumbbell size={64} className="mb-4 text-neutral-500 mx-auto" /><p className="text-neutral-400 font-medium">Nenhum treino criado.</p></div>}
                                 {workouts.map(workout => (
