@@ -697,16 +697,22 @@
                     return;
                 }
                 
-                setIsFinished(false); // Resetar estado ao iniciar novo timer
-                
+                setIsFinished(false);
+                let hasNotified = false;
+
                 const updateTimer = () => {
                     const now = Date.now();
                     const remaining = Math.ceil((targetTime - now) / 1000);
                     if (remaining <= 0) {
                         setTimeLeft(0);
                         setIsFinished(true);
-                        if (Notification.permission === 'granted') {
-                            new Notification("⏰ Tempo Esgotado!", { body: "Hora de voltar para o treino!", icon: 'icone.png' });
+                        if (!hasNotified && Notification.permission === 'granted') {
+                            hasNotified = true;
+                            new Notification("⏰ Tempo Esgotado!", { 
+                                body: "Hora de voltar para o treino!", 
+                                icon: 'icone.png',
+                                tag: 'timer_finished'
+                            });
                         }
                     } else {
                         setTimeLeft(remaining);
