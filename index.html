@@ -6,54 +6,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="IronTracks">
-    <!-- Icone Gerado Dinamicamente (Script abaixo) -->
-    <link id="ios-icon" rel="apple-touch-icon" href="">
-    <link id="fav-icon" rel="icon" type="image/png" href="">
-
-    <script>
-        // Gerador de Icone PNG para iOS/Favicon (Yellow Dumbbell)
-        (function() {
-            const size = 512;
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-
-            // 1. Fundo Amarelo
-            ctx.fillStyle = '#eab308';
-            ctx.fillRect(0, 0, size, size);
-
-            // 2. Configurar estilo do traço (Halter)
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 24; // Proporcional ao tamanho 512 (vs 24 original = x21.3)
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            // 3. Desenhar caminhos (Escalado de 24px para 512px)
-            const scale = size / 24;
-            ctx.scale(scale, scale);
-
-            // Caminhos do Lucide Dumbbell
-            const paths = [
-                new Path2D('m6.5 6.5 11 11'),
-                new Path2D('m21 21-1-1'),
-                new Path2D('m3 3 1 1'),
-                new Path2D('m18 22 4-4'),
-                new Path2D('m2 6 4-4'),
-                new Path2D('m3 10 7.986-7.995a2.121 2.121 0 0 1 2.997 2.997L6.015 13.012a2.121 2.121 0 0 1-2.997-2.997h-.002Z'),
-                new Path2D('m10.99 17.996 7.995-7.99a2.121 2.121 0 0 1 2.997 2.997l-7.996 7.995a2.121 2.121 0 0 1-2.997-2.997Z')
-            ];
-
-            paths.forEach(p => ctx.stroke(p));
-
-            // 4. Exportar como PNG Data URL
-            const dataUrl = canvas.toDataURL('image/png');
-            
-            // 5. Aplicar aos links
-            document.getElementById('ios-icon').href = dataUrl;
-            document.getElementById('fav-icon').href = dataUrl;
-        })();
-    </script>
+    <link rel="apple-touch-icon" href="icone.png">
+    <link rel="icon" type="image/png" href="icone.png">
     <title>IronTracks - Alta Performance</title>
     
     <!-- 1. Motor Visual (Tailwind CSS) -->
