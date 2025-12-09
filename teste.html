@@ -656,6 +656,20 @@
         const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTimer }) => {
             const [expandedExercise, setExpandedExercise] = useState(0);
             const { workout, logs } = session;
+            const [elapsed, setElapsed] = useState(0);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setElapsed(Math.floor((Date.now() - session.startedAt) / 1000));
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [session.startedAt]);
+
+            const formatTime = (seconds) => {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins}:${secs.toString().padStart(2, '0')}`;
+            };
 
             const toggleSet = (exIdx, setIdx, restTime) => {
                 const key = `${exIdx}-${setIdx}`;
@@ -723,7 +737,10 @@
                         <button onClick={onBack} className="p-2 rounded-full bg-neutral-800 text-white"><ArrowLeft size={20}/></button>
                         <div className="text-center">
                             <h2 className="font-black text-white leading-none">{workout.title}</h2>
-                            <p className="text-[10px] text-yellow-500 font-mono"><Clock className="inline w-3 h-3 mr-1"/>EM ANDAMENTO</p>
+                            <p className="text-[10px] text-yellow-500 font-mono flex items-center justify-center gap-1 mt-1">
+                                <Clock className="w-3 h-3"/>
+                                <span>{formatTime(elapsed)}</span>
+                            </p>
                         </div>
                         <button onClick={handleFinish} className="bg-green-500 text-black font-bold px-4 py-2 rounded-xl text-sm hover:bg-green-400 shadow-lg shadow-green-900/20">CONCLUIR</button>
                     </div>
