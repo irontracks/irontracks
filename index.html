@@ -8,6 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="IronTracks">
     <link rel="apple-touch-icon" href="icone.png">
     <link rel="icon" type="image/png" href="icone.png">
+    <link rel="manifest" href="manifest.json">
     <title>IronTracks - Alta Performance</title>
     
     <!-- 1. Motor Visual (Tailwind CSS) -->
@@ -1341,6 +1342,15 @@
 
         const root = createRoot(document.getElementById('root'));
         root.render(<App />);
+
+        // Registro do Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registrado:', reg.scope))
+                    .catch(err => console.log('SW falhou:', err));
+            });
+        }
     </script>
 </body>
 </html>
