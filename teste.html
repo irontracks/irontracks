@@ -318,7 +318,7 @@
             return (
                 <div className="fixed inset-0 z-50 bg-neutral-900 overflow-y-auto animate-slide-up text-white">
                     <div className="sticky top-0 bg-yellow-500 text-black p-4 flex justify-between items-center z-10 shadow-lg">
-                        <h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> COMMAND CENTER</h2>
+                        <h2 className="font-black text-xl flex items-center gap-2"><Crown size={24}/> CENTRO DE COMANDO</h2>
                         <button onClick={onClose} className="bg-black/20 p-2 rounded-lg"><X size={24}/></button>
                     </div>
                      <div className="p-4 pb-20">
@@ -336,7 +336,7 @@
                                             <p className="text-3xl font-black text-white">{usersList.length}</p>
                                         </div>
                                         <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700">
-                                            <h3 className="text-neutral-500 text-xs font-bold uppercase">Templates</h3>
+                                            <h3 className="text-neutral-500 text-xs font-bold uppercase">Modelos</h3>
                                             <p className="text-3xl font-black text-yellow-500">{templates.length}</p>
                                         </div>
                                     </div>
@@ -365,7 +365,7 @@
                                 )}
                                 {tab === 'templates' && (
                                     <div className="space-y-3">
-                                        <button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold hover:bg-neutral-800">+ Novo Template</button>
+                                        <button onClick={() => setEditingTemplate({ title: '', exercises: [] })} className="w-full py-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold hover:bg-neutral-800">+ Novo Modelo</button>
                                         {templates.map(t => (
                                             <div key={t.id} className="bg-neutral-800 p-4 rounded-xl flex justify-between border border-neutral-700">
                                                 <span className="font-bold">{t.title}</span>
@@ -386,7 +386,7 @@
                                     <h2 className="text-xl font-bold">{selectedStudent.displayName}</h2>
                                 </div>
                                 <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl mb-6">
-                                    <h3 className="text-blue-400 font-bold text-xs uppercase flex items-center gap-2 mb-2"><Megaphone size={14}/> IA Coach Insights</h3>
+                                    <h3 className="text-blue-400 font-bold text-xs uppercase flex items-center gap-2 mb-2"><Megaphone size={14}/> Insights do Coach IA</h3>
                                     {generateInsights().length > 0 ? generateInsights().map((tip, i) => <p key={i} className="text-sm mb-1">{tip}</p>) : <p className="text-sm text-neutral-500">Sem dados suficientes para análise.</p>}
                                 </div>
                                 <div className="flex gap-2 mb-6">
@@ -397,7 +397,7 @@
                                 {subTab === 'workouts' && (
                                     <div className="space-y-3">
                                         {studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between"><div><h4 className="font-bold">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: (selectedStudent.uid||selectedStudent.id)})} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}
-                                        <div className="mt-4"><h4 className="text-xs font-bold text-neutral-500 mb-2 uppercase">Clonar Template</h4>{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800 mb-2 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div>
+                                        <div className="mt-4"><h4 className="text-xs font-bold text-neutral-500 mb-2 uppercase">Clonar Modelo</h4>{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800 mb-2 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div>
                                     </div>
                                 )}
                                 {subTab === 'assessments' && (
@@ -794,6 +794,27 @@
             // Estado Global da Sessão Ativa
             const [activeSession, setActiveSession] = useState(null); 
             // Estrutura: { workout, logs: {}, startedAt: number, timerTargetTime: number | null }
+
+            // Persistência da Sessão Ativa
+            useEffect(() => {
+                const savedSession = localStorage.getItem('activeSession');
+                if (savedSession) {
+                    try {
+                        setActiveSession(JSON.parse(savedSession));
+                    } catch (e) {
+                        console.error("Erro ao restaurar sessão:", e);
+                        localStorage.removeItem('activeSession');
+                    }
+                }
+            }, []);
+
+            useEffect(() => {
+                if (activeSession) {
+                    localStorage.setItem('activeSession', JSON.stringify(activeSession));
+                } else {
+                    localStorage.removeItem('activeSession');
+                }
+            }, [activeSession]);
 
             // LOGICA DE AUTH: Simples e Direta
             useEffect(() => {
