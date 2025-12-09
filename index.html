@@ -155,6 +155,7 @@
                 setErrorMsg('Redirecionando...');
                 const provider = new GoogleAuthProvider();
                 try {
+                    await setPersistence(auth, browserLocalPersistence);
                     await signInWithRedirect(auth, provider);
                 } catch (error) {
                     setIsLoading(false);
@@ -978,41 +979,54 @@
 
             // LOGICA DE AUTH: Proteção de Acesso
             useEffect(() => {
-                localStorage.removeItem('auth_pending');
-                const unsubscribe = onAuthStateChanged(auth, async (u) => {
-                    if (u) {
-                        // 1. Admin sempre liberado
-                        if (u.email === ADMIN_EMAIL) {
-                            setUser(u);
-                            setAuthLoading(false);
-                            return;
-                        }
+                let unsubscribe;
+                
+                const initAuth = async () => {
+                    // Tenta processar o resultado do redirecionamento (Vital para Safari/iOS)
+                    try {
+                        await getRedirectResult(auth);
+                    } catch (e) {
+                        console.log("Redirect result info:", e);
+                    }
 
-                        // 2. Verificar se é aluno cadastrado (em qualquer lista de clientes)
-                        try {
-                            const email = u.email.toLowerCase().trim();
-                            const q = query(collectionGroup(db, 'clients'), where('email', '==', email));
-                            const snapshot = await getDocs(q);
-
-                            if (!snapshot.empty) {
+                    unsubscribe = onAuthStateChanged(auth, async (u) => {
+                        if (u) {
+                            // 1. Admin sempre liberado
+                            if (u.email === ADMIN_EMAIL) {
                                 setUser(u);
-                            } else {
-                                alert("ACESSO NEGADO: Email não cadastrado no sistema.");
+                                setAuthLoading(false);
+                                return;
+                            }
+
+                            // 2. Verificar se é aluno cadastrado (em qualquer lista de clientes)
+                            try {
+                                const email = u.email.toLowerCase().trim();
+                                const q = query(collectionGroup(db, 'clients'), where('email', '==', email));
+                                const snapshot = await getDocs(q);
+
+                                if (!snapshot.empty) {
+                                    setUser(u);
+                                } else {
+                                    alert("ACESSO NEGADO: Email não cadastrado no sistema.");
+                                    await signOut(auth);
+                                    setUser(null);
+                                }
+                            } catch (error) {
+                                console.error("Erro verificação:", error);
+                                // Diagnóstico de erro de índice
+                                alert("Erro ao verificar cadastro: " + error.message + "\n\nSe o erro mencionar 'index', contate o administrador.");
                                 await signOut(auth);
                                 setUser(null);
                             }
-                        } catch (error) {
-                            console.error("Erro verificação:", error);
-                            alert("Erro ao verificar permissão. Contate o administrador.");
-                            await signOut(auth);
+                        } else {
                             setUser(null);
                         }
-                    } else {
-                        setUser(null);
-                    }
-                    setAuthLoading(false);
-                });
-                return unsubscribe;
+                        setAuthLoading(false);
+                    });
+                };
+
+                initAuth();
+                return () => { if(unsubscribe) unsubscribe(); };
             }, []);
 
             // Handlers de Sessão
