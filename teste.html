@@ -277,7 +277,7 @@
                         </div>
                         <div>
                             <p className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest">Treino em Andamento</p>
-                            <h3 className="font-bold text-white text-sm">{session.workoutTitle}</h3>
+                            <h3 className="font-bold text-white text-sm">{session.workout?.title || 'Treino Ativo'}</h3>
                         </div>
                     </div>
                     <div className="bg-yellow-500 text-black px-3 py-1.5 rounded-lg text-xs font-black">VOLTAR</div>
@@ -446,17 +446,6 @@
             const [importCode, setImportCode] = useState('');
             const [shareCode, setShareCode] = useState(null);
             const [reportData, setReportData] = useState({ current: null, previous: null });
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
-            const [activeSession, setActiveSession] = useState(null); 
             const [notification, setNotification] = useState(null);
             
             // Estado Global da Sessão Ativa
@@ -517,104 +506,12 @@
             useEffect(() => { if(user) setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid), { uid: user.uid, displayName: user.displayName || 'Anônimo', email: user.email, photoURL: user.photoURL, lastSeen: serverTimestamp() }, { merge: true }); }, [user]);
             useEffect(() => { if (!user) return; const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), orderBy('createdAt', 'desc')); const unsub = onSnapshot(q, s => setWorkouts(s.docs.map(d => ({ id: d.id, ...d.data() })))); return () => unsub(); }, [user]);
 
-            // Session Handlers
-            const handleStartSession = (workout) => {
-                setActiveSession({
-                    workout,
-                    logs: {},
-                    startedAt: Date.now(),
-                    timerTargetTime: null
-                });
-                setView('active');
-            };
 
-            const handleUpdateSessionLog = (key, data) => {
-                setActiveSession(prev => ({
-                    ...prev,
-                    logs: { ...prev.logs, [key]: data }
-                }));
-            };
 
-            const handleStartTimer = (duration) => {
-                const target = Date.now() + (duration * 1000);
-                setActiveSession(prev => ({ ...prev, timerTargetTime: target }));
-            };
 
-            const handleCloseTimer = () => {
-                setActiveSession(prev => ({ ...prev, timerTargetTime: null }));
-            };
 
-            const handleFinishSession = (report, previous) => {
-                setActiveSession(null);
-                setReportData({ current: report, previous });
-                setView('report');
-            };
 
-            // Session Handlers
-            const handleStartSession = (workout) => {
-                setActiveSession({
-                    workout,
-                    logs: {},
-                    startedAt: Date.now(),
-                    timerTargetTime: null
-                });
-                setView('active');
-            };
 
-            const handleUpdateSessionLog = (key, data) => {
-                setActiveSession(prev => ({
-                    ...prev,
-                    logs: { ...prev.logs, [key]: data }
-                }));
-            };
-
-            const handleStartTimer = (duration) => {
-                const target = Date.now() + (duration * 1000);
-                setActiveSession(prev => ({ ...prev, timerTargetTime: target }));
-            };
-
-            const handleCloseTimer = () => {
-                setActiveSession(prev => ({ ...prev, timerTargetTime: null }));
-            };
-
-            const handleFinishSession = (report, previous) => {
-                setActiveSession(null);
-                setReportData({ current: report, previous });
-                setView('report');
-            };
-
-            // Session Handlers
-            const handleStartSession = (workout) => {
-                setActiveSession({
-                    workout,
-                    logs: {},
-                    startedAt: Date.now(),
-                    timerTargetTime: null
-                });
-                setView('active');
-            };
-
-            const handleUpdateSessionLog = (key, data) => {
-                setActiveSession(prev => ({
-                    ...prev,
-                    logs: { ...prev.logs, [key]: data }
-                }));
-            };
-
-            const handleStartTimer = (duration) => {
-                const target = Date.now() + (duration * 1000);
-                setActiveSession(prev => ({ ...prev, timerTargetTime: target }));
-            };
-
-            const handleCloseTimer = () => {
-                setActiveSession(prev => ({ ...prev, timerTargetTime: null }));
-            };
-
-            const handleFinishSession = (report, previous) => {
-                setActiveSession(null);
-                setReportData({ current: report, previous });
-                setView('report');
-            };
 
             // Session Handlers
             const handleStartSession = (workout) => {
@@ -904,7 +801,7 @@
                     
                     {activeSession && view !== 'active' && (
                         <MiniPlayer 
-                            session={activeSession.workout} 
+                            session={activeSession} 
                             onClick={() => setView('active')} 
                         />
                     )}
