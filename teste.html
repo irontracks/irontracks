@@ -278,21 +278,47 @@
                 setLogs(prev => ({ ...prev, [key]: { ...prev[key], [field]: val } }));
             };
 
-            const handleFinish = () => {
+            const handleFinish = async () => {
                 if (!confirm("Finalizar treino?")) return;
-                const session = {
-                    workoutId: workout.id,
-                    workoutTitle: workout.title,
-                    date: serverTimestamp(),
-                    totalTime: (Date.now() - startedAt) / 1000,
-                    logs: logs,
-                    exercises: workout.exercises
-                };
-                addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), session)
-                    .then((docRef) => {
-                        onFinish({ ...session, id: docRef.id }, null); 
-                    })
-                    .catch(e => alert("Erro ao salvar: " + e.message));
+                
+                try {
+                    // Sanitização de dados para evitar erros de 'undefined' no Firestore
+                    const cleanExercises = workout.exercises.map(ex => ({
+                        name: ex.name || 'Sem nome',
+                        sets: Number(ex.sets) || 0,
+                        reps: String(ex.reps || ''),
+                        restTime: Number(ex.restTime) || 0,
+                        notes: ex.notes || '',
+                        cadence: ex.cadence || ''
+                    }));
+
+                    // Sanitização dos logs
+                    const cleanLogs = {};
+                    Object.keys(logs).forEach(key => {
+                        if (logs[key]) {
+                            cleanLogs[key] = {
+                                weight: logs[key].weight || '',
+                                reps: logs[key].reps || '',
+                                done: !!logs[key].done
+                            };
+                        }
+                    });
+
+                    const session = {
+                        workoutId: workout.id,
+                        workoutTitle: workout.title,
+                        date: serverTimestamp(),
+                        totalTime: (Date.now() - startedAt) / 1000,
+                        logs: cleanLogs,
+                        exercises: cleanExercises
+                    };
+
+                    const docRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), session);
+                    onFinish({ ...session, id: docRef.id }, null); 
+                } catch (e) {
+                    console.error("Erro detalhado ao salvar:", e);
+                    alert(`Ocorreu um erro ao salvar o treino:\n${e.message}\n\nVerifique o console para mais detalhes.`);
+                }
             };
 
             return (
