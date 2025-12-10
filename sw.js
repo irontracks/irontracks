@@ -1,4 +1,4 @@
-const CACHE_NAME = 'irontracks-v8';
+const CACHE_NAME = 'irontracks-v10';
 
 // 1. Arquivos Essenciais (Locais) - Se falhar, o app não instala
 const CORE_ASSETS = [
