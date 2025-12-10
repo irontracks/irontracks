@@ -307,6 +307,9 @@
             const [studentWorkouts, setStudentWorkouts] = useState([]);
             const [assessments, setAssessments] = useState([]);
             const [photos, setPhotos] = useState([]);
+            const [coachWorkouts, setCoachWorkouts] = useState([]);
+            const [showImportModal, setShowImportModal] = useState(false);
+            const [importTab, setImportTab] = useState('templates');
             const [editingTemplate, setEditingTemplate] = useState(null);
             const [newStudent, setNewStudent] = useState({ name: '', email: '', age: '', phone: '' });
             const [newCoach, setNewCoach] = useState({ name: '', email: '', phone: '', status: 'pendente' });
@@ -335,6 +338,13 @@
                 if (!user) return;
                 const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'templates'), orderBy('createdAt', 'desc'));
                 const unsub = onSnapshot(q, snap => setTemplates(snap.docs.map(d => ({id: d.id, ...d.data()}))));
+                return () => unsub();
+            }, [user]);
+
+            useEffect(() => {
+                if (!user) return;
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'workouts'), orderBy('createdAt', 'desc'));
+                const unsub = onSnapshot(q, snap => setCoachWorkouts(snap.docs.map(d => ({id: d.id, ...d.data()}))));
                 return () => unsub();
             }, [user]);
 
@@ -647,9 +657,31 @@
                                     ))}
                                 </div>
                                 {subTab === 'workouts' && (
-                                    <div className="space-y-3">
-                                        {studentWorkouts.map(w => <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between"><div><h4 className="font-bold">{w.title}</h4><p className="text-xs text-neutral-500">{w.exercises.length} ex</p></div><div className="flex gap-2"><button onClick={() => setEditingTemplate({...w, targetStudentId: (selectedStudent.uid||selectedStudent.id)})} className="p-2 bg-neutral-700 rounded-lg"><UserCog size={16}/></button><button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/30 text-red-500 rounded-lg"><Trash2 size={16}/></button></div></div>)}
-                                        <div className="mt-4"><h4 className="text-xs font-bold text-neutral-500 mb-2 uppercase">Clonar Modelo</h4>{templates.map(t => <button key={t.id} onClick={() => handleCloneTemplate(t)} className="w-full bg-neutral-800 mb-2 p-3 rounded-lg border border-neutral-800 flex justify-between items-center"><span className="font-bold text-sm">{t.title}</span><Copy size={14} className="text-yellow-500"/></button>)}</div>
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button onClick={() => setEditingTemplate({ title: '', exercises: [], targetStudentId: (selectedStudent.uid||selectedStudent.id) })} className="bg-yellow-500 text-black font-bold p-3 rounded-xl flex items-center justify-center gap-2 hover:bg-yellow-400 shadow-lg active:scale-95 transition-transform">
+                                                <Plus size={20}/> Novo Treino
+                                            </button>
+                                            <button onClick={() => setShowImportModal(true)} className="bg-neutral-800 text-white font-bold p-3 rounded-xl border border-neutral-700 flex items-center justify-center gap-2 hover:bg-neutral-700 active:scale-95 transition-transform">
+                                                <Copy size={20}/> Importar
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {studentWorkouts.length === 0 && <div className="text-center py-8 opacity-50"><Dumbbell className="mx-auto mb-2 opacity-50" size={32}/><p>Nenhum treino atribuído.</p></div>}
+                                            {studentWorkouts.map(w => (
+                                                <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center group hover:border-yellow-500 transition-colors">
+                                                    <div>
+                                                        <h4 className="font-bold text-white text-lg">{w.title}</h4>
+                                                        <p className="text-xs text-neutral-500">{w.exercises?.length || 0} exercícios • {w.importedFrom ? 'Importado' : 'Manual'}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => setEditingTemplate({...w, targetStudentId: (selectedStudent.uid||selectedStudent.id)})} className="p-2 bg-neutral-700 rounded-lg hover:bg-white hover:text-black transition-colors"><UserCog size={16}/></button>
+                                                        <button onClick={() => handleDeleteStudentWorkout(w.id)} className="p-2 bg-red-900/20 text-red-500 rounded-lg hover:bg-red-500 hover:text-white transition-colors"><Trash2 size={16}/></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
                                 {subTab === 'assessments' && (
@@ -713,6 +745,44 @@
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+                        {showImportModal && (
+                            <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-fade-in">
+                                <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 flex flex-col max-h-[80vh] animate-slide-up shadow-2xl">
+                                    <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900 rounded-t-2xl">
+                                        <h3 className="font-bold text-lg flex items-center gap-2"><Copy size={20} className="text-yellow-500"/> Importar Treino</h3>
+                                        <button onClick={() => setShowImportModal(false)} className="p-2 bg-neutral-800 rounded-full hover:bg-neutral-700"><X size={20}/></button>
+                                    </div>
+                                    
+                                    <div className="flex p-2 gap-2 bg-neutral-800/50 m-4 rounded-xl shrink-0">
+                                         <button onClick={() => setImportTab('templates')} className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-all ${importTab==='templates'?'bg-yellow-500 text-black shadow-lg':'text-neutral-400 hover:bg-neutral-800'}`}>Modelos Salvos</button>
+                                         <button onClick={() => setImportTab('my_workouts')} className={`flex-1 py-3 rounded-lg text-xs font-bold uppercase transition-all ${importTab==='my_workouts'?'bg-yellow-500 text-black shadow-lg':'text-neutral-400 hover:bg-neutral-800'}`}>Meus Treinos</button>
+                                    </div>
+                        
+                                    <div className="flex-1 overflow-y-auto p-4 pt-0 space-y-2">
+                                         {importTab === 'templates' && templates.map(t => (
+                                              <button key={t.id} onClick={() => { handleCloneTemplate(t); setShowImportModal(false); }} className="w-full bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center hover:border-yellow-500 text-left group transition-all active:scale-95">
+                                                  <div>
+                                                      <span className="font-bold block text-white group-hover:text-yellow-500 transition-colors">{t.title}</span>
+                                                      <span className="text-[10px] text-neutral-500">{t.exercises?.length || 0} exercícios</span>
+                                                  </div>
+                                                  <ArrowLeft size={16} className="rotate-180 text-neutral-500 group-hover:text-yellow-500"/>
+                                              </button>
+                                         ))}
+                                         {importTab === 'my_workouts' && coachWorkouts.map(t => (
+                                              <button key={t.id} onClick={() => { handleCloneTemplate(t); setShowImportModal(false); }} className="w-full bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center hover:border-yellow-500 text-left group transition-all active:scale-95">
+                                                  <div>
+                                                      <span className="font-bold block text-white group-hover:text-yellow-500 transition-colors">{t.title}</span>
+                                                      <span className="text-[10px] text-neutral-500">{t.exercises?.length || 0} exercícios</span>
+                                                  </div>
+                                                  <ArrowLeft size={16} className="rotate-180 text-neutral-500 group-hover:text-yellow-500"/>
+                                              </button>
+                                         ))}
+                                         {importTab === 'templates' && templates.length === 0 && <div className="text-center py-10 opacity-50"><p>Nenhum modelo salvo.</p></div>}
+                                         {importTab === 'my_workouts' && coachWorkouts.length === 0 && <div className="text-center py-10 opacity-50"><p>Você não tem treinos pessoais.</p></div>}
+                                    </div>
+                                </div>
                             </div>
                         )}
                         {editingTemplate && <AdminWorkoutEditor initialData={editingTemplate} onCancel={() => setEditingTemplate(null)} onSave={async (data) => { 
