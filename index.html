@@ -362,6 +362,7 @@
                 if (!newStudent.email || !newStudent.name) return alert("Preencha nome e email");
                 const email = newStudent.email.trim().toLowerCase();
                 try {
+                    // 1. Criar na lista do Coach
                     await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', email), {
                         uid: email, 
                         displayName: newStudent.name, 
@@ -374,7 +375,18 @@
                         photoURL: null,
                         coachId: user.uid
                     });
-                    alert("Aluno Cadastrado!"); 
+                    
+                    // 2. Criar registro público (para Login)
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', email), {
+                        uid: email,
+                        displayName: newStudent.name,
+                        email: email,
+                        role: 'student',
+                        lastSeen: serverTimestamp(),
+                        photoURL: null
+                    });
+
+                    alert("Aluno Cadastrado com Acesso Liberado!"); 
                     setNewStudent({name:'', email:'', age: '', phone: ''});
                 } catch(e) { alert("Erro ao cadastrar: " + e.message); }
             };
@@ -503,13 +515,88 @@
 
             const handleUpdateStudentProfile = async () => {
                 if (!editingStudentProfile || !editingStudentProfile.displayName) return alert("Nome é obrigatório");
+                
+                const oldEmail = selectedStudent.email;
+                const newEmail = editingStudentProfile.email ? editingStudentProfile.email.trim().toLowerCase() : oldEmail;
+
+                // Caso 1: Email mudou (Migração Completa)
+                if (newEmail !== oldEmail) {
+                    if (!confirm("⚠️ Atenção: Você alterou o email do aluno.\n\nO sistema irá migrar todos os dados (treinos, avaliações, fotos) para o novo endereço.\n\nDeseja continuar?")) return;
+                    
+                    try {
+                        const oldClientRef = doc(db, 'artifacts', appId, 'users', user.uid, 'clients', oldEmail);
+                        const newClientRef = doc(db, 'artifacts', appId, 'users', user.uid, 'clients', newEmail);
+                        
+                        // Verifica duplicidade
+                        const check = await getDoc(newClientRef);
+                        if (check.exists()) return alert("Este email já existe na sua lista de alunos!");
+
+                        const clientData = {
+                            ...selectedStudent,
+                            displayName: editingStudentProfile.displayName,
+                            phone: editingStudentProfile.phone,
+                            age: editingStudentProfile.age,
+                            email: newEmail,
+                            uid: newEmail
+                        };
+
+                        // 1. Criar novo registro
+                        await setDoc(newClientRef, clientData);
+
+                        // 2. Migrar Subcoleções
+                        const subCols = ['workouts', 'assessments', 'photos'];
+                        for (const colName of subCols) {
+                            const oldCol = collection(oldClientRef, colName);
+                            const newCol = collection(newClientRef, colName);
+                            const snap = await getDocs(oldCol);
+                            for (const d of snap.docs) {
+                                await setDoc(doc(newCol, d.id), d.data());
+                                await deleteDoc(doc(oldCol, d.id));
+                            }
+                        }
+
+                        // 3. Atualizar Registro Público
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', newEmail), {
+                            uid: newEmail,
+                            displayName: clientData.displayName,
+                            email: newEmail,
+                            role: 'student',
+                            lastSeen: clientData.lastSeen || serverTimestamp(),
+                            photoURL: clientData.photoURL || null
+                        });
+
+                        // 4. Limpar Antigos
+                        await deleteDoc(oldClientRef);
+                        try { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', oldEmail)); } catch(e) { console.log("Erro limpeza publica:", e); }
+
+                        setSelectedStudent(clientData);
+                        setEditingStudentProfile(null);
+                        alert("Perfil e Email atualizados com sucesso!");
+                    } catch (e) { alert("Erro crítico na migração: " + e.message); }
+                    return;
+                }
+
+                // Caso 2: Apenas dados básicos (sem mudar email)
                 try {
                     const uid = editingStudentProfile.uid || editingStudentProfile.id;
-                    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', uid), {
+                    const updateData = {
                         displayName: editingStudentProfile.displayName,
                         phone: editingStudentProfile.phone,
                         age: editingStudentProfile.age
-                    });
+                    };
+
+                    // 1. Atualiza Cliente
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', uid), updateData);
+                    
+                    // 2. Garante Registro Público (Corrige acesso se estiver faltando)
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', uid), {
+                        uid: uid,
+                        email: uid,
+                        role: 'student',
+                        ...updateData,
+                        lastSeen: serverTimestamp()
+                    }, { merge: true });
+
                     setSelectedStudent(prev => ({...prev, ...editingStudentProfile}));
                     setEditingStudentProfile(null);
                     alert("Perfil atualizado!");
@@ -668,7 +755,8 @@
                                                 uid: selectedStudent.uid || selectedStudent.id,
                                                 displayName: selectedStudent.displayName || '',
                                                 phone: selectedStudent.phone || '',
-                                                age: selectedStudent.age || ''
+                                                age: selectedStudent.age || '',
+                                                email: selectedStudent.email || ''
                                             })} className="p-1.5 bg-neutral-800 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-700">
                                                 <UserCog size={16}/>
                                             </button>
@@ -784,6 +872,10 @@
                                         <div>
                                             <label className="text-[10px] text-neutral-500 uppercase font-bold">Nome Completo</label>
                                             <input className="w-full bg-neutral-800 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent text-white" value={editingStudentProfile.displayName} onChange={e=>setEditingStudentProfile({...editingStudentProfile, displayName:e.target.value})}/>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500 uppercase font-bold">Email (Login Google)</label>
+                                            <input className="w-full bg-neutral-800 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent text-white" value={editingStudentProfile.email} onChange={e=>setEditingStudentProfile({...editingStudentProfile, email:e.target.value})}/>
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-neutral-500 uppercase font-bold">Telefone / WhatsApp</label>
