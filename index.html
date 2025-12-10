@@ -1501,23 +1501,28 @@
                                 return;
                             }
 
-                            // 2. Verificar se é aluno cadastrado (em qualquer lista de clientes)
+                            // 2. Verificar se é aluno ou coach cadastrado (Via Registro Público)
                             try {
                                 const email = u.email.toLowerCase().trim();
-                                const q = query(collectionGroup(db, 'clients'), where('email', '==', email));
-                                const snapshot = await getDocs(q);
+                                
+                                // Verifica tabela pública de usuários (Alunos)
+                                const publicUserRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', email);
+                                const publicUserSnap = await getDoc(publicUserRef);
 
-                                if (!snapshot.empty) {
+                                // Verifica tabela de coaches
+                                const coachRef = doc(db, 'artifacts', appId, 'public', 'data', 'coaches', email);
+                                const coachSnap = await getDoc(coachRef);
+
+                                if (publicUserSnap.exists() || coachSnap.exists()) {
                                     setUser(u);
                                 } else {
-                                    alert("ACESSO NEGADO: Email não cadastrado no sistema.");
+                                    alert("ACESSO NEGADO: Seu email não consta no registro público.\n\nPeça ao seu treinador para abrir seu perfil no App e clicar em SALVAR para atualizar seu acesso.");
                                     await signOut(auth);
                                     setUser(null);
                                 }
                             } catch (error) {
                                 console.error("Erro verificação:", error);
-                                // Diagnóstico de erro de índice
-                                alert("Erro ao verificar cadastro: " + error.message + "\n\nSe o erro mencionar 'index', contate o administrador.");
+                                alert("Erro ao verificar cadastro: " + error.message);
                                 await signOut(auth);
                                 setUser(null);
                             }
