@@ -311,6 +311,7 @@
             const [showImportModal, setShowImportModal] = useState(false);
             const [importTab, setImportTab] = useState('templates');
             const [editingTemplate, setEditingTemplate] = useState(null);
+            const [editingStudentProfile, setEditingStudentProfile] = useState(null);
             const [newStudent, setNewStudent] = useState({ name: '', email: '', age: '', phone: '' });
             const [newCoach, setNewCoach] = useState({ name: '', email: '', phone: '', status: 'pendente' });
             const [assessmentForm, setAssessmentForm] = useState(null);
@@ -500,6 +501,21 @@
                 } catch (e) { alert("Erro: " + e.message + "\n\nNota: O Firebase bloqueia a exclusão de dados de outros usuários por segurança. Apenas o próprio usuário pode se remover, a menos que as Regras de Segurança sejam alteradas no console."); }
             };
 
+            const handleUpdateStudentProfile = async () => {
+                if (!editingStudentProfile || !editingStudentProfile.displayName) return alert("Nome é obrigatório");
+                try {
+                    const uid = editingStudentProfile.uid || editingStudentProfile.id;
+                    await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'clients', uid), {
+                        displayName: editingStudentProfile.displayName,
+                        phone: editingStudentProfile.phone,
+                        age: editingStudentProfile.age
+                    });
+                    setSelectedStudent(prev => ({...prev, ...editingStudentProfile}));
+                    setEditingStudentProfile(null);
+                    alert("Perfil atualizado!");
+                } catch (e) { alert("Erro ao atualizar: " + e.message); }
+            };
+
             const TAB_LABELS = { 'dashboard': 'VISÃO GERAL', 'students': 'ALUNOS', 'templates': 'TREINOS' };
             if (isSuperAdmin) TAB_LABELS['coaches'] = 'PROFESSORES';
             if (isSuperAdmin) TAB_LABELS['system'] = 'SISTEMA';
@@ -645,7 +661,20 @@
                             <div className="animate-slide-up">
                                 <div className="flex items-center gap-3 mb-6">
                                     <button onClick={() => setSelectedStudent(null)} className="p-2 bg-neutral-800 rounded-lg"><ArrowLeft/></button>
-                                    <h2 className="text-xl font-bold">{selectedStudent.displayName}</h2>
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <h2 className="text-xl font-bold">{selectedStudent.displayName}</h2>
+                                            <button onClick={() => setEditingStudentProfile({
+                                                uid: selectedStudent.uid || selectedStudent.id,
+                                                displayName: selectedStudent.displayName || '',
+                                                phone: selectedStudent.phone || '',
+                                                age: selectedStudent.age || ''
+                                            })} className="p-1.5 bg-neutral-800 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-700">
+                                                <UserCog size={16}/>
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-neutral-500">{selectedStudent.email}</p>
+                                    </div>
                                 </div>
                                 <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-xl mb-6">
                                     <h3 className="text-blue-400 font-bold text-xs uppercase flex items-center gap-2 mb-2"><Megaphone size={14}/> Insights do Coach IA</h3>
@@ -745,6 +774,31 @@
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+                        {editingStudentProfile && (
+                            <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 p-6 shadow-2xl animate-slide-up">
+                                    <h3 className="font-bold text-lg mb-4 text-white">Editar Perfil do Aluno</h3>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500 uppercase font-bold">Nome Completo</label>
+                                            <input className="w-full bg-neutral-800 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent text-white" value={editingStudentProfile.displayName} onChange={e=>setEditingStudentProfile({...editingStudentProfile, displayName:e.target.value})}/>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500 uppercase font-bold">Telefone / WhatsApp</label>
+                                            <input className="w-full bg-neutral-800 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent text-white" value={editingStudentProfile.phone} onChange={e=>setEditingStudentProfile({...editingStudentProfile, phone:e.target.value})}/>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500 uppercase font-bold">Idade</label>
+                                            <input type="number" className="w-full bg-neutral-800 p-3 rounded-lg outline-none focus:border-yellow-500 border border-transparent text-white" value={editingStudentProfile.age} onChange={e=>setEditingStudentProfile({...editingStudentProfile, age:e.target.value})}/>
+                                        </div>
+                                        <div className="flex gap-2 mt-4">
+                                            <button onClick={() => setEditingStudentProfile(null)} className="flex-1 bg-neutral-800 text-white font-bold p-3 rounded-lg hover:bg-neutral-700">CANCELAR</button>
+                                            <button onClick={handleUpdateStudentProfile} className="flex-1 bg-yellow-500 text-black font-bold p-3 rounded-lg hover:bg-yellow-400">SALVAR</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         )}
                         {showImportModal && (
