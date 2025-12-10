@@ -94,7 +94,7 @@
             CheckCircle2, RotateCcw, Users, Copy, Download, Activity, 
             Music, Clock, ChevronDown, ChevronUp, FileText, TrendingUp, 
             TrendingDown, Printer, X, MessageSquare, Send, ArrowLeft, Bell, Flame,
-            History, Calendar, Crown, Database, UserCog, Megaphone, AlertCircle
+            History, Calendar, Crown, Database, UserCog, Megaphone, AlertCircle, UserPlus, RefreshCw
         } from 'lucide-react';
 
         // --- CONFIG ---
@@ -603,6 +603,26 @@
                 } catch (e) { alert("Erro ao atualizar: " + e.message); }
             };
 
+            const handleSyncAccess = async () => {
+                if (!selectedStudent) return;
+                const email = selectedStudent.email || selectedStudent.id;
+                if(!confirm(`Deseja sincronizar o acesso de ${selectedStudent.displayName}?\n\nIsso criará o registro público necessário para o login, caso esteja faltando.`)) return;
+
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users', email), {
+                        uid: email,
+                        email: email,
+                        displayName: selectedStudent.displayName,
+                        role: 'student',
+                        lastSeen: serverTimestamp(),
+                        photoURL: selectedStudent.photoURL || null
+                    }, { merge: true });
+                    alert("Acesso Sincronizado!\n\nAgora o aluno deve conseguir fazer login.");
+                } catch (e) {
+                    alert("Erro ao sincronizar: " + e.message);
+                }
+            };
+
             const TAB_LABELS = { 'dashboard': 'VISÃO GERAL', 'students': 'ALUNOS', 'templates': 'TREINOS' };
             if (isSuperAdmin) TAB_LABELS['coaches'] = 'PROFESSORES';
             if (isSuperAdmin) TAB_LABELS['system'] = 'SISTEMA';
@@ -759,6 +779,9 @@
                                                 email: selectedStudent.email || ''
                                             })} className="p-1.5 bg-neutral-800 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-700">
                                                 <UserCog size={16}/>
+                                            </button>
+                                            <button onClick={handleSyncAccess} className="p-1.5 bg-neutral-800 rounded-lg text-neutral-400 hover:text-green-500 hover:bg-neutral-700" title="Sincronizar Acesso">
+                                                <RefreshCw size={16}/>
                                             </button>
                                         </div>
                                         <p className="text-xs text-neutral-500">{selectedStudent.email}</p>
@@ -1179,10 +1202,69 @@
             );
         };
 
-        const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTimer }) => {
+        const InvitePartnerModal = ({ isOpen, onClose, onInvite }) => {
+            const [search, setSearch] = useState('');
+            const [users, setUsers] = useState([]);
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => {
+                if (!isOpen) return;
+                const fetchUsers = async () => {
+                    setLoading(true);
+                    try {
+                        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users'), limit(50));
+                        const snap = await getDocs(q);
+                        setUsers(snap.docs.map(d => d.data()));
+                    } catch (e) {
+                        console.error(e);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                fetchUsers();
+            }, [isOpen]);
+
+            const filtered = users.filter(u => 
+                (u.displayName || '').toLowerCase().includes(search.toLowerCase()) || 
+                (u.email || '').toLowerCase().includes(search.toLowerCase())
+            );
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 p-6 shadow-2xl">
+                        <h3 className="font-bold text-white mb-4 text-lg">Convidar Parceiro de Treino</h3>
+                        <input 
+                            placeholder="Buscar aluno por nome ou email..." 
+                            className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-bold outline-none focus:ring-1 ring-yellow-500"
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                        />
+                        <div className="max-h-60 overflow-y-auto space-y-2 mb-4 custom-scrollbar">
+                            {loading && <p className="text-center text-neutral-500 py-4">Carregando lista...</p>}
+                            {!loading && filtered.length === 0 && <p className="text-center text-neutral-500 py-4">Ninguém encontrado.</p>}
+                            {filtered.map(u => (
+                                <button key={u.email} onClick={() => onInvite(u)} className="w-full text-left p-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 flex items-center gap-3 border border-transparent hover:border-yellow-500 transition-all">
+                                    {u.photoURL ? <img src={u.photoURL} className="w-10 h-10 rounded-full bg-neutral-700 object-cover"/> : <div className="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold text-sm">{u.displayName?.[0]}</div>}
+                                    <div>
+                                        <p className="font-bold text-white text-sm">{u.displayName}</p>
+                                        <p className="text-xs text-neutral-500">{u.email}</p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                        <button onClick={onClose} className="w-full p-4 rounded-xl bg-neutral-800 text-white font-bold hover:bg-neutral-700 transition-colors">Cancelar</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTimer, isCoach, onUpdateSession }) => {
             const [currentExIdx, setCurrentExIdx] = useState(0);
             const { workout, logs } = session;
             const [elapsed, setElapsed] = useState(0);
+            const [showInvite, setShowInvite] = useState(false);
 
             useEffect(() => {
                 const interval = setInterval(() => {
@@ -1190,6 +1272,27 @@
                 }, 1000);
                 return () => clearInterval(interval);
             }, [session.startedAt]);
+
+            // Sincronização de Treino em Equipe
+            useEffect(() => {
+                if (!session.teamSessionId) return;
+                const unsub = onSnapshot(doc(db, 'artifacts', appId, 'team_sessions', session.teamSessionId), (snap) => {
+                    if (snap.exists()) {
+                        const data = snap.data();
+                        // Se o status for finished e eu NÃO sou o host (quem iniciou), finaliza pra mim
+                        // O host é quem controla o fim.
+                        if (data.status === 'finished') {
+                            // Verifica se foi finalizado recentemente (evitar loops em sessões antigas)
+                            const finishedTime = data.finishedAt?.seconds * 1000 || 0;
+                            if (Date.now() - finishedTime < 60000) {
+                                alert("O Treinador finalizou o treino em equipe!");
+                                handleFinish(true); // Força finalização
+                            }
+                        }
+                    }
+                });
+                return () => unsub();
+            }, [session.teamSessionId]);
 
             const formatTime = (seconds) => {
                 const mins = Math.floor(seconds / 60);
@@ -1216,8 +1319,46 @@
                 onUpdateLog(key, { ...current, [field]: val });
             };
 
-            const handleFinish = async () => {
-                if (!confirm("Finalizar treino?")) return;
+            const handleSendInvite = async (student) => {
+                if (!confirm(`Convidar ${student.displayName || student.email} para treinar junto?`)) return;
+                try {
+                    let teamSessionId = session.teamSessionId;
+                    
+                    // Se não existe sessão de equipe, cria uma
+                    if (!teamSessionId) {
+                        const teamRef = await addDoc(collection(db, 'artifacts', appId, 'team_sessions'), {
+                            host: user.email,
+                            hostName: user.displayName || 'Coach',
+                            workout: session.workout,
+                            startedAt: serverTimestamp(),
+                            status: 'active',
+                            participants: [user.email]
+                        });
+                        teamSessionId = teamRef.id;
+                        // Atualiza sessão local
+                        if(onUpdateSession) onUpdateSession({ teamSessionId, host: user.displayName });
+                    }
+
+                    // Envia convite
+                    await addDoc(collection(db, 'artifacts', appId, 'invites'), {
+                        from: user.email,
+                        fromName: user.displayName || 'Coach',
+                        to: student.email,
+                        workout: session.workout,
+                        teamSessionId: teamSessionId,
+                        status: 'pending',
+                        createdAt: serverTimestamp()
+                    });
+
+                    alert("Convite enviado com sucesso!");
+                    setShowInvite(false);
+                } catch (e) {
+                    alert("Erro ao enviar convite: " + e.message);
+                }
+            };
+
+            const handleFinish = async (force = false) => {
+                if (!force && !confirm("Finalizar treino?")) return;
                 
                 try {
                     // Sanitização de dados
@@ -1251,6 +1392,17 @@
                     };
 
                     const docRef = await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'history'), sessionData);
+                    
+                    // Se for sessão em equipe e eu sou o host/coach, finalizo para todos
+                    if (session.teamSessionId && (isCoach || session.host === user.displayName)) {
+                        try {
+                            await updateDoc(doc(db, 'artifacts', appId, 'team_sessions', session.teamSessionId), {
+                                status: 'finished',
+                                finishedAt: serverTimestamp()
+                            });
+                        } catch (e) { console.error("Erro ao finalizar sessão de equipe", e); }
+                    }
+
                     onFinish({ ...sessionData, id: docRef.id }, null); 
                 } catch (e) {
                     console.error("Erro detalhado ao salvar:", e);
@@ -1278,6 +1430,11 @@
 
             return (
                 <div className="flex flex-col h-[100dvh] bg-neutral-900 overflow-hidden">
+                    <InvitePartnerModal 
+                        isOpen={showInvite} 
+                        onClose={() => setShowInvite(false)} 
+                        onInvite={handleSendInvite} 
+                    />
                     {/* Header Fixo */}
                     <div className="bg-neutral-900/95 backdrop-blur z-20 border-b border-neutral-800 pt-safe shrink-0">
                         <div className="h-4 w-full"></div>
@@ -1287,9 +1444,17 @@
                                 <h2 className="font-black text-white leading-none text-sm">{workout.title}</h2>
                                 <p className="text-[10px] text-yellow-500 font-mono flex items-center justify-center gap-1 mt-1">
                                     <Clock className="w-3 h-3"/><span>{formatTime(elapsed)}</span>
+                                    {session.host && <span className="ml-2 px-1 bg-yellow-500/20 rounded text-yellow-500">TEAM</span>}
                                 </p>
                             </div>
-                            <button onClick={handleFinish} className="bg-green-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-green-500 shadow-lg shadow-green-900/20">FIM</button>
+                            <div className="flex items-center gap-2">
+                                {isCoach && (
+                                    <button onClick={() => setShowInvite(true)} className="w-8 h-8 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-500 hover:text-white transition-colors">
+                                        <UserPlus size={16}/>
+                                    </button>
+                                )}
+                                <button onClick={() => handleFinish(false)} className="bg-green-600 text-white font-bold px-3 py-1.5 rounded-lg text-xs hover:bg-green-500 shadow-lg shadow-green-900/20">FIM</button>
+                            </div>
                         </div>
                     </div>
 
@@ -1434,6 +1599,7 @@
             const [reportData, setReportData] = useState({ current: null, previous: null });
             const [notification, setNotification] = useState(null);
             const [isCoach, setIsCoach] = useState(false);
+            const [incomingInvite, setIncomingInvite] = useState(null);
             
             // Estado Global da Sessão Ativa
             const [activeSession, setActiveSession] = useState(null); 
@@ -1537,6 +1703,19 @@
                 return () => { if(unsubscribe) unsubscribe(); };
             }, []);
 
+            useEffect(() => {
+                if (!user) return;
+                const q = query(collection(db, 'artifacts', appId, 'invites'), where('to', '==', user.email), where('status', '==', 'pending'));
+                const unsub = onSnapshot(q, (snapshot) => {
+                    snapshot.docChanges().forEach((change) => {
+                        if (change.type === 'added') {
+                            setIncomingInvite({ id: change.doc.id, ...change.doc.data() });
+                        }
+                    });
+                });
+                return () => unsub();
+            }, [user]);
+
             // Handlers de Sessão
             const handleStartSession = (workout) => {
                 if (Notification.permission === 'default') { Notification.requestPermission(); }
@@ -1621,11 +1800,49 @@
                         <ActiveWorkout 
                             session={activeSession} 
                             user={user} 
+                            isCoach={isCoach}
+                            onUpdateSession={(updates) => setActiveSession(prev => ({...prev, ...updates}))}
                             onUpdateLog={handleUpdateSessionLog}
                             onStartTimer={handleStartTimer}
                             onFinish={handleFinishSession}
                             onBack={() => setView('dashboard')} 
                         />
+                    )}
+
+                    {incomingInvite && (
+                        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+                            <div className="bg-neutral-800 p-6 rounded-3xl border border-yellow-500 shadow-2xl max-w-sm w-full text-center">
+                                <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                                    <Users size={32} className="text-black"/>
+                                </div>
+                                <h3 className="text-2xl font-black text-white mb-2">Convite de Treino!</h3>
+                                <p className="text-neutral-300 mb-6">
+                                    <span className="text-yellow-500 font-bold">{incomingInvite.fromName}</span> convidou você para treinar agora.
+                                </p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={async () => {
+                                            await setDoc(doc(db, 'artifacts', appId, 'invites', incomingInvite.id), { status: 'rejected' }, { merge: true });
+                                            setIncomingInvite(null);
+                                        }}
+                                        className="py-3 rounded-xl bg-neutral-700 text-white font-bold"
+                                    >
+                                        Agora não
+                                    </button>
+                                    <button 
+                                        onClick={async () => {
+                                            await setDoc(doc(db, 'artifacts', appId, 'invites', incomingInvite.id), { status: 'accepted' }, { merge: true });
+                                            handleStartSession(incomingInvite.workout);
+                                            setActiveSession(prev => ({ ...prev, teamSessionId: incomingInvite.teamSessionId, host: incomingInvite.fromName }));
+                                            setIncomingInvite(null);
+                                        }}
+                                        className="py-3 rounded-xl bg-yellow-500 text-black font-bold shadow-lg shadow-yellow-900/20"
+                                    >
+                                        BORA!
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
                     
                     {view === 'edit' && (
