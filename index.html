@@ -880,26 +880,26 @@
                             className="w-full bg-transparent font-bold text-white border-b border-neutral-600 pb-1 focus:border-yellow-500 outline-none placeholder-neutral-600" 
                             placeholder="Nome do exercício"
                         />
-                        <div className="grid grid-cols-4 gap-2 text-center">
+                        <div className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Sets</label>
-                                <div className="flex items-center">
-                                    <input type="number" value={exercise.sets} onChange={e=>updateExercise(index,'sets',e.target.value)} className="w-full bg-neutral-900 rounded-l-lg p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
-                                    <button onClick={()=>updateExercise(index,'sets',(parseInt(exercise.sets)||0)+1)} className="bg-yellow-500 text-black hover:bg-yellow-400 px-2 rounded-r-lg flex items-center justify-center transition-colors self-stretch"><Plus size={16}/></button>
-                                </div>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block">Sets</label>
+                                <input type="number" value={exercise.sets} onChange={e=>updateExercise(index,'sets',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block">Reps</label>
                                 <input type="text" value={exercise.reps} onChange={e=>updateExercise(index,'reps',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Cadência</label>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block">Cadência</label>
                                 <input type="text" value={exercise.cadence} onChange={e=>updateExercise(index,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Descanso</label>
+                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block">Descanso</label>
                                 <input type="number" value={exercise.restTime} onChange={e=>updateExercise(index,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm font-bold outline-none focus:ring-1 ring-yellow-500"/>
                             </div>
+                            <button onClick={()=>updateExercise(index,'sets',(parseInt(exercise.sets)||0)+1)} className="h-[38px] w-[38px] bg-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform active:scale-90" title="Adicionar Série">
+                                <Plus size={20} className="text-black"/>
+                            </button>
                         </div>
                         <div>
                             <label className="text-[10px] text-neutral-500 uppercase font-bold">Notas</label>
