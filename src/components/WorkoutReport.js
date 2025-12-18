@@ -1,0 +1,207 @@
+"use client"
+import React, { useRef } from 'react';
+import { Download, X, TrendingUp, TrendingDown, Flame } from 'lucide-react';
+import { generateWorkoutPdf } from '@/utils/report/generatePdf';
+
+const WorkoutReport = ({ session, previousSession, onClose }) => {
+    const reportRef = useRef();
+
+    if (!session) return null;
+
+    // ... (rest of the helper functions remain the same)
+    const formatDate = (ts) => {
+        if (!ts) return '';
+        const d = ts.toDate ? ts.toDate() : new Date(ts);
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const formatDuration = (s) => {
+        const mins = Math.floor(s / 60);
+        const secs = Math.floor(s % 60);
+        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const calculateTotalVolume = (logs) => {
+        let volume = 0;
+        Object.values(logs).forEach(log => {
+            if (log.weight && log.reps) volume += (parseFloat(log.weight) * parseFloat(log.reps));
+        });
+        return volume;
+    };
+
+    const currentVolume = calculateTotalVolume(session.logs || {});
+    const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs || {}) : 0;
+    const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0;
+    const durationInMinutes = session.totalTime / 60;
+    const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
+
+    const prevLogsMap = {};
+    if (previousSession && previousSession.logs) {
+        previousSession.exercises.forEach((ex, exIdx) => {
+            const exLogs = [];
+            Object.keys(previousSession.logs).forEach(key => {
+                const [eIdx, sIdx] = key.split('-');
+                if (parseInt(eIdx) === exIdx) exLogs.push(previousSession.logs[key]);
+            });
+            prevLogsMap[ex.name] = exLogs;
+        });
+    }
+
+    const handleDownloadPDF = async () => {
+        try {
+            const blob = await generateWorkoutPdf(session, previousSession);
+            const url = URL.createObjectURL(blob);
+            const filename = `${session.workoutTitle?.replace(/\s+/g, '_') || 'Relatorio'}.pdf`;
+
+            // Windows/Edge legacy
+            if (typeof navigator !== 'undefined' && navigator.msSaveOrOpenBlob) {
+                navigator.msSaveOrOpenBlob(blob, filename);
+                return;
+            }
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+
+            // Fallback for iOS Safari (download attribute not supported)
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+            }, 1000);
+        } catch (e) {
+            alert('Não foi possível gerar o PDF: ' + e.message + '\nHabilite pop-ups/downloads para este site e tente novamente.');
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-[1000] overflow-y-auto bg-neutral-900 text-black">
+            <div className="fixed top-4 right-4 mt-safe mr-safe flex gap-2 no-print z-[1100] pointer-events-auto">
+                <button 
+                    onClick={handleDownloadPDF} 
+                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"
+                >
+                    <Download size={20} /> Salvar PDF
+                </button>
+                <button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg">
+                    <X size={20} />
+                </button>
+            </div>
+            <div ref={reportRef} className="min-h-screen bg-white text-black p-8 max-w-4xl mx-auto" style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top))' }}>
+                <div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end">
+                    <div>
+                        <h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1>
+                        <p className="text-sm font-bold uppercase tracking-widest text-neutral-500">Relatório de Performance</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-2xl font-bold">{session.workoutTitle}</p>
+                        <p className="text-neutral-600">{formatDate(session.date)}</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                        <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Total</p>
+                        <p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p>
+                    </div>
+                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                        <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p>
+                        <div className="flex items-baseline gap-2">
+                            <p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>
+                            {previousSession && (
+                                <span className={`text-xs font-bold flex items-center ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {volumeDelta >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                                    {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                        <p className="text-xs font-bold uppercase text-orange-500 mb-1 flex items-center gap-1">
+                            <Flame size={12} /> Calorias
+                        </p>
+                        <p className="text-3xl font-mono font-bold text-orange-600">~{calories}</p>
+                    </div>
+                    <div className="bg-black text-white p-4 rounded-lg">
+                        <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p>
+                        <p className="text-xl font-bold uppercase italic">CONCLUÍDO</p>
+                    </div>
+                </div>
+
+                <div className="space-y-8">
+                    {session.exercises.map((ex, exIdx) => {
+                        const prevLogs = prevLogsMap[ex.name] || [];
+                        return (
+                            <div key={exIdx} className="break-inside-avoid">
+                                <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-200 pb-2">
+                                    <h3 className="text-xl font-bold uppercase flex items-center gap-2">
+                                        <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>
+                                        {ex.name}
+                                    </h3>
+                                    <div className="flex gap-3 text-xs font-mono text-neutral-500">
+                                        {ex.method && ex.method !== 'Normal' && <span className="text-red-600 font-bold uppercase">{ex.method}</span>}
+                                        {ex.rpe && <span>RPE: <span className="font-bold text-black">{ex.rpe}</span></span>}
+                                        <span>Cad: <span className="font-bold text-black">{ex.cadence || '-'}</span></span>
+                                    </div>
+                                </div>
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="text-neutral-500 border-b border-neutral-100">
+                                            <th className="py-2 text-left w-16">Série</th>
+                                            <th className="py-2 text-center w-24">Carga</th>
+                                            <th className="py-2 text-center w-24">Reps</th>
+                                            <th className="py-2 text-center w-32">Evolução</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {Array.from({ length: parseInt(ex.sets) }).map((_, sIdx) => {
+                                            const key = `${exIdx}-${sIdx}`;
+                                            const log = session.logs[key];
+                                            const prevLog = prevLogs[sIdx];
+
+                                            if (!log || (!log.weight && !log.reps)) return null;
+
+                                            let progressionText = "-";
+                                            let rowClass = "";
+
+                                            if (prevLog && prevLog.weight) {
+                                                const delta = parseFloat(log.weight) - parseFloat(prevLog.weight);
+                                                if (delta > 0) {
+                                                    progressionText = `+${delta}kg`;
+                                                    rowClass = "bg-green-50 text-green-900 font-bold";
+                                                } else if (delta < 0) {
+                                                    progressionText = `${delta}kg`;
+                                                    rowClass = "text-red-600 font-bold";
+                                                } else {
+                                                    progressionText = "=";
+                                                }
+                                            }
+
+                                            return (
+                                                <tr key={sIdx} className="border-b border-neutral-100">
+                                                    <td className="py-3 font-mono text-neutral-500">#{sIdx + 1}</td>
+                                                    <td className="py-3 text-center font-bold text-lg">{log.weight}</td>
+                                                    <td className="py-3 text-center font-mono">{log.reps}</td>
+                                                    <td className={`py-3 text-center text-xs uppercase ${rowClass}`}>{progressionText}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        );
+                    })}
+                </div>
+                <div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">
+                    IronTracks System • {getCurrentDate()}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default WorkoutReport;

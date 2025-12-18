@@ -1,20 +1,32 @@
 {
   "name": "iron-tracks",
-  "version": "0.1.0",
+  "version": "2.4.14",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deploy": "git config user.email \"djmkapple@gmail.com\" && npx vercel --prod",
+    "postversion": "git config user.email \"djmkapple@gmail.com\" && npx vercel --prod"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.87.3",
+    "chart.js": "^4.5.1",
+    "framer-motion": "^12.23.26",
+    "html2pdf.js": "^0.12.1",
+    "lucide-react": "^0.559.0",
     "next": "16.0.8",
+    "pdf-lib": "^1.17.1",
+    "puppeteer": "^22.15.0",
     "react": "19.2.1",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/react": "19.2.7",
     "eslint": "^9",
     "eslint-config-next": "16.0.8",
     "tailwindcss": "^4"
