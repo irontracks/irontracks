@@ -191,7 +191,6 @@ GRANT SELECT ON assessments TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON assessments TO authenticated;
 GRANT SELECT ON assessment_photos TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON assessment_photos TO authenticated;
-GRANT USAGE ON SEQUENCE assessment_photos_id_seq TO authenticated;
 
 -- Habilitar Realtime para atualizações em tempo real
 ALTER TABLE assessments REPLICA IDENTITY FULL;

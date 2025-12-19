@@ -36,12 +36,12 @@ export default function AssessmentButton({
 
   if (showForm) {
     return (
-      <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto relative" onClick={(e) => e.stopPropagation()}>
-          <div className="absolute top-3 right-3">
+      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-20" onClick={() => setShowForm(false)}>
+        <div className="bg-neutral-900 rounded-xl border border-neutral-800 max-w-4xl w-full max-h-[90vh] overflow-y-auto relative custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute top-3 right-3 z-10">
             <button
               onClick={() => setShowForm(false)}
-              className="p-2 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-700"
+              className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white transition-colors"
               aria-label="Fechar"
             >
               <X className="w-5 h-5" />
@@ -60,25 +60,25 @@ export default function AssessmentButton({
 
   if (variant === 'card') {
     return (
-      <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${className}`}>
+      <div className={`bg-neutral-800 rounded-xl border border-neutral-700 p-6 ${className}`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Avaliações Físicas</h3>
-          <TrendingUp className="w-6 h-6 text-blue-500" />
+          <h3 className="text-lg font-bold text-white">Avaliações Físicas</h3>
+          <TrendingUp className="w-6 h-6 text-yellow-500" />
         </div>
-        <p className="text-gray-600 mb-4">
+        <p className="text-neutral-400 mb-4">
           Gerencie as avaliações físicas e acompanhe a evolução do aluno
         </p>
         <div className="flex gap-3">
           <button
             onClick={handleNewAssessment}
-            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
             Nova Avaliação
           </button>
           <button
             onClick={handleViewHistory}
-            className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-300 rounded-xl border border-neutral-700 hover:bg-neutral-800 transition-colors"
           >
             <FileText className="w-4 h-4 mr-2" />
             Ver Histórico
@@ -93,14 +93,14 @@ export default function AssessmentButton({
       <div className={`flex gap-2 ${className}`}>
         <button
           onClick={handleNewAssessment}
-          className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          className="p-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 transition-colors"
           title="Nova Avaliação"
         >
           <Plus className="w-4 h-4" />
         </button>
         <button
           onClick={handleViewHistory}
-          className="p-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          className="p-2 bg-neutral-900 text-neutral-300 rounded-xl border border-neutral-700 hover:bg-neutral-800 transition-colors"
           title="Ver Histórico"
         >
           <FileText className="w-4 h-4" />
@@ -113,14 +113,14 @@ export default function AssessmentButton({
     <div className={`flex gap-3 ${className}`}>
       <button
         onClick={handleNewAssessment}
-        className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        className="inline-flex items-center px-4 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
       >
         <Plus className="w-4 h-4 mr-2" />
         Nova Avaliação
       </button>
       <button
         onClick={handleViewHistory}
-        className="inline-flex items-center px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+        className="inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-300 rounded-xl border border-neutral-700 hover:bg-neutral-800 transition-colors"
       >
         <FileText className="w-4 h-4 mr-2" />
         Histórico

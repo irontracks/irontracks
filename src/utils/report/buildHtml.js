@@ -1,4 +1,4 @@
-export function buildReportHTML(session, previousSession) {
+export function buildReportHTML(session, previousSession, studentName = '') {
   const formatDate = (ts) => {
     if (!ts) return ''
     const d = ts.toDate ? ts.toDate() : new Date(ts)
@@ -20,6 +20,7 @@ export function buildReportHTML(session, previousSession) {
   const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0
   const volumeDelta = prevVolume > 0 ? (((currentVolume - prevVolume) / prevVolume) * 100).toFixed(1) : '0.0'
   const durationInMinutes = (session.totalTime || 0) / 60
+  const realTotalTime = (session.realTotalTime || (Array.isArray(session.exerciseDurations) ? session.exerciseDurations.reduce((a,b)=>a+(b||0),0) : 0))
   const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
 
   const prevLogsMap = {}
@@ -117,6 +118,7 @@ export function buildReportHTML(session, previousSession) {
           <div style="text-align:right">
             <div style="font-size:20px; font-weight:800">${session.workoutTitle || 'Treino'}</div>
             <div style="color:#6b7280">${formatDate(session.date)}</div>
+            ${studentName ? `<div style="color:#6b7280; font-size:12px; text-transform:uppercase; letter-spacing:.08em">Aluno: <span style="color:#111; font-weight:700">${studentName}</span></div>` : ''}
           </div>
         </div>
 
@@ -124,6 +126,10 @@ export function buildReportHTML(session, previousSession) {
           <div class="card">
             <div class="muted" style="margin-bottom:4px">Tempo Total</div>
             <div style="font-size:28px; font-family: ui-monospace; font-weight:800">${formatDuration(session.totalTime || 0)}</div>
+          </div>
+          <div class="card">
+            <div class="muted" style="margin-bottom:4px">Tempo Real</div>
+            <div style="font-size:28px; font-family: ui-monospace; font-weight:800">${formatDuration(realTotalTime || 0)}</div>
           </div>
           <div class="card">
             <div class="muted" style="margin-bottom:4px">Volume (Kg)</div>
@@ -149,4 +155,3 @@ export function buildReportHTML(session, previousSession) {
     </body>
   </html>`
 }
-

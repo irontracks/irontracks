@@ -111,18 +111,18 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Dobras Cutâneas</h2>
-        <p className="text-gray-600">
-          Medição das 7 dobras cutâneas de <span className="font-semibold">{studentName}</span> para análise de composição corporal
+        <h2 className="text-2xl font-bold text-white mb-2">Dobras Cutâneas</h2>
+        <p className="text-neutral-400">
+          Medição das 7 dobras cutâneas de <span className="font-semibold text-white">{studentName}</span> para análise de composição corporal
         </p>
       </div>
 
       {/* Informações Importantes */}
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4">
         <div className="flex items-start">
-          <AlertTriangle className="w-5 h-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-red-800">
-            <p className="font-medium mb-2">Importante - Precisão é fundamental:</p>
+          <AlertTriangle className="w-5 h-5 text-red-500 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-red-300">
+            <p className="font-bold mb-2">Importante - Precisão é fundamental:</p>
             <ul className="space-y-1">
               <li>• Use um adipômetro calibrado e em bom estado</li>
               <li>• Pegue a dobra com o polegar e indicador, 1 cm acima do local de medição</li>
@@ -135,11 +135,11 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       </div>
 
       {/* Técnica de Medição */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
         <div className="flex items-start">
-          <Info className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-2">Técnica correta:</p>
+          <Info className="w-5 h-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-300">
+            <p className="font-bold mb-2">Técnica correta:</p>
             <ol className="space-y-1 list-decimal list-inside">
               <li>Marque o local anatômico correto</li>
               <li>Pegue a dobra com polegar e indicador, separando bem a pele e gordura subcutânea</li>
@@ -156,21 +156,25 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
         {skinfolds.map((skinfold, index) => {
           const status = getSkinfoldStatus(formData[skinfold.field]);
           return (
-            <div key={skinfold.field} className={`p-4 rounded-lg border-2 transition-all duration-200 ${getStatusColor(status)}`}>
+            <div key={skinfold.field} className={`p-4 rounded-xl border transition-all duration-200 ${status === 'normal' ? 'border-green-500/30 bg-green-900/10' :
+                status === 'low' || status === 'high' ? 'border-yellow-500/30 bg-yellow-900/10' :
+                  status === 'very-low' || status === 'very-high' ? 'border-red-500/30 bg-red-900/10' :
+                    'border-neutral-700 bg-neutral-800'
+              }`}>
               <div className="space-y-3">
                 {/* Header da dobra */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
-                    <Ruler className="w-4 h-4 text-gray-400 mr-2" />
-                    <label className="block text-sm font-medium text-gray-700">
+                    <Ruler className="w-4 h-4 text-neutral-400 mr-2" />
+                    <label className="block text-sm font-bold text-neutral-300">
                       {skinfold.label}
                     </label>
                   </div>
-                  <span className="text-xs font-medium px-2 py-1 rounded bg-gray-100 text-gray-600">
+                  <span className="text-xs font-medium px-2 py-1 rounded bg-neutral-700 text-neutral-300">
                     {skinfold.location}
                   </span>
                 </div>
-                
+
                 {/* Campo de entrada */}
                 <div className="relative">
                   <input
@@ -179,36 +183,33 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
                     value={formData[skinfold.field]}
                     onChange={(e) => handleNumberInput(skinfold.field, e.target.value)}
                     placeholder={skinfold.placeholder}
-                    className={`w-full px-3 py-2 pr-12 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-600 text-gray-900 bg-white ${
-                      errors[skinfold.field] ? 'border-red-300' : 'border-gray-300'
-                    }`}
+                    className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${errors[skinfold.field] ? 'border-red-500' : 'border-neutral-700'
+                      }`}
                   />
-                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 text-sm">mm</span>
+                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
                 </div>
-                
+
                 {/* Descrição */}
-                <p className="text-xs text-gray-500">{skinfold.description}</p>
-                
+                <p className="text-xs text-neutral-500">{skinfold.description}</p>
+
                 {/* Status */}
                 {status !== 'empty' && (
                   <div className="flex items-center">
-                    <div className={`w-2 h-2 rounded-full mr-2 ${
-                      status === 'normal' ? 'bg-green-500' :
-                      status === 'low' || status === 'high' ? 'bg-yellow-500' :
-                      'bg-red-500'
-                    }`} />
-                    <span className={`text-xs font-medium ${
-                      status === 'normal' ? 'text-green-700' :
-                      status === 'low' || status === 'high' ? 'text-yellow-700' :
-                      'text-red-700'
-                    }`}>
+                    <div className={`w-2 h-2 rounded-full mr-2 ${status === 'normal' ? 'bg-green-500' :
+                        status === 'low' || status === 'high' ? 'bg-yellow-500' :
+                          'bg-red-500'
+                      }`} />
+                    <span className={`text-xs font-bold ${status === 'normal' ? 'text-green-400' :
+                        status === 'low' || status === 'high' ? 'text-yellow-400' :
+                          'text-red-400'
+                      }`}>
                       {getStatusText(status)}
                     </span>
                   </div>
                 )}
-                
+
                 {errors[skinfold.field] && (
-                  <p className="text-sm text-red-600">{errors[skinfold.field]}</p>
+                  <p className="text-sm text-red-500">{errors[skinfold.field]}</p>
                 )}
               </div>
             </div>
@@ -217,28 +218,28 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       </div>
 
       {/* Valores de Referência */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Valores de Referência (mm):</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-gray-600">
+      <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+        <h3 className="text-sm font-bold text-white mb-3">Valores de Referência (mm):</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-neutral-400">
           <div>
-            <p className="font-medium">Homens:</p>
+            <p className="font-bold text-neutral-300">Homens:</p>
             <p>8-20: Baixo</p>
             <p>20-35: Normal</p>
             <p>35+: Elevado</p>
           </div>
           <div>
-            <p className="font-medium">Mulheres:</p>
+            <p className="font-bold text-neutral-300">Mulheres:</p>
             <p>12-25: Baixo</p>
             <p>25-40: Normal</p>
             <p>40+: Elevado</p>
           </div>
           <div>
-            <p className="font-medium">Atletas:</p>
+            <p className="font-bold text-neutral-300">Atletas:</p>
             <p>Homens: 5-15</p>
             <p>Mulheres: 8-20</p>
           </div>
           <div>
-            <p className="font-medium">Geral:</p>
+            <p className="font-bold text-neutral-300">Geral:</p>
             <p>Mínimo: 3mm</p>
             <p>Máximo: 50mm</p>
           </div>
@@ -246,9 +247,9 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       </div>
 
       {/* Dicas Finais */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-yellow-900 mb-2">Dicas para melhor precisão:</h3>
-        <ul className="text-sm text-yellow-800 space-y-1">
+      <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-yellow-500 mb-2">Dicas para melhor precisão:</h3>
+        <ul className="text-sm text-yellow-400/80 space-y-1">
           <li>• Treine a técnica antes de começar as medições oficiais</li>
           <li>• Se possível, tenha um assistente para ajudar com as dobras difíceis</li>
           <li>• Meça em ambiente com temperatura estável (20-22°C ideal)</li>
@@ -260,7 +261,7 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
 
       {/* Observações */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-bold text-neutral-300">
           Observações sobre as dobras (opcional)
         </label>
         <textarea
@@ -268,9 +269,9 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
           onChange={(e) => updateFormData({ observations: e.target.value })}
           rows={3}
           placeholder="Anote aqui dificuldades na medição, qualidade da pele, ou outras observações relevantes..."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600"
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-neutral-500">
           Ex: "Dificuldade na dobra subescapular devido a tensão muscular", "Pele muito fina no tricipital"
         </p>
       </div>

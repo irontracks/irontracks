@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Download, Save, ArrowLeft, User, Ruler, Calculator, TrendingUp } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
-import { 
+import {
   calculateSumSkinfolds,
   calculateBodyDensity,
   calculateBodyFatPercentage,
@@ -97,61 +97,61 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
       className="space-y-6"
     >
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Resultados da Avaliação</h2>
-        <p className="text-gray-600">Confira os resultados antes de salvar</p>
+        <h2 className="text-2xl font-bold text-white mb-2">Resultados da Avaliação</h2>
+        <p className="text-neutral-400">Confira os resultados antes de salvar</p>
       </div>
 
       {/* Informações Básicas */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
         <div className="flex items-center mb-4">
-          <User className="w-5 h-5 text-gray-400 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-900">Informações do Aluno</h3>
+          <User className="w-5 h-5 text-yellow-500 mr-2" />
+          <h3 className="text-lg font-bold text-white">Informações do Aluno</h3>
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Nome</p>
-            <p className="font-medium">{studentName}</p>
+            <p className="text-sm text-neutral-400">Nome</p>
+            <p className="font-medium text-white">{studentName}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Data da Avaliação</p>
-            <p className="font-medium">{formatDate(new Date())}</p>
+            <p className="text-sm text-neutral-400">Data da Avaliação</p>
+            <p className="font-medium text-white">{formatDate(new Date())}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Idade</p>
-            <p className="font-medium">{formData.age} anos</p>
+            <p className="text-sm text-neutral-400">Idade</p>
+            <p className="font-medium text-white">{formData.age} anos</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Gênero</p>
-            <p className="font-medium">{formData.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
+            <p className="text-sm text-neutral-400">Gênero</p>
+            <p className="font-medium text-white">{formData.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
           </div>
         </div>
       </div>
 
       {/* Medidas Antropométricas */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
         <div className="flex items-center mb-4">
-          <Ruler className="w-5 h-5 text-gray-400 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-900">Medidas Antropométricas</h3>
+          <Ruler className="w-5 h-5 text-yellow-500 mr-2" />
+          <h3 className="text-lg font-bold text-white">Medidas Antropométricas</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">Peso</p>
-            <p className="text-xl font-bold text-blue-600">{formData.weight} kg</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-lg">
+            <p className="text-sm text-neutral-400">Peso</p>
+            <p className="text-xl font-bold text-white">{formData.weight} kg</p>
           </div>
-          <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">Altura</p>
-            <p className="text-xl font-bold text-blue-600">{formData.height} cm</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-lg">
+            <p className="text-sm text-neutral-400">Altura</p>
+            <p className="text-xl font-bold text-white">{formData.height} cm</p>
           </div>
-          <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">IMC</p>
-            <p className="text-xl font-bold text-blue-600">{results.bmi.toFixed(1)}</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-lg">
+            <p className="text-sm text-neutral-400">IMC</p>
+            <p className="text-xl font-bold text-white">{results.bmi.toFixed(1)}</p>
             <p className={`text-xs font-medium ${getClassificationColor(results.bmiClassification)}`}>
               {results.bmiClassification}
             </p>
           </div>
-          <div className="text-center p-3 bg-gray-50 rounded-lg">
-            <p className="text-sm text-gray-600">Circunferências</p>
-            <p className="text-xs text-gray-500">{[
+          <div className="text-center p-3 bg-neutral-900 rounded-lg">
+            <p className="text-sm text-neutral-400">Circunferências</p>
+            <p className="text-xs text-neutral-500">{[
               formData.arm_circ,
               formData.chest_circ,
               formData.waist_circ,
@@ -164,36 +164,36 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
       </div>
 
       {/* Composição Corporal */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
+      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
         <div className="flex items-center mb-4">
-          <Calculator className="w-5 h-5 text-gray-400 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-900">Composição Corporal</h3>
+          <Calculator className="w-5 h-5 text-yellow-500 mr-2" />
+          <h3 className="text-lg font-bold text-white">Composição Corporal</h3>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-gray-600">% Gordura</p>
-            <p className="text-2xl font-bold text-blue-600">{results.bodyComposition.bodyFatPercentage.toFixed(1)}%</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
+            <p className="text-sm text-neutral-400">% Gordura</p>
+            <p className="text-2xl font-bold text-white">{results.bodyComposition.bodyFatPercentage.toFixed(1)}%</p>
             <p className={`text-xs font-medium ${getClassificationColor(results.bodyFatClassification)}`}>
               {results.bodyFatClassification}
             </p>
           </div>
-          <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-sm text-gray-600">Massa Magra</p>
-            <p className="text-2xl font-bold text-green-600">{results.leanMass.toFixed(1)} kg</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
+            <p className="text-sm text-neutral-400">Massa Magra</p>
+            <p className="text-2xl font-bold text-green-400">{results.leanMass.toFixed(1)} kg</p>
           </div>
-          <div className="text-center p-3 bg-orange-50 rounded-lg border border-orange-200">
-            <p className="text-sm text-gray-600">Massa Gorda</p>
-            <p className="text-2xl font-bold text-orange-600">{results.fatMass.toFixed(1)} kg</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
+            <p className="text-sm text-neutral-400">Massa Gorda</p>
+            <p className="text-2xl font-bold text-red-400">{results.fatMass.toFixed(1)} kg</p>
           </div>
-          <div className="text-center p-3 bg-purple-50 rounded-lg border border-purple-200">
-            <p className="text-sm text-gray-600">Taxa Metabólica Basal</p>
-            <p className="text-xl font-bold text-purple-600">{results.bmr.toFixed(0)} kcal</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
+            <p className="text-sm text-neutral-400">Taxa Metabólica Basal</p>
+            <p className="text-xl font-bold text-yellow-400">{results.bmr.toFixed(0)} kcal</p>
           </div>
         </div>
 
         {/* Dobra Cutâneas */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h4 className="font-medium text-gray-900 mb-3">Dobras Cutâneas (mm)</h4>
+        <div className="bg-neutral-900 rounded-xl p-4">
+          <h4 className="font-bold text-white mb-3">Dobras Cutâneas (mm)</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             {[
               ['Tricipital', formData.triceps_skinfold],
@@ -205,16 +205,16 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
               ['Panturrilha', formData.calf_skinfold]
             ].filter(([_, v]) => !!v).map(([label, value]) => (
               <div key={String(label)} className="flex justify-between">
-                <span className="text-gray-600 capitalize">{label}:</span>
-                <span className="font-medium">{value} mm</span>
+                <span className="text-neutral-400 capitalize">{label}:</span>
+                <span className="font-medium text-white">{value} mm</span>
               </div>
             ))}
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
-              Soma das dobras: <span className="font-medium">{results.bodyComposition.sumOfSkinfolds.toFixed(1)} mm</span>
+          <div className="mt-3 pt-3 border-t border-neutral-700">
+            <p className="text-sm text-neutral-400">
+              Soma das dobras: <span className="font-medium text-white">{results.bodyComposition.sumOfSkinfolds.toFixed(1)} mm</span>
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-neutral-500 mt-1">
               Calculado usando fórmula de Pollock para 7 dobras cutâneas
             </p>
           </div>
@@ -230,34 +230,34 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
         formData.thigh_circ,
         formData.calf_circ
       ].some(Boolean) && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center mb-4">
-            <TrendingUp className="w-5 h-5 text-gray-400 mr-2" />
-            <h3 className="text-lg font-semibold text-gray-900">Circunferências (cm)</h3>
+          <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
+            <div className="flex items-center mb-4">
+              <TrendingUp className="w-5 h-5 text-yellow-500 mr-2" />
+              <h3 className="text-lg font-bold text-white">Circunferências (cm)</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                ['Braço', formData.arm_circ],
+                ['Tórax', formData.chest_circ],
+                ['Cintura', formData.waist_circ],
+                ['Quadril', formData.hip_circ],
+                ['Coxa', formData.thigh_circ],
+                ['Panturrilha', formData.calf_circ]
+              ].filter(([_, v]) => !!v).map(([label, value]) => (
+                <div key={String(label)} className="text-center p-3 bg-neutral-900 rounded-lg">
+                  <p className="text-sm text-neutral-400 capitalize">{label}</p>
+                  <p className="text-lg font-bold text-white">{value} cm</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[
-              ['Braço', formData.arm_circ],
-              ['Tórax', formData.chest_circ],
-              ['Cintura', formData.waist_circ],
-              ['Quadril', formData.hip_circ],
-              ['Coxa', formData.thigh_circ],
-              ['Panturrilha', formData.calf_circ]
-            ].filter(([_, v]) => !!v).map(([label, value]) => (
-              <div key={String(label)} className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 capitalize">{label}</p>
-                <p className="text-lg font-bold text-gray-900">{value} cm</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        )}
 
       {/* Ações */}
       <div className="flex justify-between pt-6">
         <button
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors flex items-center"
+          className="px-6 py-2 border border-neutral-700 rounded-xl text-neutral-300 hover:bg-neutral-800 transition-colors flex items-center"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
@@ -280,14 +280,14 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
                 console.error('Erro ao gerar PDF da avaliação', e);
               }
             }}
-            className="px-6 py-2 border border-blue-300 rounded-lg text-blue-700 hover:bg-blue-50 transition-colors flex items-center"
+            className="px-6 py-2 border border-yellow-500/30 rounded-xl text-yellow-500 hover:bg-yellow-500/10 transition-colors flex items-center"
           >
             <Download className="w-4 h-4 mr-2" />
             Gerar PDF
           </button>
           <button
             onClick={onSave}
-            className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center"
+            className="px-6 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors flex items-center shadow-lg shadow-yellow-900/20"
           >
             <Save className="w-4 h-4 mr-2" />
             Salvar Avaliação
@@ -295,7 +295,7 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
         </div>
       </div>
 
-      <p className="text-sm text-gray-500 text-center">
+      <p className="text-sm text-neutral-500 text-center">
         Os resultados serão salvos no perfil do aluno e poderão ser acessados posteriormente
       </p>
     </motion.div>

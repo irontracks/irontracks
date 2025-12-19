@@ -14,3 +14,4 @@ CREATE POLICY "Authenticated manage own trainer assessments" ON public.assessmen
 CREATE POLICY "Authenticated delete own trainer assessments" ON public.assessments
   FOR DELETE
   USING (trainer_id = auth.uid());
+

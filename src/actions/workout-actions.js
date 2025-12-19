@@ -188,12 +188,12 @@ export async function importData(jsonData) {
             }
         }
     }
-    
+
     // 2. Import History? (Optional but requested "Importar JSON para Supabase")
     // The backup contains 'history'. Ideally we should import it too.
     if (jsonData.history) {
         for (const h of jsonData.history) {
-             const { data: newH, error: hErr } = await supabase.from('workouts').insert({
+            const { data: newH, error: hErr } = await supabase.from('workouts').insert({
                 user_id: user.id,
                 name: h.workoutTitle || "Treino Realizado",
                 date: h.date?.seconds ? new Date(h.date.seconds * 1000) : new Date(),

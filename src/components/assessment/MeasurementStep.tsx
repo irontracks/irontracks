@@ -66,18 +66,18 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Medidas Corporais</h2>
-        <p className="text-gray-600">
-          Registre as circunferências corporais de <span className="font-semibold">{studentName}</span>
+        <h2 className="text-2xl font-bold text-white mb-2">Medidas Corporais</h2>
+        <p className="text-neutral-400">
+          Registre as circunferências corporais de <span className="font-semibold text-white">{studentName}</span>
         </p>
       </div>
 
       {/* Informações de Medição */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
         <div className="flex items-start">
-          <Info className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-800">
-            <p className="font-medium mb-2">Orientações para medição:</p>
+          <Info className="w-5 h-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-300">
+            <p className="font-bold mb-2">Orientações para medição:</p>
             <ul className="space-y-1">
               <li>• Use fita métrica flexível e não elástica</li>
               <li>• O aluno deve estar em pé, relaxado, com respiração normal</li>
@@ -93,13 +93,13 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
         {measurements.map((measurement, index) => (
           <div key={measurement.field} className="space-y-3">
             <div className="flex items-center">
-              <Ruler className="w-4 h-4 text-gray-400 mr-2" />
-              <label className="block text-sm font-medium text-gray-700">
+              <Ruler className="w-4 h-4 text-yellow-500 mr-2" />
+              <label className="block text-sm font-bold text-neutral-300">
                 {measurement.label}
               </label>
-              <span className="ml-2 text-xs text-gray-400">(cm)</span>
+              <span className="ml-2 text-xs text-neutral-500">(cm)</span>
             </div>
-            
+
             <div className="relative">
               <input
                 type="text"
@@ -107,57 +107,56 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
                 value={formData[measurement.field]}
                 onChange={(e) => handleNumberInput(measurement.field, e.target.value)}
                 placeholder={measurement.placeholder}
-                className={`w-full px-3 py-2 pr-12 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder:text-gray-600 text-gray-900 bg-white ${
-                  errors[measurement.field] ? 'border-red-300' : 'border-gray-300'
-                }`}
+                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${errors[measurement.field] ? 'border-red-500' : 'border-neutral-700'
+                  }`}
               />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 text-sm">cm</span>
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
             </div>
-            
-            <p className="text-xs text-gray-500">{measurement.description}</p>
-            
+
+            <p className="text-xs text-neutral-500">{measurement.description}</p>
+
             {errors[measurement.field] && (
-              <p className="text-sm text-red-600">{errors[measurement.field]}</p>
+              <p className="text-sm text-red-500">{errors[measurement.field]}</p>
             )}
           </div>
         ))}
       </div>
 
       {/* Valores de Referência */}
-      <div className="bg-gray-50 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Valores de Referência:</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs text-gray-600">
+      <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+        <h3 className="text-sm font-bold text-white mb-3">Valores de Referência:</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-xs text-neutral-400">
           <div>
-            <p className="font-medium">Braço:</p>
+            <p className="font-bold text-neutral-300">Braço:</p>
             <p>20-50 cm</p>
           </div>
           <div>
-            <p className="font-medium">Tórax:</p>
+            <p className="font-bold text-neutral-300">Tórax:</p>
             <p>70-130 cm</p>
           </div>
           <div>
-            <p className="font-medium">Cintura:</p>
+            <p className="font-bold text-neutral-300">Cintura:</p>
             <p>60-120 cm</p>
           </div>
           <div>
-            <p className="font-medium">Quadril:</p>
+            <p className="font-bold text-neutral-300">Quadril:</p>
             <p>70-140 cm</p>
           </div>
           <div>
-            <p className="font-medium">Coxa:</p>
+            <p className="font-bold text-neutral-300">Coxa:</p>
             <p>40-80 cm</p>
           </div>
           <div>
-            <p className="font-medium">Panturrilha:</p>
+            <p className="font-bold text-neutral-300">Panturrilha:</p>
             <p>25-50 cm</p>
           </div>
         </div>
       </div>
 
       {/* Dicas de Precisão */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="text-sm font-medium text-yellow-900 mb-2">Dicas para maior precisão:</h3>
-        <ul className="text-sm text-yellow-800 space-y-1">
+      <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-yellow-500 mb-2">Dicas para maior precisão:</h3>
+        <ul className="text-sm text-yellow-400/80 space-y-1">
           <li>• Sempre meça do mesmo lado do corpo (preferencialmente lado direito)</li>
           <li>• Para cintura, meça no ponto médio entre a última costela e a crista ilíaca</li>
           <li>• Para quadril, meça no ponto de maior protuberância dos glúteos</li>
@@ -168,7 +167,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
 
       {/* Observações */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-bold text-neutral-300">
           Observações (opcional)
         </label>
         <textarea
@@ -176,9 +175,9 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
           onChange={(e) => updateFormData({ observations: e.target.value })}
           rows={3}
           placeholder="Anote aqui qualquer observação relevante sobre as medições, condições do aluno, etc."
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600"
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-neutral-500">
           Ex: "Aluno estava resfriado", "Medições tomadas pela manhã", "Equipamento calibrado em..."
         </p>
       </div>

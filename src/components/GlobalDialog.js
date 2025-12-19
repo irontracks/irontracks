@@ -10,7 +10,6 @@ const GlobalDialog = () => {
     useEffect(() => {
         if (dialog?.type === 'prompt') {
             setPromptValue(dialog.defaultValue || '');
-            // Focus input after render
             setTimeout(() => inputRef.current?.focus(), 100);
         }
     }, [dialog]);
@@ -44,7 +43,6 @@ const GlobalDialog = () => {
     return (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-scale-in">
-                {/* Header */}
                 <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-800/50">
                     <h3 className="font-bold text-white flex items-center gap-2">
                         {getIcon()}
@@ -55,7 +53,6 @@ const GlobalDialog = () => {
                     </button>
                 </div>
 
-                {/* Body */}
                 <div className="p-6">
                     <p className="text-neutral-300 text-center text-sm leading-relaxed whitespace-pre-line mb-4">
                         {dialog.message}
@@ -73,7 +70,6 @@ const GlobalDialog = () => {
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="p-4 bg-neutral-950/50 flex gap-3">
                     {(dialog.type === 'confirm' || dialog.type === 'prompt') && (
                         <button
@@ -96,3 +92,4 @@ const GlobalDialog = () => {
 };
 
 export default GlobalDialog;
+

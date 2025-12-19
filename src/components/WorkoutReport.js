@@ -1,14 +1,32 @@
 "use client"
-import React, { useRef } from 'react';
-import { Download, X, TrendingUp, TrendingDown, Flame } from 'lucide-react';
-import { generateWorkoutPdf } from '@/utils/report/generatePdf';
+import React, { useRef, useState, useEffect } from 'react';
+import { Download, X, TrendingUp, TrendingDown, Flame, FileText, Code } from 'lucide-react';
+import { buildReportHTML } from '@/utils/report/buildHtml';
 
-const WorkoutReport = ({ session, previousSession, onClose }) => {
+const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const reportRef = useRef();
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
+    const [pdfUrl, setPdfUrl] = useState(null);
+    const [pdfBlob, setPdfBlob] = useState(null);
+    const pdfFrameRef = useRef(null);
+
+    useEffect(() => {
+        const onAfterPrint = () => { setIsGenerating(false); };
+        const onFocus = () => { setIsGenerating(false); };
+        const onVisibility = () => { if (!document.hidden) setIsGenerating(false); };
+        window.addEventListener('afterprint', onAfterPrint);
+        window.addEventListener('focus', onFocus);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            window.removeEventListener('afterprint', onAfterPrint);
+            window.removeEventListener('focus', onFocus);
+            document.removeEventListener('visibilitychange', onVisibility);
+        };
+    }, []);
 
     if (!session) return null;
 
-    // ... (rest of the helper functions remain the same)
     const formatDate = (ts) => {
         if (!ts) return '';
         const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -51,42 +69,101 @@ const WorkoutReport = ({ session, previousSession, onClose }) => {
 
     const handleDownloadPDF = async () => {
         try {
-            const blob = await generateWorkoutPdf(session, previousSession);
+            setIsGenerating(true);
+            const html = buildReportHTML(session, previousSession, user?.displayName || user?.email || '');
+            const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
-            const filename = `${session.workoutTitle?.replace(/\s+/g, '_') || 'Relatorio'}.pdf`;
+            setPdfBlob(blob);
+            setPdfUrl(url);
+        } catch (e) {
+            alert('Não foi possível abrir impressão: ' + e.message + '\nPermita pop-ups para este site.');
+        } finally {
+            setIsGenerating(false);
+            setTimeout(() => setIsGenerating(false), 500);
+        }
+    };
 
-            // Windows/Edge legacy
-            if (typeof navigator !== 'undefined' && navigator.msSaveOrOpenBlob) {
-                navigator.msSaveOrOpenBlob(blob, filename);
+    const closePreview = () => {
+        try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch {}
+        setPdfUrl(null);
+        setPdfBlob(null);
+    };
+
+    const handlePrintIframe = () => {
+        try { pdfFrameRef.current?.contentWindow?.print(); } catch {}
+    };
+
+    const handleShare = async () => {
+        try {
+            const title = 'Relatório IronTracks';
+            if (navigator.share) {
+                if (pdfBlob && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], 'relatorio-irontracks.html', { type: 'text/html' })] })) {
+                    const file = new File([pdfBlob], 'relatorio-irontracks.html', { type: 'text/html' });
+                    await navigator.share({ files: [file], title });
+                    return;
+                }
+                await navigator.share({ title, url: pdfUrl });
                 return;
             }
-
             const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            a.rel = 'noopener';
+            a.href = pdfUrl;
+            a.download = 'relatorio-irontracks.html';
             document.body.appendChild(a);
             a.click();
             a.remove();
+        } catch ( e) {
+            alert('Não foi possível compartilhar. Baixei o arquivo para você.\n+Abra com seu gerenciador e compartilhe.');
+            try {
+                const a = document.createElement('a');
+                a.href = pdfUrl;
+                a.download = 'relatorio-irontracks.html';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch {}
+        }
+    };
 
-            // Fallback for iOS Safari (download attribute not supported)
-            setTimeout(() => {
-                URL.revokeObjectURL(url);
-            }, 1000);
-        } catch (e) {
-            alert('Não foi possível gerar o PDF: ' + e.message + '\nHabilite pop-ups/downloads para este site e tente novamente.');
+    const handleDownloadJson = () => {
+        try {
+            const payload = session || {};
+            const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(payload, null, 2))}`;
+            const link = document.createElement('a');
+            link.href = jsonString;
+            const baseName = (session.workoutTitle || 'Treino');
+            link.download = `${baseName}_${new Date().toISOString()}.json`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } finally {
+            setShowExportMenu(false);
         }
     };
 
     return (
         <div className="fixed inset-0 z-[1000] overflow-y-auto bg-neutral-900 text-black">
-            <div className="fixed top-4 right-4 mt-safe mr-safe flex gap-2 no-print z-[1100] pointer-events-auto">
-                <button 
-                    onClick={handleDownloadPDF} 
-                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"
-                >
-                    <Download size={20} /> Salvar PDF
-                </button>
+            <div className={`fixed top-4 right-4 mt-safe mr-safe flex gap-2 no-print z-[1100] pointer-events-auto ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="relative">
+                    <button
+                        onClick={() => setShowExportMenu(v => !v)}
+                        className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
+                    >
+                        <Download size={16} />
+                        <span className="text-sm font-medium">Salvar</span>
+                    </button>
+                    {showExportMenu && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-lg shadow-xl overflow-hidden">
+                            <button onClick={() => { setShowExportMenu(false); handleDownloadPDF(); }} className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm text-gray-800 hover:bg-gray-50">
+                                <FileText size={16} className="text-gray-600" />
+                                <span>Salvar PDF</span>
+                            </button>
+                            <button onClick={handleDownloadJson} className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm text-gray-800 hover:bg-gray-50">
+                                <Code size={16} className="text-gray-600" />
+                                <span>Salvar JSON</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
                 <button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg">
                     <X size={20} />
                 </button>
@@ -133,7 +210,12 @@ const WorkoutReport = ({ session, previousSession, onClose }) => {
                 </div>
 
                 <div className="space-y-8">
-                    {session.exercises.map((ex, exIdx) => {
+                    {(!Array.isArray(session.exercises) || session.exercises.length === 0) && (
+                        <div className="text-neutral-500 p-4 bg-neutral-100 rounded-lg border border-neutral-200">
+                            Nenhum dado de exercício registrado para este treino.
+                        </div>
+                    )}
+                    {(Array.isArray(session.exercises) ? session.exercises : []).map((ex, exIdx) => {
                         const prevLogs = prevLogsMap[ex.name] || [];
                         return (
                             <div key={exIdx} className="break-inside-avoid">
@@ -158,9 +240,9 @@ const WorkoutReport = ({ session, previousSession, onClose }) => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {Array.from({ length: parseInt(ex.sets) }).map((_, sIdx) => {
+                                        {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => {
                                             const key = `${exIdx}-${sIdx}`;
-                                            const log = session.logs[key];
+                                            const log = (session.logs || {})[key];
                                             const prevLog = prevLogs[sIdx];
 
                                             if (!log || (!log.weight && !log.reps)) return null;
@@ -200,6 +282,22 @@ const WorkoutReport = ({ session, previousSession, onClose }) => {
                     IronTracks System • {getCurrentDate()}
                 </div>
             </div>
+
+            {pdfUrl && (
+                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur flex flex-col">
+                    <div className="p-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between h-16 pt-safe">
+                        <h3 className="text-white font-bold">Pré-visualização</h3>
+                        <button onClick={closePreview} className="bg-white text-black px-4 py-2 rounded-lg font-bold">Fechar</button>
+                    </div>
+                    <div className="flex-1 bg-white">
+                        <iframe ref={pdfFrameRef} src={pdfUrl} className="w-full h-full" />
+                    </div>
+                    <div className="p-4 bg-neutral-900 border-t border-neutral-800 flex items-center justify-end gap-2 pb-safe">
+                        <button onClick={handleShare} className="bg-neutral-800 text-white px-4 py-2 rounded-lg">Compartilhar</button>
+                        <button onClick={handlePrintIframe} className="bg-yellow-500 text-black px-4 py-2 rounded-lg font-bold">Imprimir</button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

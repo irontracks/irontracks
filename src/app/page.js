@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import {
@@ -37,6 +38,8 @@ import LoadingScreen from '@/components/LoadingScreen';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import IncomingInviteModal from '@/components/IncomingInviteModal';
 import NotificationCenter from '@/components/NotificationCenter';
+import HeaderActionsMenu from '@/components/HeaderActionsMenu';
+import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge';
 import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { DialogProvider, useDialog } from '@/contexts/DialogContext';
@@ -64,12 +67,14 @@ function IronTracksApp() {
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const [notification, setNotification] = useState(null);
     const [isCoach, setIsCoach] = useState(false);
+    const [hasUnreadChat, setHasUnreadChat] = useState(false);
 
     // Estado Global da Sessão Ativa
     const [activeSession, setActiveSession] = useState(null);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
 
     const supabase = createClient();
+    const router = useRouter();
 
     // Persistência da Sessão Ativa
     useEffect(() => {
@@ -94,6 +99,9 @@ function IronTracksApp() {
             } else {
                 setView(savedView);
             }
+        } else {
+             // FORCE DASHBOARD IF NOTHING SAVED
+             setView('dashboard');
         }
     }, []);
 
@@ -114,6 +122,7 @@ function IronTracksApp() {
     // LOGICA DE AUTH SIMPLIFICADA E ROBUSTA
     useEffect(() => {
         let mounted = true;
+        let watchdog;
 
         const checkUser = async () => {
             try {
@@ -129,6 +138,18 @@ function IronTracksApp() {
                         setUser(prev => prev?.id === u.id ? prev : u);
                         
                         if (u.email === ADMIN_EMAIL) setIsCoach(true);
+                        try {
+                            const { data: tRow } = await supabase
+                                .from('teachers')
+                                .select('payment_status')
+                                .eq('email', u.email)
+                                .single();
+                            if (tRow?.payment_status === 'cancelled') {
+                                await alert('Sua conta está suspensa. Entre em contato com o administrador.');
+                                await supabase.auth.signOut();
+                                setUser(null);
+                            }
+                        } catch (_) {}
                     } else {
                         setUser(null);
                     }
@@ -143,6 +164,8 @@ function IronTracksApp() {
             }
         };
 
+        setAuthLoading(true);
+        watchdog = setTimeout(() => { if (mounted) setAuthLoading(false); }, 5000);
         checkUser();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -158,6 +181,18 @@ function IronTracksApp() {
                      setUser(prev => prev?.id === u.id ? prev : u);
                      
                      if (u.email === ADMIN_EMAIL) setIsCoach(true);
+                     try {
+                        const { data: tRow } = await supabase
+                            .from('teachers')
+                            .select('payment_status')
+                            .eq('email', u.email)
+                            .single();
+                        if (tRow?.payment_status === 'cancelled') {
+                            await alert('Sua conta está suspensa. Entre em contato com o administrador.');
+                            await supabase.auth.signOut();
+                            setUser(null);
+                        }
+                     } catch (_) {}
                  }
                  setAuthLoading(false);
             } else if (event === 'SIGNED_OUT') {
@@ -168,6 +203,7 @@ function IronTracksApp() {
 
         return () => {
             mounted = false;
+            clearTimeout(watchdog);
             subscription.unsubscribe();
         };
     }, []);
@@ -191,9 +227,17 @@ function IronTracksApp() {
 
     // Fetch Workouts
     const fetchWorkouts = useCallback(async () => {
-        if (!user) return;
+        const supabase = createClient();
         
         try {
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (!currentUser) {
+                console.warn("DASHBOARD: Usuário não identificado ao buscar treinos.");
+                return;
+            }
+            
+            console.log("BUSCANDO TREINOS PARA:", currentUser.id); // Log Obrigatório
+
             const { data, error } = await supabase
                 .from('workouts')
                 .select(`
@@ -203,11 +247,13 @@ function IronTracksApp() {
                         sets (*)
                     )
                 `)
-                .eq('user_id', user.id)
-                .eq('is_template', true)
-                .order('name');
+                .eq('created_by', currentUser.id) // <--- O PULO DO GATO
+                // .neq('is_deleted', true) // Removido temporariamente para debug se o campo is_deleted não existir ou estiver null
+                .order('created_at', { ascending: false });
                 
             if (error) throw error;
+
+            console.log("DADOS RECEBIDOS (Raw):", data?.length);
 
             if (data) {
                  const mappedWorkouts = data.map(w => ({
@@ -228,11 +274,13 @@ function IronTracksApp() {
                      })) : []
                  }));
                  setWorkouts(mappedWorkouts);
+            } else {
+                setWorkouts([]);
             }
         } catch (e) {
-            console.error("Error fetching workouts:", e);
+            console.error("Erro ao buscar:", e);
         }
-    }, [user]);
+    }, []);
 
     useEffect(() => {
         fetchWorkouts();
@@ -390,27 +438,38 @@ function IronTracksApp() {
 
                 {/* Header */}
                 {view !== 'active' && view !== 'report' && (
-                    <div className="bg-neutral-900 p-4 flex justify-between items-center sticky top-0 z-40 border-b border-neutral-800 pt-safe">
+                    <div className="bg-neutral-900/90 backdrop-blur-md p-4 pt-safe flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-neutral-800 transition-all duration-300 h-16">
                         <div className="flex items-center gap-3">
-                            {view === 'history' && (
-                                <button onClick={() => setView('dashboard')} className="w-10 h-10 flex items-center justify-center rounded-full bg-neutral-800 text-white"><RotateCcw size={20} /></button>
-                            )}
                             {user.photoURL ? <Image src={user.photoURL} width={40} height={40} className="w-10 h-10 rounded-full border-2 border-yellow-500 object-cover" alt="Profile" /> : <div className="w-10 h-10 rounded-full bg-neutral-800 border-2 border-yellow-500 flex items-center justify-center font-bold text-yellow-500">{user.displayName?.[0]}</div>}
-                            <div className="flex flex-col justify-center h-10 pt-1">
-                                <p className="text-[10px] text-neutral-400 font-bold tracking-widest uppercase leading-none mb-1">BEM-VINDO ATLETA</p>
-                                <h1 className="text-sm font-black text-white leading-none">{user.displayName}</h1>
+                            <div className="flex flex-col justify-center h-10 pt-1 overflow-hidden">
+                                <p className="text-[10px] text-neutral-400 font-bold tracking-widest uppercase leading-none mb-1 whitespace-nowrap">{isCoach ? 'BEM-VINDO COACH (v3.1)' : 'BEM-VINDO ATLETA (v3.1)'}</p>
+                                <h1 className="text-sm font-black text-white leading-none truncate w-full">{user.displayName}</h1>
                             </div>
                         </div>
                         <div className="flex gap-2 shrink-0">
-                            {(user.email === ADMIN_EMAIL || isCoach) && <button onClick={() => setShowAdminPanel(true)} className="w-10 h-10 rounded-full bg-yellow-500 text-black font-bold text-[10px] flex items-center justify-center border-2 border-yellow-600">CMD</button>}
-
-                            <NotificationCenter onStartSession={handleStartSession} />
-
-                            <button onClick={() => setView('history')} className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center hover:text-white"><History size={20} /></button>
-                            <button onClick={handleLogout} className="w-10 h-10 rounded-full bg-red-900/20 text-red-500 flex items-center justify-center hover:bg-red-900/40 transition-colors"><LogOut size={18} /></button>
+                            <HeaderActionsMenu
+                                user={user}
+                                isCoach={isCoach}
+                                hasUnreadChat={hasUnreadChat}
+                                onOpenAdmin={() => {
+                                    setShowAdminPanel(true);
+                                    // Limpa a query string para evitar re-trigger de navegação/reload
+                                    if (typeof window !== 'undefined') {
+                                        const url = new URL(window.location);
+                                        url.searchParams.delete('view');
+                                        window.history.replaceState({}, '', url);
+                                    }
+                                }}
+                                onOpenChatList={() => setView('chatList')}
+                                onOpenGlobalChat={() => setView('globalChat')}
+                                onOpenHistory={() => setView('history')}
+                                onLogout={handleLogout}
+                            />
                         </div>
                     </div>
                 )}
+
+                {user && <RealtimeNotificationBridge setNotification={setNotification} />}
 
                 {/* Main Content */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar relative">
@@ -499,7 +558,11 @@ function IronTracksApp() {
 
                     {view === 'history' && (
                         <div className="p-4 pb-24">
-                            <HistoryList user={user} onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }} />
+                            <HistoryList
+                                user={user}
+                                onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }}
+                                onBack={() => setView('dashboard')}
+                            />
                         </div>
                     )}
 

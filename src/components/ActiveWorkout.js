@@ -12,6 +12,7 @@ import InviteManager from './InviteManager';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'; 
 import { useDialog } from '@/contexts/DialogContext';
 import { playFinishSound } from '@/lib/sounds';
+import { estimateExerciseSeconds, toMinutesRounded, isCardioExercise } from '@/utils/pacing';
 import { createClient } from '@/utils/supabase/client';
 
 const appId = 'irontracks-production';
@@ -80,6 +81,8 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
         const secs = seconds % 60;
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
+
+    
 
     const toggleSet = (exIdx, setIdx, restTime) => {
         const key = `${exIdx}-${setIdx}`;
@@ -154,27 +157,41 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                 exercises: cleanExercises
             };
 
+            console.log('SAVE SESSION (ActiveWorkout):', sessionData);
+
             // Save to Supabase
             // We'll treat this as a "finished workout" (is_template = false)
             // But we need to insert into the relational tables.
-            // For now, let's skip the actual insert here and rely on the Server Action if we had one,
-            // OR just do a client-side insert into 'workouts' with is_template=false.
-            
-            const { data: historyEntry, error } = await supabase
-                .from('workouts')
-                .insert({
-                    user_id: user.id,
-                    name: workout.title,
-                    date: new Date(),
-                    is_template: false, // Log
-                    notes: JSON.stringify(sessionData) // Temporary storage of full log JSON in notes or a specific column? 
-                    // Ideally we map to tables, but for speed let's just ensure it saves something.
-                    // The schema has 'notes' text.
-                })
-                .select()
-                .single();
+            // For now, try server endpoint, fallback to client insert
 
-            if (error) throw error;
+            let historyEntry = null;
+            try {
+                const resp = await fetch('/api/workouts/finish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session: sessionData })
+                });
+                const json = await resp.json();
+                if (json.ok) {
+                    historyEntry = { id: json.saved.id };
+                } else {
+                    throw new Error(json.error || 'Falha no endpoint');
+                }
+            } catch (err) {
+                const { data: inserted, error } = await supabase
+                    .from('workouts')
+                    .insert({
+                        user_id: user.id,
+                        name: workout.title,
+                        date: new Date(),
+                        is_template: false,
+                        notes: JSON.stringify(sessionData)
+                    })
+                    .select()
+                    .single();
+                if (error) throw error;
+                historyEntry = inserted;
+            }
 
             // Se eu sou o HOST da sessão ativa no contexto, finalizo para todos
             if (teamSession?.id && teamSession?.isHost) {
@@ -224,6 +241,13 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
         const nextSetIdx = totalSets;
         updateLogValue(currentExIdx, nextSetIdx, 'weight', '');
     };
+
+    const [exerciseStartTs, setExerciseStartTs] = useState(Date.now());
+    const [exerciseDurations, setExerciseDurations] = useState([]);
+
+    useEffect(() => {
+        setExerciseStartTs(Date.now());
+    }, [currentExIdx]);
 
     return (
         <div className="flex flex-col h-[100dvh] bg-neutral-900 overflow-hidden">
@@ -296,6 +320,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                         const key = `${currentExIdx}-${i}`;
                         const log = logs[key] || {};
                         const prevLog = (previousLogs[activeExercise.name] && previousLogs[activeExercise.name][i]) || {};
+                        const isCardio = isCardioExercise(activeExercise);
 
                         return (
                             <div key={i} className={`p-3 rounded-xl border-2 transition-all ${log.done ? 'bg-green-900/20 border-green-500/50' : 'bg-neutral-800 border-transparent'}`}>
@@ -315,7 +340,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                                             />
                                         </div>
                                         <div>
-                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Reps {prevLog.reps && <span className="text-neutral-600">({prevLog.reps})</span>}</label>
+                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">{isCardio ? 'Tempo (min)' : 'Reps'} {prevLog.reps && <span className="text-neutral-600">({prevLog.reps})</span>}</label>
                                             <input
                                                 type="number"
                                                 inputMode="numeric"
@@ -325,7 +350,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                                                 className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
                                             />
                                         </div>
-                                    </div>
+                                        </div>
 
                                     <button
                                         onClick={() => toggleSet(currentExIdx, i, activeExercise.restTime)}
@@ -354,9 +379,25 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                     ANTERIOR
                 </button>
                 <button
-                    disabled={isLast}
-                    onClick={() => setCurrentExIdx(prev => prev + 1)}
-                    className="flex-1 py-4 rounded-xl bg-yellow-500 text-black font-black disabled:opacity-50 disabled:bg-neutral-800 disabled:text-neutral-500 hover:bg-yellow-400 transition-colors"
+                    onClick={async () => {
+                        if (isLast) { await handleFinish(false); return; }
+                        const nextEx = workout.exercises[currentExIdx + 1];
+                        const nextSec = estimateExerciseSeconds(nextEx);
+                        const ok = await confirm(`Meta de Tempo: ~ ${toMinutesRounded(nextSec)} min`, `Próximo: ${nextEx?.name || 'Exercício'}`);
+                        if (ok) {
+                            if (exerciseStartTs != null) {
+                                const delta = Math.max(0, Math.floor((Date.now() - exerciseStartTs) / 1000));
+                                setExerciseDurations(prev => {
+                                    const next = [...prev];
+                                    next[currentExIdx] = (next[currentExIdx] || 0) + delta;
+                                    return next;
+                                });
+                            }
+                            setCurrentExIdx(prev => prev + 1);
+                            setExerciseStartTs(Date.now());
+                        }
+                    }}
+                    className="flex-1 py-4 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-colors"
                 >
                     {isLast ? 'FINALIZAR' : 'PRÓXIMO'}
                 </button>

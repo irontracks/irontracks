@@ -70,6 +70,9 @@ export async function generateWorkoutPdf(session, previousSession) {
   y -= lineH
 
   drawKV('Tempo', formatDuration(session?.totalTime))
+  if (session?.realTotalTime) {
+    drawKV('Tempo Real', formatDuration(session.realTotalTime))
+  }
   drawKV('Volume', `${currentVolume.toLocaleString()} kg`)
   drawKV('Evolução', `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`)
   drawKV('Calorias', `~${calories}`)
@@ -179,6 +182,12 @@ export async function generateAssessmentPdf(formData, results, studentName) {
   drawKV('Massa Magra', `${formatNumber(results?.leanMass, 1)} kg`)
   drawKV('Massa Gorda', `${formatNumber(results?.fatMass, 1)} kg`)
   drawKV('IMC', formatNumber(results?.bmi, 1))
+  if (results?.bmiClassification) {
+    drawKV('Classificação IMC', results.bmiClassification)
+  }
+  if (results?.bodyFatClassification) {
+    drawKV('Classificação Gordura', results.bodyFatClassification)
+  }
   drawKV('BMR', `${formatNumber(results?.bmr, 0)} kcal/dia`)
   y -= 6
 

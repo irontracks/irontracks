@@ -4,26 +4,26 @@ import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 
-const NotificationCenter = ({ onStartSession }) => {
+const NotificationCenter = ({ onStartSession, user }) => {
     const { alert, confirm } = useDialog();
     const [isOpen, setIsOpen] = useState(false);
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
     const [systemNotifications, setSystemNotifications] = useState([]);
     const supabase = createClient();
 
-    // Fetch and Subscribe to System Notifications
     useEffect(() => {
-        const fetchNotifications = async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
+        if (!user) return;
 
-            const { data } = await supabase
+        const fetchNotifications = async () => {
+            const { data, error } = await supabase
                 .from('notifications')
                 .select('*')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
             
-            if (data) setSystemNotifications(data);
+            if (data) {
+                setSystemNotifications(data);
+            }
 
             const channel = supabase
                 .channel(`notifications:${user.id}`)
@@ -40,21 +40,19 @@ const NotificationCenter = ({ onStartSession }) => {
             return () => { supabase.removeChannel(channel); };
         };
         fetchNotifications();
-    }, []);
+    }, [user]);
 
-    // Helper to delete notification
     const handleDelete = async (id, e) => {
         e.stopPropagation();
         setSystemNotifications(prev => prev.filter(n => n.id !== id));
         await supabase.from('notifications').delete().eq('id', id);
     };
 
-    // Helper to format time
     const formatTime = (isoString) => {
         if (!isoString) return 'Agora';
         const date = new Date(isoString);
         const now = new Date();
-        const diff = (now - date) / 1000; // seconds
+        const diff = (now - date) / 1000;
 
         if (diff < 60) return 'Agora';
         if (diff < 3600) return `${Math.floor(diff/60)}m atrás`;
@@ -62,7 +60,6 @@ const NotificationCenter = ({ onStartSession }) => {
         return date.toLocaleDateString();
     };
 
-    // Combine notifications
     const allNotifications = [
         ...incomingInvites.map(inv => ({
             id: inv.id,
@@ -98,9 +95,9 @@ const NotificationCenter = ({ onStartSession }) => {
     const handleAccept = async (item) => {
         setIsOpen(false);
         try {
-            const workout = await acceptInvite(item.data);
-            if (workout && onStartSession) {
-                onStartSession(workout);
+            await acceptInvite(item.data);
+            if (item.data.workout && onStartSession) {
+                onStartSession(item.data.workout);
             }
         } catch (e) {
             await alert("Erro ao aceitar: " + e.message);
@@ -113,7 +110,6 @@ const NotificationCenter = ({ onStartSession }) => {
 
     return (
         <div className="relative z-50">
-            {/* Bell Icon */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center hover:text-white hover:bg-neutral-700 transition-colors relative"
@@ -126,17 +122,15 @@ const NotificationCenter = ({ onStartSession }) => {
                 )}
             </button>
 
-            {/* Dropdown */}
             {isOpen && (
                 <>
-                    {/* Backdrop to close on click outside */}
                     <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)}></div>
 
                     <div className="absolute right-0 top-12 w-80 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden animate-fade-in">
                         <div className="p-3 border-b border-neutral-800 bg-neutral-800/50 backdrop-blur flex justify-between items-center">
                             <h3 className="font-bold text-white text-sm">Notificações</h3>
                             {systemNotifications.length > 0 && (
-                                <button 
+                                <button
                                     onClick={async () => {
                                         if(await confirm("Limpar todas as notificações?")) {
                                             const { data: { user } } = await supabase.auth.getUser();
@@ -170,7 +164,6 @@ const NotificationCenter = ({ onStartSession }) => {
                                                 </div>
                                             </div>
 
-                                            {/* Actions for Invites */}
                                             {item.type === 'invite' && (
                                                 <div className="flex gap-2 mt-2 pl-7">
                                                     <button
@@ -188,9 +181,8 @@ const NotificationCenter = ({ onStartSession }) => {
                                                 </div>
                                             )}
 
-                                            {/* Delete Button for System Notifications */}
                                             {item.type !== 'invite' && (
-                                                <button 
+                                                <button
                                                     onClick={(e) => handleDelete(item.id, e)}
                                                     className="absolute top-2 right-2 p-2 text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >

@@ -5,7 +5,6 @@ import { AlertCircle, RefreshCw } from 'lucide-react';
 
 export default function Error({ error, reset }) {
   useEffect(() => {
-    // Log the error to an error reporting service
     console.error("Next.js App Error:", error);
   }, [error]);
 
@@ -44,3 +43,4 @@ export default function Error({ error, reset }) {
     </div>
   );
 }
+

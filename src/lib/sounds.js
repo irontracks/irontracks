@@ -81,7 +81,7 @@ export const playTimerFinishSound = () => {
         osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
         osc.frequency.setValueAtTime(0, ctx.currentTime + 0.31);
 
-        gain.gain.setValueAtTime(0.1, ctx.currentTime);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.5);
 
         osc.start();

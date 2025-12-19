@@ -2,10 +2,10 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { 
-  Assessment, 
-  AssessmentFormData, 
-  AssessmentResponse, 
+import {
+  Assessment,
+  AssessmentFormData,
+  AssessmentResponse,
   AssessmentListResponse,
   CreateAssessmentRequest,
   UpdateAssessmentRequest,
@@ -161,7 +161,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       // Atualizar lista local
       setAssessments(prev => prev.map(assessment => 
-        assessment.id === id ? formattedAssessment : assessment
+        assessment.id === id ? formattedAssessment : assessment 
       ));
 
       return {
@@ -335,3 +335,4 @@ export const useAssessment = (): UseAssessmentReturn => {
     formDataToAssessment
   };
 };
+

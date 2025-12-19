@@ -13,6 +13,21 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
     };
 
     useEffect(() => {
+        let soundInterval;
+
+        if (isFinished) {
+            playTimerFinishSound();
+            soundInterval = setInterval(() => {
+                playTimerFinishSound();
+            }, 1500);
+        }
+
+        return () => {
+            if (soundInterval) clearInterval(soundInterval);
+        };
+    }, [isFinished]);
+
+    useEffect(() => {
         if (!targetTime) {
             setIsFinished(false);
             return;
@@ -29,13 +44,12 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
                 setIsFinished(true);
                 if (!hasNotified) {
                     hasNotified = true;
-                    playTimerFinishSound();
                     if (Notification.permission === 'granted') {
                         new Notification("⏰ Tempo Esgotado!", { 
                             body: "Hora de voltar para o treino!", 
-                            icon: 'icone.png',
-                            tag: 'timer_finished'
-                        });
+                            icon: 'icone.png', 
+                            tag: 'timer_finished' 
+                        }); 
                     }
                 }
             } else {

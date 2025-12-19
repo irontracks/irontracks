@@ -11,7 +11,6 @@ const StudentEvolution = ({ user, onClose }) => {
     
     useEffect(() => {
         const loadData = async () => {
-             // 1. Fetch Assessments
              const { data: assData } = await supabase
                 .from('assessments')
                 .select('*')
@@ -19,7 +18,6 @@ const StudentEvolution = ({ user, onClose }) => {
                 .order('date', { ascending: false });
              if (assData) setAssessments(assData);
 
-             // 2. Fetch Photos
              const { data: photoData } = await supabase
                 .from('photos')
                 .select('*')
