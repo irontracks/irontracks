@@ -8,7 +8,9 @@ const ADMIN_EMAIL = 'djmkapple@gmail.com'
 async function checkAdmin() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== ADMIN_EMAIL) {
+    const email = (user?.email || '').toLowerCase().trim()
+    const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
+    if (!user || email !== adminEmail) {
         throw new Error('Unauthorized')
     }
     return user
@@ -80,12 +82,47 @@ export async function registerStudent(email, password, name) {
     }
 }
 
-export async function addTeacher(name, email, phone, status = 'pending') {
+export async function addTeacher(name, email, phone, birth_date, status = 'pending') {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
-        const { error } = await adminDb.from('teachers').insert({ name, email, phone, status })
-        if (error) throw error
+
+        const normalizeString = (v) => {
+            const s = String(v ?? '').trim()
+            return s ? s : null
+        }
+
+        const nextName = normalizeString(name)
+        const nextEmail = normalizeString(email)?.toLowerCase() || null
+        const nextPhone = normalizeString(phone)
+        const nextBirthDate = normalizeString(birth_date)
+        const nextStatus = normalizeString(status) || 'pending'
+
+        if (!nextName || !nextEmail) throw new Error('Missing name or email')
+
+        const payload = { name: nextName, email: nextEmail, status: nextStatus }
+        if (nextPhone !== null) payload.phone = nextPhone
+        if (nextBirthDate !== null) payload.birth_date = nextBirthDate
+
+        const tryInsert = async (p) => {
+            const { error } = await adminDb.from('teachers').insert(p)
+            if (error) throw error
+        }
+
+        try {
+            await tryInsert(payload)
+        } catch (err) {
+            const msg = String(err?.message || err || '')
+            if (msg.includes("Could not find the 'birth_date' column") || msg.includes('birth_date')) {
+                const { birth_date, ...rest } = payload
+                await tryInsert(rest)
+            } else if (msg.includes("Could not find the 'phone' column") || msg.includes('phone')) {
+                const { phone, ...rest } = payload
+                await tryInsert(rest)
+            } else {
+                throw err
+            }
+        }
         return { success: true }
     } catch (e) {
         return { error: e.message }
@@ -116,6 +153,104 @@ export async function clearAllTeachers() {
     }
 }
 
+export async function clearAllWorkouts() {
+    try {
+        await checkAdmin()
+        const adminDb = createAdminClient()
+        const { error } = await adminDb.from('workouts').delete().gte('created_at', '1900-01-01')
+        if (error) throw error
+        return { success: true }
+    } catch (e) {
+        return { error: e.message }
+    }
+}
+
+export async function updateTeacher(id, data) {
+    try {
+        await checkAdmin()
+        const adminDb = createAdminClient()
+
+        const safeId = String(id || '').trim()
+        if (!safeId) throw new Error('Missing teacher id')
+
+        const normalizeString = (v) => {
+            const s = String(v ?? '').trim()
+            return s ? s : null
+        }
+
+        const payload = {}
+        const nextName = normalizeString(data?.name)
+        const nextEmail = normalizeString(data?.email)?.toLowerCase() || null
+        const nextPhone = normalizeString(data?.phone)
+        const nextBirthDate = normalizeString(data?.birth_date)
+
+        if (nextName !== null) payload.name = nextName
+        if (nextEmail !== null) payload.email = nextEmail
+        if (nextPhone !== null) payload.phone = nextPhone
+        if (nextBirthDate !== null) payload.birth_date = nextBirthDate
+
+        const tryUpdate = async (p) => {
+            const { error } = await adminDb.from('teachers').update(p).eq('id', safeId)
+            if (error) throw error
+        }
+
+        try {
+            await tryUpdate(payload)
+        } catch (err) {
+            const msg = String(err?.message || err || '')
+            if (msg.includes("Could not find the 'birth_date' column") || msg.includes('birth_date')) {
+                const { birth_date, ...rest } = payload
+                await tryUpdate(rest)
+            } else if (msg.includes("Could not find the 'phone' column") || msg.includes('phone')) {
+                const { phone, ...rest } = payload
+                await tryUpdate(rest)
+            } else {
+                throw err
+            }
+        }
+
+        if (nextEmail) {
+            const email = nextEmail
+            const name = nextName || email
+            const { data: existingProfile } = await adminDb
+                .from('profiles')
+                .select('id')
+                .ilike('email', email)
+                .maybeSingle()
+            const userId = existingProfile?.id || null
+            if (userId) {
+                await adminDb.from('profiles').upsert({
+                    id: userId,
+                    email,
+                    display_name: name,
+                    role: 'teacher',
+                    last_seen: new Date(),
+                }, { onConflict: 'id' })
+
+                await adminDb.from('teachers')
+                    .update({ user_id: userId, email })
+                    .eq('id', safeId)
+            }
+        }
+
+        return { success: true }
+    } catch (e) {
+        return { error: e.message }
+    }
+}
+
+export async function deleteTeacher(id) {
+    try {
+        await checkAdmin()
+        const adminDb = createAdminClient()
+        const { error } = await adminDb.from('teachers').delete().eq('id', id)
+        if (error) throw error
+        return { success: true }
+    } catch (e) {
+        return { error: e.message }
+    }
+}
+
 export async function clearPublicRegistry() {
     try {
         await checkAdmin()
@@ -130,54 +265,113 @@ export async function clearPublicRegistry() {
 
 export async function assignWorkoutToStudent(studentId, template) {
     try {
-        await checkAdmin();
+        const adminUser = await checkAdmin();
         const adminDb = createAdminClient();
-        // Resolve auth user id: studentId may be students.id or auth.users.id
-        let targetUserId = studentId;
-        // If provided id is NOT an auth.users.id, try to resolve via students
-        const { data: maybeAuthUser } = await adminDb.from('profiles').select('id').eq('id', studentId).single();
-        if (!maybeAuthUser) {
+
+        let targetId = studentId;
+        let isAuthUser = false;
+
+        const { data: maybeProfile } = await adminDb
+            .from('profiles')
+            .select('id')
+            .eq('id', targetId)
+            .maybeSingle();
+        if (maybeProfile?.id) {
+            isAuthUser = true;
+            targetId = maybeProfile.id;
+        } else {
             const { data: studentRow } = await adminDb
                 .from('students')
-                .select('user_id, email, id')
+                .select('id, user_id, email')
                 .or(`id.eq.${studentId},user_id.eq.${studentId}`)
-                .limit(1)
-                .single();
-            if (studentRow?.user_id) {
-                targetUserId = studentRow.user_id;
+                .maybeSingle();
+            if (!studentRow) throw new Error('Aluno não encontrado');
+            if (studentRow.user_id) {
+                isAuthUser = true;
+                targetId = studentRow.user_id;
             } else {
-                throw new Error('Aluno ainda não possui conta (login Google). Peça para realizar o primeiro login para vincular o treino.');
+                isAuthUser = false;
+                targetId = studentRow.id;
             }
         }
 
         const { data: newWorkout, error: wError } = await adminDb
             .from('workouts')
             .insert({
-                user_id: targetUserId,
-                name: template.name,
-                notes: template.notes,
-                is_template: true
+                user_id: isAuthUser ? targetId : null,
+                student_id: isAuthUser ? null : targetId,
+                name: template?.name ?? '',
+                notes: template?.notes ?? '',
+                is_template: true,
+                created_by: adminUser.id
             })
             .select()
             .single();
 
         if (wError) throw wError;
 
-        // 2. Clone Exercises
-        if (template.exercises && template.exercises.length > 0) {
-            const exercisesToInsert = template.exercises.map(ex => ({
+        if (Array.isArray(template?.exercises) && template.exercises.length > 0) {
+            const exercisesToInsert = template.exercises.map((ex, idx) => ({
                 workout_id: newWorkout.id,
-                name: ex.name,
-                muscle_group: ex.muscle_group,
-                notes: ex.notes,
-                video_url: ex.video_url,
-                rest_time: ex.rest_time,
-                cadence: ex.cadence,
-                method: ex.method,
-                "order": ex.order
+                name: ex?.name ?? '',
+                notes: ex?.notes ?? '',
+                video_url: ex?.video_url ?? '',
+                rest_time: ex?.rest_time ?? 60,
+                cadence: ex?.cadence ?? '2020',
+                method: ex?.method ?? 'Normal',
+                order: ex?.order ?? idx
             }));
-            const { error: exError } = await adminDb.from('exercises').insert(exercisesToInsert);
+            const { data: insertedExs, error: exError } = await adminDb
+                .from('exercises')
+                .insert(exercisesToInsert)
+                .select();
             if (exError) throw exError;
+
+            const insertSetSafe = async (payload) => {
+                try {
+                    const { error } = await adminDb.from('sets').insert(payload);
+                    if (!error) return;
+                    const msg = (error?.message || '').toLowerCase();
+                    if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
+                        const reduced = { ...payload };
+                        delete reduced.advanced_config;
+                        delete reduced.is_warmup;
+                        await adminDb.from('sets').insert(reduced);
+                        return;
+                    }
+                    throw error;
+                } catch (e) {
+                    const msg = (e?.message || '').toLowerCase();
+                    if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
+                        const reduced = { ...payload };
+                        delete reduced.advanced_config;
+                        delete reduced.is_warmup;
+                        await adminDb.from('sets').insert(reduced);
+                        return;
+                    }
+                    throw e;
+                }
+            };
+
+            for (let i = 0; i < insertedExs.length; i++) {
+                const dstEx = insertedExs[i];
+                const srcEx = template.exercises[i] || {};
+                const setsArr = Array.isArray(srcEx.sets) ? srcEx.sets : [];
+                if (dstEx?.id && setsArr.length > 0) {
+                    for (const s of setsArr) {
+                        await insertSetSafe({
+                            exercise_id: dstEx.id,
+                            weight: s?.weight ?? null,
+                            reps: s?.reps ?? null,
+                            rpe: s?.rpe ?? null,
+                            set_number: s?.set_number ?? 1,
+                            completed: false,
+                            is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
+                            advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
+                        });
+                    }
+                }
+            }
         }
 
         return { success: true, workoutId: newWorkout.id, workout: newWorkout };
@@ -191,23 +385,32 @@ export async function getStudentWorkouts(studentId) {
         await checkAdmin();
         const adminDb = createAdminClient();
 
-        // Resolve auth user id from either auth.users/profiles or students
-        let targetUserId = studentId;
-        const { data: maybeProfile } = await adminDb.from('profiles').select('id').eq('id', studentId).single();
-        if (!maybeProfile) {
+        let targetId = studentId;
+        let isAuthUser = false;
+        const { data: maybeProfile } = await adminDb.from('profiles').select('id').eq('id', studentId).maybeSingle();
+        if (maybeProfile?.id) {
+            isAuthUser = true;
+            targetId = maybeProfile.id;
+        } else {
             const { data: srow } = await adminDb
                 .from('students')
-                .select('user_id, id')
+                .select('id, user_id')
                 .or(`id.eq.${studentId},user_id.eq.${studentId}`)
-                .limit(1)
-                .single();
-            if (srow?.user_id) targetUserId = srow.user_id;
+                .maybeSingle();
+            if (srow?.user_id) {
+                isAuthUser = true;
+                targetId = srow.user_id;
+            } else if (srow?.id) {
+                isAuthUser = false;
+                targetId = srow.id;
+            }
         }
 
         const { data, error } = await adminDb
             .from('workouts')
-            .select('*, exercises(*)')
-            .eq('user_id', targetUserId)
+            .select('*, exercises(*, sets(*))')
+            .or(`user_id.eq.${targetId},student_id.eq.${targetId}`)
+            .eq('is_template', true)
             .order('name');
 
         if (error) throw error;
@@ -226,5 +429,297 @@ export async function removeWorkoutFromStudent(workoutId) {
         return { success: true };
     } catch (e) {
         return { error: e.message };
+    }
+}
+
+export async function exportAllData() {
+    try {
+        await checkAdmin()
+        const adminDb = createAdminClient()
+
+        const { data: profiles } = await adminDb.from('profiles').select('*')
+        const { data: teachers } = await adminDb.from('teachers').select('*')
+        const { data: students } = await adminDb.from('students').select('*')
+        const { data: assessments } = await adminDb.from('assessments').select('*')
+        const { data: notifications } = await adminDb.from('notifications').select('*')
+        const { data: chat_channels } = await adminDb.from('chat_channels').select('*')
+        const { data: messages } = await adminDb.from('messages').select('*')
+        const { data: invites } = await adminDb.from('invites').select('*')
+        const { data: team_sessions } = await adminDb.from('team_sessions').select('*')
+
+        const { data: workouts } = await adminDb
+            .from('workouts')
+            .select('*, exercises(*, sets(*))')
+            .order('name')
+
+        const payload = {
+            exported_at: new Date().toISOString(),
+            profiles: profiles || [],
+            teachers: teachers || [],
+            students: students || [],
+            assessments: assessments || [],
+            notifications: notifications || [],
+            chat_channels: chat_channels || [],
+            messages: messages || [],
+            invites: invites || [],
+            team_sessions: team_sessions || [],
+            workouts: (workouts || []).map(w => ({
+                id: w.id,
+                user_id: w.user_id,
+                student_id: w.student_id,
+                title: w.name,
+                notes: w.notes,
+                is_template: !!w.is_template,
+                created_by: w.created_by,
+                exercises: (w.exercises || []).map(e => ({
+                    id: e.id,
+                    name: e.name,
+                    notes: e.notes,
+                    video_url: e.video_url,
+                    rest_time: e.rest_time,
+                    cadence: e.cadence,
+                    method: e.method,
+                    order: e.order,
+                    sets: (e.sets || []).map(s => ({
+                        reps: s.reps,
+                        rpe: s.rpe,
+                        set_number: s.set_number
+                    }))
+                }))
+            }))
+        }
+
+        return { success: true, data: payload }
+    } catch (e) {
+        return { error: e.message }
+    }
+}
+
+export async function importAllData(json) {
+    try {
+        await checkAdmin()
+        const adminDb = createAdminClient()
+
+        const profiles = Array.isArray(json?.profiles) ? json.profiles : []
+        const teachers = Array.isArray(json?.teachers) ? json.teachers : []
+        const students = Array.isArray(json?.students) ? json.students : []
+        const assessments = Array.isArray(json?.assessments) ? json.assessments : []
+        const notifications = Array.isArray(json?.notifications) ? json.notifications : []
+        const chat_channels = Array.isArray(json?.chat_channels) ? json.chat_channels : []
+        const messages = Array.isArray(json?.messages) ? json.messages : []
+        const invites = Array.isArray(json?.invites) ? json.invites : []
+        const team_sessions = Array.isArray(json?.team_sessions) ? json.team_sessions : []
+        const workouts = Array.isArray(json?.workouts) ? json.workouts : []
+
+        if (chat_channels.length) {
+            const batchSize = 500
+            for (let i = 0; i < chat_channels.length; i += batchSize) {
+                const batch = chat_channels.slice(i, i + batchSize)
+                await adminDb.from('chat_channels').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        if (team_sessions.length) {
+            const batchSize = 500
+            for (let i = 0; i < team_sessions.length; i += batchSize) {
+                const batch = team_sessions.slice(i, i + batchSize)
+                await adminDb.from('team_sessions').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        if (profiles.length) {
+            const batchSize = 500
+            for (let i = 0; i < profiles.length; i += batchSize) {
+                const batch = profiles.slice(i, i + batchSize).map(p => ({
+                    id: p.id,
+                    email: p.email,
+                    display_name: p.display_name,
+                    role: p.role,
+                    photo_url: p.photo_url,
+                    last_seen: p.last_seen
+                }))
+                await adminDb.from('profiles').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        if (teachers.length) {
+            const batchSize = 500
+            for (let i = 0; i < teachers.length; i += batchSize) {
+                const batch = teachers.slice(i, i + batchSize).map(t => ({
+                    id: t.id,
+                    name: t.name,
+                    email: t.email,
+                    phone: t.phone,
+                    birth_date: t.birth_date,
+                    status: t.status
+                }))
+                await adminDb.from('teachers').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        if (students.length) {
+            const batchSize = 500
+            for (let i = 0; i < students.length; i += batchSize) {
+                const batch = students.slice(i, i + batchSize).map(s => ({
+                    id: s.id,
+                    name: s.name,
+                    email: s.email,
+                    phone: s.phone,
+                    user_id: s.user_id,
+                    teacher_id: s.teacher_id,
+                    created_by: s.created_by,
+                    status: s.status
+                }))
+                await adminDb.from('students').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        for (const w of workouts) {
+            const baseWorkout = {
+                user_id: w?.user_id ?? null,
+                student_id: w?.student_id ?? null,
+                name: w?.title || w?.name || '',
+                notes: w?.notes ?? null,
+                is_template: w?.is_template === true,
+                created_by: w?.created_by ?? null
+            }
+
+            let savedW = null
+            if (w?.id) {
+                const { data, error } = await adminDb
+                    .from('workouts')
+                    .upsert({ ...baseWorkout, id: w.id }, { onConflict: 'id' })
+                    .select()
+                    .single()
+                if (!error) savedW = data
+            }
+
+            if (!savedW) {
+                const { data } = await adminDb
+                    .from('workouts')
+                    .insert(baseWorkout)
+                    .select()
+                    .single()
+                savedW = data
+            }
+
+            if (!savedW?.id) continue
+
+            const { data: existingExs } = await adminDb
+                .from('exercises')
+                .select('id')
+                .eq('workout_id', savedW.id)
+            const exIds = (existingExs || []).map(x => x.id).filter(Boolean)
+            if (exIds.length) await adminDb.from('sets').delete().in('exercise_id', exIds)
+            await adminDb.from('exercises').delete().eq('workout_id', savedW.id)
+
+            const exs = Array.isArray(w?.exercises) ? w.exercises : []
+            for (const [idx, e] of exs.entries()) {
+                const baseExercise = {
+                    workout_id: savedW.id,
+                    name: e?.name || '',
+                    notes: e?.notes ?? null,
+                    video_url: e?.video_url ?? null,
+                    rest_time: e?.rest_time ?? null,
+                    cadence: e?.cadence ?? null,
+                    method: e?.method ?? null,
+                    order: e?.order ?? idx
+                }
+
+                let savedEx = null
+                if (e?.id) {
+                    const { data, error } = await adminDb
+                        .from('exercises')
+                        .upsert({ ...baseExercise, id: e.id }, { onConflict: 'id' })
+                        .select()
+                        .single()
+                    if (!error) savedEx = data
+                }
+                if (!savedEx) {
+                    const { data } = await adminDb
+                        .from('exercises')
+                        .insert(baseExercise)
+                        .select()
+                        .single()
+                    savedEx = data
+                }
+
+                if (!savedEx?.id) continue
+
+                const sets = Array.isArray(e?.sets) ? e.sets : []
+                for (let i = 0; i < sets.length; i++) {
+                    const s = sets[i]
+                    await adminDb.from('sets').insert({
+                        exercise_id: savedEx.id,
+                        reps: s?.reps ?? null,
+                        rpe: s?.rpe ?? null,
+                        set_number: s?.set_number ?? (i + 1),
+                        weight: s?.weight ?? null,
+                        is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
+                        advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
+                    })
+                }
+            }
+        }
+
+        if (assessments.length) {
+            const batchSize = 200
+            for (let i = 0; i < assessments.length; i += batchSize) {
+                const batch = assessments.slice(i, i + batchSize).map(a => ({
+                    id: a.id,
+                    student_id: a.student_id,
+                    trainer_id: a.trainer_id,
+                    assessment_date: a.assessment_date,
+                    weight: a.weight,
+                    height: a.height,
+                    age: a.age,
+                    gender: a.gender,
+                    arm_circ: a.arm_circ,
+                    chest_circ: a.chest_circ,
+                    waist_circ: a.waist_circ,
+                    hip_circ: a.hip_circ,
+                    thigh_circ: a.thigh_circ,
+                    calf_circ: a.calf_circ,
+                    triceps_skinfold: a.triceps_skinfold,
+                    biceps_skinfold: a.biceps_skinfold,
+                    subscapular_skinfold: a.subscapular_skinfold,
+                    suprailiac_skinfold: a.suprailiac_skinfold,
+                    abdominal_skinfold: a.abdominal_skinfold,
+                    thigh_skinfold: a.thigh_skinfold,
+                    calf_skinfold: a.calf_skinfold,
+                    observations: a.observations,
+                    pdf_url: a.pdf_url
+                }))
+                await adminDb.from('assessments').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        if (notifications.length) {
+            const batchSize = 500
+            for (let i = 0; i < notifications.length; i += batchSize) {
+                const batch = notifications.slice(i, i + batchSize)
+                await adminDb.from('notifications').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        if (messages.length) {
+            const batchSize = 500
+            for (let i = 0; i < messages.length; i += batchSize) {
+                const batch = messages.slice(i, i + batchSize)
+                await adminDb.from('messages').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        if (invites.length) {
+            const batchSize = 500
+            for (let i = 0; i < invites.length; i += batchSize) {
+                const batch = invites.slice(i, i + batchSize)
+                await adminDb.from('invites').upsert(batch, { onConflict: 'id' })
+            }
+        }
+
+        return { success: true }
+    } catch (e) {
+        return { error: e.message }
     }
 }

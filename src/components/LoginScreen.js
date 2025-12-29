@@ -27,7 +27,8 @@ const LoginScreen = () => {
         } catch (error) {
             console.error("Login Error:", error);
             setIsLoading(false);
-            setErrorMsg(error.message);
+            const msg = (error && error.message) ? error.message : 'Falha ao fazer login.';
+            setErrorMsg(msg);
         }
     };
 
@@ -37,7 +38,7 @@ const LoginScreen = () => {
                 <Dumbbell size={64} className="text-black" />
             </div>
             <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
-            <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v3.0 (Supabase)</p>
+            <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v3.0</p>
             
             <button 
                 onClick={handleLogin}

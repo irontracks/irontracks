@@ -69,8 +69,16 @@ export const DialogProvider = ({ children }) => {
         });
     }, [closeDialog]);
 
+    const showLoading = useCallback((message, title = 'Aguarde') => {
+        setDialog({
+            type: 'loading',
+            title,
+            message
+        });
+    }, []);
+
     return (
-        <DialogContext.Provider value={{ dialog, confirm, alert, prompt, closeDialog }}>
+        <DialogContext.Provider value={{ dialog, confirm, alert, prompt, closeDialog, showLoading }}>
             {children}
         </DialogContext.Provider>
     );

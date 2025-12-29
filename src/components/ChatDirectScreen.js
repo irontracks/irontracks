@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
     ChevronLeft,
@@ -16,6 +16,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
+    const [nowMs, setNowMs] = useState(0);
     const [otherUser, setOtherUser] = useState(null);
     const [isTyping, setIsTyping] = useState(false);
     const [channelId, setChannelId] = useState(null);
@@ -24,7 +25,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const [loadingMore, setLoadingMore] = useState(false);
     
     const { alert, prompt } = useDialog();
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);
     const typingTimeoutRef = useRef(null);
@@ -32,10 +33,27 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const [showEmoji, setShowEmoji] = useState(false);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
+    const [debugChat, setDebugChat] = useState(false);
 
     const resolvedOtherUserId = targetUser?.id ?? otherUserId;
     const resolvedOtherUserName = targetUser?.display_name ?? targetUser?.name ?? otherUserName;
     const resolvedOtherUserPhoto = targetUser?.photo_url ?? targetUser?.photoURL ?? otherUserPhoto;
+
+    useEffect(() => {
+        const tick = () => setNowMs(Date.now());
+        const t = setTimeout(tick, 0);
+        const id = setInterval(tick, 60_000);
+        try {
+            const byEnv = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_DEBUG_CHAT === '1';
+            const byQS = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debugChat') === '1';
+            const byLS = typeof window !== 'undefined' && localStorage.getItem('debug_chat') === '1';
+            setDebugChat(Boolean(byEnv || byQS || byLS));
+        } catch {}
+        return () => {
+            clearTimeout(t);
+            clearInterval(id);
+        };
+    }, []);
 
     const loadOtherUser = useCallback(async () => {
         try {
@@ -50,10 +68,14 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         } catch (error) {
             console.error('Erro ao carregar usuário:', error);
         }
-    }, [resolvedOtherUserId]);
+    }, [resolvedOtherUserId, supabase]);
 
     const getOrCreateChannel = useCallback(async () => {
         try {
+            if (!user?.id || !resolvedOtherUserId) {
+                const err = new Error('Usuário inválido para iniciar conversa.');
+                throw err;
+            }
             const { data: channelId, error } = await supabase
                 .rpc('get_or_create_direct_channel', {
                     user1: user.id,
@@ -65,10 +87,11 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             return channelId;
         } catch (error) {
             console.error('Erro ao obter canal:', error);
-            await alert('Erro ao iniciar conversa: ' + error.message);
+            const msg = error?.message || String(error || '');
+            await alert('Erro ao iniciar conversa: ' + msg);
             throw error;
         }
-    }, [user.id, resolvedOtherUserId, alert]);
+    }, [alert, resolvedOtherUserId, supabase, user?.id]);
 
     const loadMessages = useCallback(async (channelId, beforeTs = null) => {
         try {
@@ -119,9 +142,9 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 return;
             }
             console.error('Erro ao carregar mensagens:', error);
-            await alert('Erro ao carregar mensagens: ' + (error.message || 'Desconhecido'));
+            await alert('Erro ao carregar mensagens: ' + (error?.message || 'Desconhecido'));
         }
-    }, [supabase]);
+    }, [alert, markMessagesAsRead, supabase]);
 
     const markMessagesAsRead = useCallback(async (channelId) => {
         try {
@@ -136,7 +159,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             if (msg.includes('Abort') || msg.includes('ERR_ABORTED')) return;
             console.error('Erro ao marcar como lido:', error);
         }
-    }, [resolvedOtherUserId]);
+    }, [resolvedOtherUserId, supabase]);
 
     const setupRealtime = useCallback((channelId) => {
         const subscription = supabase
@@ -176,7 +199,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, [user.id, markMessagesAsRead]);
+    }, [markMessagesAsRead, supabase, user?.id]);
 
     useEffect(() => {
         let unsubscribe;
@@ -246,7 +269,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
         } catch (error) {
             console.error('Erro ao enviar mensagem:', error);
-            await alert('Erro ao enviar mensagem: ' + error.message);
+            const msg = error?.message || String(error || '');
+            await alert('Erro ao enviar mensagem: ' + msg);
             setNewMessage(message);
         }
     };
@@ -317,8 +341,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     }
 
     const isUserOnline = () => {
-        if (!otherUser?.last_seen) return false;
-        const diff = Date.now() - new Date(otherUser.last_seen).getTime();
+        if (!otherUser?.last_seen || !nowMs) return false;
+        const diff = nowMs - new Date(otherUser.last_seen).getTime();
         return diff < 5 * 60 * 1000;
     };
 
@@ -330,12 +354,13 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     };
 
     if (loading) {
-        return (
-            <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col">
-                <div className="p-4 bg-neutral-800 border-b border-neutral-700 h-16 items-center pt-safe sticky top-0 z-20 justify-center relative flex">
-                    <button onClick={onClose} className="absolute left-4 w-8 h-8 flex items-center justify-center text-neutral-200 hover:text-white">
-                        <ChevronLeft size={20} />
-                    </button>
+
+		return (
+			<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col">
+				<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 h-16 items-center pt-safe sticky top-0 z-20 justify-center relative flex">
+					<button onClick={onClose} className="absolute left-4 w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
+						<ChevronLeft size={20} />
+					</button>
                     <div className="w-10 h-10 bg-neutral-700 rounded-full animate-pulse"></div>
                     <div className="ml-3">
                         <div className="h-5 bg-neutral-700 rounded animate-pulse mb-1 w-32"></div>
@@ -349,14 +374,14 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         );
     }
 
-    return (
-            <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up">
-                <div className="p-4 bg-neutral-800 border-b border-neutral-700 h-16 items-center pt-safe sticky top-0 z-20 justify-center relative flex">
-                    <button onClick={onClose} className="absolute left-4 w-8 h-8 flex items-center justify-center text-neutral-200 hover:text-white">
-                        <ChevronLeft size={20} />
-                    </button>
+		return (
+				<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col animate-slide-up">
+					<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 h-16 items-center pt-safe sticky top-0 z-20 justify-center relative flex">
+						<button onClick={onClose} className="absolute left-4 w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
+							<ChevronLeft size={20} />
+						</button>
                 
-                <div className="flex items-center gap-3 justify-center w-full">
+					<div className="flex items-center gap-3 justify-center w-full">
                     {(otherUser?.photo_url || resolvedOtherUserPhoto) ? (
                         <Image
                             src={otherUser?.photo_url || resolvedOtherUserPhoto}
@@ -391,6 +416,12 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     </div>
                 </div>
                 </div>
+
+            {debugChat && (
+                <div className="px-4 pt-2">
+                    <div className="text-red-500 text-4xl font-black text-center">TESTE INTERNO</div>
+                </div>
+            )}
 
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/30">
                 {messages.length === 0 ? (
@@ -473,7 +504,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 />
                 
                 <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setShowEmoji(v => !v)} className="p-2 rounded-full bg-neutral-700 text.white hover:bg-neutral-600"><Smile size={18} /></button>
+						<button type="button" onClick={() => setShowEmoji(v => !v)} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><Smile size={18} /></button>
                     <button type="button" onClick={handleAddGif} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><Link2 size={18} /></button>
                     <button type="button" onClick={handleAttachClick} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><ImageIcon size={18} /></button>
                     <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />

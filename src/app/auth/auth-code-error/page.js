@@ -1,10 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 
-export default function AuthCodeError() {
+function AuthCodeErrorInner() {
+  const sp = useSearchParams();
+  const err = (sp?.get('error') || '').trim();
   return (
     <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-6 text-center">
       <div className="bg-neutral-800 p-8 rounded-2xl border border-neutral-700 max-w-md w-full shadow-2xl">
@@ -15,7 +18,8 @@ export default function AuthCodeError() {
         <h1 className="text-2xl font-black text-white mb-2 uppercase">Erro de Autenticação</h1>
         
         <p className="text-neutral-400 mb-8 leading-relaxed">
-          Não foi possível validar seu login. O link pode ter expirado ou já foi utilizado.
+          Não foi possível validar seu login.
+          {err ? ` (${err})` : ''}
         </p>
 
         <Link
@@ -30,3 +34,16 @@ export default function AuthCodeError() {
   );
 }
 
+export default function AuthCodeError() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-6 text-center">
+          <div className="bg-neutral-800 p-8 rounded-2xl border border-neutral-700 max-w-md w-full shadow-2xl" />
+        </div>
+      }
+    >
+      <AuthCodeErrorInner />
+    </Suspense>
+  );
+}

@@ -73,11 +73,11 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
       </div>
 
       {/* Informações de Medição */}
-      <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+      <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
         <div className="flex items-start">
-          <Info className="w-5 h-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-300">
-            <p className="font-bold mb-2">Orientações para medição:</p>
+          <Info className="w-5 h-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-neutral-300">
+            <p className="font-bold mb-2 text-yellow-500">Orientações para medição:</p>
             <ul className="space-y-1">
               <li>• Use fita métrica flexível e não elástica</li>
               <li>• O aluno deve estar em pé, relaxado, com respiração normal</li>
@@ -178,7 +178,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
           className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600"
         />
         <p className="text-xs text-neutral-500">
-          Ex: "Aluno estava resfriado", "Medições tomadas pela manhã", "Equipamento calibrado em..."
+          Ex: &quot;Aluno estava resfriado&quot;, &quot;Medições tomadas pela manhã&quot;, &quot;Equipamento calibrado em...&quot;
         </p>
       </div>
     </div>

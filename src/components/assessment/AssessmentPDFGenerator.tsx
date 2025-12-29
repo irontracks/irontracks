@@ -87,11 +87,16 @@ export default function AssessmentPDFGenerator({
 }: AssessmentPDFGeneratorProps) {
   const generatePDF = async () => {
     try {
+      const safeStudentName = String(studentName || 'Aluno');
+      const safeDate = assessmentDate instanceof Date && !isNaN(assessmentDate as any)
+        ? assessmentDate
+        : new Date();
+
       const pdfBlob = await generateAssessmentPDF({
         formData,
-        studentName,
+        studentName: safeStudentName,
         trainerName,
-        assessmentDate,
+        assessmentDate: safeDate,
         photos
       });
 
@@ -99,7 +104,8 @@ export default function AssessmentPDFGenerator({
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `avaliacao_fisica_${studentName.replace(/\s+/g, '_')}_${assessmentDate.toISOString().split('T')[0]}.pdf`;
+      const fileDate = safeDate.toISOString().split('T')[0];
+      link.download = `avaliacao_fisica_${safeStudentName.replace(/\s+/g, '_')}_${fileDate}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

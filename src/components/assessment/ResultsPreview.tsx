@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, Save, ArrowLeft, User, Ruler, Calculator, TrendingUp } from 'lucide-react';
+import { Download, ArrowLeft, User, Ruler, Calculator, TrendingUp, FileText, Code } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
 import {
   calculateSumSkinfolds,
@@ -15,12 +15,12 @@ import { generateAssessmentPdf } from '@/utils/report/generatePdf';
 
 interface ResultsPreviewProps {
   formData: AssessmentFormData;
-  onSave: () => void;
   onBack: () => void;
   studentName: string;
 }
 
-export default function ResultsPreview({ formData, onSave, onBack, studentName }: ResultsPreviewProps) {
+export default function ResultsPreview({ formData, onBack, studentName }: ResultsPreviewProps) {
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const results = useMemo(() => {
     const weight = parseFloat(formData.weight || '0');
     const height = parseFloat(formData.height || '0');
@@ -86,6 +86,49 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
         return 'text-red-600';
       default:
         return 'text-gray-600';
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      const blob = await generateAssessmentPdf(formData, results, studentName);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = formData.assessment_date || new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `avaliacao_${studentName?.replace(/\s+/g, '_') || 'aluno'}_${date}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Erro ao gerar PDF da avaliação', e);
+    } finally {
+      setShowExportMenu(false);
+    }
+  };
+
+  const handleExportJson = () => {
+    try {
+      const payload = {
+        formData: formData || {},
+        results: results || {}
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = formData.assessment_date || new Date().toISOString().split('T')[0];
+      a.href = url;
+      a.download = `avaliacao_${studentName?.replace(/\s+/g, '_') || 'aluno'}_${date}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Erro ao exportar avaliação em JSON', e);
+    } finally {
+      setShowExportMenu(false);
     }
   };
 
@@ -253,49 +296,37 @@ export default function ResultsPreview({ formData, onSave, onBack, studentName }
           </div>
         )}
 
-      {/* Ações */}
-      <div className="flex justify-between pt-6">
-        <button
-          onClick={onBack}
-          className="px-6 py-2 border border-neutral-700 rounded-xl text-neutral-300 hover:bg-neutral-800 transition-colors flex items-center"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </button>
-        <div className="flex gap-3">
+      <div className="flex justify-end items-center pt-6">
+        <div className="relative">
           <button
-            onClick={async () => {
-              try {
-                const blob = await generateAssessmentPdf(formData, results, studentName);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                const date = formData.assessment_date || new Date().toISOString().split('T')[0];
-                a.href = url;
-                a.download = `avaliacao_${studentName?.replace(/\s+/g, '_') || 'aluno'}_${date}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
-              } catch (e) {
-                console.error('Erro ao gerar PDF da avaliação', e);
-              }
-            }}
-            className="px-6 py-2 border border-yellow-500/30 rounded-xl text-yellow-500 hover:bg-yellow-500/10 transition-colors flex items-center"
+            onClick={() => setShowExportMenu(v => !v)}
+            className="px-6 py-2 border border-yellow-500/30 rounded-xl text-yellow-500 hover:bg-yellow-500/10 transition-colors flex items-center gap-2"
           >
-            <Download className="w-4 h-4 mr-2" />
-            Gerar PDF
+            <Download className="w-4 h-4" />
+            <span>Exportar</span>
           </button>
-          <button
-            onClick={onSave}
-            className="px-6 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors flex items-center shadow-lg shadow-yellow-900/20"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            Salvar Avaliação
-          </button>
+          {showExportMenu && (
+            <div className="absolute right-0 mt-2 w-52 bg-neutral-900 border border-neutral-800 rounded-xl shadow-xl z-10">
+              <button
+                onClick={handleExportPdf}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-800"
+              >
+                <FileText className="w-4 h-4 text-yellow-500" />
+                <span>Exportar PDF</span>
+              </button>
+              <button
+                onClick={handleExportJson}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-800"
+              >
+                <Code className="w-4 h-4 text-yellow-500" />
+                <span>Exportar JSON</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      <p className="text-sm text-neutral-500 text-center">
+      <p className="text-sm text-neutral-500 text-center mt-4">
         Os resultados serão salvos no perfil do aluno e poderão ser acessados posteriormente
       </p>
     </motion.div>

@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, History, Trash2, Plus, Edit3 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ChevronLeft, History, Trash2, Plus, Edit3, CheckCircle2, Circle } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import WorkoutReport from '@/components/WorkoutReport';
 import { useDialog } from '@/contexts/DialogContext';
 
-const HistoryList = ({ user, onViewReport, onBack }) => {
+const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOnly, title }) => {
     const { confirm, alert } = useDialog();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
+    const isReadOnly = !!readOnly;
     const [showManual, setShowManual] = useState(false);
     const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0,16));
     const [manualDuration, setManualDuration] = useState('45');
@@ -27,18 +28,92 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
     const [editDuration, setEditDuration] = useState('45');
     const [editNotes, setEditNotes] = useState('');
     const [editExercises, setEditExercises] = useState([]);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState(new Set());
+
+    const toggleSelectionMode = () => {
+        setIsSelectionMode(!isSelectionMode);
+        setSelectedIds(new Set());
+    };
+
+    const toggleItemSelection = (id) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleBulkDelete = async () => {
+        if (selectedIds.size === 0) return;
+        if (!(await confirm(`Excluir ${selectedIds.size} itens selecionados?`))) return;
+        
+        try {
+            const ids = Array.from(selectedIds);
+            const { error } = await supabase
+                .from('workouts')
+                .delete()
+                .in('id', ids)
+                .eq('is_template', false);
+
+            if (error) throw error;
+            
+            setHistory(prev => prev.filter(h => !selectedIds.has(h.id)));
+            setIsSelectionMode(false);
+            setSelectedIds(new Set());
+            await alert('Itens excluídos com sucesso');
+        } catch (e) {
+            await alert('Erro ao excluir: ' + e.message);
+        }
+    };
+
+    const formatHistoryTitle = (title, dateValue) => {
+        const base = title || 'Treino';
+        try {
+            const d = new Date(dateValue);
+            if (!isNaN(d.getTime())) {
+                const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                return `${base} ${dateStr}`;
+            }
+        } catch {}
+        return base;
+    };
 
     useEffect(() => {
         const loadHistory = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('workouts')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .order('date', { ascending: false })
-                    .limit(200);
+                setLoading(true);
+                const baseUserId = user?.id;
+                const hasTarget = !!(targetId || targetEmail);
 
-                if (error) throw error;
+                if (!baseUserId && !hasTarget) {
+                    setHistory([]);
+                    return;
+                }
+
+                let data = [];
+
+                if (hasTarget) {
+                    const qs = targetId
+                        ? `id=${encodeURIComponent(targetId)}`
+                        : `email=${encodeURIComponent(targetEmail || '')}`;
+                    const resp = await fetch(`/api/admin/workouts/history?${qs}`);
+                    const json = await resp.json();
+                    if (!json?.ok) throw new Error(json?.error || 'Falha ao carregar histórico');
+                    data = Array.isArray(json?.rows) ? json.rows : [];
+                } else {
+                    const { data: rows, error } = await supabase
+                        .from('workouts')
+                        .select('*')
+                        .eq('user_id', baseUserId)
+                        .eq('is_template', false)
+                        .order('date', { ascending: false })
+                        .limit(200);
+
+                    if (error) throw error;
+                    data = Array.isArray(rows) ? rows : [];
+                }
 
                 const formatted = (data || []).map(w => {
                     let raw = null;
@@ -63,12 +138,13 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
                 setHistory(formatted);
             } catch (e) {
                 console.error("Erro histórico", e);
+                setHistory([]);
             } finally {
                 setLoading(false);
             }
         };
         loadHistory();
-    }, [user]);
+    }, [supabase, user?.id, targetId, targetEmail]);
 
     const saveManualExisting = async () => {
         try {
@@ -106,10 +182,12 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
                     };
                 }
             });
+            const totalSeconds = parseInt(manualDuration || '0', 10) * 60;
             const session = {
                 workoutTitle: selectedTemplate.name || 'Treino',
                 date: new Date(manualDate).toISOString(),
-                totalTime: parseInt(manualDuration || '0', 10) * 60,
+                totalTime: totalSeconds,
+                realTotalTime: totalSeconds,
                 logs,
                 exercises,
                 notes: manualNotes || '',
@@ -147,10 +225,12 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
                     logs[`${exIdx}-${sIdx}`] = { weight: '', reps: ex.reps || '', done: true };
                 }
             });
+            const totalSeconds = parseInt(manualDuration || '0', 10) * 60;
             const session = {
                 workoutTitle: newWorkout.title,
                 date: new Date(manualDate).toISOString(),
-                totalTime: parseInt(manualDuration || '0', 10) * 60,
+                totalTime: totalSeconds,
+                realTotalTime: totalSeconds,
                 logs,
                 exercises,
                 notes: manualNotes || ''
@@ -172,15 +252,19 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
 
     useEffect(() => {
         const fetchAvailableWorkouts = async () => {
-            const { data } = await supabase
-                .from('workouts')
-                .select('id, name')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-            setAvailableWorkouts(data || []);
+            try {
+                if (!user?.id) { setAvailableWorkouts([]); return; }
+                const { data } = await supabase
+                    .from('workouts')
+                    .select('id, name')
+                    .eq('user_id', user.id)
+                    .eq('is_template', false)
+                    .order('created_at', { ascending: false });
+                setAvailableWorkouts(data || []);
+            } catch { setAvailableWorkouts([]); }
         };
         if (showManual && manualTab === 'existing') fetchAvailableWorkouts();
-    }, [showManual, manualTab, user.id]);
+    }, [manualTab, showManual, supabase, user?.id]);
 
     useEffect(() => {
         const buildManualFromTemplate = async () => {
@@ -211,7 +295,7 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
             setManualExercises(exs);
         };
         if (selectedTemplate && manualTab === 'existing') buildManualFromTemplate();
-    }, [selectedTemplate, manualTab]);
+    }, [manualTab, selectedTemplate, supabase]);
 
     const updateManualExercise = (idx, field, value) => {
         setManualExercises(prev => {
@@ -312,7 +396,8 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
                     logs[`${exIdx}-${sIdx}`] = { weight: editExercises[exIdx]?.weights?.[sIdx] ?? '', reps: (editExercises[exIdx]?.repsPerSet?.[sIdx] ?? ex.reps) ?? '', done: true };
                 }
             });
-            const session = { workoutTitle: editTitle, date: new Date(editDate).toISOString(), totalTime: parseInt(editDuration || '0', 10) * 60, logs, exercises, notes: editNotes || '' };
+            const totalSeconds = parseInt(editDuration || '0', 10) * 60;
+            const session = { workoutTitle: editTitle, date: new Date(editDate).toISOString(), totalTime: totalSeconds, realTotalTime: totalSeconds, logs, exercises, notes: editNotes || '' };
             const { error } = await supabase
                 .from('workouts')
                 .update({ name: editTitle, date: new Date(editDate), notes: JSON.stringify(session) })
@@ -332,49 +417,76 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
         <div className="min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra pt-header-safe">
             <div className="flex items-center gap-3 mb-6 pt-safe h-16">
                 <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-8 h-8 flex items-center justify-center text-neutral-200 hover:text-white"><ChevronLeft className="pointer-events-none" /></button>
-                <h2 className="text-xl font-bold flex items-center gap-2"><History className="text-yellow-500" /> Histórico</h2>
-                <div className="ml-auto">
-                    <button type="button" onClick={() => setShowManual(true)} className="cursor-pointer relative z-10 p-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 font-bold flex items-center gap-2"><Plus size={16}/> Adicionar</button>
+                <h2 className="text-xl font-bold flex items-center gap-2"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
+                <div className="ml-auto flex items-center gap-3">
+                    {!isReadOnly && history.length > 0 && (
+                        <button type="button" onClick={toggleSelectionMode} className="text-yellow-500 font-bold text-sm hover:text-yellow-400">
+                            {isSelectionMode ? 'Cancelar' : 'Selecionar'}
+                        </button>
+                    )}
+                    {!isReadOnly && !isSelectionMode && (
+                        <button type="button" onClick={() => setShowManual(true)} className="cursor-pointer relative z-10 p-2 bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 font-bold flex items-center gap-2"><Plus size={16}/> Adicionar</button>
+                    )}
                 </div>
             </div>
             {loading && <p className="text-center text-neutral-500 animate-pulse">Carregando histórico...</p>}
             {!loading && history.length === 0 && <div className="text-center py-10 opacity-50"><p>Nenhum treino finalizado ainda.</p></div>}
             <div className="space-y-3">
-                {history.filter(h => !h.isTemplate).map(session => (
-                    <div key={session.id} onClick={() => setSelectedSession(session.rawSession || session)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 cursor-pointer hover:border-yellow-500/50 relative group transition-colors">
+                {history.map(session => (
+                    <div key={session.id} onClick={() => isSelectionMode ? toggleItemSelection(session.id) : setSelectedSession(session.rawSession || session)} className={`bg-neutral-800 p-4 rounded-xl border cursor-pointer relative group transition-colors ${isSelectionMode ? (selectedIds.has(session.id) ? 'border-yellow-500 bg-neutral-800/80' : 'border-neutral-700') : 'border-neutral-700 hover:border-yellow-500/50'}`}>
                         <div className="flex justify-between items-center">
-                            <div>
-                                <h3 className="font-bold text-lg text-white">{session.workoutTitle}</h3>
-                                <p className="text-xs text-neutral-500">{(() => {
+                            {isSelectionMode && (
+                                <div className="mr-3">
+                                    {selectedIds.has(session.id) ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
+                                </div>
+                            )}
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg text-white">{formatHistoryTitle(session.workoutTitle, session.date)}</h3>
+                                <p className="text-xs text-neutral-500">Concluído em: {(() => {
                                     try {
                                         const d = new Date(session.date);
-                                        return isNaN(d.getTime()) ? 'Data Desconhecida' : d.toLocaleDateString('pt-BR');
+                                        return isNaN(d.getTime()) ? 'Data Desconhecida' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
                                     } catch { return 'Data Desconhecida'; }
                                 })()} • {Math.floor((session.totalTime || 0) / 60)} min</p>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={(e) => handleDeleteClick(e, session)}
-                                    className="cursor-pointer relative z-20 p-2 rounded-lg transition-colors bg-neutral-900/50 text-neutral-500 border border-transparent hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20"
-                                >
-                                    <Trash2 size={18} className="pointer-events-none"/>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); openEdit(session); }}
-                                    className="cursor-pointer relative z-20 p-2 rounded-lg transition-colors bg-neutral-900/50 text-neutral-500 border border-transparent hover:bg-yellow-500/10 hover:text-yellow-500 hover:border-yellow-500/20"
-                                >
-                                    <Edit3 size={18} className="pointer-events-none"/>
-                                </button>
-                            </div>
+                            {!isReadOnly && !isSelectionMode && (
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleDeleteClick(e, session)}
+                                        className="cursor-pointer relative z-20 p-2 rounded-lg transition-colors bg-neutral-900/50 text-neutral-500 border border-transparent hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20"
+                                    >
+                                        <Trash2 size={18} className="pointer-events-none"/>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); openEdit(session); }}
+                                        className="cursor-pointer relative z-20 p-2 rounded-lg transition-colors bg-neutral-900/50 text-neutral-500 border border-transparent hover:bg-yellow-500/10 hover:text-yellow-500 hover:border-yellow-500/20"
+                                    >
+                                        <Edit3 size={18} className="pointer-events-none"/>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
             </div>
         </div>
 
-        {showManual && (
+        {!isReadOnly && isSelectionMode && (
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-900 border-t border-neutral-800 pb-safe z-50 flex justify-between items-center animate-slide-up">
+                <span className="text-neutral-500 text-sm font-bold">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                <button 
+                    onClick={handleBulkDelete} 
+                    disabled={selectedIds.size === 0}
+                    className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 hover:bg-red-500/20 transition-colors"
+                >
+                    <Trash2 size={18} /> Excluir
+                </button>
+            </div>
+        )}
+
+        {!isReadOnly && showManual && (
             <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowManual(false)}>
                 <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                     <div className="p-4 border-b border-neutral-800">
@@ -458,11 +570,11 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
                                 )}
                             </div>
                         )}
-                        {manualTab === 'new' && (
-                            <div>
-                                <ExerciseEditor workout={newWorkout} onSave={setNewWorkout} onCancel={()=>{}} onChange={setNewWorkout} />
-                            </div>
-                        )}
+						{manualTab === 'new' && (
+							<div>
+								<ExerciseEditor workout={newWorkout} onSave={setNewWorkout} onCancel={()=>{}} onChange={setNewWorkout} />
+							</div>
+						)}
                     </div>
                     <div className="p-4 bg-neutral-900/50 flex gap-2">
                         <button onClick={()=>setShowManual(false)} className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700">Cancelar</button>
@@ -567,4 +679,3 @@ const HistoryList = ({ user, onViewReport, onBack }) => {
 };
 
 export default HistoryList;
-

@@ -34,12 +34,6 @@ const AdminWorkoutEditor = ({ initialData, onSave, onCancel }) => {
             <div className="flex justify-between items-center mb-6">
                 <button onClick={onCancel} className="text-neutral-400">Cancelar</button>
                 <h3 className="font-bold text-white">{workout.id ? 'Editar' : 'Novo'}</h3>
-                <button 
-                    onClick={() => onSave(workout)} 
-                    className="bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2 px-6 rounded-full transition-colors flex items-center gap-2 shadow-lg"
-                >
-                    SALVAR TREINO
-                </button>
             </div>
             <input value={workout.title} onChange={e => setWorkout({...workout, title: e.target.value})} className="w-full bg-neutral-800 text-xl font-bold p-4 rounded-xl mb-4 border border-neutral-700 outline-none" placeholder="Nome do Treino"/>
             
@@ -69,13 +63,12 @@ const AdminWorkoutEditor = ({ initialData, onSave, onCancel }) => {
                                 <div className="col-span-1"><label className="text-[10px] text-neutral-500">Cad</label><input value={ex.cadence} onChange={e=>updateExercise(idx,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm"/></div>
                                 <div className="col-span-1">
                                     <label className="text-[10px] text-neutral-500">Método</label>
-                                    <select value={ex.method || 'Normal'} onChange={e=>updateExercise(idx,'method',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-[10px] h-[38px] outline-none">
+                                    <select value={((String(ex.method || '').toLowerCase() === 'warm-up') || (String(ex.method || '').toLowerCase() === 'warm_up') || (String(ex.method || '').toLowerCase() === 'warmup')) ? 'Normal' : (ex.method || 'Normal')} onChange={e=>updateExercise(idx,'method',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-[10px] h-[38px] outline-none">
                                         <option value="Normal">Normal</option>
                                         <option value="Drop-set">Drop-set</option>
                                         <option value="Rest-Pause">Rest-Pause</option>
                                         <option value="Bi-Set">Bi-Set</option>
                                         <option value="Cluster">Cluster</option>
-                                        <option value="Warm-up">Warm-up</option>
                                     </select>
                                 </div>
                             </div>
@@ -91,13 +84,7 @@ const AdminWorkoutEditor = ({ initialData, onSave, onCancel }) => {
             </div>
             <button onClick={addExercise} className="w-full py-4 mt-4 border-2 border-dashed border-neutral-700 text-neutral-400 rounded-xl font-bold">+ Exercício</button>
             
-            {/* FLOATING SAVE BUTTON (EMERGENCY FIX) */}
-            <button 
-                onClick={() => onSave(workout)} 
-                className="fixed bottom-10 right-10 z-[9999] bg-green-600 hover:bg-green-500 text-white font-bold py-4 px-8 rounded-full shadow-2xl border-4 border-white text-xl flex items-center gap-2 animate-bounce"
-            >
-                💾 SALVAR TREINO
-            </button>
+            {/* Removed floating save to evitar duplicidade */}
         </div>
     );
 };

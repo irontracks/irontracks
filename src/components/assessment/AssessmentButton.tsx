@@ -1,7 +1,7 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, TrendingUp, X } from 'lucide-react';
+import { Plus, FileText, TrendingUp, X, Upload } from 'lucide-react';
 import { AssessmentForm } from './AssessmentForm';
 
 interface AssessmentButtonProps {
@@ -19,9 +19,10 @@ export default function AssessmentButton({
 }: AssessmentButtonProps) {
   const [showForm, setShowForm] = useState(false);
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleNewAssessment = () => {
-    setShowForm(true);
+    router.push(`/assessments/new/${studentId}`);
   };
 
   const handleViewHistory = () => {
@@ -32,6 +33,81 @@ export default function AssessmentButton({
     setShowForm(false);
     // Recarregar a página ou atualizar os dados
     window.location.reload();
+  };
+
+  const handleImportClick = () => {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.click();
+  };
+
+  const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const text = await file.text();
+      let parsed: unknown;
+
+      try {
+        parsed = JSON.parse(text);
+      } catch (error) {
+        console.error("Erro ao parsear JSON de avaliação", error);
+        if (typeof window !== "undefined") {
+          window.alert("Arquivo JSON inválido. Verifique o conteúdo exportado.");
+        }
+        return;
+      }
+
+      if (!parsed || typeof parsed !== "object") {
+        if (typeof window !== "undefined") {
+          window.alert("Formato de arquivo não reconhecido para avaliação.");
+        }
+        return;
+      }
+
+      const payload: any = parsed as any;
+      const importedForm = payload.formData || payload;
+      if (!importedForm || typeof importedForm !== "object") {
+        if (typeof window !== "undefined") {
+          window.alert("JSON não contém dados de avaliação válidos.");
+        }
+        return;
+      }
+
+      const hasCoreField =
+        "weight" in importedForm ||
+        "height" in importedForm ||
+        "assessment_date" in importedForm;
+
+      if (!hasCoreField) {
+        if (typeof window !== "undefined") {
+          window.alert("JSON não parece ser uma avaliação física exportada.");
+        }
+        return;
+      }
+
+      if (typeof window !== "undefined") {
+        try {
+          const storageKey = `assessment_import_${studentId}`;
+          window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+        } catch (error) {
+          console.error("Erro ao salvar avaliação importada na sessão", error);
+          window.alert("Não foi possível preparar os dados importados. Tente novamente.");
+          return;
+        }
+      }
+
+      router.push(`/assessments/new/${studentId}`);
+    } catch (error) {
+      console.error("Erro ao importar JSON de avaliação", error);
+      if (typeof window !== "undefined") {
+        window.alert("Falha ao importar arquivo JSON de avaliação.");
+      }
+    } finally {
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
   };
 
   if (showForm) {
@@ -68,7 +144,7 @@ export default function AssessmentButton({
         <p className="text-neutral-400 mb-4">
           Gerencie as avaliações físicas e acompanhe a evolução do aluno
         </p>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={handleNewAssessment}
             className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
@@ -83,6 +159,20 @@ export default function AssessmentButton({
             <FileText className="w-4 h-4 mr-2" />
             Ver Histórico
           </button>
+          <button
+            onClick={handleImportClick}
+            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Importar JSON
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={handleImportFileChange}
+          />
         </div>
       </div>
     );

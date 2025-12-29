@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
     ChevronLeft,
@@ -37,17 +37,17 @@ const ChatScreen = ({ user, onClose }) => {
     const [searchQuery] = useState('');
 
     const dummy = useRef();
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
     const [privateChannels, setPrivateChannels] = useState([]);
     const [sendingInviteTo, setSendingInviteTo] = useState(null);
 
-    const fetchGlobalId = async () => {
+    const fetchGlobalId = useCallback(async () => {
         const res = await fetch('/api/chat/global-id')
         const j = await res.json()
         if (!j.ok) throw new Error(j.error)
         return j.id
-    }
+    }, [])
 
     const loadData = useCallback(async () => {
         setRefreshing(true);
@@ -60,22 +60,86 @@ const ChatScreen = ({ user, onClose }) => {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [user.id, user.email]);
+    }, [fetchGlobalId]);
+
+    const ensureBucket = useCallback(async () => {
+        try {
+            await fetch('/api/storage/ensure-bucket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'chat-media' }) })
+        } catch {}
+    }, [])
+
+    const formatMessage = useCallback((m) => {
+        let payload = null
+        try { if (typeof m.content === 'string' && m.content.startsWith('{')) payload = JSON.parse(m.content) } catch {}
+        return {
+            id: m.id,
+            text: payload?.text ?? m.content,
+            kind: payload?.type ?? 'text',
+            mediaUrl: payload?.media_url,
+            thumbUrl: payload?.thumb_url,
+            uid: m.user_id,
+            createdAt: new Date(m.created_at),
+            displayName: m.profiles?.display_name || 'Unknown',
+            photoURL: m.profiles?.photo_url
+        }
+    }, [])
 
     useEffect(() => {
         let mounted = true;
-        
+
         loadData();
         ensureBucket().catch(err => console.warn('Bucket ensure failed', err));
-        
+
         return () => { mounted = false; };
-    }, [loadData, user.id]);
+    }, [ensureBucket, loadData]);
+
+    const openGlobalChat = useCallback(async () => {
+        if (globalChannel) {
+            setActiveChannel({ id: globalChannel.id, name: 'Iron Lounge', type: 'global' });
+            setView('chat');
+            return;
+        }
+
+        try {
+            const gid = await fetchGlobalId()
+
+            if (gid) {
+                const global = { id: gid }
+                setGlobalChannel(global);
+                setActiveChannel({ id: gid, name: 'Iron Lounge', type: 'global' });
+                setView('chat');
+            } else {
+                const { data: newGlobal, error: createError } = await supabase
+                    .from('chat_channels')
+                    .insert({ type: 'global' })
+                    .select('id')
+                    .single();
+
+                if (createError) {
+                    if (createError.code === '23505') {
+                        return openGlobalChat();
+                    }
+                    throw createError;
+                }
+
+                if (newGlobal) {
+                    setGlobalChannel(newGlobal);
+                    setActiveChannel({ id: newGlobal.id, name: 'Iron Lounge', type: 'global' });
+                    setView('chat');
+                } else {
+                    throw new Error("Unknown error creating global channel");
+                }
+            }
+        } catch (e) {
+            alert(`Erro ao conectar no chat global: ${e.message || 'Erro desconhecido'}`);
+        }
+    }, [alert, fetchGlobalId, globalChannel, supabase])
 
     useEffect(() => {
         if (globalChannel && view === 'list') {
             openGlobalChat();
         }
-    }, [globalChannel, view]);
+    }, [globalChannel, openGlobalChat, view]);
 
     useEffect(() => {
         if (!activeChannel) return;
@@ -118,27 +182,11 @@ const ChatScreen = ({ user, onClose }) => {
 
         const poll = setInterval(loadMessages, 5000);
         return () => { supabase.removeChannel(channel); clearInterval(poll); };
-    }, [activeChannel]);
+    }, [activeChannel, formatMessage, supabase]);
 
     useEffect(() => {
         dummy.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
-
-    const formatMessage = (m) => {
-        let payload = null
-        try { if (typeof m.content === 'string' && m.content.startsWith('{')) payload = JSON.parse(m.content) } catch {}
-        return {
-            id: m.id,
-            text: payload?.text ?? m.content,
-            kind: payload?.type ?? 'text',
-            mediaUrl: payload?.media_url,
-            thumbUrl: payload?.thumb_url,
-            uid: m.user_id,
-            createdAt: new Date(m.created_at),
-            displayName: m.profiles?.display_name || 'Unknown',
-            photoURL: m.profiles?.photo_url
-        }
-    };
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
@@ -152,12 +200,6 @@ const ChatScreen = ({ user, onClose }) => {
             body: JSON.stringify({ channel_id: activeChannel.id, content: text })
         })
     };
-
-    const ensureBucket = async () => {
-        try {
-            await fetch('/api/storage/ensure-bucket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'chat-media' }) })
-        } catch {}
-    }
 
     const handleAttachClick = () => { fileInputRef.current?.click() }
 
@@ -282,61 +324,20 @@ const ChatScreen = ({ user, onClose }) => {
         loadData();
     };
 
-    const openGlobalChat = async () => {
-        if (globalChannel) {
-            setActiveChannel({ id: globalChannel.id, name: 'Iron Lounge', type: 'global' });
-            setView('chat');
-            return;
-        }
-
-        try {
-            const gid = await fetchGlobalId()
-            
-            if (gid) {
-                const global = { id: gid }
-                setGlobalChannel(global);
-                setActiveChannel({ id: gid, name: 'Iron Lounge', type: 'global' });
-                setView('chat');
-            } else {
-                const { data: newGlobal, error: createError } = await supabase
-                    .from('chat_channels')
-                    .insert({ type: 'global' })
-                    .select('id')
-                    .single();
-                
-                if (createError) {
-                    if (createError.code === '23505') {
-                        return openGlobalChat();
-                    }
-                    throw createError;
-                }
-
-                if (newGlobal) {
-                    setGlobalChannel(newGlobal);
-                    setActiveChannel({ id: newGlobal.id, name: 'Iron Lounge', type: 'global' });
-                    setView('chat');
-                } else {
-                    throw new Error("Unknown error creating global channel");
-                }
-            }
-        } catch (e) {
-            alert(`Erro ao conectar no chat global: ${e.message || 'Erro desconhecido'}`);
-        }
-    };
-
     const openPrivateChat = (channel) => {
         setActiveChannel({ ...channel, type: 'private' });
         setView('chat');
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-neutral-900 flex flex-col animate-slide-up">
-            <div className="p-4 bg-neutral-800 border-b border-neutral-700 flex justify-between items-center shadow-lg pt-safe h-16">
-                <div className="flex items-center gap-3">
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-neutral-200 hover:text-white">
-                        <ChevronLeft size={20} />
-                    </button>
-                    <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
+
+		<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col animate-slide-up">
+			<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center shadow-lg pt-safe min-h-[56px]">
+				<div className="flex items-center gap-3">
+					<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
+						<ChevronLeft size={20} />
+					</button>
+					<div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
                     
                     <div>
                         <h3 className="font-bold text-lg text-white">

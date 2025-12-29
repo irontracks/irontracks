@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { playStartSound } from '@/lib/sounds';
 
 const TeamWorkoutContext = createContext({
     incomingInvites: [],
@@ -23,7 +24,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
     const [incomingInvites, setIncomingInvites] = useState([]);
     const [teamSession, setTeamSession] = useState(null);
     const [loading, setLoading] = useState(false);
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
     // 1. Listen for Incoming Invites
     useEffect(() => {
@@ -85,6 +86,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                         },
                         workout: newInvite.workout_data
                     }]);
+                    try { playStartSound(); } catch {}
                 }
             )
             .subscribe((status) => {
@@ -94,7 +96,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user?.id]);
+    }, [supabase, user?.id]);
 
     // 2. Listen to Active Team Session
     useEffect(() => {
@@ -128,7 +130,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [teamSession?.id]);
+    }, [supabase, teamSession?.id]);
 
     const sendInvite = async (targetUser, workout, currentTeamSessionId = null) => {
         let sessionId = currentTeamSessionId;

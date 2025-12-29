@@ -1,0 +1,1015 @@
+'use client'
+
+import React, { useMemo, useState } from 'react'
+import dynamic from 'next/dynamic'
+import { useRouter } from 'next/navigation'
+import {
+  ArrowLeft,
+  Check,
+  Clock,
+  CreditCard,
+  Dumbbell,
+  Upload,
+  X,
+} from 'lucide-react'
+
+import { createClient } from '@/utils/supabase/client'
+import { createWorkout, deleteWorkout, importData, updateWorkout } from '@/actions/workout-actions'
+
+import AdminPanelV2 from '@/components/AdminPanelV2'
+import ActiveWorkout from '@/components/ActiveWorkout'
+import ChatDirectScreen from '@/components/ChatDirectScreen'
+import ChatListScreen from '@/components/ChatListScreen'
+import ChatScreen from '@/components/ChatScreen'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import ExerciseEditor from '@/components/ExerciseEditor'
+import GlobalDialog from '@/components/GlobalDialog'
+import HeaderActionsMenu from '@/components/HeaderActionsMenu'
+import HistoryList from '@/components/HistoryList'
+import IncomingInviteModal from '@/components/IncomingInviteModal'
+import NotificationCenter from '@/components/NotificationCenter'
+import NotificationToast from '@/components/NotificationToast'
+import RestTimerOverlay from '@/components/RestTimerOverlay'
+import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge'
+import { BackButton } from '@/components/ui/BackButton'
+import { DialogProvider, useDialog } from '@/contexts/DialogContext'
+import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext'
+import { playStartSound } from '@/lib/sounds'
+import { workoutPlanHtml } from '@/utils/report/templates'
+import { calculateExerciseDuration, estimateExerciseSeconds, toMinutesRounded } from '@/utils/pacing'
+
+import StudentDashboard, { type DashboardWorkout } from './StudentDashboard'
+import TeacherDashboard from './TeacherDashboard'
+import WorkoutReport from '@/components/WorkoutReport'
+
+const AssessmentHistory = dynamic(() => import('@/pages/AssessmentHistory'), { ssr: false })
+
+type DashboardUser = {
+  id: string
+  email: string | null
+  displayName?: string | null
+  photoURL?: string | null
+  role?: string | null
+}
+
+type DirectChat = {
+  other_user_id: string
+  other_user_name?: string | null
+  other_user_photo?: string | null
+}
+
+type NotificationPayload = {
+  text: string
+  senderName?: string | null
+}
+
+type Props = {
+  user: DashboardUser
+  isCoach: boolean
+  coachPending: boolean
+  initialProfileIncomplete: boolean
+  initialProfileDraftName: string
+  initialWorkouts: DashboardWorkout[]
+}
+
+const mapWorkoutRow = (w: any) => {
+  const exs = (w?.exercises || [])
+    .filter((e: any) => e && typeof e === 'object')
+    .sort((a: any, b: any) => (a?.order || 0) - (b?.order || 0))
+    .map((e: any) => {
+      try {
+        const isCardio = String(e?.method || '').toLowerCase() === 'cardio'
+        const dbSets = Array.isArray(e?.sets) ? e.sets.filter((s: any) => s && typeof s === 'object') : []
+
+        const sortedSets = dbSets.slice().sort((aSet: any, bSet: any) => (aSet?.set_number || 0) - (bSet?.set_number || 0))
+        const setsCount = sortedSets.length || (isCardio ? 1 : 4)
+
+        const setDetails = sortedSets.map((s: any, idx: number) => ({
+          set_number: s?.set_number ?? idx + 1,
+          reps: s?.reps ?? null,
+          rpe: s?.rpe ?? null,
+          weight: s?.weight ?? null,
+          is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
+          advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+        }))
+
+        const nonEmptyReps = setDetails.map((s: any) => s?.reps).filter((r: any) => r !== null && r !== undefined && r !== '')
+        const defaultReps = isCardio ? '20' : '10'
+        let repsHeader = defaultReps
+        if (nonEmptyReps.length > 0) {
+          const uniqueReps = Array.from(new Set(nonEmptyReps))
+          repsHeader = (uniqueReps.length === 1 ? uniqueReps[0] : nonEmptyReps[0]) ?? defaultReps
+        }
+
+        const rpeValues = setDetails.map((s: any) => s?.rpe).filter((v: any) => v !== null && v !== undefined && !Number.isNaN(v))
+        const defaultRpe = isCardio ? 5 : 8
+        const rpeHeader = rpeValues.length > 0 ? rpeValues[0] : defaultRpe
+
+        return {
+          id: e?.id,
+          name: e?.name,
+          notes: e?.notes,
+          videoUrl: e?.video_url,
+          restTime: e?.rest_time,
+          cadence: e?.cadence,
+          method: e?.method,
+          sets: setsCount,
+          reps: repsHeader,
+          rpe: rpeHeader,
+          setDetails,
+        }
+      } catch {
+        return null
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    id: w?.id,
+    user_id: w?.user_id ?? null,
+    created_by: w?.created_by ?? null,
+    title: w?.title ?? w?.name ?? 'Treino',
+    notes: w?.notes ?? null,
+    exercises: exs,
+  }
+}
+
+function DashboardInner(props: Props) {
+  const { confirm, alert } = useDialog()
+  const router = useRouter()
+
+  const supabase = useMemo(() => createClient(), [])
+
+  const [view, setView] = useState<'dashboard' | 'assessments' | 'edit' | 'active' | 'history' | 'report' | 'chat' | 'globalChat' | 'chatList' | 'directChat' | 'admin'>(
+    'dashboard'
+  )
+
+  const [profileIncomplete, setProfileIncomplete] = useState<boolean>(!!props.initialProfileIncomplete)
+  const [profileDraftName, setProfileDraftName] = useState<string>(props.initialProfileDraftName || '')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [showCompleteProfile, setShowCompleteProfile] = useState(false)
+
+  const [workouts, setWorkouts] = useState<DashboardWorkout[]>(Array.isArray(props.initialWorkouts) ? props.initialWorkouts : [])
+  const [currentWorkout, setCurrentWorkout] = useState<any>(null)
+  const [activeSession, setActiveSession] = useState<any>(null)
+  const [reportData, setReportData] = useState<{ current: any; previous: any } | null>(null)
+  const [exportWorkout, setExportWorkout] = useState<any>(null)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [quickViewWorkout, setQuickViewWorkout] = useState<any>(null)
+  const [showNotifCenter, setShowNotifCenter] = useState(false)
+  const [notification, setNotification] = useState<NotificationPayload | null>(null)
+  const [showAdminPanel, setShowAdminPanel] = useState(false)
+
+  const [showWalletModal, setShowWalletModal] = useState(false)
+  const [loadingWallet, setLoadingWallet] = useState(false)
+  const [savingWallet, setSavingWallet] = useState(false)
+  const [walletIdDraft, setWalletIdDraft] = useState('')
+
+  const [showJsonImportModal, setShowJsonImportModal] = useState(false)
+  const [exportingAll, setExportingAll] = useState(false)
+  const [directChat, setDirectChat] = useState<DirectChat | null>(null)
+
+  const clearSupabaseCookiesBestEffort = () => {
+    try {
+      if (typeof document === 'undefined') return
+      const raw = String(document.cookie || '')
+      const cookieNames = raw
+        .split(';')
+        .map((p) => p.trim())
+        .map((p) => p.split('=')[0])
+        .filter(Boolean)
+      const targets = cookieNames.filter((n) => n.startsWith('sb-') || n.includes('supabase'))
+      targets.forEach((name) => {
+        try {
+          document.cookie = `${name}=; Max-Age=0; path=/`
+          document.cookie = `${name}=; Max-Age=0; path=/; samesite=lax`
+          document.cookie = `${name}=; Max-Age=0; path=/; samesite=none; secure`
+        } catch {}
+      })
+    } catch {}
+  }
+
+  const clearClientSessionState = () => {
+    try {
+      if (typeof localStorage === 'undefined') return
+      localStorage.removeItem('activeSession')
+      localStorage.removeItem('appView')
+    } catch {}
+  }
+
+  const safeSignOut = async () => {
+    try {
+      clearSupabaseCookiesBestEffort()
+      clearClientSessionState()
+      try {
+        if (typeof indexedDB !== 'undefined') {
+          try {
+            indexedDB.deleteDatabase('supabase-auth-token')
+          } catch {}
+        }
+      } catch {}
+    } catch {}
+  }
+
+  const handleLogout = async () => {
+    const ok = await confirm('Deseja realmente sair da sua conta?', 'Sair')
+    if (!ok) return
+    await safeSignOut()
+    try {
+      window.location.href = '/'
+    } catch {
+      try {
+        router.refresh()
+      } catch {}
+    }
+  }
+
+  const openWalletModal = async () => {
+    if (!props.isCoach) return
+    setShowWalletModal(true)
+    setLoadingWallet(true)
+    try {
+      const res = await fetch('/api/teachers/wallet', { cache: 'no-store' })
+      const json = await res.json().catch(() => ({} as any))
+      if (!json?.ok) {
+        await alert('Falha ao carregar walletId: ' + (json?.error || ''))
+        setWalletIdDraft('')
+        return
+      }
+      setWalletIdDraft(String(json?.teacher?.asaas_wallet_id || ''))
+    } catch (e: any) {
+      await alert('Erro ao carregar walletId: ' + (e?.message ?? String(e)))
+      setWalletIdDraft('')
+    } finally {
+      setLoadingWallet(false)
+    }
+  }
+
+  const saveWalletId = async () => {
+    if (savingWallet) return
+    const walletId = String(walletIdDraft || '').trim()
+    if (!walletId) {
+      await alert('Informe seu walletId do Asaas.')
+      return
+    }
+    setSavingWallet(true)
+    try {
+      const res = await fetch('/api/teachers/wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ asaas_wallet_id: walletId }),
+      })
+      const json = await res.json().catch(() => ({} as any))
+      if (!json?.ok) {
+        await alert('Falha ao salvar walletId: ' + (json?.error || ''))
+        return
+      }
+      await alert('WalletId salvo com sucesso!')
+      setShowWalletModal(false)
+    } catch (e: any) {
+      await alert('Erro ao salvar walletId: ' + (e?.message ?? String(e)))
+    } finally {
+      setSavingWallet(false)
+    }
+  }
+
+  const refreshWorkouts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('*, exercises(*, sets(*))')
+        .eq('is_template', true)
+        .eq('user_id', props.user.id)
+        .order('name', { ascending: true })
+
+      if (error) throw error
+      const mapped = (data || []).map(mapWorkoutRow).filter((w: any) => Array.isArray(w?.exercises) && w.exercises.length > 0)
+      setWorkouts(mapped)
+    } catch (e: any) {
+      await alert('Erro ao atualizar treinos: ' + (e?.message ?? String(e)))
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    const nextName = String(profileDraftName || '').trim()
+    if (!nextName) {
+      await alert('Informe seu nome para completar o perfil.', 'Perfil incompleto')
+      return
+    }
+
+    setSavingProfile(true)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: props.user.id,
+            email: props.user.email,
+            display_name: nextName,
+            photo_url: props.user.photoURL ?? null,
+            last_seen: new Date(),
+            role: props.user.role || 'user',
+          },
+          { onConflict: 'id' }
+        )
+      if (error) throw error
+      setProfileIncomplete(false)
+      setShowCompleteProfile(false)
+    } catch (e: any) {
+      await alert('Erro ao salvar perfil: ' + (e?.message ?? String(e)))
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  const handleStartSession = async (workout: any) => {
+    const exercisesList = Array.isArray(workout?.exercises) ? workout.exercises.filter((ex: any) => ex && typeof ex === 'object') : []
+    if (exercisesList.length === 0) {
+      await alert('Este treino está sem exercícios válidos. Edite o treino antes de iniciar.', 'Treino incompleto')
+      return
+    }
+
+    const first = exercisesList[0] || {}
+    const exMin = toMinutesRounded(estimateExerciseSeconds(first))
+    const totalMin = toMinutesRounded(exercisesList.reduce((acc: number, ex: any) => acc + calculateExerciseDuration(ex), 0))
+    const ok = await confirm(`Iniciar "${String(workout?.title || 'Treino')}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`, 'Iniciar Treino')
+    if (!ok) return
+
+    playStartSound()
+    setActiveSession({
+      workout: { ...workout, exercises: exercisesList },
+      logs: {},
+      startedAt: Date.now(),
+      timerTargetTime: null,
+    })
+    setView('active')
+  }
+
+  const handleUpdateSessionLog = (key: string, data: any) => {
+    setActiveSession((prev: any) => {
+      if (!prev) return null
+      return { ...prev, logs: { ...(prev.logs || {}), [key]: data } }
+    })
+  }
+
+  const handleStartTimer = (duration: number) => {
+    setActiveSession((prev: any) => ({
+      ...(prev || {}),
+      timerTargetTime: Date.now() + duration * 1000,
+    }))
+  }
+
+  const handleCloseTimer = () => {
+    setActiveSession((prev: any) => ({
+      ...(prev || {}),
+      timerTargetTime: null,
+    }))
+  }
+
+  const handleFinishSession = async (sessionData: any, showReport: boolean) => {
+    setActiveSession(null)
+    if (showReport === false) {
+      setView('dashboard')
+      return
+    }
+    setReportData({ current: sessionData, previous: null })
+    setView('report')
+  }
+
+  const handleCreateWorkout = () => {
+    setCurrentWorkout({ title: '', exercises: [] })
+    setView('edit')
+  }
+
+  const handleEditWorkout = async (workout: any) => {
+    if (!workout?.id) return
+    try {
+      const { data, error } = await supabase.from('workouts').select('*, exercises(*, sets(*))').eq('id', workout.id).maybeSingle()
+      if (error) throw error
+      if (!data) {
+        setCurrentWorkout(workout)
+        setView('edit')
+        return
+      }
+      setCurrentWorkout(mapWorkoutRow(data))
+      setView('edit')
+    } catch (e: any) {
+      await alert('Erro ao carregar treino para edição: ' + (e?.message ?? String(e)))
+    }
+  }
+
+  const handleSaveWorkout = async (workoutToSave: any) => {
+    const w = workoutToSave || currentWorkout
+    if (!w || !w.title) return
+    try {
+      if (w.id) {
+        await updateWorkout(w.id, w)
+      } else {
+        await createWorkout(w)
+      }
+      setCurrentWorkout(w)
+      await refreshWorkouts()
+      setView('dashboard')
+    } catch (e: any) {
+      await alert('Erro: ' + (e?.message ?? String(e)))
+    }
+  }
+
+  const handleDeleteWorkout = async (id?: string, title?: string) => {
+    const safeId = String(id || '').trim()
+    if (!safeId) return
+    const name = title || workouts.find((w: any) => w?.id === safeId)?.title || 'este treino'
+    const ok = await confirm(`Apagar o treino "${String(name)}"?`, 'Excluir Treino')
+    if (!ok) return
+    try {
+      await deleteWorkout(safeId)
+      await refreshWorkouts()
+    } catch (e: any) {
+      await alert('Erro: ' + (e?.message ?? String(e)))
+    }
+  }
+
+  const handleDuplicateWorkout = async (workout: any) => {
+    const ok = await confirm(`Duplicar "${String(workout?.title || 'Treino')}"?`, 'Duplicar Treino')
+    if (!ok) return
+    const newWorkout = { ...workout, title: `${String(workout?.title || 'Treino')} (Cópia)` }
+    delete newWorkout.id
+    try {
+      await createWorkout(newWorkout)
+      await refreshWorkouts()
+    } catch (e: any) {
+      await alert('Erro ao duplicar: ' + (e?.message ?? String(e)))
+    }
+  }
+
+  const handleShareWorkout = async (workout: any) => {
+    setExportWorkout(workout)
+    setShowExportModal(true)
+  }
+
+  const handleExportPdf = async () => {
+    if (!exportWorkout) return
+    try {
+      const html = workoutPlanHtml(exportWorkout, props.user)
+      const win = window.open('', '_blank')
+      if (!win) return
+      win.document.open()
+      win.document.write(html)
+      win.document.close()
+      win.focus()
+      setTimeout(() => {
+        try {
+          win.print()
+        } catch {}
+      }, 300)
+      setShowExportModal(false)
+    } catch (e: any) {
+      await alert('Erro ao gerar PDF: ' + (e?.message ?? String(e)))
+    }
+  }
+
+  const handleExportJson = () => {
+    if (!exportWorkout) return
+    const json = JSON.stringify(
+      {
+        workout: {
+          title: exportWorkout.title,
+          exercises: (exportWorkout.exercises || []).map((ex: any) => ({
+            name: ex.name,
+            sets: ex.sets,
+            reps: ex.reps,
+            rpe: ex.rpe,
+            cadence: ex.cadence,
+            restTime: ex.restTime,
+            method: ex.method,
+            videoUrl: ex.videoUrl,
+            notes: ex.notes,
+          })),
+        },
+      },
+      null,
+      2
+    )
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${String(exportWorkout.title || 'treino').replace(/\s+/g, '_')}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    setShowExportModal(false)
+  }
+
+  const handleExportAllWorkouts = async () => {
+    try {
+      setExportingAll(true)
+      const payload = {
+        user: { id: props.user?.id || '', email: props.user?.email || '' },
+        workouts: (workouts || []).map((w: any) => ({
+          id: w?.id,
+          title: w?.title,
+          notes: w?.notes,
+          is_template: true,
+          exercises: (w?.exercises || []).map((ex: any) => ({
+            name: ex?.name,
+            sets: ex?.sets,
+            reps: ex?.reps,
+            rpe: ex?.rpe,
+            cadence: ex?.cadence,
+            restTime: ex?.restTime,
+            method: ex?.method,
+            videoUrl: ex?.videoUrl,
+            notes: ex?.notes,
+          })),
+        })),
+      }
+      const json = JSON.stringify(payload, null, 2)
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `irontracks_workouts_${new Date().toISOString()}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+    } finally {
+      setExportingAll(false)
+    }
+  }
+
+  const handleJsonUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e?.target?.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = async (event) => {
+      try {
+        const json = JSON.parse(String(event?.target?.result || ''))
+        const ok = await confirm(`Importar dados de ${json?.user?.email || 'Unknown'}? Isso criará novos treinos.`, 'Importar Backup')
+        if (!ok) return
+        await importData(json)
+        await refreshWorkouts()
+        await alert('Dados importados com sucesso!', 'Sucesso')
+        setShowJsonImportModal(false)
+      } catch (err: any) {
+        await alert('Erro ao ler arquivo JSON: ' + (err?.message ?? String(err)))
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const currentWorkoutId = activeSession?.workout?.id
+  let nextWorkout: any = null
+  if (currentWorkoutId && Array.isArray(workouts) && workouts.length > 0) {
+    const index = workouts.findIndex((w: any) => w?.id === currentWorkoutId)
+    if (index !== -1 && index + 1 < workouts.length) nextWorkout = workouts[index + 1]
+  }
+
+  const isHeaderVisible = view !== 'active' && view !== 'report'
+
+  return (
+    <TeamWorkoutProvider user={props.user as any}>
+      <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
+        <IncomingInviteModal onStartSession={handleStartSession} />
+
+        {isHeaderVisible && (
+          <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
+            <div className="flex items-center cursor-pointer group" onClick={() => setView('dashboard')}>
+              <div className="flex items-center gap-2">
+                <Dumbbell size={18} className="text-yellow-500 opacity-25" />
+                <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
+                  IRON<span className="text-yellow-500">TRACKS</span>
+                </h1>
+              </div>
+              <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50" />
+              <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">{props.isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}</span>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <HeaderActionsMenu
+                user={props.user as any}
+                isCoach={props.isCoach}
+                hasUnreadChat={false}
+                hasUnreadNotification={false}
+                onOpenAdmin={() => setShowAdminPanel(true)}
+                onOpenChatList={() => setView('chatList')}
+                onOpenGlobalChat={() => setView('globalChat')}
+                onOpenHistory={() => setView('history')}
+                onOpenNotifications={() => setShowNotifCenter(true)}
+                onOpenSchedule={() => router.push('/dashboard/schedule')}
+                onOpenWallet={openWalletModal}
+                onLogout={handleLogout}
+              />
+            </div>
+          </div>
+        )}
+
+        {props.isCoach && props.coachPending && (
+          <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center">
+            Sua conta de Professor está pendente.{' '}
+            <button
+              className="underline"
+              onClick={async () => {
+                try {
+                  const r = await fetch('/api/teachers/accept', { method: 'POST' })
+                  const j = await r.json()
+                  if (j?.ok) {
+                    await alert('Conta ativada!')
+                  } else {
+                    await alert('Falha ao ativar: ' + (j?.error || ''))
+                  }
+                } catch (e: any) {
+                  await alert('Erro: ' + (e?.message ?? String(e)))
+                }
+              }}
+            >
+              Aceitar
+            </button>
+          </div>
+        )}
+
+        <RealtimeNotificationBridge setNotification={setNotification as any} />
+
+        <div className={`flex-1 overflow-y-auto custom-scrollbar relative ${isHeaderVisible ? 'pt-32 md:pt-24' : ''}`}>
+          {view === 'dashboard' || view === 'assessments' ? (
+            props.isCoach ? (
+              <TeacherDashboard
+                workouts={workouts}
+                profileIncomplete={profileIncomplete}
+                onOpenCompleteProfile={() => setShowCompleteProfile(true)}
+                view={view as any}
+                onChangeView={setView as any}
+                onCreateWorkout={handleCreateWorkout}
+                onQuickView={(w) => setQuickViewWorkout(w)}
+                onStartSession={handleStartSession}
+                onShareWorkout={handleShareWorkout}
+                onDuplicateWorkout={handleDuplicateWorkout}
+                onEditWorkout={handleEditWorkout}
+                onDeleteWorkout={handleDeleteWorkout}
+                currentUserId={props.user.id}
+                exportingAll={exportingAll}
+                onExportAll={handleExportAllWorkouts}
+                onOpenJsonImport={() => setShowJsonImportModal(true)}
+              />
+            ) : (
+              <StudentDashboard
+                workouts={workouts}
+                profileIncomplete={profileIncomplete}
+                onOpenCompleteProfile={() => setShowCompleteProfile(true)}
+                view={view as any}
+                onChangeView={setView as any}
+                onCreateWorkout={handleCreateWorkout}
+                onQuickView={(w) => setQuickViewWorkout(w)}
+                onStartSession={handleStartSession}
+                onShareWorkout={handleShareWorkout}
+                onDuplicateWorkout={handleDuplicateWorkout}
+                onEditWorkout={handleEditWorkout}
+                onDeleteWorkout={handleDeleteWorkout}
+                currentUserId={props.user.id}
+                exportingAll={exportingAll}
+                onExportAll={handleExportAllWorkouts}
+                onOpenJsonImport={() => setShowJsonImportModal(true)}
+              />
+            )
+          ) : null}
+
+          {view === 'assessments' && (
+            <div className="p-4 pb-24">
+              <AssessmentHistory studentId={props.user.id} />
+            </div>
+          )}
+
+          {view === 'edit' && (
+            <ExerciseEditor
+              workout={currentWorkout}
+              onSave={handleSaveWorkout}
+              onCancel={() => setView('dashboard')}
+              onChange={setCurrentWorkout}
+              onSaved={() => {
+                refreshWorkouts().catch(() => {})
+                setView('dashboard')
+              }}
+            />
+          )}
+
+          {view === 'active' && activeSession && (
+            <ActiveWorkout
+              session={activeSession}
+              user={props.user as any}
+              onUpdateLog={handleUpdateSessionLog}
+              onFinish={handleFinishSession}
+              onBack={() => setView('dashboard')}
+              onStartTimer={handleStartTimer}
+              isCoach={props.isCoach}
+              onUpdateSession={(updates: any) => setActiveSession((prev: any) => ({ ...(prev || {}), ...(updates || {}) }))}
+              nextWorkout={nextWorkout}
+            />
+          )}
+
+          {view === 'history' && (
+            <div className="p-4 pb-24">
+              <HistoryList
+                user={props.user as any}
+                onViewReport={(s: any) => {
+                  setReportData({ current: s, previous: null })
+                  setView('report')
+                }}
+                onBack={() => setView('dashboard')}
+                targetId={null as any}
+                targetEmail={null as any}
+                readOnly={false as any}
+                title={'Histórico' as any}
+              />
+            </div>
+          )}
+
+          {view === 'report' && reportData?.current && (
+            <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe">
+              <WorkoutReport
+                session={reportData.current}
+                previousSession={reportData.previous}
+                user={props.user as any}
+                onClose={() => setView('dashboard')}
+              />
+            </div>
+          )}
+
+          {view === 'chat' && (
+            <div className="absolute inset-0 z-50 bg-neutral-900">
+              <ChatScreen user={props.user as any} onClose={() => setView('dashboard')} />
+            </div>
+          )}
+
+          {view === 'globalChat' && (
+            <div className="absolute inset-0 z-50 bg-neutral-900">
+              <ChatScreen user={props.user as any} onClose={() => setView('dashboard')} />
+            </div>
+          )}
+
+          {view === 'chatList' && (
+            <div className="absolute inset-0 z-50 bg-neutral-900">
+              <ChatListScreen
+                user={props.user as any}
+                onClose={() => setView('dashboard')}
+                onSelectUser={() => {}}
+                onSelectChannel={(c: any) => {
+                  setDirectChat(c)
+                  setView('directChat')
+                }}
+              />
+            </div>
+          )}
+
+          {view === 'directChat' && directChat && (
+            <div className="absolute inset-0 z-50 bg-neutral-900">
+              <ChatDirectScreen
+                user={props.user as any}
+                targetUser={{
+                  id: directChat.other_user_id,
+                  display_name: directChat.other_user_name,
+                  photo_url: directChat.other_user_photo,
+                }}
+                otherUserId={directChat.other_user_id}
+                otherUserName={directChat.other_user_name}
+                otherUserPhoto={directChat.other_user_photo}
+                onClose={() => setView('chatList')}
+              />
+            </div>
+          )}
+
+          {view === 'admin' && (
+            <div className="fixed inset-0 z-[60]">
+              <AdminPanelV2 user={props.user as any} onClose={() => setView('dashboard')} />
+            </div>
+          )}
+        </div>
+
+        {showCompleteProfile && (
+          <div className="fixed inset-0 z-[85] bg-black/80 flex items-center justify-center p-4">
+            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="font-black text-white">Completar Perfil</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowCompleteProfile(false)}
+                  className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                  aria-label="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Nome de Exibição</label>
+              <input
+                value={profileDraftName}
+                onChange={(e) => setProfileDraftName(e.target.value)}
+                placeholder="Ex: João Silva"
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
+              />
+
+              <div className="flex gap-2 mt-5">
+                <button
+                  type="button"
+                  onClick={() => setShowCompleteProfile(false)}
+                  disabled={savingProfile}
+                  className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveProfile}
+                  disabled={savingProfile}
+                  className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50"
+                >
+                  {savingProfile ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showJsonImportModal && (
+          <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
+            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
+              <Upload size={48} className="mx-auto text-blue-500 mb-4" />
+              <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
+              <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
+
+              <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
+                Selecionar Arquivo
+                <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
+              </label>
+
+              <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showExportModal && exportWorkout && (
+          <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
+            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                <h3 className="font-bold text-white">Como deseja exportar?</h3>
+                <BackButton onClick={() => setShowExportModal(false)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
+              </div>
+              <div className="p-4 space-y-3">
+                <button onClick={handleExportPdf} className="w-full px-4 py-3 bg-yellow-500 text-black font-bold rounded-xl">
+                  Baixar PDF
+                </button>
+                <button onClick={handleExportJson} className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl">
+                  Baixar JSON
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {quickViewWorkout && (
+          <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQuickViewWorkout(null)}>
+            <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 flex justify-between items-center border-b border-neutral-800">
+                <h3 className="font-bold text-white">{String(quickViewWorkout?.title || 'Treino')}</h3>
+                <button
+                  type="button"
+                  onClick={() => setQuickViewWorkout(null)}
+                  className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors py-2 px-3 rounded-xl hover:bg-neutral-800 active:opacity-70"
+                  aria-label="Voltar"
+                >
+                  <ArrowLeft size={20} />
+                  <span className="font-semibold text-sm">Voltar</span>
+                </button>
+              </div>
+              <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+                {(quickViewWorkout?.exercises || []).map((ex: any, idx: number) => (
+                  <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-bold text-white text-sm">{String(ex?.name || 'Exercício')}</h4>
+                      <span className="text-xs text-neutral-400">{(parseInt(String(ex?.sets || '0')) || 0)} x {ex?.reps || '-'}</span>
+                    </div>
+                    <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
+                      <Clock size={14} className="text-yellow-500" />
+                      <span>Descanso: {ex?.restTime ? `${parseInt(String(ex.restTime))}s` : '-'}</span>
+                    </div>
+                    {ex?.notes ? <p className="text-sm text-neutral-300 mt-2">{String(ex.notes)}</p> : null}
+                  </div>
+                ))}
+                {(!quickViewWorkout?.exercises || quickViewWorkout.exercises.length === 0) && (
+                  <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
+                )}
+              </div>
+              <div className="p-4 border-t border-neutral-800 flex gap-2">
+                <button
+                  onClick={() => {
+                    const w = quickViewWorkout
+                    setQuickViewWorkout(null)
+                    handleStartSession(w)
+                  }}
+                  className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl"
+                >
+                  Iniciar Treino
+                </button>
+                <button onClick={() => setQuickViewWorkout(null)} className="flex-1 p-3 bg-neutral-800 text-white font-bold rounded-xl">
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showNotifCenter && (
+          <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowNotifCenter(false)}>
+            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 flex justify-between items-center border-b border-neutral-800">
+                <h3 className="font-bold text-white">Notificações</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifCenter(false)}
+                  className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                  aria-label="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 relative">
+                <NotificationCenter user={props.user as any} onStartSession={handleStartSession} initialOpen embedded />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showWalletModal && (
+          <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowWalletModal(false)}>
+            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 flex justify-between items-center border-b border-neutral-800">
+                <div className="flex items-center gap-2">
+                  <CreditCard size={18} className="text-yellow-500" />
+                  <h3 className="font-bold text-white">Carteira (Asaas)</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowWalletModal(false)}
+                  className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                  aria-label="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-3">
+                <div className="text-sm text-neutral-300">
+                  Cole aqui o seu <span className="font-bold text-white">walletId</span> do Asaas para receber repasses.
+                </div>
+                <input
+                  value={walletIdDraft}
+                  onChange={(e) => setWalletIdDraft(e.target.value)}
+                  placeholder={loadingWallet ? 'Carregando...' : 'Ex: 12345678-...'}
+                  disabled={loadingWallet || savingWallet}
+                  className="w-full bg-neutral-800 p-3 rounded-xl text-white border border-neutral-700 focus:border-yellow-500 outline-none disabled:opacity-60"
+                />
+                <button
+                  onClick={saveWalletId}
+                  disabled={loadingWallet || savingWallet}
+                  className="w-full min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black disabled:opacity-60"
+                >
+                  {savingWallet ? 'Salvando...' : 'Salvar walletId'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSession?.timerTargetTime ? <RestTimerOverlay targetTime={activeSession.timerTargetTime} onClose={handleCloseTimer} onFinish={handleCloseTimer} /> : null}
+
+        {notification ? (
+          <NotificationToast
+            notification={notification as any}
+            onClose={() => {
+              setView('chat')
+              setNotification(null)
+            }}
+          />
+        ) : null}
+
+        {showAdminPanel ? <AdminPanelV2 user={props.user as any} onClose={() => setShowAdminPanel(false)} /> : null}
+      </div>
+    </TeamWorkoutProvider>
+  )
+}
+
+export default function DashboardApp(props: Props) {
+  return (
+    <ErrorBoundary>
+      <DialogProvider>
+        <DashboardInner {...props} />
+        <GlobalDialog />
+      </DialogProvider>
+    </ErrorBoundary>
+  )
+}

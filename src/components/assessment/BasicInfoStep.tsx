@@ -174,9 +174,9 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
       </div>
 
       {/* Informações Importantes */}
-      <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
-        <h3 className="text-sm font-bold text-blue-400 mb-2">Importante:</h3>
-        <ul className="text-sm text-blue-300 space-y-1">
+      <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
+        <h3 className="text-sm font-bold text-yellow-500 mb-2">Importante:</h3>
+        <ul className="text-sm text-neutral-300 space-y-1">
           <li>• Certifique-se de que as medidas foram tomadas corretamente</li>
           <li>• O aluno deve estar em jejum ou ter seguido as orientações pré-avaliação</li>
           <li>• Use o mesmo equipamento e técnica para garantir consistência</li>
@@ -185,7 +185,7 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
       </div>
 
       {/* Valores de Referência Rápidos */}
-      <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+      <div className="bg-neutral-900 rounded-xl p-4 border border-neutral-800">
         <h3 className="text-sm font-bold text-white mb-3">Valores de Referência:</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-neutral-400">
           <div>

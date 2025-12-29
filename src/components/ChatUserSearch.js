@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
     ChevronLeft,
@@ -11,10 +11,25 @@ import { useDialog } from '@/contexts/DialogContext';
 const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [nowMs, setNowMs] = useState(0);
     const { alert } = useDialog();
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
+
+    useEffect(() => {
+        const tick = () => setNowMs(Date.now());
+        const t = setTimeout(tick, 0);
+        const id = setInterval(tick, 60_000);
+        return () => {
+            clearTimeout(t);
+            clearInterval(id);
+        };
+    }, []);
 
     const fetchAllUsers = useCallback(async () => {
+        if (!user?.id) {
+            setUsers([]);
+            return;
+        }
         setLoading(true);
         try {
             const { data, error } = await supabase
@@ -27,11 +42,12 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
             setUsers(data || []);
         } catch (error) {
             console.error('Erro ao carregar usuários:', error);
-            await alert('Erro ao carregar usuários: ' + error.message);
+            const msg = error?.message || String(error || '');
+            await alert('Erro ao carregar usuários: ' + msg);
         } finally {
             setLoading(false);
         }
-    }, [user.id, alert]);
+    }, [user?.id, alert, supabase]);
 
     useEffect(() => {
         fetchAllUsers();
@@ -49,11 +65,11 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
             })
             .subscribe();
         return () => { supabase.removeChannel(sub); };
-    }, [fetchAllUsers]);
+    }, [fetchAllUsers, supabase]);
 
     const isUserOnline = (lastSeen) => {
-        if (!lastSeen) return false;
-        const diff = Date.now() - new Date(lastSeen).getTime();
+        if (!lastSeen || !nowMs) return false;
+        const diff = nowMs - new Date(lastSeen).getTime();
         return diff < 5 * 60 * 1000;
     };
 
@@ -142,4 +158,3 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
 };
 
 export default ChatUserSearch;
-

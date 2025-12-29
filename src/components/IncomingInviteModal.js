@@ -6,30 +6,27 @@ import { useDialog } from '@/contexts/DialogContext';
 const IncomingInviteModal = ({ onStartSession }) => {
     const { alert } = useDialog();
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
-    const [activeInvite, setActiveInvite] = useState(null);
 
-    // Monitora novos convites para exibir o POPUP
+    const [nowMs, setNowMs] = useState(0);
+
     useEffect(() => {
-        if (incomingInvites.length > 0) {
-            // Pega o mais recente
-            const latest = incomingInvites[0];
+        const tick = () => setNowMs(Date.now());
+        const t = setTimeout(tick, 0);
+        const id = setInterval(tick, 60_000);
+        return () => {
+            clearTimeout(t);
+            clearInterval(id);
+        };
+    }, []);
 
-            // Só mostra se for recente (menos de 5 minutos para evitar problemas de relógio)
-            // O Contexto já filtra por 1 hora, mas o popup deve ser "ao vivo"
-            const diff = Date.now() - (latest.createdAt?.seconds * 1000 || Date.now());
-            if (diff < 300000) { // 5 minutos de tolerância (era 45s)
-                setActiveInvite(latest);
-            }
-        } else {
-            setActiveInvite(null);
-        }
-    }, [incomingInvites]);
+    const latestInvite = Array.isArray(incomingInvites) ? incomingInvites[0] : null;
+    const latestInviteCreatedAtMs = typeof latestInvite?.createdAt?.seconds === 'number' ? latestInvite.createdAt.seconds * 1000 : 0;
+    const shouldShow = Boolean(latestInvite && nowMs && latestInviteCreatedAtMs && (nowMs - latestInviteCreatedAtMs) < 300000);
 
     const handleAccept = async () => {
-        if (!activeInvite) return;
+        if (!latestInvite) return;
         try {
-            const workout = await acceptInvite(activeInvite);
-            setActiveInvite(null);
+            const workout = await acceptInvite(latestInvite);
             if (workout && onStartSession) {
                 onStartSession(workout);
             }
@@ -39,12 +36,11 @@ const IncomingInviteModal = ({ onStartSession }) => {
     };
 
     const handleReject = async () => {
-        if (!activeInvite) return;
-        await rejectInvite(activeInvite.id);
-        setActiveInvite(null);
+        if (!latestInvite) return;
+        await rejectInvite(latestInvite.id);
     };
 
-    if (!activeInvite) return null;
+    if (!shouldShow) return null;
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
@@ -54,7 +50,7 @@ const IncomingInviteModal = ({ onStartSession }) => {
                 </div>
                 <h3 className="text-2xl font-black text-white mb-2">Convite de Treino!</h3>
                 <p className="text-neutral-300 mb-6">
-                    <span className="text-yellow-500 font-bold">{activeInvite.fromName}</span> convidou você para treinar agora.
+                    <span className="text-yellow-500 font-bold">{latestInvite?.fromName}</span> convidou você para treinar agora.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                     <button

@@ -1,7 +1,8 @@
 "use client"
 import React, { useRef, useState, useEffect } from 'react';
-import { Download, X, TrendingUp, TrendingDown, Flame, FileText, Code } from 'lucide-react';
+import { Download, ArrowLeft, TrendingUp, TrendingDown, Flame, FileText, Code, Users } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
+import { workoutPlanHtml } from '@/utils/report/templates';
 
 const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const reportRef = useRef();
@@ -83,6 +84,44 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         }
     };
 
+    const handlePartnerPlan = (participant) => {
+        try {
+            if (!participant) return;
+            const exercises = Array.isArray(session.exercises) ? session.exercises : [];
+            const workout = {
+                title: session.workoutTitle || 'Treino',
+                exercises: exercises.map((ex) => ({
+                    name: ex.name,
+                    sets: Number(ex.sets) || 0,
+                    reps: ex.reps,
+                    rpe: ex.rpe,
+                    cadence: ex.cadence,
+                    restTime: ex.restTime,
+                    method: ex.method,
+                    notes: ex.notes
+                }))
+            };
+            const partnerUser = {
+                displayName: participant.name || participant.uid || '',
+                email: participant.email || ''
+            };
+            const html = workoutPlanHtml(workout, partnerUser);
+            const win = window.open('', '_blank');
+            if (!win) return;
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+            setTimeout(() => {
+                try {
+                    win.print();
+                } catch {}
+            }, 300);
+        } catch (e) {
+            alert('Não foi possível gerar o PDF do parceiro: ' + (e?.message || String(e)));
+        }
+    };
+
     const closePreview = () => {
         try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch {}
         setPdfUrl(null);
@@ -140,6 +179,17 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         }
     };
 
+    const teamMeta = session.teamMeta && typeof session.teamMeta === 'object' ? session.teamMeta : null;
+    const rawParticipants = teamMeta && Array.isArray(teamMeta.participants) ? teamMeta.participants : [];
+    const currentUserId = user?.id || user?.uid || null;
+    const partners = rawParticipants.filter((p) => {
+        const uid = p && (p.uid || p.id || null);
+        if (!uid || !currentUserId) return true;
+        return uid !== currentUserId;
+    });
+
+    const isTeamSession = partners.length > 0;
+
     return (
         <div className="fixed inset-0 z-[1000] overflow-y-auto bg-neutral-900 text-black">
             <div className={`fixed top-4 right-4 mt-safe mr-safe flex gap-2 no-print z-[1100] pointer-events-auto ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -164,8 +214,9 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                         </div>
                     )}
                 </div>
-                <button onClick={onClose} className="bg-white text-black p-3 rounded-xl font-bold shadow-lg">
-                    <X size={20} />
+                <button onClick={onClose} className="bg-white text.black px-3 py-2 rounded-xl font-bold shadow-lg inline-flex items-center gap-2">
+                    <ArrowLeft size={18} />
+                    <span className="text-xs">Voltar</span>
                 </button>
             </div>
             <div ref={reportRef} className="min-h-screen bg-white text-black p-8 max-w-4xl mx-auto" style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top))' }}>
@@ -179,6 +230,33 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                         <p className="text-neutral-600">{formatDate(session.date)}</p>
                     </div>
                 </div>
+
+                {isTeamSession && (
+                    <div className="mb-8 p-4 rounded-lg border border-neutral-200 bg-neutral-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center">
+                                <Users size={18} />
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-widest text-neutral-500">Treino em Equipe</p>
+                                <p className="text-sm font-semibold text-neutral-900">
+                                    {partners.length === 1 ? '1 parceiro treinando com você' : `${partners.length} parceiros treinando com você`}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {partners.map((p, idx) => (
+                                <button
+                                    key={p.uid || p.id || idx}
+                                    onClick={() => handlePartnerPlan(p)}
+                                    className="px-3 py-2 rounded-full bg-black text-white text-xs font-bold uppercase tracking-wide hover:bg-neutral-900"
+                                >
+                                    Ver PDF de {p.name || 'Parceiro'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">

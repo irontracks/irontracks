@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Timer, X } from 'lucide-react';
+import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound } from '@/lib/sounds';
 
 const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
@@ -28,12 +28,7 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
     }, [isFinished]);
 
     useEffect(() => {
-        if (!targetTime) {
-            setIsFinished(false);
-            return;
-        }
-        
-        setIsFinished(false);
+        if (!targetTime) return;
         let hasNotified = false;
 
         const updateTimer = () => {
@@ -44,7 +39,7 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
                 setIsFinished(true);
                 if (!hasNotified) {
                     hasNotified = true;
-                    if (Notification.permission === 'granted') {
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                         new Notification("⏰ Tempo Esgotado!", { 
                             body: "Hora de voltar para o treino!", 
                             icon: 'icone.png', 
@@ -54,6 +49,7 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
                 }
             } else {
                 setTimeLeft(remaining);
+                setIsFinished(false);
             }
         };
 
@@ -88,7 +84,7 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={onClose} className="h-12 w-12 bg-neutral-800 rounded-xl text-neutral-400 border border-neutral-700 hover:text-white hover:bg-neutral-700 flex items-center justify-center"><X size={20}/></button>
+                    <button onClick={onClose} className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2"><ArrowLeft size={16}/> <span className="text-xs font-bold">Voltar</span></button>
                 </div>
             </div>
         </div>

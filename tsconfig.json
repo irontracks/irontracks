@@ -37,6 +37,8 @@
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "_macro_mixer_orig",
+    "_legacy_backup"
   ]
 }

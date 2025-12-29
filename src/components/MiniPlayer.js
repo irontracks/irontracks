@@ -5,12 +5,13 @@ const MiniPlayer = ({ session, onClick }) => {
     const [elapsed, setElapsed] = useState(0);
     
     useEffect(() => {
-        if (!session?.startedAt) return;
+        const startedAt = session?.startedAt;
+        if (!startedAt) return;
         const interval = setInterval(() => {
-            setElapsed(Math.floor((Date.now() - session.startedAt) / 1000));
+            setElapsed(Math.floor((Date.now() - startedAt) / 1000));
         }, 1000);
         return () => clearInterval(interval);
-    }, [session]);
+    }, [session?.startedAt]);
 
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);

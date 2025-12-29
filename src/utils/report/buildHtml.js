@@ -16,32 +16,60 @@ export function buildReportHTML(session, previousSession, studentName = '') {
     })
     return volume
   }
-  const currentVolume = calculateTotalVolume(session.logs)
-  const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0
+  const currentVolume = calculateTotalVolume(session?.logs || {})
+  const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs || {}) : 0
   const volumeDelta = prevVolume > 0 ? (((currentVolume - prevVolume) / prevVolume) * 100).toFixed(1) : '0.0'
-  const durationInMinutes = (session.totalTime || 0) / 60
-  const realTotalTime = (session.realTotalTime || (Array.isArray(session.exerciseDurations) ? session.exerciseDurations.reduce((a,b)=>a+(b||0),0) : 0))
+  const durationInMinutes = ((session && session.totalTime) || 0) / 60
+  const realTotalTime = (session && session.realTotalTime)
+    || (Array.isArray(session?.exerciseDurations) ? session.exerciseDurations.reduce((a,b)=>a+(b||0),0) : 0)
   const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
 
   const prevLogsMap = {}
-  if (previousSession && previousSession.exercises && previousSession.logs) {
+  if (previousSession && Array.isArray(previousSession.exercises) && previousSession.logs) {
     previousSession.exercises.forEach((ex, exIdx) => {
       const exLogs = []
-      Object.keys(previousSession.logs).forEach(key => {
-        const [eIdx, sIdx] = key.split('-')
-        if (parseInt(eIdx) === exIdx) exLogs.push(previousSession.logs[key])
+      Object.keys(previousSession.logs || {}).forEach(key => {
+        const parts = String(key || '').split('-')
+        const eIdx = parseInt(parts[0] || '0', 10)
+        if (eIdx === exIdx) exLogs.push(previousSession.logs[key])
       })
-      prevLogsMap[ex.name] = exLogs
+      if (ex && ex.name) prevLogsMap[ex.name] = exLogs
     })
   }
 
-  const rowsHtml = (ex, exIdx) => {
-    const sets = parseInt(ex.sets || 0)
-    const prevLogs = prevLogsMap[ex.name] || []
+  const getSetTag = (log) => {
+    if (!log || typeof log !== 'object') return ''
+    const isWarmup = !!(log.is_warmup ?? log.isWarmup)
+    if (isWarmup) return 'Aquecimento'
+    const cfg = log.advanced_config ?? log.advancedConfig
+    const rawType = cfg && (cfg.type || cfg.kind || cfg.mode)
+    const t = String(rawType || '').toLowerCase()
+    if (!t) return ''
+    if (t.includes('drop')) return 'Drop-set'
+    if (t.includes('rest')) return 'Rest-pause'
+    if (t.includes('cluster')) return 'Cluster'
+    if (t.includes('bi')) return 'Bi-set'
+    return 'Método'
+  }
+
+  const hasProgressionForExercise = (ex, exIdx) => {
+    const sets = parseInt(ex?.sets || 0, 10)
+    const prevLogs = prevLogsMap[ex?.name] || []
+    if (!sets || !Array.isArray(prevLogs) || prevLogs.length === 0) return false
+    for (let sIdx = 0; sIdx < sets; sIdx++) {
+      const prevLog = prevLogs[sIdx]
+      if (prevLog && prevLog.weight) return true
+    }
+    return false
+  }
+
+  const rowsHtml = (ex, exIdx, showProgression) => {
+    const sets = parseInt(ex?.sets || 0, 10)
+    const prevLogs = prevLogsMap[ex?.name] || []
     let rows = ''
     for (let sIdx = 0; sIdx < sets; sIdx++) {
       const key = `${exIdx}-${sIdx}`
-      const log = session.logs ? session.logs[key] : null
+      const log = session && session.logs ? session.logs[key] : null
       const prevLog = prevLogs[sIdx]
       if (!log || (!log.weight && !log.reps)) continue
       let progressionText = '-'
@@ -52,45 +80,66 @@ export function buildReportHTML(session, previousSession, studentName = '') {
         else if (delta < 0) { progressionText = `${delta}kg`; progressionClass = 'color: #dc2626; font-weight: 700' }
         else progressionText = '='
       }
+      const tag = getSetTag(log)
+      const tagHtml = tag ? `<span style="margin-left:4px; font-size:10px; color:#374151">(${tag})</span>` : ''
+      const note = (log && (log.note || log.observation)) || ''
       rows += `
-        <tr style="border-bottom:1px solid #eee">
-          <td style="padding:12px; font-family: ui-monospace; color:#6b7280">#${sIdx + 1}</td>
+        <tr style="border-bottom:1px solid #000">
+          <td style="padding:12px; font-family: ui-monospace; color:#6b7280">#${sIdx + 1}${tagHtml}</td>
           <td style="padding:12px; text-align:center; font-weight:700; font-size:16px">${log.weight || '-'}</td>
           <td style="padding:12px; text-align:center; font-family: ui-monospace">${log.reps || '-'}</td>
-          <td style="padding:12px; text-align:center; font-size:12px; text-transform:uppercase; ${progressionClass}">${progressionText}</td>
+          <td style="padding:12px; text-align:center; font-family: ui-monospace">${ex && ex.cadence ? ex.cadence : '-'}</td>
+          ${showProgression ? `<td style="padding:12px; text-align:center; font-size:12px; text-transform:uppercase; ${progressionClass}">${progressionText}</td>` : ''}
         </tr>`
+
+      if (note) {
+        const colSpan = showProgression ? 5 : 4
+        rows += `
+        <tr>
+          <td colspan="${colSpan}" style="padding:6px 12px; font-size:12px; color:#4b5563; background:#f9fafb">Obs: ${note}</td>
+        </tr>`
+      }
     }
     return rows
   }
 
-  const exercisesHtml = (session.exercises || []).map((ex, exIdx) => `
+  const exercisesArray = Array.isArray(session?.exercises) ? session.exercises : []
+
+  const exercisesHtml = exercisesArray.map((ex, exIdx) => {
+    const showProgression = hasProgressionForExercise(ex, exIdx)
+    return `
     <div style="page-break-inside: avoid; margin-bottom:24px">
       <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px; border-bottom:2px solid #e5e7eb; padding-bottom:8px">
         <h3 style="font-size:18px; font-weight:800; text-transform:uppercase; display:flex; align-items:center; gap:8px">
           <span style="background:#000; color:#fff; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; font-size:12px">${exIdx + 1}</span>
-          ${ex.name || ''}
+          ${ex?.name || ''}
         </h3>
         <div style="display:flex; gap:12px; font-size:12px; font-family: ui-monospace; color:#6b7280">
-          ${ex.method && ex.method !== 'Normal' ? `<span style="color:#dc2626; font-weight:700; text-transform:uppercase">${ex.method}</span>` : ''}
-          ${ex.rpe ? `<span>RPE: <span style="font-weight:700; color:#000">${ex.rpe}</span></span>` : ''}
-          <span>Cad: <span style="font-weight:700; color:#000">${ex.cadence || '-'}</span></span>
+          ${ex && ex.method && ex.method !== 'Normal' ? `<span style="color:#dc2626; font-weight:700; text-transform:uppercase">${ex.method}</span>` : ''}
+          ${ex && ex.rpe ? `<span>RPE: <span style="font-weight:700; color:#000">${ex.rpe}</span></span>` : ''}
         </div>
       </div>
       <table style="width:100%; font-size:14px; border-collapse:collapse">
         <thead>
-          <tr style="color:#6b7280; border-bottom:1px solid #f3f4f6">
-            <th style="padding:8px; text-align:left; width:64px">Série</th>
-            <th style="padding:8px; text-align:center; width:96px">Carga</th>
-            <th style="padding:8px; text-align:center; width:96px">Reps</th>
-            <th style="padding:8px; text-align:center; width:128px">Evolução</th>
+          <tr style="color:#111827; border-bottom:1px solid #000">
+            <th style="padding:8px; text-align:left; width:64px; border-bottom:1px solid #000">Série</th>
+            <th style="padding:8px; text-align:center; width:96px; border-bottom:1px solid #000">Carga</th>
+            <th style="padding:8px; text-align:center; width:96px; border-bottom:1px solid #000">Reps</th>
+            <th style="padding:8px; text-align:center; width:80px; border-bottom:1px solid #000">Cad</th>
+            ${showProgression ? `<th style="padding:8px; text-align:center; width:128px; border-bottom:1px solid #000">Evolução</th>` : ''}
           </tr>
         </thead>
         <tbody>
-          ${rowsHtml(ex, exIdx)}
+          ${rowsHtml(ex, exIdx, showProgression)}
         </tbody>
       </table>
     </div>
-  `).join('')
+  `}).join('')
+
+  const origin = (typeof window !== 'undefined' && window.location && window.location.origin)
+    ? window.location.origin
+    : ''
+  const logoUrl = `${origin}/icone.png`
 
   return `<!doctype html>
   <html>
@@ -99,21 +148,29 @@ export function buildReportHTML(session, previousSession, studentName = '') {
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Relatório IronTracks</title>
       <style>
-        body { background:#fff; color:#000; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+        body { background:#fff; color:#000; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; }
         .container { max-width:860px; margin:0 auto; padding:24px; }
         .header { border-bottom:4px solid #000; padding-bottom:24px; margin-bottom:32px; display:flex; justify-content:space-between; align-items:flex-end }
         .brand { font-size:36px; font-weight:900; font-style:italic; letter-spacing:-0.02em }
         .muted { color:#6b7280; font-weight:700; text-transform:uppercase; letter-spacing:.2em }
         .card { background:#f5f5f5; border:1px solid #e5e7eb; border-radius:12px; padding:16px }
         .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px }
+        @media print {
+          @page { size:auto; margin:0mm; }
+          body { -webkit-print-color-adjust:exact; margin:0; }
+          .no-print { display:none !important; }
+        }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
-          <div>
-            <div class="brand">IRON<span class="muted" style="color:#6b7280">TRACKS</span></div>
-            <div class="muted">Relatório de Performance</div>
+          <div style="display:flex; align-items:flex-end; gap:12px">
+            <img src="${logoUrl}" alt="IronTracks" style="width:40px; height:40px; border-radius:8px; object-fit:contain; border:1px solid #000; background:#000" />
+            <div>
+              <div class="brand">IRONTRACKS</div>
+              <div class="muted">Relatório de Performance</div>
+            </div>
           </div>
           <div style="text-align:right">
             <div style="font-size:20px; font-weight:800">${session.workoutTitle || 'Treino'}</div>

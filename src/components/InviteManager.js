@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, UserPlus, Check, X } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import Image from 'next/image';
@@ -10,21 +10,38 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [invitedIds, setInvitedIds] = useState(new Set());
-    const supabase = createClient();
+    const [nowMs, setNowMs] = useState(0);
+    const supabase = useMemo(() => createClient(), []);
 
     useEffect(() => {
         if (!isOpen) return;
+        const tick = () => setNowMs(Date.now());
+        const t = setTimeout(tick, 0);
+        const id = setInterval(tick, 60_000);
+        return () => {
+            clearTimeout(t);
+            clearInterval(id);
+        };
+    }, [isOpen]);
 
-        setLoading(true);
-        const fetchProfiles = async () => {
-            const { data } = await supabase
-                .from('profiles')
-                .select('*')
-                .limit(20); // Limit initial fetch
-            
-            if (data) {
-                // Map Supabase profile to app user structure
-                const mapped = data.map(p => ({
+    useEffect(() => {
+        if (!isOpen) return;
+        let cancelled = false;
+
+        (async () => {
+            await Promise.resolve();
+            if (cancelled) return;
+            setLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .limit(20);
+
+                if (cancelled) return;
+                if (error) throw error;
+
+                const mapped = (data || []).map(p => ({
                     id: p.id,
                     displayName: p.display_name,
                     email: p.email,
@@ -32,12 +49,19 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                     lastSeen: p.last_seen
                 }));
                 setUsers(mapped);
+            } catch (e) {
+                if (!cancelled) {
+                    const msg = e?.message || String(e || '');
+                    await alert('Erro ao carregar usuários: ' + msg);
+                    setUsers([]);
+                }
+            } finally {
+                if (!cancelled) setLoading(false);
             }
-            setLoading(false);
-        };
-        fetchProfiles();
+        })();
 
-    }, [isOpen]);
+        return () => { cancelled = true; };
+    }, [isOpen, supabase, alert]);
 
     // Simple search function - In a real app with many users, this should be server-side search
     // Supabase supports text search, but for migration speed we'll filter client-side the fetched list
@@ -47,14 +71,15 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
         
         const searchProfiles = async () => {
             setLoading(true);
-            const { data } = await supabase
-                .from('profiles')
-                .select('*')
-                .ilike('display_name', `%${searchTerm}%`) // Case insensitive search
-                .limit(20);
+            try {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .ilike('display_name', `%${searchTerm}%`)
+                    .limit(20);
 
-            if (data) {
-                const mapped = data.map(p => ({
+                if (error) throw error;
+                const mapped = (data || []).map(p => ({
                     id: p.id,
                     displayName: p.display_name,
                     email: p.email,
@@ -62,32 +87,39 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                     lastSeen: p.last_seen
                 }));
                 setUsers(mapped);
+            } catch (e) {
+                const msg = e?.message || String(e || '');
+                await alert('Erro ao buscar usuários: ' + msg);
+                setUsers([]);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         
         const timer = setTimeout(searchProfiles, 500); // Debounce
         return () => clearTimeout(timer);
-    }, [searchTerm, isOpen]);
+    }, [searchTerm, isOpen, supabase, alert]);
 
     const handleInvite = async (user) => {
         try {
             await onInvite(user);
             setInvitedIds(prev => new Set(prev).add(user.id));
         } catch (e) {
-            await alert("Erro ao enviar: " + e.message);
+            const msg = e?.message || String(e || '');
+            await alert("Erro ao enviar: " + msg);
         }
     };
 
     const isOnline = (lastSeen) => {
-        if (!lastSeen) return false;
-        const diff = Date.now() - (new Date(lastSeen).getTime());
+        if (!lastSeen || !nowMs) return false;
+        const diff = nowMs - (new Date(lastSeen).getTime());
         return diff < 10 * 60 * 1000;
     };
 
     const getLastSeenText = (lastSeen) => {
         if (!lastSeen) return 'Nunca';
-        const diff = Date.now() - (new Date(lastSeen).getTime());
+        if (!nowMs) return '...';
+        const diff = nowMs - (new Date(lastSeen).getTime());
         const minutes = Math.floor(diff / 60000);
         if (minutes < 1) return 'Agora';
         if (minutes < 60) return `${minutes} min`;

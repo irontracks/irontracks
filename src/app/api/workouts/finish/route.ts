@@ -4,7 +4,9 @@ import { createClient } from '@/utils/supabase/server'
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
     const body = await request.json()
@@ -18,8 +20,9 @@ export async function POST(request: Request) {
         created_by: user.id,
         name: session.workoutTitle || 'Treino Realizado',
         date: new Date(session?.date ?? new Date()),
+        completed_at: new Date().toISOString(),
         is_template: false,
-        notes: JSON.stringify(session)
+        notes: JSON.stringify(session),
       })
       .select('id, created_at')
       .single()

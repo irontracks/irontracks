@@ -135,11 +135,11 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       </div>
 
       {/* Técnica de Medição */}
-      <div className="bg-blue-900/20 border border-blue-500/30 rounded-xl p-4">
+      <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
         <div className="flex items-start">
-          <Info className="w-5 h-5 text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-blue-300">
-            <p className="font-bold mb-2">Técnica correta:</p>
+          <Info className="w-5 h-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-neutral-300">
+            <p className="font-bold mb-2 text-yellow-500">Técnica correta:</p>
             <ol className="space-y-1 list-decimal list-inside">
               <li>Marque o local anatômico correto</li>
               <li>Pegue a dobra com polegar e indicador, separando bem a pele e gordura subcutânea</li>
@@ -272,7 +272,7 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
           className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600"
         />
         <p className="text-xs text-neutral-500">
-          Ex: "Dificuldade na dobra subescapular devido a tensão muscular", "Pele muito fina no tricipital"
+          Ex: &quot;Dificuldade na dobra subescapular devido a tensão muscular&quot;, &quot;Pele muito fina no tricipital&quot;
         </p>
       </div>
     </div>

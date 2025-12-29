@@ -1,46 +1,61 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Bell, Check, X, Users, MessageSquare, AlertTriangle, Trash2 } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 
-const NotificationCenter = ({ onStartSession, user }) => {
+const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => {
     const { alert, confirm } = useDialog();
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(() => !!initialOpen);
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
     const [systemNotifications, setSystemNotifications] = useState([]);
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user?.id) return;
+
+        let isMounted = true;
+        let channel;
 
         const fetchNotifications = async () => {
-            const { data, error } = await supabase
-                .from('notifications')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false });
-            
-            if (data) {
-                setSystemNotifications(data);
+            try {
+                const { data } = await supabase
+                    .from('notifications')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .order('created_at', { ascending: false });
+
+                if (isMounted) {
+                    setSystemNotifications(data || []);
+                }
+            } catch {
+                if (isMounted) {
+                    setSystemNotifications([]);
+                }
             }
-
-            const channel = supabase
-                .channel(`notifications:${user.id}`)
-                .on('postgres_changes', {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'notifications',
-                    filter: `user_id=eq.${user.id}`
-                }, (payload) => {
-                    setSystemNotifications(prev => [payload.new, ...prev]);
-                })
-                .subscribe();
-
-            return () => { supabase.removeChannel(channel); };
         };
+
         fetchNotifications();
-    }, [user]);
+
+        channel = supabase
+            .channel(`notifications:${user.id}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'notifications',
+                filter: `user_id=eq.${user.id}`
+            }, (payload) => {
+                setSystemNotifications(prev => [payload.new, ...prev]);
+            })
+            .subscribe();
+
+        return () => {
+            isMounted = false;
+            if (channel) {
+                supabase.removeChannel(channel);
+            }
+        };
+    }, [supabase, user?.id]);
 
     const handleDelete = async (id, e) => {
         e.stopPropagation();
@@ -68,7 +83,7 @@ const NotificationCenter = ({ onStartSession, user }) => {
             message: `Chamou você para treinar: ${inv.workout?.title || 'Treino'}`,
             timeAgo: 'Agora',
             data: inv,
-            timestamp: Date.now()
+            timestamp: typeof inv?.created_at === 'string' ? Date.parse(inv.created_at) : 0
         })),
         ...systemNotifications.map(n => ({
             id: n.id,
@@ -108,6 +123,85 @@ const NotificationCenter = ({ onStartSession, user }) => {
         await rejectInvite(item.id);
     };
 
+    const handleClearAll = async () => {
+        const confirmed = await confirm("Limpar todas as notificações?");
+        if (!confirmed) return;
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (!currentUser) return;
+        await supabase.from('notifications').delete().eq('user_id', currentUser.id);
+        setSystemNotifications([]);
+    };
+
+    const renderList = () => (
+        <div className="max-h-80 overflow-y-auto custom-scrollbar">
+            {allNotifications.length === 0 ? (
+                <div className="p-8 text-center text-neutral-500 text-xs">
+                    <Bell size={24} className="mx-auto mb-2 opacity-20" />
+                    Nenhuma notificação nova
+                </div>
+            ) : (
+                <div className="divide-y divide-neutral-800">
+                    {allNotifications.map(item => (
+                        <div key={item.id} className="p-4 hover:bg-neutral-800/50 transition-colors relative group">
+                            <div className="flex gap-3 mb-2">
+                                <div className="mt-1">{getIcon(item.type)}</div>
+                                <div className="flex-1 pr-6">
+                                    <p className="text-sm font-bold text-white leading-tight">{item.title}</p>
+                                    <p className="text-xs text-neutral-400 mt-1 break-words">{item.message}</p>
+                                    <p className="text-[10px] text-neutral-600 mt-1">{item.timeAgo}</p>
+                                </div>
+                            </div>
+
+                            {item.type === 'invite' && (
+                                <div className="flex gap-2 mt-2 pl-7">
+                                    <button
+                                        onClick={() => handleAccept(item)}
+                                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                                    >
+                                        <Check size={12} /> Aceitar
+                                    </button>
+                                    <button
+                                        onClick={() => handleReject(item)}
+                                        className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
+                                    >
+                                        <X size={12} /> Recusar
+                                    </button>
+                                </div>
+                            )}
+
+                            {item.type !== 'invite' && (
+                                <button
+                                    onClick={(e) => handleDelete(item.id, e)}
+                                    className="absolute top-2 right-2 p-2 text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    if (embedded) {
+        return (
+            <div className="w-full">
+                {systemNotifications.length > 0 && (
+                    <div className="flex justify-end mb-2">
+                        <button
+                            onClick={handleClearAll}
+                            className="text-[10px] text-neutral-500 hover:text-white uppercase"
+                        >
+                            Limpar Tudo
+                        </button>
+                    </div>
+                )}
+                {renderList()}
+            </div>
+        );
+    }
+
     return (
         <div className="relative z-50">
             <button
@@ -131,13 +225,7 @@ const NotificationCenter = ({ onStartSession, user }) => {
                             <h3 className="font-bold text-white text-sm">Notificações</h3>
                             {systemNotifications.length > 0 && (
                                 <button
-                                    onClick={async () => {
-                                        if(await confirm("Limpar todas as notificações?")) {
-                                            const { data: { user } } = await supabase.auth.getUser();
-                                            if(user) await supabase.from('notifications').delete().eq('user_id', user.id);
-                                            setSystemNotifications([]);
-                                        }
-                                    }}
+                                    onClick={handleClearAll}
                                     className="text-[10px] text-neutral-500 hover:text-white uppercase"
                                 >
                                     Limpar Tudo
@@ -145,55 +233,7 @@ const NotificationCenter = ({ onStartSession, user }) => {
                             )}
                         </div>
 
-                        <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                            {allNotifications.length === 0 ? (
-                                <div className="p-8 text-center text-neutral-500 text-xs">
-                                    <Bell size={24} className="mx-auto mb-2 opacity-20" />
-                                    Nenhuma notificação nova
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-neutral-800">
-                                    {allNotifications.map(item => (
-                                        <div key={item.id} className="p-4 hover:bg-neutral-800/50 transition-colors relative group">
-                                            <div className="flex gap-3 mb-2">
-                                                <div className="mt-1">{getIcon(item.type)}</div>
-                                                <div className="flex-1 pr-6">
-                                                    <p className="text-sm font-bold text-white leading-tight">{item.title}</p>
-                                                    <p className="text-xs text-neutral-400 mt-1 break-words">{item.message}</p>
-                                                    <p className="text-[10px] text-neutral-600 mt-1">{item.timeAgo}</p>
-                                                </div>
-                                            </div>
-
-                                            {item.type === 'invite' && (
-                                                <div className="flex gap-2 mt-2 pl-7">
-                                                    <button
-                                                        onClick={() => handleAccept(item)}
-                                                        className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
-                                                    >
-                                                        <Check size={12} /> Aceitar
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleReject(item)}
-                                                        className="flex-1 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-bold py-1.5 rounded-lg flex items-center justify-center gap-1 transition-colors"
-                                                    >
-                                                        <X size={12} /> Recusar
-                                                    </button>
-                                                </div>
-                                            )}
-
-                                            {item.type !== 'invite' && (
-                                                <button
-                                                    onClick={(e) => handleDelete(item.id, e)}
-                                                    className="absolute top-2 right-2 p-2 text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        {renderList()}
                     </div>
                 </>
             )}

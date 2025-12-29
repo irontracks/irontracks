@@ -1,56 +1,40 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: Request) {
+export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const channelId = searchParams.get('channel_id')
-    
-    if (!channelId) {
-      return NextResponse.json({ ok: false, error: 'Channel ID required' }, { status: 400 })
-    }
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const admin = createAdminClient()
-    
-    // 1. Fetch messages (raw)
-    const { data: messages, error: msgError } = await admin
+    const url = new URL(req.url)
+    const channel_id = url.searchParams.get('channel_id') || ''
+    if (!channel_id) return NextResponse.json({ ok: false, error: 'missing channel_id' }, { status: 400 })
+
+    const { data: msgs, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('channel_id', channelId)
+      .eq('channel_id', channel_id)
       .order('created_at', { ascending: false })
       .limit(200)
 
-    if (msgError) throw msgError
-    if (!messages || messages.length === 0) return NextResponse.json({ ok: true, data: [] })
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    // 2. Extract User IDs
-    const userIds = Array.from(new Set(messages.map(m => m.user_id)))
-
-    // 3. Fetch Profiles manually
-    const { data: profiles, error: profError } = await admin
-      .from('profiles')
-      .select('id, display_name, photo_url')
-      .in('id', userIds)
-
-    if (profError) throw profError
-
-    // 4. Map profiles to a lookup object
-    const profileMap = (profiles || []).reduce((acc, p) => {
-      acc[p.id] = p
-      return acc
-    }, {} as Record<string, any>)
-
-    // 5. Attach profiles to messages
-    const data = messages.map(m => ({
-      ...m,
-      profiles: profileMap[m.user_id] || { display_name: 'Unknown', photo_url: null }
-    }))
-
-    return NextResponse.json({ ok: true, data })
+    const ids = Array.from(new Set((msgs || []).map(m => m.user_id).filter(Boolean)))
+    let profs: any[] = []
+    if (ids.length) {
+      const { data: p } = await supabase
+        .from('profiles')
+        .select('id, display_name, photo_url')
+        .in('id', ids)
+      profs = p || []
+    }
+    const map = new Map(profs.map(x => [x.id, x]))
+    const enriched = (msgs || []).map(m => ({ ...m, profiles: map.get(m.user_id) || null }))
+    return NextResponse.json({ ok: true, data: enriched })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

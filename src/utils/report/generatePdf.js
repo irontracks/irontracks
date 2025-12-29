@@ -1,6 +1,16 @@
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
-
 export async function generateWorkoutPdf(session, previousSession) {
+  let PDFDocument;
+  let StandardFonts;
+  let rgb;
+  try {
+    const pdfLib = await import('pdf-lib')
+    PDFDocument = pdfLib.PDFDocument
+    StandardFonts = pdfLib.StandardFonts
+    rgb = pdfLib.rgb
+  } catch (e) {
+    throw new Error('Falha ao carregar o gerador de PDF')
+  }
+
   const pdfDoc = await PDFDocument.create()
   const page = pdfDoc.addPage([595, 842])
   const { width, height } = page.getSize()
@@ -114,6 +124,14 @@ export async function generateWorkoutPdf(session, previousSession) {
       }
       page.drawText(`#${sIdx + 1}`.padEnd(7) + String(log.weight || '-').padEnd(7) + String(log.reps || '-').padEnd(7) + evol, { x: margin, y, size: monoSize, font })
       y -= lineH
+
+      const note = log.note || log.observation
+      if (note) {
+        ensureSpace(1)
+        const text = String(note)
+        page.drawText(`Obs: ${text}`, { x: margin + 8, y, size: textSize - 1, font })
+        y -= lineH
+      }
     }
     y -= 6
   })
@@ -123,6 +141,18 @@ export async function generateWorkoutPdf(session, previousSession) {
 }
 
 export async function generateAssessmentPdf(formData, results, studentName) {
+  let PDFDocument;
+  let StandardFonts;
+  let rgb;
+  try {
+    const pdfLib = await import('pdf-lib')
+    PDFDocument = pdfLib.PDFDocument
+    StandardFonts = pdfLib.StandardFonts
+    rgb = pdfLib.rgb
+  } catch (e) {
+    throw new Error('Falha ao carregar o gerador de PDF')
+  }
+
   const pdfDoc = await PDFDocument.create()
   let page = pdfDoc.addPage([595, 842])
   const { width, height } = page.getSize()
