@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -74,30 +74,30 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [teacherStatusFilter, setTeacherStatusFilter] = useState('all');
     const [templateQuery, setTemplateQuery] = useState('');
 
-    const normalizeText = (value) => String(value || '').toLowerCase();
+    const normalizeText = useCallback((value) => String(value || '').toLowerCase(), []);
 
-    const statusMatches = (rowStatus, selected) => {
+    const statusMatches = useCallback((rowStatus, selected) => {
         if (!selected || selected === 'all') return true;
         return normalizeText(rowStatus) === normalizeText(selected);
-    };
+    }, [normalizeText]);
 
-    const studentMatchesQuery = (s) => {
+    const studentMatchesQuery = useCallback((s) => {
         const q = normalizeText(studentQuery).trim();
         if (!q) return true;
         return normalizeText(s?.name).includes(q) || normalizeText(s?.email).includes(q);
-    };
+    }, [normalizeText, studentQuery]);
 
-    const teacherMatchesQuery = (t) => {
+    const teacherMatchesQuery = useCallback((t) => {
         const q = normalizeText(teacherQuery).trim();
         if (!q) return true;
         return normalizeText(t?.name).includes(q) || normalizeText(t?.email).includes(q);
-    };
+    }, [normalizeText, teacherQuery]);
 
-    const templateMatchesQuery = (t) => {
+    const templateMatchesQuery = useCallback((t) => {
         const q = normalizeText(templateQuery).trim();
         if (!q) return true;
         return normalizeText(t?.name).includes(q);
-    };
+    }, [normalizeText, templateQuery]);
 
     const studentsWithTeacherFiltered = useMemo(() => {
         const list = Array.isArray(usersList) ? usersList : [];
@@ -105,7 +105,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             .filter((s) => !!s?.teacher_id)
             .filter(studentMatchesQuery)
             .filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
-    }, [studentQuery, studentStatusFilter, usersList]);
+    }, [studentStatusFilter, studentMatchesQuery, statusMatches, usersList]);
 
     const studentsWithoutTeacherFiltered = useMemo(() => {
         const list = Array.isArray(usersList) ? usersList : [];
@@ -113,19 +113,19 @@ const AdminPanelV2 = ({ user, onClose }) => {
             .filter((s) => !s?.teacher_id)
             .filter(studentMatchesQuery)
             .filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
-    }, [studentQuery, studentStatusFilter, usersList]);
+    }, [studentStatusFilter, studentMatchesQuery, statusMatches, usersList]);
 
     const teachersFiltered = useMemo(() => {
         const list = Array.isArray(teachersList) ? teachersList : [];
         return list
             .filter(teacherMatchesQuery)
             .filter((t) => statusMatches(t?.status || 'pendente', teacherStatusFilter));
-    }, [teacherQuery, teacherStatusFilter, teachersList]);
+    }, [statusMatches, teacherMatchesQuery, teacherStatusFilter, teachersList]);
 
     const templatesFiltered = useMemo(() => {
         const list = Array.isArray(templates) ? templates : [];
         return list.filter(templateMatchesQuery);
-    }, [templateQuery, templates]);
+    }, [templateMatchesQuery, templates]);
 
     useEffect(() => {
         if (!selectedStudent) setHistoryOpen(false);
@@ -1127,124 +1127,217 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 )}
 
                 {tab === 'students' && !selectedStudent && (
-                    <div className="space-y-6">
-                        <button onClick={() => setShowRegisterModal(true)} className="w-full py-3 bg-neutral-800 border border-yellow-500/30 text-yellow-500 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-yellow-500/10">
-                            <UserPlus size={20} /> CADASTRAR NOVO ALUNO
-                        </button>
-
-                        {/* Com Professor */}
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-neutral-500 mb-3">Com Professor</h3>
-                            {(usersList.filter(s => !!s.teacher_id)).length === 0 && (
-                                <p className="text-neutral-500 text-sm">Nenhum aluno com professor.</p>
-                            )}
-                            {usersList.filter(s => !!s.teacher_id).map(s => (
-                                <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 hover:border-yellow-500 cursor-pointer w-full max-w-[100vw] overflow-hidden">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-lg text-neutral-300 flex-shrink-0">{(s.name || s.email || '?')[0]}</div>
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="font-bold text-white truncate">{s.name || s.email}</h3>
-                                            <p className="text-xs text-neutral-400 truncate">{s.email}</p>
-                                        </div>
+                    <div className="w-full max-w-6xl mx-auto space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <UserCog size={18} className="text-yellow-500" />
+                                        <h2 className="text-base md:text-lg font-black tracking-tight">Alunos</h2>
                                     </div>
-
-                                    <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
-                                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-neutral-700 text-neutral-300 w-fit">
-                                            {isTeacher && s.teacher_id === user.id ? 'Seu aluno' : 'Professor atribuído'}
-                                        </span>
-                                        {(isAdmin || (isTeacher && s.teacher_id === user.id)) && (
-                                            <select
-                                                value={s.status || 'pendente'}
-                                                onClick={(e) => e.stopPropagation()}
-                                                onPointerDown={(e) => e.stopPropagation()}
-                                                onMouseDown={(e) => e.stopPropagation()}
-                                                onChange={async (e) => {
-                                                    const newStatus = e.target.value;
-                                                    try {
-                                                        const res = await fetch('/api/admin/students/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id, status: newStatus }) });
-                                                        const json = await res.json();
-                                                        if (json.ok) setUsersList(prev => prev.map(x => x.id === s.id ? { ...x, status: newStatus } : x));
-                                                    } catch {}
-                                                }}
-                                                className="bg-neutral-700 text-neutral-200 rounded-lg px-2 py-2 text-xs w-full sm:w-auto max-w-full"
-                                            >
-                                                <option value="pago">pago</option>
-                                                <option value="pendente">pendente</option>
-                                                <option value="atrasado">atrasado</option>
-                                                <option value="cancelar">cancelar</option>
-                                            </select>
-                                        )}
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                        {totalStudents} no total • {studentsWithTeacher} com professor • {studentsWithoutTeacher} sem professor
                                     </div>
                                 </div>
-                            ))}
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        onClick={() => setShowRegisterModal(true)}
+                                        className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
+                                    >
+                                        <UserPlus size={18} /> CADASTRAR
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-2">
+                                <div className="relative lg:col-span-2">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <input
+                                        value={studentQuery}
+                                        onChange={(e) => setStudentQuery(e.target.value)}
+                                        placeholder="Buscar aluno por nome ou email"
+                                        className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl pl-10 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                    {[
+                                        { key: 'all', label: 'Todos' },
+                                        { key: 'pago', label: 'Pago' },
+                                        { key: 'pendente', label: 'Pendente' },
+                                        { key: 'atrasado', label: 'Atrasado' },
+                                        { key: 'cancelar', label: 'Cancelar' }
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.key}
+                                            type="button"
+                                            onClick={() => setStudentStatusFilter(opt.key)}
+                                            className={`whitespace-nowrap min-h-[40px] px-3 py-2 rounded-full text-[11px] font-black uppercase tracking-wide border transition-all duration-300 active:scale-95 ${
+                                                studentStatusFilter === opt.key
+                                                    ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/15'
+                                                    : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
 
-                        {/* Sem Professor */}
-                        <div>
-                            <h3 className="text-xs font-bold uppercase text-neutral-500 mb-3">Sem Professor</h3>
-                            {(usersList.filter(s => !s.teacher_id)).length === 0 && (
-                                <p className="text-neutral-500 text-sm">Nenhum aluno sem professor.</p>
-                            )}
-                            {usersList.filter(s => !s.teacher_id).map(s => (
-                                <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 hover:border-yellow-500 cursor-pointer w-full max-w-[100vw] overflow-hidden">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-lg text-neutral-300 flex-shrink-0">{(s.name || s.email || '?')[0]}</div>
-                                        <div className="min-w-0 flex-1">
-                                            <h3 className="font-bold text-white truncate">{s.name || s.email}</h3>
-                                            <p className="text-xs text-neutral-400 truncate">{s.email}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-neutral-700 text-neutral-300 w-fit">Sem professor</span>
-                                    </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-neutral-500">Com Professor</h3>
+                                    <span className="text-[11px] font-bold text-neutral-400">{studentsWithTeacherFiltered.length}</span>
                                 </div>
-                            ))}
-                        
+                                {studentsWithTeacherFiltered.length === 0 ? (
+                                    <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-4">
+                                        <p className="text-neutral-500 text-sm">Nenhum aluno encontrado.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {studentsWithTeacherFiltered.map(s => (
+                                            <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700 hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300 cursor-pointer w-full max-w-[100vw] overflow-hidden">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center font-black text-lg text-neutral-200 flex-shrink-0">{(s.name || s.email || '?')[0]}</div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="font-black text-white truncate">{s.name || s.email}</h3>
+                                                        <p className="text-xs text-neutral-400 truncate">{s.email}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                                                    <span className="px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 w-fit">
+                                                        {isTeacher && s.teacher_id === user.id ? 'Seu aluno' : 'Vinculado'}
+                                                    </span>
+                                                    {(isAdmin || (isTeacher && s.teacher_id === user.id)) && (
+                                                        <select
+                                                            value={s.status || 'pendente'}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            onPointerDown={(e) => e.stopPropagation()}
+                                                            onMouseDown={(e) => e.stopPropagation()}
+                                                            onChange={async (e) => {
+                                                                const newStatus = e.target.value;
+                                                                try {
+                                                                    const res = await fetch('/api/admin/students/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id, status: newStatus }) });
+                                                                    const json = await res.json();
+                                                                    if (json.ok) setUsersList(prev => prev.map(x => x.id === s.id ? { ...x, status: newStatus } : x));
+                                                                } catch {}
+                                                            }}
+                                                            className="min-h-[40px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs w-full sm:w-auto max-w-full border border-neutral-700 focus:border-yellow-500 focus:outline-none"
+                                                        >
+                                                            <option value="pago">pago</option>
+                                                            <option value="pendente">pendente</option>
+                                                            <option value="atrasado">atrasado</option>
+                                                            <option value="cancelar">cancelar</option>
+                                                        </select>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h3 className="text-xs font-black uppercase tracking-widest text-neutral-500">Sem Professor</h3>
+                                    <span className="text-[11px] font-bold text-neutral-400">{studentsWithoutTeacherFiltered.length}</span>
+                                </div>
+                                {studentsWithoutTeacherFiltered.length === 0 ? (
+                                    <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-4">
+                                        <p className="text-neutral-500 text-sm">Nenhum aluno encontrado.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {studentsWithoutTeacherFiltered.map(s => (
+                                            <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700 hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300 cursor-pointer w-full max-w-[100vw] overflow-hidden">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center font-black text-lg text-neutral-200 flex-shrink-0">{(s.name || s.email || '?')[0]}</div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="font-black text-white truncate">{s.name || s.email}</h3>
+                                                        <p className="text-xs text-neutral-400 truncate">{s.email}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                    <span className="px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-wide bg-neutral-900 text-neutral-300 border border-neutral-700 w-fit">Sem professor</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
 
                 {tab === 'templates' && !selectedStudent && (
-                    <div className="space-y-3">
-                        {templates.length === 0 && (
-                            <p className="text-neutral-500 text-center py-10">Nenhum treino criado.</p>
-                        )}
-                        {templates.map(t => (
-                            <div
-                                key={t.id}
-                                className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer hover:border-yellow-500"
-                                onClick={() => openEditTemplate(t)}
-                            >
-                                <div>
-                                    <h3 className="font-bold text-white">{t.name}</h3>
-                                    <p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p>
+                    <div className="w-full max-w-6xl mx-auto space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <Dumbbell size={18} className="text-yellow-500" />
+                                        <h2 className="text-base md:text-lg font-black tracking-tight">Treinos</h2>
+                                    </div>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">{(Array.isArray(templates) ? templates.length : 0)} no total</div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); openEditTemplate(t); }}
-                                        className="w-8 h-8 rounded-full bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black flex items-center justify-center"
-                                    >
-                                        <Edit3 size={16} />
-                                    </button>
-                                    <button
-                                        onClick={async (e) => {
-                                            e.stopPropagation();
-                                            if (!(await confirm('Excluir este treino?', 'Apagar Treino'))) return;
-                                            try {
-                                                await deleteWorkout(t.id);
-                                                setTemplates(prev => prev.filter(x => x.id !== t.id));
-                                            } catch (err) {
-                                                await alert('Erro ao excluir: ' + err.message);
-                                            }
-                                        }}
-                                        className="w-8 h-8 rounded-full bg-neutral-700 hover:bg-red-600 text-neutral-300 hover:text-white flex items-center justify-center"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                                <div className="text-[11px] font-bold text-neutral-400">{templatesFiltered.length} visíveis</div>
                             </div>
-                        ))}
+                            <div className="mt-4 relative">
+                                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                <input
+                                    value={templateQuery}
+                                    onChange={(e) => setTemplateQuery(e.target.value)}
+                                    placeholder="Buscar treino por nome"
+                                    className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl pl-10 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
+                                />
+                            </div>
+                        </div>
+
+                        {templatesFiltered.length === 0 ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center">
+                                <p className="text-neutral-500">Nenhum treino encontrado.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {templatesFiltered.map(t => (
+                                    <div
+                                        key={t.id}
+                                        className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700 flex justify-between items-center cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+                                        onClick={() => openEditTemplate(t)}
+                                    >
+                                        <div className="min-w-0">
+                                            <h3 className="font-black text-white truncate">{t.name}</h3>
+                                            <p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openEditTemplate(t); }}
+                                                className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 hover:border-yellow-500/40 hover:bg-yellow-500/10 text-neutral-300 hover:text-yellow-400 flex items-center justify-center transition-all duration-300 active:scale-95"
+                                            >
+                                                <Edit3 size={16} />
+                                            </button>
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (!(await confirm('Excluir este treino?', 'Apagar Treino'))) return;
+                                                    try {
+                                                        await deleteWorkout(t.id);
+                                                        setTemplates(prev => prev.filter(x => x.id !== t.id));
+                                                    } catch (err) {
+                                                        await alert('Erro ao excluir: ' + err.message);
+                                                    }
+                                                }}
+                                                className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 hover:border-red-500/40 hover:bg-red-900/20 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all duration-300 active:scale-95"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1274,111 +1367,193 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </button>
                         </div>
 
-                        {/* Danger Zone */}
-                        <div className="bg-red-900/10 p-4 rounded-xl border border-red-500/30 space-y-4">
-                            <h3 className="font-black text-red-500 flex items-center gap-2 text-lg"><ShieldAlert size={24}/> DANGER ZONE (SISTEMA)</h3>
-                            <p className="text-red-400 text-xs">Ações irreversíveis. Cuidado.</p>
-                            
-                            <button onClick={() => handleDangerAction('ZERAR TODOS OS ALUNOS', clearAllStudents)} className="w-full py-3 bg-red-900/20 border border-red-500/50 hover:bg-red-900/50 text-red-500 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                <Trash2 size={18} /> ZERAR TODOS OS ALUNOS
+                        <div className="bg-neutral-900/40 p-4 rounded-2xl border border-red-500/25">
+                            <button
+                                type="button"
+                                onClick={() => setDangerOpen(v => !v)}
+                                className="w-full flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-10 h-10 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-center justify-center flex-shrink-0">
+                                        <ShieldAlert size={18} className="text-red-400" />
+                                    </div>
+                                    <div className="min-w-0 text-left">
+                                        <div className="font-black text-red-400 tracking-tight">Danger Zone</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">Ações irreversíveis com confirmação dupla</div>
+                                    </div>
+                                </div>
+                                <div className={`w-9 h-9 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center transition-all duration-300 ${dangerOpen ? 'rotate-180' : ''}`}>
+                                    <ChevronDown size={16} className="text-neutral-400" />
+                                </div>
                             </button>
-                            
-                            <button onClick={() => handleDangerAction('ZERAR TODOS OS PROFESSORES', clearAllTeachers)} className="w-full py-3 bg-red-900/20 border border-red-500/50 hover:bg-red-900/50 text-red-500 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                <Trash2 size={18} /> ZERAR TODOS OS PROFESSORES
-                            </button>
-                            
-                            <button onClick={() => handleDangerAction('ZERAR TODOS OS TREINOS', clearAllWorkouts)} className="w-full py-3 bg-red-900/20 border border-red-500/50 hover:bg-red-900/50 text-red-500 font-bold rounded-xl flex items-center justify-center gap-2 transition-colors">
-                                <Trash2 size={18} /> ZERAR TODOS OS TREINOS
-                            </button>
+
+                            {dangerOpen && (
+                                <div className="mt-4 space-y-2">
+                                    <button
+                                        onClick={() => handleDangerAction('ZERAR TODOS OS ALUNOS', clearAllStudents)}
+                                        className="w-full min-h-[44px] px-4 py-3 bg-red-900/20 border border-red-500/40 hover:bg-red-900/35 text-red-300 font-black rounded-xl flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                    >
+                                        <Trash2 size={18} /> ZERAR TODOS OS ALUNOS
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleDangerAction('ZERAR TODOS OS PROFESSORES', clearAllTeachers)}
+                                        className="w-full min-h-[44px] px-4 py-3 bg-red-900/20 border border-red-500/40 hover:bg-red-900/35 text-red-300 font-black rounded-xl flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                    >
+                                        <Trash2 size={18} /> ZERAR TODOS OS PROFESSORES
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleDangerAction('ZERAR TODOS OS TREINOS', clearAllWorkouts)}
+                                        className="w-full min-h-[44px] px-4 py-3 bg-red-900/20 border border-red-500/40 hover:bg-red-900/35 text-red-300 font-black rounded-xl flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                    >
+                                        <Trash2 size={18} /> ZERAR TODOS OS TREINOS
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
 
                 {tab === 'teachers' && isAdmin && !selectedStudent && (
-                    <div className="space-y-3">
-                        <button onClick={() => setShowTeacherModal(true)} className="w-full py-3 bg-neutral-800 border border-yellow-500/30 text-yellow-500 rounded-xl font-bold flex items-center justify-center gap-2 mb-4 hover:bg-yellow-500/10">
-                            <Plus size={20} /> ADICIONAR PROFESSOR
-                        </button>
-                        {teachersList.length === 0 && <p className="text-neutral-500 text-center py-10">Nenhum professor cadastrado.</p>}
-                        {teachersList.map(t => (
-                            <div
-                                key={t.id}
-                                className="bg-neutral-800 p-4 rounded-xl flex justify-between items-center border border-neutral-700 cursor-pointer hover:border-yellow-500"
-                                onClick={() => setEditingTeacher(t)}
-                            >
-                                <div>
-                                    <h3 className="font-bold text-white">{t.name}</h3>
-                                    <p className="text-xs text-neutral-400">{t.email}</p>
-                                    <p className="text-xs text-neutral-500">{t.phone || 'Sem telefone'}</p>
-                                    <div className="text-xs text-neutral-500 mt-1">Nascimento: {t.birth_date ? new Date(t.birth_date).toLocaleDateString() : '-'}</div>
+                    <div className="w-full max-w-6xl mx-auto space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <UserCog size={18} className="text-yellow-500" />
+                                        <h2 className="text-base md:text-lg font-black tracking-tight">Professores</h2>
+                                    </div>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">{(Array.isArray(teachersList) ? teachersList.length : 0)} cadastrados</div>
                                 </div>
-                                <div className="flex flex-col items-end gap-2">
-                                    <div className="px-3 py-1 rounded-full bg-neutral-700 text-xs font-bold uppercase mb-1">{t.status}</div>
-                                    <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        onClick={() => setShowTeacherModal(true)}
+                                        className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
+                                    >
+                                        <Plus size={18} /> ADICIONAR
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-2">
+                                <div className="relative lg:col-span-2">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <input
+                                        value={teacherQuery}
+                                        onChange={(e) => setTeacherQuery(e.target.value)}
+                                        placeholder="Buscar professor por nome ou email"
+                                        className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl pl-10 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                    {[
+                                        { key: 'all', label: 'Todos' },
+                                        { key: 'pago', label: 'Pago' },
+                                        { key: 'pendente', label: 'Pendente' },
+                                        { key: 'atrasado', label: 'Atrasado' },
+                                        { key: 'cancelar', label: 'Cancelar' }
+                                    ].map((opt) => (
                                         <button
-                                            onClick={(e) => { e.stopPropagation(); setEditingTeacher(t); }}
-                                            className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded-lg"
+                                            key={opt.key}
+                                            type="button"
+                                            onClick={() => setTeacherStatusFilter(opt.key)}
+                                            className={`whitespace-nowrap min-h-[40px] px-3 py-2 rounded-full text-[11px] font-black uppercase tracking-wide border transition-all duration-300 active:scale-95 ${
+                                                teacherStatusFilter === opt.key
+                                                    ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/15'
+                                                    : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                            }`}
                                         >
-                                            <Edit3 size={16}/>
+                                            {opt.label}
                                         </button>
-                                        {isAdmin && (
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {teachersFiltered.length === 0 ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center">
+                                <p className="text-neutral-500">Nenhum professor encontrado.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {teachersFiltered.map(t => (
+                                    <div
+                                        key={t.id}
+                                        className="bg-neutral-800 p-4 rounded-2xl flex justify-between items-center border border-neutral-700 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+                                        onClick={() => setEditingTeacher(t)}
+                                    >
+                                        <div className="min-w-0">
+                                            <h3 className="font-black text-white truncate">{t.name}</h3>
+                                            <p className="text-xs text-neutral-400 truncate">{t.email}</p>
+                                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                <span className="px-3 py-1.5 rounded-full bg-neutral-900 border border-neutral-700 text-[11px] font-black uppercase tracking-wide text-neutral-200">
+                                                    {t.status || 'pendente'}
+                                                </span>
+                                                <span className="text-[11px] font-semibold text-neutral-500">{t.phone || 'Sem telefone'}</span>
+                                                <span className="text-[11px] font-semibold text-neutral-500">Nascimento: {t.birth_date ? new Date(t.birth_date).toLocaleDateString() : '-'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                                onClick={() => setEditingTeacher(t)}
+                                                className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 hover:border-yellow-500/40 hover:bg-yellow-500/10 text-neutral-300 hover:text-yellow-400 flex items-center justify-center transition-all duration-300 active:scale-95"
+                                            >
+                                                <Edit3 size={16} />
+                                            </button>
                                             <select
                                                 value={t.status || 'pendente'}
-                                                onClick={(e) => e.stopPropagation()}
                                                 onChange={async (e) => {
                                                     const newStatus = e.target.value;
                                                     const res = await fetch('/api/admin/teachers/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, status: newStatus }) });
                                                     const json = await res.json();
                                                     if (json.ok) setTeachersList(prev => prev.map(x => x.id === t.id ? { ...x, status: newStatus } : x));
                                                 }}
-                                                className="bg-neutral-700 text-neutral-200 rounded-lg px-2 py-1 text-xs"
+                                                className="min-h-[40px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs border border-neutral-700 focus:border-yellow-500 focus:outline-none"
                                             >
                                                 <option value="pago">pago</option>
                                                 <option value="pendente">pendente</option>
                                                 <option value="atrasado">atrasado</option>
                                                 <option value="cancelar">cancelar</option>
                                             </select>
-                                        )}
-                                        <button
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                if (await confirm(`Excluir professor ${t.name}?`)) {
-                                                    try {
-                                                        const res = await fetch('/api/admin/teachers/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) });
-                                                        const json = await res.json();
-                                                        if (!json.ok) throw new Error(json.error || 'Falha ao excluir');
-                                                        setTeachersList(prev => prev.filter(x => x.id !== t.id));
-                                                    } catch (err) {
-                                                        await alert('Erro: ' + err.message);
-                                                    }
-                                                }
-                                            }}
-                                            className="p-2 bg-neutral-700 hover:bg-red-500 text-neutral-300 hover:text-white rounded-lg"
-                                        >
-                                            <Trash2 size={16}/>
-                                        </button>
-                                        {isAdmin && t.status === 'pending' && (
                                             <button
-                                                onClick={async (e) => {
-                                                    e.stopPropagation();
-                                                    try {
-                                                        const res = await fetch('/api/admin/teachers/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, status: 'active' }) });
-                                                        const json = await res.json();
-                                                        if (!json.ok) throw new Error(json.error||'');
-                                                        setTeachersList(prev => prev.map(x => x.id===t.id ? { ...x, status: 'active' } : x));
-                                                    } catch (err) {
-                                                        await alert('Erro ao aprovar: ' + err.message);
+                                                onClick={async () => {
+                                                    if (await confirm(`Excluir professor ${t.name}?`)) {
+                                                        try {
+                                                            const res = await fetch('/api/admin/teachers/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) });
+                                                            const json = await res.json();
+                                                            if (!json.ok) throw new Error(json.error || 'Falha ao excluir');
+                                                            setTeachersList(prev => prev.filter(x => x.id !== t.id));
+                                                        } catch (err) {
+                                                            await alert('Erro: ' + err.message);
+                                                        }
                                                     }
                                                 }}
-                                                className="px-3 py-1 bg-green-600 text-white rounded-lg text-xs font-bold"
+                                                className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 hover:border-red-500/40 hover:bg-red-900/20 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all duration-300 active:scale-95"
                                             >
-                                                Aprovar
+                                                <Trash2 size={16} />
                                             </button>
-                                        )}
+                                            {isAdmin && (t.status === 'pending' || t.status === 'pendente') && (
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res = await fetch('/api/admin/teachers/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, status: 'active' }) });
+                                                            const json = await res.json();
+                                                            if (!json.ok) throw new Error(json.error || '');
+                                                            setTeachersList(prev => prev.map(x => x.id === t.id ? { ...x, status: 'active' } : x));
+                                                        } catch (err) {
+                                                            await alert('Erro ao aprovar: ' + err.message);
+                                                        }
+                                                    }}
+                                                    className="min-h-[40px] px-3 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                                >
+                                                    Aprovar
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                ))}
                             </div>
-                        ))}
+                        )}
                     </div>
                 )}
 
