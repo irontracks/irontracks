@@ -360,8 +360,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     if (loading) {
 
 		return (
-			<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col">
-				<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950/80 backdrop-blur-xl border-b border-neutral-800 sticky top-0 z-20 justify-center relative flex">
+			<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
+				<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 sticky top-0 z-20 justify-center relative flex shadow-lg shadow-black/30">
 					<button onClick={onClose} className="absolute left-4 w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
 						<ChevronLeft size={20} />
 					</button>
@@ -379,8 +379,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 	}
 
 		return (
-				<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col animate-slide-up">
-					<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950/80 backdrop-blur-xl border-b border-neutral-800 sticky top-0 z-20 justify-center relative flex">
+				<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
+					<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 sticky top-0 z-20 justify-center relative flex shadow-lg shadow-black/30">
 						<button onClick={onClose} className="absolute left-4 w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
 							<ChevronLeft size={20} />
 						</button>
@@ -427,7 +427,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 </div>
             )}
 
-			<div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-black/30 pb-28">
+			<div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-neutral-950 pb-[calc(env(safe-area-inset-bottom)+120px)]">
 				{messages.length === 0 ? (
 					<div className="text-center py-10 text-neutral-500">
 						<div className="text-lg mb-2">💬</div>
@@ -524,38 +524,30 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 				)}
 			</div>
 
-			<form onSubmit={handleSendMessage} className="sticky bottom-0 z-30 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] bg-neutral-950/80 backdrop-blur-xl border-t border-neutral-800">
-				<div className="flex items-end gap-2">
-					<div className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-2xl px-3 py-2 focus-within:border-yellow-500/60 focus-within:ring-2 focus-within:ring-yellow-500/15 transition-colors">
-						<input
-							type="text"
-							value={newMessage}
-							onChange={(e) => setNewMessage(e.target.value)}
-							placeholder="Digite uma mensagem…"
-							className="w-full bg-transparent text-white outline-none placeholder:text-neutral-500 text-[15px] leading-6"
-						/>
-						<div className="flex items-center justify-between mt-2">
-							<div className="flex items-center gap-1">
-								<button type="button" onClick={() => setShowEmoji(v => !v)} className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><Smile size={18} /></button>
-								<button type="button" onClick={handleAddGif} className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><Link2 size={18} /></button>
-								<button type="button" onClick={handleAttachClick} className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><ImageIcon size={18} /></button>
-								<input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />
-							</div>
-							{uploading ? <span className="text-[11px] text-neutral-400">Enviando…</span> : null}
-						</div>
-					</div>
-
+			<form onSubmit={handleSendMessage} className="sticky bottom-0 z-30 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] bg-neutral-950 border-t border-neutral-800 shadow-[0_-14px_40px_rgba(0,0,0,0.55)]">
+				<div className="flex items-center gap-2 bg-neutral-900 border border-neutral-800 rounded-2xl px-2 py-2">
+					<button type="button" onClick={() => setShowEmoji(v => !v)} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><Smile size={18} /></button>
+					<button type="button" onClick={handleAttachClick} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><ImageIcon size={18} /></button>
+					<button type="button" onClick={handleAddGif} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><Link2 size={18} /></button>
+					<input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />
+					<input
+						type="text"
+						value={newMessage}
+						onChange={(e) => setNewMessage(e.target.value)}
+						placeholder="Digite uma mensagem…"
+						className="flex-1 min-w-0 bg-transparent text-white outline-none placeholder:text-neutral-500 text-[15px] leading-6 px-2"
+					/>
 					<button
 						type="submit"
 						disabled={!newMessage.trim()}
-						className="shrink-0 w-12 h-12 rounded-full bg-yellow-500 text-black flex items-center justify-center shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
+						className="shrink-0 w-11 h-11 rounded-xl bg-yellow-500 text-black flex items-center justify-center shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
 					>
-						<Send size={20} />
+						<Send size={18} />
 					</button>
 				</div>
-
+				{uploading ? <div className="mt-2 text-[11px] text-neutral-400">Enviando…</div> : null}
 				{showEmoji && (
-					<div className="absolute right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] bg-neutral-950 border border-neutral-800 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-2xl z-50">
+					<div className="absolute right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] bg-neutral-950 border border-neutral-800 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-2xl z-50">
 						{['😀','😁','😂','😉','😊','😍','👍','💪','🔥','🙏','🥳','🤝','🤩','🤔','👏','🙌'].map(e => (
 							<button type="button" key={e} className="text-xl w-9 h-9 rounded-xl hover:bg-neutral-900 active:scale-95 transition-transform" onClick={() => insertEmoji(e)}>{e}</button>
 						))}

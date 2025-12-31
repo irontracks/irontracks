@@ -112,10 +112,10 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
         }
     };
 
-    if (loading) {
+	if (loading) {
 			return (
-			<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col">
-				<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center h-16 pt-safe sticky top-0 z-20">
+			<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
+				<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center sticky top-0 z-20 shadow-lg shadow-black/30">
 					<div className="flex items-center gap-3">
 						<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
 							<ChevronLeft size={20} />
@@ -135,28 +135,28 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
     const offlineUsers = users.filter(u => !isUserOnline(u.last_seen));
 
 		return (
-			<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col animate-slide-up">
-				<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center shadow-lg h-16 pt-safe sticky top-0 z-20">
-					<div className="flex items-center gap-3">
-						<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
-							<ChevronLeft size={20} />
-						</button>
-						<div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
-						<div>
-							<h3 className="font-bold text-lg text-white">Conversas</h3>
-							<p className="text-xs text-neutral-400">Chat direto com seus contatos</p>
-						</div>
+		<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
+			<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center sticky top-0 z-20 shadow-lg shadow-black/30">
+				<div className="flex items-center gap-3">
+					<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
+						<ChevronLeft size={20} />
+					</button>
+					<div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
+					<div>
+						<h3 className="font-bold text-lg text-white">Conversas</h3>
+						<p className="text-xs text-neutral-400">Chat direto com seus contatos</p>
 					</div>
-					<div className="flex gap-2"></div>
 				</div>
-            <div className="p-4 border-b border-neutral-800">
-                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Contatos</h4>
-            </div>
+				<div className="flex gap-2"></div>
+			</div>
+			<div className="p-4 border-b border-neutral-800">
+				<h4 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Contatos</h4>
+			</div>
 
-            <div className="flex-1 overflow-y-auto">
-                {users.length === 0 ? (
-                    <div className="p-8 text-center text-neutral-500">
-                        <MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
+			<div className="flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),16px)]">
+				{users.length === 0 ? (
+					<div className="p-8 text-center text-neutral-500">
+						<MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
                         <p className="text-lg mb-2">Nenhum contato encontrado</p>
                         <p className="text-sm">Crie usuários para iniciar conversas</p>
                     </div>
