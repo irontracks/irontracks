@@ -67,6 +67,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [systemImporting, setSystemImporting] = useState(false);
     const systemFileInputRef = useRef(null);
     const [dangerOpen, setDangerOpen] = useState(false);
+    const [moreTabsOpen, setMoreTabsOpen] = useState(false);
 
     const [studentQuery, setStudentQuery] = useState('');
     const [studentStatusFilter, setStudentStatusFilter] = useState('all');
@@ -1024,6 +1025,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
         TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFS', system: 'SISTEMA' };
     }
 
+    const MAIN_TABS = ['dashboard', 'students', 'templates'];
+    const extraTabs = Object.keys(TAB_LABELS).filter((k) => !MAIN_TABS.includes(k));
+    const isExtraTabActive = extraTabs.includes(tab);
+
     const totalStudents = Array.isArray(usersList) ? usersList.length : 0;
     const studentsWithTeacher = Array.isArray(usersList) ? usersList.filter(s => !!s.teacher_id).length : 0;
     const studentsWithoutTeacher = Array.isArray(usersList) ? usersList.filter(s => !s.teacher_id).length : 0;
@@ -1057,22 +1062,53 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         </div>
                         <div className="flex items-center gap-2 min-w-0">
                             <div className="flex-1 min-w-0">
-                                <div className="overflow-x-auto no-scrollbar touch-pan-x overscroll-x-contain scroll-px-4">
-                                    <div className="flex gap-2 pb-1 pr-2">
-                                        {Object.entries(TAB_LABELS).map(([key, label]) => (
+                                <div className="hidden md:flex items-center gap-2 justify-end flex-wrap">
+                                    {Object.entries(TAB_LABELS).map(([key, label]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => { setTab(key); setSelectedStudent(null); setMoreTabsOpen(false); }}
+                                            className={`min-h-[40px] px-3.5 md:px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-300 border active:scale-95 ${
+                                                tab === key
+                                                    ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
+                                                    : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                            }`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="md:hidden flex items-center gap-2">
+                                    <div className="flex-1 bg-neutral-900/70 border border-neutral-800 rounded-full p-1 flex items-center gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+                                        {MAIN_TABS.map((key) => (
                                             <button
                                                 key={key}
-                                                onClick={() => { setTab(key); setSelectedStudent(null); }}
-                                                className={`min-h-[40px] px-3.5 md:px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-300 border active:scale-95 ${
+                                                type="button"
+                                                onClick={() => { setTab(key); setSelectedStudent(null); setMoreTabsOpen(false); }}
+                                                className={`flex-1 min-h-[40px] px-2 rounded-full font-black text-[11px] uppercase tracking-wide transition-all duration-300 active:scale-95 ${
                                                     tab === key
-                                                        ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
-                                                        : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                                        ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                                        : 'text-neutral-200'
                                                 }`}
                                             >
-                                                {label}
+                                                {TAB_LABELS[key] || key}
                                             </button>
                                         ))}
                                     </div>
+                                    {extraTabs.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setMoreTabsOpen(true)}
+                                            className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all duration-300 active:scale-95 ${
+                                                isExtraTabActive
+                                                    ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
+                                                    : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                            }`}
+                                            aria-label="Mais"
+                                        >
+                                            <ChevronDown size={18} />
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                             <button
