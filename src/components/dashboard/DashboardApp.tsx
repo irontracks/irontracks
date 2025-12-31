@@ -1313,6 +1313,7 @@ function DashboardInner(props: Props) {
                 targetEmail={null as any}
                 readOnly={false as any}
                 title={'Histórico' as any}
+                embedded
               />
             </div>
           )}

@@ -1,16 +1,17 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronLeft, History, Trash2, Plus, Edit3, CheckCircle2, Circle } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import WorkoutReport from '@/components/WorkoutReport';
 import { useDialog } from '@/contexts/DialogContext';
 
-const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOnly, title }) => {
+const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false }) => {
     const { confirm, alert } = useDialog();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const supabase = useMemo(() => createClient(), []);
     const isReadOnly = !!readOnly;
+    const [range, setRange] = useState(() => (readOnly ? 'all' : '30'));
     const [showManual, setShowManual] = useState(false);
     const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0,16));
     const [manualDuration, setManualDuration] = useState('45');
@@ -68,17 +69,68 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         }
     };
 
-    const formatHistoryTitle = (title, dateValue) => {
-        const base = title || 'Treino';
+    const formatHistoryTitle = (title) => {
+        return title || 'Treino';
+    };
+
+    const formatCompletedAt = (dateValue) => {
         try {
             const d = new Date(dateValue);
-            if (!isNaN(d.getTime())) {
-                const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                return `${base} ${dateStr}`;
-            }
-        } catch {}
-        return base;
+            if (isNaN(d.getTime())) return 'Data desconhecida';
+            const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+            const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            return `${dateStr} • ${timeStr}`;
+        } catch {
+            return 'Data desconhecida';
+        }
     };
+
+    const rangeLabel = useMemo(() => {
+        if (range === '7') return 'Últimos 7 dias';
+        if (range === '30') return 'Últimos 30 dias';
+        if (range === '90') return 'Últimos 90 dias';
+        return 'Tudo';
+    }, [range]);
+
+    const historyItems = useMemo(() => {
+        return Array.isArray(history) ? history : [];
+    }, [history]);
+
+    const filteredHistory = useMemo(() => {
+        if (range === 'all') return historyItems;
+        const days = Number(range);
+        if (!Number.isFinite(days) || days <= 0) return historyItems;
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        return historyItems.filter((s) => {
+            const t = new Date(s?.date).getTime();
+            if (!Number.isFinite(t) || Number.isNaN(t)) return false;
+            return t >= cutoff;
+        });
+    }, [historyItems, range]);
+
+    const summary = useMemo(() => {
+        const totalSeconds = filteredHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
+        const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
+        const count = filteredHistory.length;
+        const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
+        return { count, totalMinutes, avgMinutes };
+    }, [filteredHistory]);
+
+    const openSession = (session) => {
+        const payload = session?.rawSession || session;
+        if (typeof onViewReport === 'function') {
+            try {
+                onViewReport(payload);
+                return;
+            } catch {}
+        }
+        setSelectedSession(payload);
+    };
+
+    useEffect(() => {
+        if (!isSelectionMode) return;
+        setSelectedIds(new Set());
+    }, [isSelectionMode, range]);
 
     useEffect(() => {
         const loadHistory = async () => {
@@ -414,16 +466,45 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
 
     return (
         <>
-        <div className="min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra pt-header-safe">
-            <div className="flex items-center gap-3 mb-6 pt-safe flex-wrap">
-                <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
-                <h2 className="text-xl font-black flex items-center gap-2"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
-                <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
-                    {!isReadOnly && history.length > 0 && (
+        <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra pt-header-safe"}>
+            {!embedded && (
+                <div className="flex items-center gap-3 mb-4 pt-safe flex-wrap">
+                    <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
+                    <div className="min-w-0">
+                        <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{rangeLabel}</div>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                        {!isReadOnly && historyItems.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={toggleSelectionMode}
+                                className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}
+                            >
+                                {isSelectionMode ? 'Cancelar' : 'Selecionar'}
+                            </button>
+                        )}
+                        {!isReadOnly && !isSelectionMode && (
+                            <button
+                                type="button"
+                                onClick={() => setShowManual(true)}
+                                className="cursor-pointer relative z-10 min-h-[44px] px-4 py-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center gap-2 shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
+                            >
+                                <Plus size={16} />
+                                <span className="hidden sm:inline">Adicionar</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {embedded && (
+                <div className="flex items-center justify-end gap-2 mb-4">
+                    {!isReadOnly && historyItems.length > 0 && (
                         <button
                             type="button"
                             onClick={toggleSelectionMode}
-                            className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}
+                            className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-900 border border-neutral-800 text-yellow-400 hover:bg-neutral-800'}`}
                         >
                             {isSelectionMode ? 'Cancelar' : 'Selecionar'}
                         </button>
@@ -435,57 +516,167 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                             className="cursor-pointer relative z-10 min-h-[44px] px-4 py-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center gap-2 shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
                         >
                             <Plus size={16} />
-                            <span className="hidden sm:inline">Adicionar</span>
+                            <span className="hidden sm:inline">Adicionar treino</span>
+                            <span className="sm:hidden">Adicionar</span>
                         </button>
                     )}
                 </div>
-            </div>
-            {loading && <p className="text-center text-neutral-500 animate-pulse">Carregando histórico...</p>}
-            {!loading && history.length === 0 && <div className="text-center py-10 opacity-50"><p>Nenhum treino finalizado ainda.</p></div>}
-            <div className="space-y-3">
-                {history.map(session => (
-                    <div key={session.id} onClick={() => isSelectionMode ? toggleItemSelection(session.id) : setSelectedSession(session.rawSession || session)} className={`bg-neutral-800 p-4 rounded-xl border cursor-pointer relative group transition-colors ${isSelectionMode ? (selectedIds.has(session.id) ? 'border-yellow-500 bg-neutral-800/80' : 'border-neutral-700') : 'border-neutral-700 hover:border-yellow-500/50'}`}>
-                        <div className="flex justify-between items-center">
-                            {isSelectionMode && (
-                                <div className="mr-3">
-                                    {selectedIds.has(session.id) ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
-                                </div>
-                            )}
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg text-white">{formatHistoryTitle(session.workoutTitle, session.date)}</h3>
-                                <p className="text-xs text-neutral-500">Concluído em: {(() => {
-                                    try {
-                                        const d = new Date(session.date);
-                                        return isNaN(d.getTime()) ? 'Data Desconhecida' : d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-                                    } catch { return 'Data Desconhecida'; }
-                                })()} • {Math.floor((session.totalTime || 0) / 60)} min</p>
+            )}
+
+            <div className="space-y-4">
+                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/10 via-transparent to-transparent pointer-events-none" />
+                    <div className="relative">
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                            <div>
+                                <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Resumo</div>
+                                <div className="text-base font-black tracking-tight text-white">{rangeLabel}</div>
                             </div>
-                            {!isReadOnly && !isSelectionMode && (
-                                <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                {[
+                                    { key: '7', label: '7 dias' },
+                                    { key: '30', label: '30 dias' },
+                                    { key: '90', label: '90 dias' },
+                                    { key: 'all', label: 'Tudo' },
+                                ].map((opt) => (
                                     <button
+                                        key={opt.key}
                                         type="button"
-                                        onClick={(e) => handleDeleteClick(e, session)}
-                                        className="cursor-pointer relative z-20 p-2 rounded-lg transition-colors bg-neutral-900/50 text-neutral-500 border border-transparent hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/20"
+                                        onClick={() => setRange(opt.key)}
+                                        className={`min-h-[40px] px-3 rounded-full text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 whitespace-nowrap ${range === opt.key ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-950 border border-neutral-800 text-neutral-300 hover:bg-neutral-900'}`}
                                     >
-                                        <Trash2 size={18} className="pointer-events-none"/>
+                                        {opt.label}
                                     </button>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.stopPropagation(); openEdit(session); }}
-                                        className="cursor-pointer relative z-20 p-2 rounded-lg transition-colors bg-neutral-900/50 text-neutral-500 border border-transparent hover:bg-yellow-500/10 hover:text-yellow-500 hover:border-yellow-500/20"
-                                    >
-                                        <Edit3 size={18} className="pointer-events-none"/>
-                                    </button>
-                                </div>
-                            )}
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-3 mt-4">
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
+                                <div className="text-xl font-black tracking-tight text-white">{summary.count}</div>
+                            </div>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total</div>
+                                <div className="text-xl font-black tracking-tight text-white">{summary.totalMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                            </div>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
+                                <div className="text-xl font-black tracking-tight text-white">{summary.avgMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                            </div>
                         </div>
                     </div>
-                ))}
+                </div>
+
+                {loading && (
+                    <div className="grid gap-3">
+                        {Array.from({ length: 4 }).map((_, idx) => (
+                            <div key={idx} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 animate-pulse">
+                                <div className="h-4 bg-neutral-800 rounded w-2/3" />
+                                <div className="mt-3 h-3 bg-neutral-800 rounded w-1/2" />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {!loading && historyItems.length === 0 && (
+                    <div className="text-center py-10 border border-neutral-800 bg-neutral-900 rounded-2xl">
+                        <div className="text-neutral-400 font-bold">Nenhum treino finalizado ainda.</div>
+                        {!isReadOnly && (
+                            <div className="mt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowManual(true)}
+                                    className="min-h-[44px] px-5 py-2.5 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
+                                >
+                                    Adicionar primeiro treino
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {!loading && historyItems.length > 0 && filteredHistory.length === 0 && (
+                    <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-4">
+                        <div className="text-white font-black">Sem treinos nesse período</div>
+                        <div className="text-sm text-neutral-400 mt-1">Tente aumentar o período para ver mais resultados.</div>
+                        <div className="mt-4 flex gap-2 flex-wrap">
+                            <button type="button" onClick={() => setRange('all')} className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95">Ver tudo</button>
+                            <button type="button" onClick={() => setRange('90')} className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black transition-all duration-300 active:scale-95">Últimos 90 dias</button>
+                        </div>
+                    </div>
+                )}
+
+                {!loading && filteredHistory.length > 0 && (
+                    <div className="space-y-3 pb-24">
+                        {filteredHistory.map((session) => {
+                            const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
+                            const isSelected = selectedIds.has(session.id);
+                            return (
+                                <div
+                                    key={session.id}
+                                    onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
+                                    className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}
+                                >
+                                    <div className="flex items-start gap-3">
+                                        {isSelectionMode && (
+                                            <div className="mt-0.5">
+                                                {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
+                                            </div>
+                                        )}
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
+                                                    <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            <CalendarDays size={14} className="text-yellow-500/70" />
+                                                            {formatCompletedAt(session?.date)}
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1.5">
+                                                            <Clock size={14} className="text-yellow-500/70" />
+                                                            {minutes} min
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {!isReadOnly && !isSelectionMode && (
+                                                    <div className="flex items-center gap-2 shrink-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => handleDeleteClick(e, session)}
+                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                            aria-label="Excluir"
+                                                        >
+                                                            <Trash2 size={18} className="pointer-events-none" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openEdit(session);
+                                                            }}
+                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                            aria-label="Editar"
+                                                        >
+                                                            <Edit3 size={18} className="pointer-events-none" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
 
         {!isReadOnly && isSelectionMode && (
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-900 border-t border-neutral-800 pb-safe z-50 flex justify-between items-center animate-slide-up">
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950 border-t border-neutral-800 pb-safe z-50 flex justify-between items-center">
                 <span className="text-neutral-500 text-sm font-bold">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
                 <button 
                     onClick={handleBulkDelete} 
