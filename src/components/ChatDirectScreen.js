@@ -360,66 +360,66 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     if (loading) {
 
 		return (
-			<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col">
-				<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 h-16 items-center pt-safe sticky top-0 z-20 justify-center relative flex">
+			<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col">
+				<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950/80 backdrop-blur-xl border-b border-neutral-800 sticky top-0 z-20 justify-center relative flex">
 					<button onClick={onClose} className="absolute left-4 w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
 						<ChevronLeft size={20} />
 					</button>
-                    <div className="w-10 h-10 bg-neutral-700 rounded-full animate-pulse"></div>
-                    <div className="ml-3">
-                        <div className="h-5 bg-neutral-700 rounded animate-pulse mb-1 w-32"></div>
-                        <div className="h-3 bg-neutral-700 rounded animate-pulse w-20"></div>
-                    </div>
-                </div>
-                <div className="flex-1 flex items-center justify-center">
-                    <div className="text-neutral-500">Carregando conversa...</div>
-                </div>
-            </div>
-        );
-    }
+					<div className="w-10 h-10 bg-neutral-700 rounded-full animate-pulse"></div>
+					<div className="ml-3">
+						<div className="h-5 bg-neutral-700 rounded animate-pulse mb-1 w-32"></div>
+						<div className="h-3 bg-neutral-700 rounded animate-pulse w-20"></div>
+					</div>
+				</div>
+				<div className="flex-1 flex items-center justify-center">
+					<div className="text-neutral-500">Carregando conversa...</div>
+				</div>
+			</div>
+		);
+	}
 
 		return (
-				<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col animate-slide-up">
-					<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 h-16 items-center pt-safe sticky top-0 z-20 justify-center relative flex">
+				<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col animate-slide-up">
+					<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950/80 backdrop-blur-xl border-b border-neutral-800 sticky top-0 z-20 justify-center relative flex">
 						<button onClick={onClose} className="absolute left-4 w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
 							<ChevronLeft size={20} />
 						</button>
-                
+				
 					<div className="flex items-center gap-3 justify-center w-full">
-                    {(otherUser?.photo_url || resolvedOtherUserPhoto) ? (
-                        <Image
-                            src={otherUser?.photo_url || resolvedOtherUserPhoto}
-                            width={36}
-                            height={36}
-                            className="rounded-full object-cover"
-                            alt={otherUser?.display_name || resolvedOtherUserName}
-                        />
-                    ) : (
-                        <div className="w-9 h-9 bg-neutral-700 rounded-full flex items-center justify-center font-bold text-white">
-                            {otherUser?.display_name?.[0] || resolvedOtherUserName?.[0] || '?'}
-                        </div>
-                    )}
-                    
-                    <div className="min-w-0 text-center">
-                        <h3 className="font-bold text-white truncate max-w-[56vw] mx-auto">
-                            {otherUser?.display_name || resolvedOtherUserName || 'Usuário'}
-                        </h3>
-                        <div className="flex items-center justify-center gap-1 text-xs">
-                            {isUserOnline() ? (
-                                <>
-                                    <Circle size={8} className="text-green-500 fill-green-500" />
-                                    <span className="text-green-500">Online</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Circle size={8} className="text-neutral-500" />
-                                    <span className="text-neutral-400">Offline</span>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                </div>
+						{(otherUser?.photo_url || resolvedOtherUserPhoto) ? (
+							<Image
+								src={otherUser?.photo_url || resolvedOtherUserPhoto}
+								width={36}
+								height={36}
+								className="w-10 h-10 rounded-full object-cover ring-2 ring-yellow-500/20"
+								alt={otherUser?.display_name || resolvedOtherUserName}
+							/>
+						) : (
+							<div className="w-10 h-10 bg-neutral-900 border border-neutral-800 rounded-full flex items-center justify-center font-black text-white ring-2 ring-yellow-500/20">
+								{otherUser?.display_name?.[0] || resolvedOtherUserName?.[0] || '?'}
+							</div>
+						)}
+						
+						<div className="min-w-0 text-center">
+							<h3 className="font-black tracking-tight text-white truncate max-w-[56vw] mx-auto">
+								{otherUser?.display_name || resolvedOtherUserName || 'Usuário'}
+							</h3>
+							<div className="flex items-center justify-center gap-1.5 text-[11px]">
+								{isUserOnline() ? (
+									<>
+										<span className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_0_3px_rgba(34,197,94,0.12)]"></span>
+										<span className="text-green-400 font-semibold">Online</span>
+									</>
+								) : (
+									<>
+										<span className="w-1.5 h-1.5 rounded-full bg-neutral-500"></span>
+										<span className="text-neutral-400 font-medium">Offline</span>
+									</>
+								)}
+							</div>
+						</div>
+					</div>
+					</div>
 
             {debugChat && (
                 <div className="px-4 pt-2">
@@ -427,50 +427,50 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 </div>
             )}
 
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/30">
-                {messages.length === 0 ? (
-                    <div className="text-center py-10 text-neutral-500">
-                        <div className="text-lg mb-2">💬</div>
-                        <p>Comece a conversa!</p>
-                        <p className="text-sm">Envie uma mensagem para {otherUser?.display_name || otherUserName}</p>
-                    </div>
-                ) : (
-                    <>
-                        {messages.map((message, index) => {
-                            const isMyMessage = message.sender_id === user.id;
-                            const showAvatar = !isMyMessage && (index === 0 || messages[index-1].sender_id !== message.sender_id);
-                            
-                            return (
-                                <div
-                                    key={message.id}
-                                    className={`flex gap-3 ${isMyMessage ? 'flex-row-reverse' : ''} ${!showAvatar && !isMyMessage ? 'ml-11' : ''}`}
-                                >
-                                    {!isMyMessage && showAvatar && (
-                                        message.sender?.photo_url ? (
-                                            <Image
-                                                src={message.sender.photo_url}
-                                                width={32}
-                                                height={32}
-                                                className="w-8 h-8 rounded-full bg-neutral-700 object-cover self-end mb-1"
-                                                alt={message.sender.display_name}
-                                            />
-                                        ) : (
-                                            <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-[10px] self-end mb-1">
-                                                {message.sender?.display_name?.[0] || '?'}
-                                            </div>
-                                        )
-                                    )}
-                                    
-                                    <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm break-words ${
-                                        isMyMessage
-                                            ? 'bg-yellow-500 text-black rounded-br-none'
-                                            : 'bg-neutral-800 text-white rounded-bl-none'
-                                    }`}>
-                                        {!isMyMessage && (
-                                            <p className="text-[10px] font-bold opacity-50 mb-1">
-                                                {message.sender?.display_name || 'Usuário'}
-                                            </p>
-                                        )}
+			<div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 bg-black/30 pb-28">
+				{messages.length === 0 ? (
+					<div className="text-center py-10 text-neutral-500">
+						<div className="text-lg mb-2">💬</div>
+						<p className="font-semibold">Comece a conversa</p>
+						<p className="text-sm">Envie uma mensagem para {otherUser?.display_name || otherUserName}</p>
+					</div>
+				) : (
+					<>
+						{messages.map((message, index) => {
+							const isMyMessage = message.sender_id === user.id;
+							const showAvatar = !isMyMessage && (index === 0 || messages[index-1].sender_id !== message.sender_id);
+							
+							return (
+								<div
+									key={message.id}
+									className={`flex gap-3 ${isMyMessage ? 'flex-row-reverse' : ''} ${!showAvatar && !isMyMessage ? 'ml-11' : ''}`}
+								>
+									{!isMyMessage && showAvatar && (
+										message.sender?.photo_url ? (
+											<Image
+												src={message.sender.photo_url}
+												width={32}
+												height={32}
+												className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 object-cover self-end mb-1"
+												alt={message.sender.display_name}
+											/>
+										) : (
+											<div className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center font-black text-[10px] self-end mb-1">
+												{message.sender?.display_name?.[0] || '?'}
+											</div>
+										)
+									)}
+									
+									<div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm break-words ${
+										isMyMessage
+											? 'bg-yellow-500 text-black rounded-br-none shadow-yellow-500/15'
+											: 'bg-neutral-900/80 text-white rounded-bl-none border border-neutral-800'
+									}`}> 
+										{!isMyMessage && (
+											<p className="text-[10px] font-bold text-neutral-400 mb-1">
+												{message.sender?.display_name || 'Usuário'}
+											</p>
+										)}
                                         {(() => {
                                             let payload = null;
                                             try { if (typeof message.content === 'string' && message.content.startsWith('{')) payload = JSON.parse(message.content); } catch {}
@@ -507,58 +507,63 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                             
                                             return <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{payload?.text ?? message.content}</p>;
                                         })()}
-                                        <p className={`text-[9px] mt-1 text-right ${
-                                            isMyMessage ? 'text-black/50' : 'text-neutral-500'
-                                        }`}>
-                                            {formatTime(message.created_at)}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        <div ref={messagesEndRef} />
-                        {loadingMore && (
-                            <div className="text-center text-xs text-neutral-500 py-2">Carregando mensagens...</div>
-                        )}
-                    </>
-                )}
-            </div>
+										<p className={`text-[10px] mt-1 text-right tabular-nums ${
+											isMyMessage ? 'text-black/60' : 'text-neutral-500'
+										}`}>
+											{formatTime(message.created_at)}
+										</p>
+									</div>
+								</div>
+							);
+						})}
+						<div ref={messagesEndRef} />
+						{loadingMore && (
+							<div className="text-center text-xs text-neutral-500 py-2">Carregando mensagens...</div>
+						)}
+					</>
+				)}
+			</div>
 
-            <form onSubmit={handleSendMessage} className="bg-neutral-800 border-t border-neutral-700 flex items-center gap-2 px-4 py-2 pb-[max(env(safe-area-inset-bottom),20px)] mb-[max(env(safe-area-inset-bottom),60px)]">
-                <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Digite uma mensagem..."
-                    className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors"
-                />
-                
-                <div className="flex items-center gap-2">
-						<button type="button" onClick={() => setShowEmoji(v => !v)} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><Smile size={18} /></button>
-                    <button type="button" onClick={handleAddGif} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><Link2 size={18} /></button>
-                    <button type="button" onClick={handleAttachClick} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><ImageIcon size={18} /></button>
-                    <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />
-                    
-                    <button
-                        type="submit"
-                        disabled={!newMessage.trim()}
-                        className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-transform active:scale-95"
-                    >
-                        <Send size={20} />
-                    </button>
-                </div>
-                
-                {uploading && <span className="text-xs text-neutral-400 ml-2">...</span>}
-                {showEmoji && (
-                    <div className="absolute bottom-20 right-6 bg-neutral-900 border border-neutral-700 rounded-xl p-2 grid grid-cols-8 gap-1 shadow-xl z-50">
-                        {['😀','😁','😂','😉','😊','😍','👍','💪','🔥','🙏','🥳','🤝','🤩','🤔','👏','🙌'].map(e => (
-                            <button type="button" key={e} className="text-xl" onClick={() => insertEmoji(e)}>{e}</button>
-                        ))}
-                    </div>
-                )}
-            </form>
-        </div>
-    );
+			<form onSubmit={handleSendMessage} className="sticky bottom-0 z-30 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] bg-neutral-950/80 backdrop-blur-xl border-t border-neutral-800">
+				<div className="flex items-end gap-2">
+					<div className="flex-1 min-w-0 bg-neutral-900 border border-neutral-800 rounded-2xl px-3 py-2 focus-within:border-yellow-500/60 focus-within:ring-2 focus-within:ring-yellow-500/15 transition-colors">
+						<input
+							type="text"
+							value={newMessage}
+							onChange={(e) => setNewMessage(e.target.value)}
+							placeholder="Digite uma mensagem…"
+							className="w-full bg-transparent text-white outline-none placeholder:text-neutral-500 text-[15px] leading-6"
+						/>
+						<div className="flex items-center justify-between mt-2">
+							<div className="flex items-center gap-1">
+								<button type="button" onClick={() => setShowEmoji(v => !v)} className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><Smile size={18} /></button>
+								<button type="button" onClick={handleAddGif} className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><Link2 size={18} /></button>
+								<button type="button" onClick={handleAttachClick} className="w-10 h-10 rounded-full bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center"><ImageIcon size={18} /></button>
+								<input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />
+							</div>
+							{uploading ? <span className="text-[11px] text-neutral-400">Enviando…</span> : null}
+						</div>
+					</div>
+
+					<button
+						type="submit"
+						disabled={!newMessage.trim()}
+						className="shrink-0 w-12 h-12 rounded-full bg-yellow-500 text-black flex items-center justify-center shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
+					>
+						<Send size={20} />
+					</button>
+				</div>
+
+				{showEmoji && (
+					<div className="absolute right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] bg-neutral-950 border border-neutral-800 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-2xl z-50">
+						{['😀','😁','😂','😉','😊','😍','👍','💪','🔥','🙏','🥳','🤝','🤩','🤔','👏','🙌'].map(e => (
+							<button type="button" key={e} className="text-xl w-9 h-9 rounded-xl hover:bg-neutral-900 active:scale-95 transition-transform" onClick={() => insertEmoji(e)}>{e}</button>
+						))}
+					</div>
+				)}
+			</form>
+		</div>
+	);
 };
 
 export default ChatDirectScreen;
