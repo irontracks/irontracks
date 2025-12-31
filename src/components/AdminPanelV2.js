@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
     Crown, X, UserCog, AlertCircle, Trash2, Megaphone, Plus, Copy, ArrowLeft,
     MessageSquare, Send, RefreshCw, Dumbbell, Share2, UserPlus, AlertTriangle, Edit3, ShieldAlert,
-    ChevronDown, FileText, Download, History
+    ChevronDown, FileText, Download, History, Search
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import AdminWorkoutEditor from './AdminWorkoutEditor';
@@ -46,6 +46,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     const [tab, setTab] = useState('dashboard');
     const [usersList, setUsersList] = useState([]);
+    const [teachersList, setTeachersList] = useState([]);
     const [templates, setTemplates] = useState([]);
     const [myWorkoutsCount, setMyWorkoutsCount] = useState(0);
     const [selectedStudent, setSelectedStudent] = useState(null);
@@ -65,6 +66,66 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [systemExporting, setSystemExporting] = useState(false);
     const [systemImporting, setSystemImporting] = useState(false);
     const systemFileInputRef = useRef(null);
+    const [dangerOpen, setDangerOpen] = useState(false);
+
+    const [studentQuery, setStudentQuery] = useState('');
+    const [studentStatusFilter, setStudentStatusFilter] = useState('all');
+    const [teacherQuery, setTeacherQuery] = useState('');
+    const [teacherStatusFilter, setTeacherStatusFilter] = useState('all');
+    const [templateQuery, setTemplateQuery] = useState('');
+
+    const normalizeText = (value) => String(value || '').toLowerCase();
+
+    const statusMatches = (rowStatus, selected) => {
+        if (!selected || selected === 'all') return true;
+        return normalizeText(rowStatus) === normalizeText(selected);
+    };
+
+    const studentMatchesQuery = (s) => {
+        const q = normalizeText(studentQuery).trim();
+        if (!q) return true;
+        return normalizeText(s?.name).includes(q) || normalizeText(s?.email).includes(q);
+    };
+
+    const teacherMatchesQuery = (t) => {
+        const q = normalizeText(teacherQuery).trim();
+        if (!q) return true;
+        return normalizeText(t?.name).includes(q) || normalizeText(t?.email).includes(q);
+    };
+
+    const templateMatchesQuery = (t) => {
+        const q = normalizeText(templateQuery).trim();
+        if (!q) return true;
+        return normalizeText(t?.name).includes(q);
+    };
+
+    const studentsWithTeacherFiltered = useMemo(() => {
+        const list = Array.isArray(usersList) ? usersList : [];
+        return list
+            .filter((s) => !!s?.teacher_id)
+            .filter(studentMatchesQuery)
+            .filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
+    }, [studentQuery, studentStatusFilter, usersList]);
+
+    const studentsWithoutTeacherFiltered = useMemo(() => {
+        const list = Array.isArray(usersList) ? usersList : [];
+        return list
+            .filter((s) => !s?.teacher_id)
+            .filter(studentMatchesQuery)
+            .filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
+    }, [studentQuery, studentStatusFilter, usersList]);
+
+    const teachersFiltered = useMemo(() => {
+        const list = Array.isArray(teachersList) ? teachersList : [];
+        return list
+            .filter(teacherMatchesQuery)
+            .filter((t) => statusMatches(t?.status || 'pendente', teacherStatusFilter));
+    }, [teacherQuery, teacherStatusFilter, teachersList]);
+
+    const templatesFiltered = useMemo(() => {
+        const list = Array.isArray(templates) ? templates : [];
+        return list.filter(templateMatchesQuery);
+    }, [templateQuery, templates]);
 
     useEffect(() => {
         if (!selectedStudent) setHistoryOpen(false);
@@ -212,7 +273,6 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [broadcastTitle, setBroadcastTitle] = useState('');
     const [sendingBroadcast, setSendingBroadcast] = useState(false);
 
-    const [teachersList, setTeachersList] = useState([]);
     const [showTeacherModal, setShowTeacherModal] = useState(false);
     const [newTeacher, setNewTeacher] = useState({ name: '', email: '', phone: '', birth_date: '' });
     const [addingTeacher, setAddingTeacher] = useState(false);
@@ -959,9 +1019,9 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     if (!isAdmin && !isTeacher) return null;
 
-    let TAB_LABELS = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'MEUS TREINOS' };
+    let TAB_LABELS = { dashboard: 'VISÃO', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', system: 'SISTEMA' };
+        TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFS', system: 'SISTEMA' };
     }
 
     const totalStudents = Array.isArray(usersList) ? usersList.length : 0;
@@ -970,22 +1030,22 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const totalTeachers = Array.isArray(teachersList) ? teachersList.length : 0;
 
     return (
-        <div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col">
-            <div className="sticky top-0 z-50 bg-neutral-900/95 border-b border-neutral-800 shadow-2xl pt-safe flex-shrink-0">
+        <div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col overflow-hidden">
+            <div className="sticky top-0 z-50 bg-neutral-950/90 backdrop-blur-xl border-b border-neutral-800 shadow-[0_16px_40px_rgba(0,0,0,0.55)] pt-safe flex-shrink-0">
                 {debugError && (
                     <div className="bg-red-600 text-white font-bold p-4 text-center text-xs break-all mb-2 rounded-xl">
                         DIAGNOSTIC MODE: {debugError}
                     </div>
                 )}
-                <div className="px-4 md:px-6 py-2 md:py-2">
-                    <div className="flex justify-between items-center gap-4">
+                <div className="px-4 md:px-8 py-3">
+                    <div className="w-full max-w-6xl mx-auto flex justify-between items-center gap-4">
                         <div className="flex items-center gap-3">
                             <button
                                 type="button"
-                                onClick={() => window.location.reload()}
-                                className="flex items-center gap-3 cursor-pointer group"
+                                onClick={() => { setSelectedStudent(null); setTab('dashboard'); }}
+                                className="flex items-center gap-3 cursor-pointer group active:scale-[0.99] transition-transform"
                             >
-                                <div className="w-9 h-9 rounded-2xl bg-yellow-500 flex items-center justify-center shadow-[0_0_0_1px_rgba(0,0,0,0.3)] group-active:scale-95 transition-transform">
+                                <div className="w-10 h-10 rounded-2xl bg-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/20 border border-yellow-400/40">
                                     <Crown size={20} className="text-black" />
                                 </div>
                                 <div className="flex flex-col items-start">
@@ -993,22 +1053,20 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     <span className="text-sm md:text-base font-black text-white leading-tight">Painel de Controle</span>
                                 </div>
                             </button>
-                            <div className="hidden md:block text-[11px] uppercase tracking-widest text-neutral-500 font-bold">
-                                Visão geral do seu negócio como Coach
-                            </div>
+                            <div className="hidden md:block text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Operações do seu negócio</div>
                         </div>
                         <div className="flex items-center gap-2 min-w-0">
                             <div className="flex-1 min-w-0">
-                                <div className="overflow-x-auto no-scrollbar touch-pan-x overscroll-x-contain">
+                                <div className="overflow-x-auto no-scrollbar touch-pan-x overscroll-x-contain scroll-px-4">
                                     <div className="flex gap-2 pb-1 pr-2">
                                         {Object.entries(TAB_LABELS).map(([key, label]) => (
                                             <button
                                                 key={key}
                                                 onClick={() => { setTab(key); setSelectedStudent(null); }}
-                                                className={`px-3 md:px-4 py-1.5 rounded-full font-bold text-[11px] uppercase tracking-wide whitespace-nowrap transition-colors border ${
+                                                className={`min-h-[40px] px-3.5 md:px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-300 border active:scale-95 ${
                                                     tab === key
-                                                        ? 'bg-yellow-500 text-black border-yellow-400 shadow-[0_0_0_1px_rgba(0,0,0,0.5)]'
-                                                        : 'bg-neutral-900 text-neutral-300 border-neutral-700 hover:bg-neutral-800'
+                                                        ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
+                                                        : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
                                                 }`}
                                             >
                                                 {label}
@@ -1019,7 +1077,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </div>
                             <button
                                 onClick={() => onClose && onClose()}
-                                className="flex-shrink-0 w-9 h-9 md:w-10 md:h-10 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white flex items-center justify-center transition-all backdrop-blur-md border border-neutral-700"
+                                className="flex-shrink-0 w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
                             >
                                 <X size={18} className="font-bold" />
                             </button>
@@ -1030,27 +1088,27 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
             <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-20 pb-safe">
                 {tab === 'dashboard' && !selectedStudent && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="w-full max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div
-                            className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 cursor-pointer hover:border-yellow-500 transition-colors"
+                            className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
                             onClick={() => { setTab('students'); setSelectedStudent(null); }}
                         >
                             <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Total Alunos</h3>
                             <p className="text-3xl font-black text-white mt-1">{totalStudents}</p>
                         </div>
-                        <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 transition-colors">
+                        <div className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 transition-colors">
                             <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Com Professor</h3>
                             <p className="text-3xl font-black text-green-400 mt-1">{studentsWithTeacher}</p>
                         </div>
                         <div
-                            className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 cursor-pointer hover:border-yellow-500 transition-colors"
+                            className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
                             onClick={() => { setTab('students'); setSelectedStudent(null); }}
                         >
                             <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Sem Professor</h3>
                             <p className="text-3xl font-black text-yellow-500 mt-1">{studentsWithoutTeacher}</p>
                         </div>
                         <div
-                            className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 cursor-pointer hover:border-yellow-500 transition-colors"
+                            className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
                             onClick={() => { setTab('templates'); setSelectedStudent(null); }}
                         >
                             <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Treinos Criados</h3>
@@ -1058,7 +1116,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         </div>
                         {isAdmin && (
                             <div
-                                className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 cursor-pointer hover:border-yellow-500 transition-colors"
+                                className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
                                 onClick={() => { setTab('teachers'); setSelectedStudent(null); }}
                             >
                                 <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Professores Ativos</h3>
