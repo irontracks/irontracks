@@ -1031,12 +1031,11 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     let TAB_LABELS = { dashboard: 'VISÃO', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFS', system: 'SISTEMA' };
+        TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', system: 'SISTEMA' };
     }
 
-    const MAIN_TABS = ['dashboard', 'students', 'templates'];
-    const extraTabs = Object.keys(TAB_LABELS).filter((k) => !MAIN_TABS.includes(k));
-    const isExtraTabActive = extraTabs.includes(tab);
+    const tabKeys = Object.keys(TAB_LABELS);
+    const currentTabLabel = TAB_LABELS[tab] || 'VISÃO';
 
     const totalStudents = Array.isArray(usersList) ? usersList.length : 0;
     const studentsWithTeacher = Array.isArray(usersList) ? usersList.filter(s => !!s.teacher_id).length : 0;
@@ -1062,23 +1061,32 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
                 <div className="px-4 md:px-8 py-3">
-                    <div className="w-full max-w-6xl mx-auto flex justify-between items-center gap-4">
-                        <div className="flex items-center gap-3">
+                    <div className="w-full max-w-6xl mx-auto space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => { setSelectedStudent(null); setTab('dashboard'); }}
+                                    className="flex items-center gap-3 cursor-pointer group active:scale-[0.99] transition-transform"
+                                >
+                                    <div className="w-10 h-10 rounded-2xl bg-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/20 border border-yellow-400/40">
+                                        <Crown size={20} className="text-black" />
+                                    </div>
+                                    <div className="flex flex-col items-start">
+                                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-yellow-500/80">IronTracks</span>
+                                        <span className="text-sm md:text-base font-black text-white leading-tight">Painel de Controle</span>
+                                    </div>
+                                </button>
+                                <div className="hidden md:block text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Operações do seu negócio</div>
+                            </div>
                             <button
-                                type="button"
-                                onClick={() => { setSelectedStudent(null); setTab('dashboard'); }}
-                                className="flex items-center gap-3 cursor-pointer group active:scale-[0.99] transition-transform"
+                                onClick={() => onClose && onClose()}
+                                className="flex-shrink-0 w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
                             >
-                                <div className="w-10 h-10 rounded-2xl bg-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/20 border border-yellow-400/40">
-                                    <Crown size={20} className="text-black" />
-                                </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-yellow-500/80">IronTracks</span>
-                                    <span className="text-sm md:text-base font-black text-white leading-tight">Painel de Controle</span>
-                                </div>
+                                <X size={18} className="font-bold" />
                             </button>
-                            <div className="hidden md:block text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Operações do seu negócio</div>
                         </div>
+
                         <div className="flex items-center gap-2 min-w-0">
                             <div className="flex-1 min-w-0">
                                 <div className="hidden md:flex items-center gap-2 justify-end flex-wrap">
@@ -1098,50 +1106,22 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
 
                                 <div className="md:hidden flex items-center gap-2">
-                                    <div className="flex-1 bg-neutral-900/70 border border-neutral-800 rounded-full p-1 flex items-center gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-                                        {MAIN_TABS.map((key) => (
-                                            <button
-                                                key={key}
-                                                type="button"
-                                                onClick={() => { setTab(key); setSelectedStudent(null); setMoreTabsOpen(false); }}
-                                                className={`flex-1 min-h-[40px] px-2 rounded-full font-black text-[11px] uppercase tracking-wide transition-all duration-300 active:scale-95 ${
-                                                    tab === key
-                                                        ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
-                                                        : 'text-neutral-200'
-                                                }`}
-                                            >
-                                                {TAB_LABELS[key] || key}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    {extraTabs.length > 0 && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setMoreTabsOpen(true)}
-                                            className={`w-11 h-11 rounded-full border flex items-center justify-center transition-all duration-300 active:scale-95 ${
-                                                isExtraTabActive
-                                                    ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
-                                                    : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
-                                            }`}
-                                            aria-label="Mais"
-                                        >
-                                            <ChevronDown size={18} />
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setMoreTabsOpen(true)}
+                                        className="flex-1 min-h-[44px] px-4 rounded-2xl bg-neutral-900/80 border border-neutral-800 flex items-center justify-between gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)] active:scale-95 transition-all duration-300"
+                                    >
+                                        <span className="text-[11px] font-black uppercase tracking-widest text-neutral-100 truncate">{currentTabLabel}</span>
+                                        <ChevronDown size={18} className="text-neutral-300" />
+                                    </button>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => onClose && onClose()}
-                                className="flex-shrink-0 w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
-                            >
-                                <X size={18} className="font-bold" />
-                            </button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {moreTabsOpen && extraTabs.length > 0 && (
+            {moreTabsOpen && (
                 <div
                     className="md:hidden fixed inset-0 z-[60]"
                     role="dialog"
@@ -1166,21 +1146,64 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </button>
                             </div>
                             <div className="p-3 grid gap-2">
-                                {(Array.isArray(extraTabs) ? extraTabs : []).map((key) => {
+                                {(Array.isArray(tabKeys) ? tabKeys : []).map((key) => {
                                     const isActive = tab === key;
+                                    const label = TAB_LABELS[key] || key;
+                                    let subtitle = '';
+                                    if (key === 'dashboard') subtitle = 'Visão geral do negócio';
+                                    else if (key === 'students') subtitle = 'Gestão de alunos e status';
+                                    else if (key === 'templates') subtitle = 'Biblioteca de treinos-base';
+                                    else if (key === 'teachers') subtitle = 'Gestão de professores e convites';
+                                    else if (key === 'system') subtitle = 'Backup, broadcasts e operações críticas';
+
+                                    let iconColor = isActive ? 'text-yellow-400' : 'text-neutral-400';
+                                    let badgeClass = isActive
+                                        ? 'bg-yellow-500/15 border-yellow-500/40'
+                                        : 'bg-neutral-900 border-neutral-800';
+
+                                    if (key === 'system') {
+                                        iconColor = isActive ? 'text-red-400' : 'text-red-300';
+                                        badgeClass = isActive
+                                            ? 'bg-red-900/60 border-red-500/60'
+                                            : 'bg-red-950/70 border-red-700/70';
+                                    }
+
                                     return (
                                         <button
                                             key={key}
                                             type="button"
                                             onClick={() => { setTab(key); setSelectedStudent(null); setMoreTabsOpen(false); }}
-                                            className={`w-full min-h-[48px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 active:scale-[0.99] ${
+                                            className={`w-full min-h-[56px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 active:scale-[0.99] ${
                                                 isActive
-                                                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
-                                                    : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                                    ? key === 'system'
+                                                        ? 'bg-red-900/20 text-red-300 border-red-500/40 shadow-lg shadow-red-500/20'
+                                                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
+                                                    : key === 'system'
+                                                        ? 'bg-neutral-900/80 text-red-300 border-red-800 hover:bg-neutral-900'
+                                                        : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
                                             }`}
                                         >
-                                            <span className="font-black text-[12px] uppercase tracking-widest truncate">{TAB_LABELS[key] || key}</span>
-                                            <ChevronDown size={18} className={`transition-transform ${isActive ? 'rotate-180' : '-rotate-90'}`} />
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 border ${badgeClass}`}>
+                                                    {key === 'dashboard' && <Crown size={16} className={iconColor} />}
+                                                    {key === 'students' && <UserPlus size={16} className={iconColor} />}
+                                                    {key === 'templates' && <Dumbbell size={16} className={iconColor} />}
+                                                    {key === 'teachers' && <UserCog size={16} className={iconColor} />}
+                                                    {key === 'system' && <ShieldAlert size={16} className={iconColor} />}
+                                                </div>
+                                                <div className="min-w-0 text-left">
+                                                    <div className="font-black text-[12px] uppercase tracking-widest truncate">{label}</div>
+                                                    {subtitle && (
+                                                        <div className="text-[11px] text-neutral-400 truncate">
+                                                            {subtitle}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <ChevronDown
+                                                size={16}
+                                                className={`transition-transform text-neutral-500 ${isActive ? 'rotate-90' : '-rotate-90'}`}
+                                            />
                                         </button>
                                     );
                                 })}
@@ -1471,23 +1494,23 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </button>
                         </div>
 
-                        <div className="bg-neutral-900/40 p-4 rounded-2xl border border-red-500/25">
+                        <div className="bg-red-950/40 p-4 rounded-2xl border border-red-500/40 shadow-[0_16px_40px_rgba(0,0,0,0.75)]">
                             <button
                                 type="button"
                                 onClick={() => setDangerOpen(v => !v)}
                                 className="w-full flex items-center justify-between gap-3 active:scale-[0.99] transition-transform"
                             >
                                 <div className="flex items-center gap-3 min-w-0">
-                                    <div className="w-10 h-10 rounded-2xl bg-red-500/10 border border-red-500/25 flex items-center justify-center flex-shrink-0">
-                                        <ShieldAlert size={18} className="text-red-400" />
+                                    <div className="w-10 h-10 rounded-2xl bg-red-900/70 border border-red-500/60 flex items-center justify-center flex-shrink-0 shadow-[0_0_25px_rgba(248,113,113,0.35)]">
+                                        <ShieldAlert size={18} className="text-red-300" />
                                     </div>
                                     <div className="min-w-0 text-left">
-                                        <div className="font-black text-red-400 tracking-tight">Danger Zone</div>
-                                        <div className="text-xs text-neutral-400 font-semibold">Ações irreversíveis com confirmação dupla</div>
+                                        <div className="font-black text-red-400 tracking-[0.18em] text-[11px] uppercase">Danger Zone</div>
+                                        <div className="text-xs text-neutral-300 font-semibold">Ações irreversíveis com confirmação dupla. Não há como desfazer.</div>
                                     </div>
                                 </div>
-                                <div className={`w-9 h-9 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center transition-all duration-300 ${dangerOpen ? 'rotate-180' : ''}`}>
-                                    <ChevronDown size={16} className="text-neutral-400" />
+                                <div className={`w-9 h-9 rounded-full bg-neutral-900 border border-red-700 flex items-center justify-center transition-all duration-300 ${dangerOpen ? 'rotate-180' : ''}`}>
+                                    <ChevronDown size={16} className="text-red-300" />
                                 </div>
                             </button>
 
