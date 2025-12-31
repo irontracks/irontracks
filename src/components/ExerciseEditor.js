@@ -195,6 +195,38 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         onChange?.({ ...workout, exercises: newExercises });
     };
 
+    const toggleBiSetWithNext = async (index) => {
+        try {
+            const list = Array.isArray(workout?.exercises) ? workout.exercises : [];
+            const current = list[index];
+            const next = list[index + 1];
+            if (!current || !next) return;
+
+            const currentType = getExerciseType(current);
+            const nextType = getExerciseType(next);
+            if (currentType === 'cardio' || nextType === 'cardio') {
+                await alert('Bi-set só pode ser usado entre exercícios de força.', 'Atenção');
+                return;
+            }
+
+            const currentMethod = normalizeMethod(current?.method);
+            if (currentMethod === 'Bi-Set') {
+                updateExercise(index, 'method', 'Normal');
+                return;
+            }
+
+            const allowedMethods = new Set(['Normal', 'Bi-Set']);
+            if (!allowedMethods.has(currentMethod)) {
+                const ok = await confirm('Isso vai trocar o método para Bi-Set. Continuar?', 'Linkar com Próximo');
+                if (!ok) return;
+            }
+
+            updateExercise(index, 'method', 'Bi-Set');
+        } catch (e) {
+            await alert('Não foi possível atualizar o link. ' + (e?.message ?? String(e)), 'Erro');
+        }
+    };
+
     const addExercise = () => {
         onChange?.({
             ...workout,
@@ -263,7 +295,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 		if (typeof showLoading === 'function') {
 			showLoading('Seu treino está sendo salvo. Aguarde...', 'Salvando');
 		}
-		try {
+	try {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
             
@@ -313,55 +345,65 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                      const { data: insertedExs, error: exErr } = await supabase.from('exercises').insert(exercisesToInsert).select();
                      if (exErr) throw exErr;
 
-                     const insertSetSafe = async (payload) => {
-                         try {
-                             const { error } = await supabase.from('sets').insert(payload);
-                             if (!error) return;
-                             const msg = (error?.message || '').toLowerCase();
-                             if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
-                                 const reduced = { ...payload };
-                                 delete reduced.advanced_config;
-                                 delete reduced.is_warmup;
-                                 await supabase.from('sets').insert(reduced);
-                                 return;
-                             }
-                             throw error;
-                         } catch (e) {
-                             const msg = (e?.message || '').toLowerCase();
-                             if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
-                                 const reduced = { ...payload };
-                                 delete reduced.advanced_config;
-                                 delete reduced.is_warmup;
-                                 await supabase.from('sets').insert(reduced);
-                                 return;
-                             }
-                             throw e;
-                         }
-                     };
-                     
-                     for (const ex of insertedExs) {
-                         const original = (typeof ex?.order === 'number' && Array.isArray(workout.exercises))
-                             ? workout.exercises[ex.order]
-                             : (workout.exercises || []).find(e => e?.name === ex.name);
-                         const setDetails = Array.isArray(original?.setDetails)
-                             ? original.setDetails
-                             : (Array.isArray(original?.set_details) ? original.set_details : null);
-                         const numSets = setDetails
-                             ? setDetails.length
-                             : (parseInt(original?.sets) || 0);
-                         for (let i = 0; i < numSets; i++) {
-                             const s = setDetails ? setDetails[i] : null;
-                             await insertSetSafe({
-                                 exercise_id: ex.id,
-                                 reps: s?.reps ?? original?.reps ?? null,
-                                 rpe: s?.rpe ?? original?.rpe ?? null,
-                                 set_number: s?.set_number ?? (i + 1),
-                                 weight: s?.weight ?? null,
-                                 is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-                                 advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
-                             });
-                         }
-                     }
+                    const SETS_INSERT_CHUNK_SIZE = 200;
+                    const chunkArray = (arr, size) => {
+                        const safe = Array.isArray(arr) ? arr : [];
+                        const chunkSize = Math.max(1, Number(size) || 1);
+                        const out = [];
+                        for (let i = 0; i < safe.length; i += chunkSize) out.push(safe.slice(i, i + chunkSize));
+                        return out;
+                    };
+
+                    const insertSetsBulkSafe = async (rows) => {
+                        const chunks = chunkArray(rows, SETS_INSERT_CHUNK_SIZE);
+                        for (const batch of chunks) {
+                            if (!Array.isArray(batch) || batch.length === 0) continue;
+                            const { error } = await supabase.from('sets').insert(batch);
+                            if (!error) continue;
+
+                            const msg = String(error?.message || '').toLowerCase();
+                            const shouldReduce = msg.includes('advanced_config') || msg.includes('is_warmup');
+                            if (!shouldReduce) throw error;
+
+                            const reducedBatch = batch.map((row) => {
+                                if (!row || typeof row !== 'object') return row;
+                                const next = { ...row };
+                                delete next.advanced_config;
+                                delete next.is_warmup;
+                                return next;
+                            });
+
+                            const { error: reducedErr } = await supabase.from('sets').insert(reducedBatch);
+                            if (reducedErr) throw reducedErr;
+                        }
+                    };
+
+                    const setRows = [];
+                    for (const ex of (insertedExs || [])) {
+                        const original = (typeof ex?.order === 'number' && Array.isArray(workout.exercises))
+                            ? workout.exercises[ex.order]
+                            : (workout.exercises || []).find(e => e?.name === ex.name);
+                        const setDetails = Array.isArray(original?.setDetails)
+                            ? original.setDetails
+                            : (Array.isArray(original?.set_details) ? original.set_details : null);
+                        const numSets = setDetails
+                            ? setDetails.length
+                            : (parseInt(original?.sets) || 0);
+                        for (let i = 0; i < numSets; i += 1) {
+                            const s = setDetails ? setDetails[i] : null;
+                            setRows.push({
+                                exercise_id: ex.id,
+                                reps: s?.reps ?? original?.reps ?? null,
+                                rpe: s?.rpe ?? original?.rpe ?? null,
+                                set_number: s?.set_number ?? (i + 1),
+                                weight: s?.weight ?? null,
+                                is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
+                                advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
+                            });
+                        }
+                    }
+
+                    if (setRows.length > 0) await insertSetsBulkSafe(setRows);
                  }
 			}
 			
@@ -455,37 +497,50 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                         const linkedFromPrev = normalizeMethod(prev?.method) === 'Bi-Set';
                         const hasNext = index < ((workout.exercises || []).length - 1);
                         const isBiSet = safeMethod === 'Bi-Set';
+                        const nextExercise = hasNext ? (workout.exercises || [])[index + 1] : null;
+                        const nextType = nextExercise ? getExerciseType(nextExercise) : null;
+                        const canShowLinkButton = hasNext && exerciseType !== 'cardio' && nextType !== 'cardio';
                         const setsCount = Math.max(0, parseInt(exercise?.sets) || 0);
                         const setDetails = ensureSetDetails(exercise, setsCount);
 
                         return (
-                            <div
-                                key={index}
-                                className={`bg-neutral-800 p-4 border border-neutral-700 relative group transition-all hover:border-neutral-600 ${linkedFromPrev ? '-mt-4 rounded-t-none border-t-0' : 'rounded-xl'} ${isBiSet && hasNext ? 'rounded-b-none' : ''}`}
-                            >
-                                {(isBiSet || linkedFromPrev) && (
-                                    <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-1 bg-yellow-500/20" />
-                                )}
-                                <div className="absolute top-2 right-2 flex gap-2">
-                                     <button
-                                        onClick={() => toggleExerciseType(index, exerciseType)}
-                                        className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${
-                                            exerciseType === 'cardio'
-                                            ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
-                                            : 'bg-neutral-700 text-neutral-400 border-neutral-600 hover:border-neutral-400'
-                                        }`}
-                                    >
-                                        {exerciseType === 'cardio' ? 'Cardio' : 'Força'}
-                                    </button>
-                                    <button
-                                        onClick={() => removeExercise(index)}
-                                        className="text-neutral-600 hover:text-red-500 p-1 transition-colors"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                            <React.Fragment key={index}>
+                                <div
+                                    className={`bg-neutral-800 p-4 border border-neutral-700 relative group transition-all hover:border-neutral-600 ${linkedFromPrev ? '-mt-4 rounded-t-none border-t-0' : 'rounded-xl'} ${isBiSet && hasNext ? 'rounded-b-none' : ''}`}
+                                >
+                                    {(isBiSet || linkedFromPrev) && (
+                                        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-1 bg-yellow-500/20" />
+                                    )}
+                                    <div className="absolute top-2 right-2 flex gap-2">
+                                        <button
+                                            onClick={() => toggleExerciseType(index, exerciseType)}
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${
+                                                exerciseType === 'cardio'
+                                                ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                                                : 'bg-neutral-700 text-neutral-400 border-neutral-600 hover:border-neutral-400'
+                                            }`}
+                                        >
+                                            {exerciseType === 'cardio' ? 'Cardio' : 'Força'}
+                                        </button>
+                                        {isBiSet && hasNext && (
+                                            <button
+                                                type="button"
+                                                onClick={() => toggleBiSetWithNext(index)}
+                                                className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-yellow-500/30 text-yellow-500 hover:text-yellow-400 hover:border-yellow-500/50 bg-yellow-500/10"
+                                                title="Deslinkar do próximo"
+                                            >
+                                                Deslinkar
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => removeExercise(index)}
+                                            className="text-neutral-600 hover:text-red-500 p-1 transition-colors"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
 
-                                <div className="space-y-4 pr-0 pt-6">
+                                    <div className="space-y-4 pr-0 pt-6">
                                     {exerciseType === 'cardio' ? (
                                         <div>
                                             <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Modalidade</label>
@@ -844,13 +899,28 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                     )}
                                 </div>
 
-                                {isBiSet && hasNext && (
-                                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-neutral-900 border border-neutral-700 rounded-full px-3 py-1 flex items-center gap-2">
-                                        <Link2 size={14} className="text-yellow-500" />
-                                        <span className="text-[10px] text-neutral-300 font-bold">BI-SET</span>
+                                    {isBiSet && hasNext && (
+                                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-neutral-900 border border-neutral-700 rounded-full px-3 py-1 flex items-center gap-2 z-20 shadow-lg">
+                                            <Link2 size={14} className="text-yellow-500" />
+                                            <span className="text-[10px] text-neutral-300 font-bold">BI-SET</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {canShowLinkButton && !isBiSet && (
+                                    <div className="flex justify-center -mt-4 -mb-4 relative z-10">
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleBiSetWithNext(index)}
+                                            className="mt-3 mb-3 inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-full text-xs font-bold text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors min-h-[44px]"
+                                            title="Linkar com próximo (Bi-set)"
+                                        >
+                                            <Link2 size={16} className="text-yellow-500" />
+                                            <span>Linkar com Próximo</span>
+                                        </button>
                                     </div>
                                 )}
-                            </div>
+                            </React.Fragment>
                         );
                     })}
                 </div>

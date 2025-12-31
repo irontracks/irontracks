@@ -20,7 +20,7 @@ export async function GET() {
     const { data: workouts, error: wError } = await admin
       .from('workouts')
       .select('user_id')
-      .neq('user_id', null)
+      .not('user_id', 'is', null)
     
     if (wError) throw wError
 

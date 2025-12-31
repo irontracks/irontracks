@@ -1,11 +1,28 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { LayoutGrid, Bell, MessageSquare, Users, History, LogOut, Command, Calendar, CreditCard } from 'lucide-react'
 
 const HeaderActionsMenu = ({ user, isCoach, hasUnreadChat, hasUnreadNotification, onOpenAdmin, onOpenChatList, onOpenGlobalChat, onOpenHistory, onOpenNotifications, onLogout, onOpenSchedule, onOpenWallet }) => {
   const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      setOpen(false)
+    }
+    try {
+      window.addEventListener('keydown', onKeyDown)
+    } catch {}
+    return () => {
+      try {
+        window.removeEventListener('keydown', onKeyDown)
+      } catch {}
+    }
+  }, [open])
 
   return (
     <div className="relative flex items-center">

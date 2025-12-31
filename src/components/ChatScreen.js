@@ -20,6 +20,8 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 
+const CHAT_MEDIA_PREVIEW_SIZE = 800;
+
 const ChatScreen = ({ user, onClose }) => {
     const [view, setView] = useState('list');
     const [activeChannel, setActiveChannel] = useState(null);
@@ -378,33 +380,69 @@ const ChatScreen = ({ user, onClose }) => {
                         {messages.length === 0 && <div className="text-center py-10 text-neutral-500 text-sm">Nenhuma mensagem ainda.<br/>Seja o primeiro a dizer olá! 👋</div>}
                         
                         {messages.map((msg, idx) => {
-                            const isMe = msg.uid === user.id;
-                            const showAvatar = !isMe && (idx === 0 || messages[idx-1].uid !== msg.uid);
+                            const myId = user?.id ? String(user.id) : '';
+                            const msgUid = msg?.uid ? String(msg.uid) : '';
+                            const isMe = !!myId && msgUid === myId;
+                            const prevUid = messages?.[idx - 1]?.uid ? String(messages[idx - 1].uid) : '';
+                            const showAvatar = !isMe && (idx === 0 || prevUid !== msgUid);
+                            const displayName = String(msg?.displayName || '').trim();
+                            const initial = displayName ? displayName[0] : '?';
+                            const avatarAlt = displayName || 'avatar';
+                            const timeLabel = (() => {
+                                try {
+                                    const raw = msg?.createdAt;
+                                    const d = raw instanceof Date ? raw : new Date(raw);
+                                    if (!Number.isFinite(d.getTime())) return '';
+                                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                } catch {
+                                    return '';
+                                }
+                            })();
                             
                             return (
                                 <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${!showAvatar && !isMe ? 'ml-11' : ''}`}>
                                     {!isMe && showAvatar && (
                                         msg.photoURL ? (
-                                            <Image src={msg.photoURL} width={32} height={32} className="w-8 h-8 rounded-full bg-neutral-700 object-cover self-end mb-1" alt={msg.displayName} />
+                                            <Image src={msg.photoURL} width={32} height={32} className="w-8 h-8 rounded-full bg-neutral-700 object-cover self-end mb-1" alt={avatarAlt} />
                                         ) : (
-                                            <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-[10px] self-end mb-1">{msg.displayName[0]}</div>
+                                            <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-[10px] self-end mb-1">{initial}</div>
                                         )
                                     )}
                                     <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm break-words ${isMe ? 'bg-yellow-500 text-black rounded-br-none' : 'bg-neutral-800 text-white rounded-bl-none'}`}>
-                                        {!isMe && activeChannel.type === 'global' && <p className="text-[10px] font-bold opacity-50 mb-1">{msg.displayName}</p>}
+                                        {!isMe && activeChannel.type === 'global' && <p className="text-[10px] font-bold opacity-50 mb-1">{displayName || 'Usuário'}</p>}
                                         {msg.kind === 'image' && (
-                                            <img src={msg.thumbUrl || msg.mediaUrl} alt="imagem" className="rounded-lg max-h-64 w-full object-cover" onClick={() => window.open(msg.mediaUrl, '_blank')} />
+                                            <Image
+                                                src={msg.thumbUrl || msg.mediaUrl}
+                                                alt="imagem"
+                                                width={CHAT_MEDIA_PREVIEW_SIZE}
+                                                height={CHAT_MEDIA_PREVIEW_SIZE}
+                                                className="rounded-lg max-h-64 w-full object-cover cursor-pointer"
+                                                onClick={() => {
+                                                    try {
+                                                        const url = msg?.mediaUrl ? String(msg.mediaUrl) : '';
+                                                        if (!url) return;
+                                                        window.open(url, '_blank');
+                                                    } catch {}
+                                                }}
+                                            />
                                         )}
                                         {msg.kind === 'video' && (
                                             <video src={msg.mediaUrl} controls playsInline className="rounded-lg max-h-64 w-full" />
                                         )}
                                         {msg.kind === 'gif' && (
-                                            <img src={msg.mediaUrl} alt="gif" className="rounded-lg max-h-64 w-full object-cover" />
+                                            <Image
+                                                src={msg.mediaUrl}
+                                                alt="gif"
+                                                width={CHAT_MEDIA_PREVIEW_SIZE}
+                                                height={CHAT_MEDIA_PREVIEW_SIZE}
+                                                className="rounded-lg max-h-64 w-full object-cover"
+                                                unoptimized
+                                            />
                                         )}
                                         {(!msg.kind || msg.kind === 'text') && (
                                             <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
                                         )}
-                                        <p className={`text-[9px] mt-1 text-right ${isMe ? 'text-black/50' : 'text-neutral-500'}`}>{msg.createdAt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                        <p className={`text-[9px] mt-1 text-right ${isMe ? 'text-black/50' : 'text-neutral-500'}`}>{timeLabel}</p>
                                     </div>
                                 </div>
                             )

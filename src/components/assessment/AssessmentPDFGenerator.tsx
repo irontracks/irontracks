@@ -1,4 +1,5 @@
 import React from 'react';
+import { Download, Loader2 } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
 import {
   calculateSumSkinfolds,
@@ -85,8 +86,13 @@ export default function AssessmentPDFGenerator({
   assessmentDate,
   photos
 }: AssessmentPDFGeneratorProps) {
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
   const generatePDF = async () => {
     try {
+      if (isGenerating) return;
+      setIsGenerating(true);
+
       const safeStudentName = String(studentName || 'Aluno');
       const safeDate = assessmentDate instanceof Date && !isNaN(assessmentDate as any)
         ? assessmentDate
@@ -115,18 +121,19 @@ export default function AssessmentPDFGenerator({
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       return { success: false, error };
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   return (
     <button
       onClick={generatePDF}
-      className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+      disabled={isGenerating}
+      className="inline-flex items-center gap-2 min-h-[44px] px-4 py-2 bg-yellow-500 text-black rounded-xl font-black shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95 disabled:opacity-60 disabled:active:scale-100"
     >
-      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-      Gerar PDF
+      {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+      {isGenerating ? 'Gerando…' : 'Gerar PDF'}
     </button>
   );
 }

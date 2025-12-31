@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, ArrowLeft, Clock, User, Plus, Pencil, Trash2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
@@ -67,7 +67,7 @@ function getTypeLabel(type: 'personal' | 'assessment' | 'other') {
 
 export default function SchedulePage() {
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const today = new Date()
   const initialDate = toDateInputValue(today)
@@ -92,23 +92,26 @@ export default function SchedulePage() {
     type: 'personal',
   })
 
-  const loadAppointmentsForDate = async (dateString: string) => {
-    const safeDate = dateString || toDateInputValue(new Date())
-    const startOfDay = new Date(`${safeDate}T00:00:00`)
-    const endOfDay = new Date(`${safeDate}T23:59:59.999`)
+  const loadAppointmentsForDate = useCallback(
+    async (dateString: string) => {
+      const safeDate = dateString || toDateInputValue(new Date())
+      const startOfDay = new Date(`${safeDate}T00:00:00`)
+      const endOfDay = new Date(`${safeDate}T23:59:59.999`)
 
-    const { data, error: queryError } = await supabase
-      .from('appointments')
-      .select('id, title, start_time, end_time, type, notes, student_id')
-      .gte('start_time', startOfDay.toISOString())
-      .lte('start_time', endOfDay.toISOString())
-      .order('start_time', { ascending: true })
+      const { data, error: queryError } = await supabase
+        .from('appointments')
+        .select('id, title, start_time, end_time, type, notes, student_id')
+        .gte('start_time', startOfDay.toISOString())
+        .lte('start_time', endOfDay.toISOString())
+        .order('start_time', { ascending: true })
 
-    if (queryError) throw queryError
-    setAppointments(Array.isArray(data) ? data : [])
-  }
+      if (queryError) throw queryError
+      setAppointments(Array.isArray(data) ? data : [])
+    },
+    [supabase]
+  )
 
-  const loadStudentsForCoach = async () => {
+  const loadStudentsForCoach = useCallback(async () => {
     const { data, error } = await supabase
       .from('students')
       .select('id, name, email')
@@ -116,7 +119,7 @@ export default function SchedulePage() {
 
     if (error) throw error
     setStudents(Array.isArray(data) ? data : [])
-  }
+  }, [supabase])
 
   useEffect(() => {
     let isMounted = true
@@ -156,7 +159,7 @@ export default function SchedulePage() {
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [supabase, loadStudentsForCoach])
 
   useEffect(() => {
     if (!userId || !selectedDate) return
@@ -180,7 +183,7 @@ export default function SchedulePage() {
     return () => {
       isCancelled = true
     }
-  }, [userId, selectedDate])
+  }, [userId, selectedDate, loadAppointmentsForDate])
 
   const handleOpenModal = () => {
     const base = new Date()

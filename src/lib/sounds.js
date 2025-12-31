@@ -1,6 +1,10 @@
 let __ctx;
 
+const UNLOCK_SILENT_GAIN = 0.000001;
+const UNLOCK_SILENT_DURATION_S = 0.03;
+
 const ensureCtx = () => {
+    if (typeof window === 'undefined') return null;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
     if (!__ctx || __ctx.state === 'closed') __ctx = new AC();
@@ -11,7 +15,24 @@ const ensureCtx = () => {
 export const unlockAudio = () => {
     try {
         const ctx = ensureCtx();
-        if (ctx && ctx.state === 'suspended') ctx.resume();
+        if (!ctx) return;
+        if (ctx.state === 'suspended') {
+            try {
+                const maybePromise = ctx.resume();
+                if (maybePromise && typeof maybePromise.then === 'function') {
+                    maybePromise.catch(() => {});
+                }
+            } catch {}
+        }
+        try {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            gain.gain.setValueAtTime(UNLOCK_SILENT_GAIN, ctx.currentTime);
+            osc.start();
+            osc.stop(ctx.currentTime + UNLOCK_SILENT_DURATION_S);
+        } catch {}
     } catch {}
 };
 

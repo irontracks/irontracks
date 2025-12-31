@@ -33,6 +33,11 @@ ChartJS.register(
   Filler
 );
 
+const LOOKBACK_DAYS = 28;
+const BASE_ACTIVITY_FACTOR = 1.2;
+const TEF_FACTOR = 0.1;
+const MAX_SESSION_SECONDS = 4 * 60 * 60;
+
 const toPositiveNumberOrNull = (value: any): number | null => {
   const num = typeof value === 'string' ? Number(value.replace(',', '.')) : Number(value);
   return Number.isFinite(num) && num > 0 ? num : null;
@@ -89,6 +94,101 @@ const getSum7Mm = (assessment: any): number | null => {
   return toPositiveNumberOrNull(assessment?.sum7 ?? assessment?.measurements?.sum7);
 };
 
+const safeJsonParse = (raw: any): any | null => {
+  try {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    if (typeof raw !== 'string') return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const safeDateMs = (raw: any): number | null => {
+  if (!raw) return null;
+  const d = new Date(raw);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : null;
+};
+
+const safeDateMsStartOfDay = (raw: any): number | null => {
+  if (!raw) return null;
+  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+    const d = new Date(`${raw.trim()}T00:00:00.000`);
+    const t = d.getTime();
+    return Number.isFinite(t) ? t : null;
+  }
+  return safeDateMs(raw);
+};
+
+const safeDateMsEndOfDay = (raw: any): number | null => {
+  if (!raw) return null;
+  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
+    const d = new Date(`${raw.trim()}T23:59:59.999`);
+    const t = d.getTime();
+    return Number.isFinite(t) ? t : null;
+  }
+  return safeDateMs(raw);
+};
+
+const countSessionSets = (session: any): number => {
+  const logs = session?.logs;
+  if (logs && typeof logs === 'object') {
+    try {
+      const values = Object.values(logs);
+      if (Array.isArray(values)) {
+        const doneCount = values.reduce((acc: number, v: any) => {
+          if (v && typeof v === 'object' && v.done === true) return acc + 1;
+          return acc;
+        }, 0);
+        if (doneCount > 0) return doneCount;
+        return values.length;
+      }
+    } catch {
+      return 0;
+    }
+  }
+
+  const exercises = Array.isArray(session?.exercises) ? session.exercises : [];
+  let total = 0;
+  for (const ex of exercises) {
+    const setsArr = Array.isArray(ex?.sets) ? ex.sets : null;
+    if (setsArr) {
+      total += setsArr.length;
+      continue;
+    }
+    const count = typeof ex?.sets === 'number' ? ex.sets : Number(ex?.sets);
+    if (Number.isFinite(count) && count > 0) total += Math.floor(count);
+  }
+  return total;
+};
+
+const estimateStrengthTrainingMet = (seconds: number, setsCount: number): number => {
+  const minutes = seconds > 0 ? seconds / 60 : 0;
+  if (!Number.isFinite(minutes) || minutes <= 0) return 4.8;
+  const setsPerMin = setsCount > 0 ? setsCount / minutes : 0;
+  if (!Number.isFinite(setsPerMin) || setsPerMin <= 0) return 4.8;
+
+  if (setsPerMin < 0.25) return 3.8;
+  if (setsPerMin < 0.35) return 4.6;
+  if (setsPerMin < 0.5) return 5.3;
+  return 5.9;
+};
+
+const uniqueStrings = (values: any[]): string[] => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const v of values) {
+    if (typeof v !== 'string') continue;
+    const s = v.trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+};
+
 interface AssessmentHistoryProps {
   studentId?: string;
 }
@@ -100,6 +200,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   const [assessments, setAssessments] = useState<any[]>([]);
   const [loading, setLoading] = useState(!!studentId);
   const [error, setError] = useState<string | null>(null);
+  const [workoutSessions, setWorkoutSessions] = useState<{ dateMs: number; metHours: number }[]>([]);
+  const [workoutSessionsLoading, setWorkoutSessionsLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [studentName, setStudentName] = useState<string>('Aluno');
@@ -194,11 +296,262 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     });
   }, [assessments]);
 
+  const workoutWindow = useMemo(() => {
+    if (!Array.isArray(sortedAssessments) || sortedAssessments.length === 0) return null;
+    const minTimes = sortedAssessments
+      .map(a => safeDateMsStartOfDay(a?.date ?? a?.assessment_date))
+      .filter((t): t is number => typeof t === 'number' && Number.isFinite(t) && t > 0);
+    const maxTimes = sortedAssessments
+      .map(a => safeDateMsEndOfDay(a?.date ?? a?.assessment_date))
+      .filter((t): t is number => typeof t === 'number' && Number.isFinite(t) && t > 0);
+    if (minTimes.length === 0 || maxTimes.length === 0) return null;
+    const minTime = Math.min(...minTimes);
+    const maxTime = Math.max(...maxTimes);
+    const lookbackMs = LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    return {
+      from: new Date(minTime - lookbackMs),
+      to: new Date(maxTime)
+    };
+  }, [sortedAssessments]);
+
+  const workoutWindowFromIso = workoutWindow?.from ? workoutWindow.from.toISOString() : null;
+  const workoutWindowToIso = workoutWindow?.to ? workoutWindow.to.toISOString() : null;
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (!studentId || !workoutWindowFromIso || !workoutWindowToIso) {
+          if (mounted) setWorkoutSessions([]);
+          return;
+        }
+        if (mounted) setWorkoutSessionsLoading(true);
+
+        const candidateId = String(studentId || '').trim();
+        const candidateIds: string[] = [];
+
+        try {
+          const { data: directProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', candidateId)
+            .maybeSingle();
+
+          if (directProfile?.id) {
+            candidateIds.push(directProfile.id as string);
+          } else {
+            const { data: studentRow } = await supabase
+              .from('students')
+              .select('id, user_id, email')
+              .or(`id.eq.${candidateId},user_id.eq.${candidateId}`)
+              .maybeSingle();
+
+            if (studentRow?.user_id) candidateIds.push(studentRow.user_id as string);
+            if (!studentRow?.user_id && studentRow?.email) {
+              const { data: profileByEmail } = await supabase
+                .from('profiles')
+                .select('id')
+                .ilike('email', studentRow.email)
+                .maybeSingle();
+              if (profileByEmail?.id) candidateIds.push(profileByEmail.id as string);
+            }
+          }
+        } catch {
+          candidateIds.push(candidateId);
+        }
+
+        const ids = uniqueStrings([candidateId, ...candidateIds]);
+        if (ids.length === 0) {
+          if (mounted) setWorkoutSessions([]);
+          return;
+        }
+
+        const baseSelect = 'id, user_id, student_id, date, created_at, completed_at, is_template, notes';
+        const fromIso = workoutWindowFromIso;
+        const toIso = workoutWindowToIso;
+        const fromDay = typeof fromIso === 'string' ? fromIso.split('T')[0] : null;
+        const toDay = typeof toIso === 'string' ? toIso.split('T')[0] : null;
+
+        const rows: any[] = [];
+        try {
+          const { data, error: wErr } = await supabase
+            .from('workouts')
+            .select(baseSelect)
+            .eq('is_template', false)
+            .in('user_id', ids)
+            .gte('completed_at', fromIso)
+            .lte('completed_at', toIso)
+            .order('completed_at', { ascending: true });
+          if (!wErr && Array.isArray(data)) rows.push(...data);
+        } catch {}
+
+        try {
+          const { data, error: wErr } = await supabase
+            .from('workouts')
+            .select(baseSelect)
+            .eq('is_template', false)
+            .in('student_id', ids)
+            .gte('completed_at', fromIso)
+            .lte('completed_at', toIso)
+            .order('completed_at', { ascending: true });
+          if (!wErr && Array.isArray(data)) rows.push(...data);
+        } catch {}
+
+        if (fromDay && toDay) {
+          try {
+            const { data, error: wErr } = await supabase
+              .from('workouts')
+              .select(baseSelect)
+              .eq('is_template', false)
+              .in('user_id', ids)
+              .gte('date', fromDay)
+              .lte('date', toDay)
+              .order('date', { ascending: true });
+            if (!wErr && Array.isArray(data)) rows.push(...data);
+          } catch {}
+
+          try {
+            const { data, error: wErr } = await supabase
+              .from('workouts')
+              .select(baseSelect)
+              .eq('is_template', false)
+              .in('student_id', ids)
+              .gte('date', fromDay)
+              .lte('date', toDay)
+              .order('date', { ascending: true });
+            if (!wErr && Array.isArray(data)) rows.push(...data);
+          } catch {}
+        }
+
+        const byId = new Map<string, any>();
+        for (const r of rows) {
+          if (r?.id) byId.set(String(r.id), r);
+        }
+
+        const sessions: { dateMs: number; metHours: number }[] = [];
+        byId.forEach((r) => {
+          const dateMs = safeDateMs(r?.completed_at ?? r?.date ?? r?.created_at);
+          if (!dateMs) return;
+          const parsed = safeJsonParse(r?.notes);
+          const totalTime = toPositiveNumberOrNull(parsed?.totalTime);
+          const realTime = toPositiveNumberOrNull(parsed?.realTotalTime);
+          let rawSeconds = totalTime || realTime || null;
+          if (!rawSeconds) {
+            try {
+              const exerciseDurations = Array.isArray(parsed?.exerciseDurations)
+                ? parsed.exerciseDurations
+                : (Array.isArray(parsed?.exercisesDurations) ? parsed.exercisesDurations : null);
+              if (exerciseDurations && exerciseDurations.length > 0) {
+                const sum = exerciseDurations.reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
+                if (Number.isFinite(sum) && sum > 0) rawSeconds = sum;
+              }
+            } catch {}
+          }
+          if (!rawSeconds) return;
+          const seconds = Math.min(rawSeconds, MAX_SESSION_SECONDS);
+          if (!Number.isFinite(seconds) || seconds <= 0) return;
+          const setsCount = countSessionSets(parsed);
+          const met = estimateStrengthTrainingMet(seconds, setsCount);
+          const metHours = (met * seconds) / 3600;
+          if (!Number.isFinite(metHours) || metHours <= 0) return;
+          sessions.push({ dateMs, metHours });
+        });
+
+        sessions.sort((a, b) => a.dateMs - b.dateMs);
+
+        if (mounted) setWorkoutSessions(sessions);
+      } catch {
+        if (mounted) setWorkoutSessions([]);
+      } finally {
+        if (mounted) setWorkoutSessionsLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [studentId, supabase, workoutWindowFromIso, workoutWindowToIso]);
+
+  const tdeeByAssessmentId = useMemo(() => {
+    const out = new Map<string, number>();
+    if (!Array.isArray(sortedAssessments) || sortedAssessments.length === 0) return out;
+
+    const sessions = Array.isArray(workoutSessions) ? workoutSessions : [];
+
+    const dates = sessions.map(s => s.dateMs);
+    const prefix: number[] = new Array(sessions.length + 1);
+    prefix[0] = 0;
+    for (let i = 0; i < sessions.length; i++) {
+      prefix[i + 1] = prefix[i] + (Number(sessions[i]?.metHours) || 0);
+    }
+
+    const lowerBound = (arr: number[], x: number): number => {
+      let lo = 0;
+      let hi = arr.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (arr[mid] < x) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
+
+    const upperBound = (arr: number[], x: number): number => {
+      let lo = 0;
+      let hi = arr.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (arr[mid] <= x) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
+
+    const lookbackMs = LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+    for (const assessment of sortedAssessments) {
+      const id = assessment?.id ? String(assessment.id) : '';
+      if (!id) continue;
+      const dateMs = safeDateMsEndOfDay(assessment?.date ?? assessment?.assessment_date);
+      if (!dateMs) continue;
+
+      const bmr = getBmrKcal(assessment);
+      const weightKg = getWeightKg(assessment);
+      if (!bmr || !weightKg) continue;
+
+      let eatPerDay = 0;
+      if (sessions.length > 0) {
+        const start = dateMs - lookbackMs;
+        const l = lowerBound(dates, start);
+        const r = upperBound(dates, dateMs);
+        const sumMetHours = prefix[r] - prefix[l];
+        const eatTotal = weightKg * sumMetHours;
+        eatPerDay = eatTotal / LOOKBACK_DAYS;
+        if (!Number.isFinite(eatPerDay) || eatPerDay < 0) eatPerDay = 0;
+      }
+
+      const baseline = bmr * BASE_ACTIVITY_FACTOR;
+      const totalBeforeTef = baseline + eatPerDay;
+      const tdee = totalBeforeTef * (1 + TEF_FACTOR);
+
+      if (Number.isFinite(tdee) && tdee > 0) out.set(id, tdee);
+    }
+
+    return out;
+  }, [sortedAssessments, workoutSessions]);
+
   const formatDate = (rawDate: any, options?: Intl.DateTimeFormatOptions) => {
     if (!rawDate) return '-';
     const date = new Date(rawDate);
     if (Number.isNaN(date.getTime())) return '-';
     return date.toLocaleDateString('pt-BR', options);
+  };
+
+  const formatDateCompact = (rawDate: any) => {
+    return formatDate(rawDate, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
+  const formatWeekdayCompact = (rawDate: any) => {
+    return formatDate(rawDate, { weekday: 'long' });
   };
 
   const safeGender = (raw: any) => {
@@ -384,10 +737,10 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   return (
     <DialogProvider>
     <GlobalDialog />
-    <div className="p-4 bg-neutral-900 text-white">
+      <div className="p-4 bg-neutral-900 text-white">
       {/* Cabeçalho escuro com ações */}
       <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div className="flex items-center">
             <User className="w-8 h-8 text-yellow-500 mr-3" />
             <div>
@@ -395,10 +748,29 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
               <p className="text-neutral-400 text-sm">Gerencie as avaliações e acompanhe a evolução</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowForm(true)} className="px-4 py-2 rounded-xl bg-yellow-500 text-black font-bold">+ Nova Avaliação</button>
-            <button onClick={() => setShowHistory(true)} className="px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 font-medium">Ver Histórico</button>
-            <button onClick={() => { if (typeof window !== 'undefined') window.history.back(); }} className="ml-2 p-2 rounded-full bg-neutral-900 border border-neutral-700 text-neutral-300 hover:bg-neutral-800" title="Fechar"><X className="w-5 h-5"/></button>
+          <div className="w-full sm:w-auto flex items-center gap-2">
+            <div className="grid grid-cols-2 gap-2 flex-1 sm:flex-none">
+              <button
+                onClick={() => setShowForm(true)}
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95"
+              >
+                + Nova Avaliação
+              </button>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+              >
+                Ver Histórico
+              </button>
+            </div>
+            <button
+              onClick={() => { if (typeof window !== 'undefined') window.history.back(); }}
+              className="shrink-0 w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition-all duration-300 active:scale-95 flex items-center justify-center"
+              title="Fechar"
+              type="button"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         </div>
         {latestAssessment && previousAssessment && (
@@ -536,61 +908,74 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
         <div id="assessments-history" className="divide-y divide-neutral-700">
           {sortedAssessments.map((assessment) => (
             <div key={assessment.id} className="p-6 hover:bg-neutral-900 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center mb-2">
-                    <span className="font-bold text-white">
-                      {formatDate(assessment.date || assessment.assessment_date, {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </span>
-                    <span className="ml-3 px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full">
-                      {assessment.age ?? '-'} anos
-                    </span>
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-black text-white text-sm sm:text-base truncate">
+                        {formatDateCompact(assessment.date || assessment.assessment_date)}
+                      </div>
+                      <div className="text-xs text-neutral-500 mt-0.5 truncate">
+                        {formatWeekdayCompact(assessment.date || assessment.assessment_date)}
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
+                        {assessment.age ?? '-'} anos
+                      </span>
+                      {assessment.photos && assessment.photos.length > 0 && (
+                        <span className="px-2.5 py-1 bg-green-500/15 text-green-400 text-xs rounded-full border border-green-500/20 font-bold">
+                          Com fotos
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-neutral-400">Peso:</span>
-                      <span className="ml-1 font-medium text-white">{(() => {
+
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-sm">
+                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Peso</div>
+                      <div className="text-white font-black mt-1">{(() => {
                         const w = getWeightKg(assessment);
                         return w ? `${w.toFixed(1)} kg` : '-';
-                      })()}</span>
+                      })()}</div>
                     </div>
-                    <div>
-                      <span className="text-neutral-400">% Gordura:</span>
-                      <span className="ml-1 font-medium text-white">{(() => {
+                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">% Gordura</div>
+                      <div className="text-white font-black mt-1">{(() => {
                         const bf = getBodyFatPercent(assessment);
                         return bf ? `${bf.toFixed(1)}%` : '-';
-                      })()}</span>
+                      })()}</div>
                     </div>
-                    <div>
-                      <span className="text-neutral-400">Massa Magra:</span>
-                      <span className="ml-1 font-medium text-white">{(() => {
+                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Massa Magra</div>
+                      <div className="text-white font-black mt-1">{(() => {
                         const lm = getLeanMassKg(assessment);
                         return lm ? `${lm.toFixed(1)} kg` : '-';
-                      })()}</span>
+                      })()}</div>
                     </div>
-                    <div>
-                      <span className="text-neutral-400">BMR:</span>
-                      <span className="ml-1 font-medium text-white">{(() => {
+                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">BMR</div>
+                      <div className="text-white font-black mt-1">{(() => {
                         const v = getBmrKcal(assessment);
                         return v ? `${v.toFixed(0)} kcal` : '-';
-                      })()}</span>
+                      })()}</div>
+                    </div>
+                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">TDEE</div>
+                      <div className="text-white font-black mt-1">{(() => {
+                        if (workoutSessionsLoading) return '...';
+                        const v = tdeeByAssessmentId.get(String(assessment.id));
+                        return v ? `${v.toFixed(0)} kcal` : '-';
+                      })()}</div>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  {assessment.photos && assessment.photos.length > 0 && (
-                    <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full">
-                      Com fotos
-                    </span>
-                  )}
+
+                <div className="flex flex-row flex-wrap items-center gap-2 md:justify-end">
                   <button
                     onClick={() => setSelectedAssessment(selectedAssessment === assessment.id ? null : assessment.id)}
-                    className="px-3 py-1 text-yellow-500 hover:text-yellow-400 text-sm font-bold"
+                    className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+                    type="button"
                   >
                     {selectedAssessment === assessment.id ? 'Ocultar' : 'Detalhes'}
                   </button>
@@ -616,7 +1001,6 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                       calf_skinfold: String(assessment.skinfolds?.calf || ''),
                       observations: ''
                     }}
-
                     studentName={assessment.student_name}
                     trainerName={assessment.trainer_name}
                     assessmentDate={new Date(assessment.assessment_date || Date.now())}
@@ -693,10 +1077,10 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
             <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
               {sortedAssessments.map(a => (
                 <div key={a.id} className="bg-neutral-800 p-3 rounded-xl border border-neutral-700">
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                     <div>
-                      <div className="font-bold text-white">{formatDate(a.date || a.assessment_date)}</div>
-                      <div className="text-xs text-neutral-400">{(() => {
+                      <div className="font-black text-white">{formatDateCompact(a.date || a.assessment_date)}</div>
+                      <div className="text-xs text-neutral-500">{(() => {
                         const w = getWeightKg(a);
                         const bf = getBodyFatPercent(a);
                         const weightLabel = w ? `${w.toFixed(1)} kg` : '-';
@@ -704,8 +1088,14 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                         return `Peso ${weightLabel} • % Gordura ${bfLabel}`;
                       })()}</div>
                     </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setSelectedAssessment(selectedAssessment === a.id ? null : a.id)} className="px-3 py-1 text-yellow-500 hover:text-yellow-400 text-sm font-bold">Detalhes</button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => setSelectedAssessment(selectedAssessment === a.id ? null : a.id)}
+                        className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+                        type="button"
+                      >
+                        Detalhes
+                      </button>
                       <AssessmentPDFGenerator
                         formData={{
                           assessment_date: String(a.assessment_date || ''),

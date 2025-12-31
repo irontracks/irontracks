@@ -3,6 +3,40 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 
+const SETS_INSERT_CHUNK_SIZE = 200;
+
+const chunkArray = (arr, size) => {
+    const safe = Array.isArray(arr) ? arr : [];
+    const chunkSize = Math.max(1, Number(size) || 1);
+    const out = [];
+    for (let i = 0; i < safe.length; i += chunkSize) out.push(safe.slice(i, i + chunkSize));
+    return out;
+};
+
+const insertSetsBulkSafe = async (supabase, rows) => {
+    const batches = chunkArray(rows, SETS_INSERT_CHUNK_SIZE);
+    for (const batch of batches) {
+        if (!Array.isArray(batch) || batch.length === 0) continue;
+        const { error } = await supabase.from('sets').insert(batch);
+        if (!error) continue;
+
+        const msg = String(error?.message || '').toLowerCase();
+        const shouldReduce = msg.includes('advanced_config') || msg.includes('is_warmup');
+        if (!shouldReduce) throw error;
+
+        const reducedBatch = batch.map((row) => {
+            if (!row || typeof row !== 'object') return row;
+            const next = { ...row };
+            delete next.advanced_config;
+            delete next.is_warmup;
+            return next;
+        });
+
+        const { error: reducedErr } = await supabase.from('sets').insert(reducedBatch);
+        if (reducedErr) throw reducedErr;
+    }
+};
+
 // WORKOUTS
 export async function createWorkout(data) {
     const supabase = await createClient();
@@ -44,36 +78,8 @@ export async function createWorkout(data) {
 
         if (exError) throw exError;
 
-        const insertSetSafe = async (payload) => {
-            try {
-                const { error } = await supabase.from('sets').insert(payload);
-                if (!error) return;
-
-                const msg = (error?.message || '').toLowerCase();
-                if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
-                    const reduced = { ...payload };
-                    delete reduced.advanced_config;
-                    delete reduced.is_warmup;
-                    await supabase.from('sets').insert(reduced);
-                    return;
-                }
-
-                throw error;
-            } catch (e) {
-                const msg = (e?.message || '').toLowerCase();
-                if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
-                    const reduced = { ...payload };
-                    delete reduced.advanced_config;
-                    delete reduced.is_warmup;
-                    await supabase.from('sets').insert(reduced);
-                    return;
-                }
-                throw e;
-            }
-        };
-
-        const setPromises = [];
-        for (const ex of exercises) {
+        const setRows = [];
+        for (const ex of (exercises || [])) {
             const originalEx = (typeof ex?.order === 'number' && Array.isArray(data?.exercises))
                 ? (data.exercises[ex.order] || {})
                 : (data.exercises.find(e => e?.name === ex.name) || {});
@@ -83,9 +89,9 @@ export async function createWorkout(data) {
             const headerSets = Number.parseInt(originalEx?.sets, 10) || 0;
             const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0);
 
-            for (let i = 0; i < numSets; i++) {
+            for (let i = 0; i < numSets; i += 1) {
                 const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null;
-                const payload = {
+                setRows.push({
                     exercise_id: ex.id,
                     reps: s?.reps ?? originalEx?.reps ?? null,
                     rpe: s?.rpe ?? originalEx?.rpe ?? null,
@@ -93,12 +99,11 @@ export async function createWorkout(data) {
                     weight: s?.weight ?? null,
                     is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
                     advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
-                };
-                setPromises.push(insertSetSafe(payload));
+                });
             }
         }
 
-        await Promise.all(setPromises);
+        if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
     }
 
     revalidatePath('/');
@@ -146,36 +151,8 @@ export async function updateWorkout(id, data) {
 
         if (exError) throw exError;
 
-        const insertSetSafe = async (payload) => {
-            try {
-                const { error } = await supabase.from('sets').insert(payload);
-                if (!error) return;
-
-                const msg = (error?.message || '').toLowerCase();
-                if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
-                    const reduced = { ...payload };
-                    delete reduced.advanced_config;
-                    delete reduced.is_warmup;
-                    await supabase.from('sets').insert(reduced);
-                    return;
-                }
-
-                throw error;
-            } catch (e) {
-                const msg = (e?.message || '').toLowerCase();
-                if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
-                    const reduced = { ...payload };
-                    delete reduced.advanced_config;
-                    delete reduced.is_warmup;
-                    await supabase.from('sets').insert(reduced);
-                    return;
-                }
-                throw e;
-            }
-        };
-
-        const setPromises = [];
-        for (const ex of exercises) {
+        const setRows = [];
+        for (const ex of (exercises || [])) {
             const originalEx = (typeof ex?.order === 'number' && Array.isArray(data?.exercises))
                 ? (data.exercises[ex.order] || {})
                 : (data.exercises.find(e => e?.name === ex.name) || {});
@@ -185,9 +162,9 @@ export async function updateWorkout(id, data) {
             const headerSets = Number.parseInt(originalEx?.sets, 10) || 0;
             const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0);
 
-            for (let i = 0; i < numSets; i++) {
+            for (let i = 0; i < numSets; i += 1) {
                 const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null;
-                const payload = {
+                setRows.push({
                     exercise_id: ex.id,
                     reps: s?.reps ?? originalEx?.reps ?? null,
                     rpe: s?.rpe ?? originalEx?.rpe ?? null,
@@ -195,13 +172,11 @@ export async function updateWorkout(id, data) {
                     weight: s?.weight ?? null,
                     is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
                     advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
-                };
-
-                setPromises.push(insertSetSafe(payload));
+                });
             }
         }
 
-        await Promise.all(setPromises);
+        if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
     }
 
     revalidatePath('/');

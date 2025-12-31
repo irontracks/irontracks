@@ -178,6 +178,8 @@ function IronTracksApp() {
     const isFetching = useRef(false);
 
     const signOutInFlightRef = useRef(false);
+    const serverSessionSyncRef = useRef({ timer: null, lastKey: '' });
+    const serverSessionSyncWarnedRef = useRef(false);
 
     const clearSupabaseCookiesBestEffort = useCallback(() => {
         try {
@@ -215,11 +217,18 @@ function IronTracksApp() {
         } catch {}
     }, []);
 
-        const clearClientSessionState = useCallback(() => {
-        try { localStorage.removeItem('activeSession'); } catch {}
-        setActiveSession(null);
-        setView('dashboard');
-    }, []);
+		const clearClientSessionState = useCallback(() => {
+		try {
+			localStorage.removeItem('activeSession');
+			localStorage.removeItem('appView');
+			if (user?.id) {
+				localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`);
+				localStorage.removeItem(`irontracks.appView.v2.${user.id}`);
+			}
+		} catch {}
+		setActiveSession(null);
+		setView('dashboard');
+	}, [user?.id]);
 
     const safeSignOut = useCallback(async (scope = 'local') => {
         if (signOutInFlightRef.current) return;
@@ -235,20 +244,159 @@ function IronTracksApp() {
         } finally {
             signOutInFlightRef.current = false;
         }
-    }, [supabase, clearSupabaseCookiesBestEffort, clearSupabaseStorageBestEffort]);
+    }, [clearSupabaseCookiesBestEffort, clearSupabaseStorageBestEffort]);
 
-    // Persistência da Sessão Ativa
     useEffect(() => {
-        const savedSession = localStorage.getItem('activeSession');
-        if (savedSession) {
-            try {
-                setActiveSession(JSON.parse(savedSession));
-            } catch (e) {
-                console.error("Erro ao restaurar sessão:", e);
-                localStorage.removeItem('activeSession');
+        let cancelled = false;
+        const userId = user?.id ? String(user.id) : '';
+        if (!userId) return;
+
+        const scopedKey = `irontracks.activeSession.v2.${userId}`;
+        let localSavedAt = 0;
+
+        try {
+            const raw = localStorage.getItem(scopedKey) || localStorage.getItem('activeSession');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && typeof parsed === 'object' && parsed?.startedAt && parsed?.workout) {
+                    localSavedAt = Number(parsed?._savedAt ?? 0) || 0;
+                    setActiveSession(parsed);
+                    setView('active');
+
+                    if (!localStorage.getItem(scopedKey)) {
+                        try {
+                            localStorage.setItem(scopedKey, JSON.stringify(parsed));
+                            localStorage.removeItem('activeSession');
+                        } catch {}
+                    }
+                }
             }
+        } catch {
+            try {
+                localStorage.removeItem(scopedKey);
+                localStorage.removeItem('activeSession');
+            } catch {}
         }
-    }, []);
+
+        const loadServer = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('active_workout_sessions')
+                    .select('state, updated_at')
+                    .eq('user_id', userId)
+                    .maybeSingle();
+                if (cancelled) return;
+                if (error) {
+                    const msg = String((error && typeof error === 'object' && 'message' in error ? error.message : '') || '').toLowerCase();
+                    const code = String((error && typeof error === 'object' && 'code' in error ? error.code : '') || '').toLowerCase();
+                    const isMissing = code === '42p01' || msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache');
+                    if (isMissing && !serverSessionSyncWarnedRef.current) {
+                        serverSessionSyncWarnedRef.current = true;
+                        try {
+                            setNotification({
+                                text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
+                                senderName: 'Aviso do Sistema',
+                                displayName: 'Sistema',
+                                photoURL: null,
+                            });
+                        } catch {}
+                    }
+                    return;
+                }
+
+                const state = data?.state;
+                if (!state || typeof state !== 'object') return;
+                if (!state?.startedAt || !state?.workout) return;
+
+                const updatedAtMs = (() => {
+                    const fromCol = typeof data?.updated_at === 'string' ? Date.parse(data.updated_at) : NaN;
+                    const fromState = Number(state?._savedAt ?? 0) || 0;
+                    return Math.max(Number.isFinite(fromCol) ? fromCol : 0, fromState);
+                })();
+
+                if (updatedAtMs <= localSavedAt) return;
+
+                setActiveSession(state);
+                setView('active');
+                try {
+                    localStorage.setItem(scopedKey, JSON.stringify(state));
+                } catch {}
+            } catch {}
+        };
+
+        loadServer();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [supabase, user?.id]);
+
+    useEffect(() => {
+        const userId = user?.id ? String(user.id) : '';
+        if (!userId) return;
+
+        let mounted = true;
+        let channel;
+
+        try {
+            channel = supabase
+                .channel(`active-workout-session:${userId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: '*',
+                        schema: 'public',
+                        table: 'active_workout_sessions',
+                        filter: `user_id=eq.${userId}`,
+                    },
+                    (payload) => {
+                        try {
+                            if (!mounted) return;
+                            const ev = String(payload?.eventType || '').toUpperCase();
+                            if (ev === 'DELETE') {
+                                setActiveSession(null);
+                                setView('dashboard');
+                                try {
+                                    localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
+                                } catch {}
+                                try {
+                                    setNotification({
+                                        text: 'Treino finalizado em outro dispositivo.',
+                                        senderName: 'Aviso do Sistema',
+                                        displayName: 'Sistema',
+                                        photoURL: null,
+                                    });
+                                } catch {}
+                                return;
+                            }
+
+                            if (ev === 'UPDATE') {
+                                const state = payload?.new?.state;
+                                if (!state || typeof state !== 'object' || !state?.startedAt || !state?.workout) {
+                                    setActiveSession(null);
+                                    setView('dashboard');
+                                    try {
+                                        localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
+                                    } catch {}
+                                }
+                            }
+                        } catch {}
+                    }
+                )
+                .subscribe();
+        } catch {}
+
+        return () => {
+            mounted = false;
+            try {
+                if (channel) supabase.removeChannel(channel);
+            } catch {
+                try {
+                    if (channel) createClient().removeChannel(channel);
+                } catch {}
+            }
+        };
+    }, [supabase, user?.id]);
 
     useEffect(() => {
         const handler = () => { try { unlockAudio(); } catch {} };
@@ -258,37 +406,170 @@ function IronTracksApp() {
             document.removeEventListener('touchstart', handler);
             document.removeEventListener('click', handler);
         };
-    }, []);
+    }, [supabase, alert, clearClientSessionState]);
 
     // Persistência da View (Aba Atual)
     useEffect(() => {
-        const savedView = localStorage.getItem('appView');
-        if (savedView) {
-            // Evita restaurar 'active' se não houver sessão, para não cair em tela vazia
-            if (savedView === 'active' && !localStorage.getItem('activeSession')) {
-                setView('dashboard');
-            } else {
-                setView(savedView);
+        try {
+            if (!user?.id) return;
+            const scopedViewKey = `irontracks.appView.v2.${user.id}`;
+            const scopedSessionKey = `irontracks.activeSession.v2.${user.id}`;
+            const savedSession = localStorage.getItem(scopedSessionKey);
+            if (savedSession) {
+                setView('active');
+                return;
             }
-        } else {
-             // FORCE DASHBOARD IF NOTHING SAVED
-             setView('dashboard');
+
+            const raw = localStorage.getItem(scopedViewKey) || localStorage.getItem('appView');
+            const savedView = raw ? String(raw) : '';
+            if (!savedView) {
+                setView('dashboard');
+                return;
+            }
+
+            if (savedView === 'active') {
+                setView('dashboard');
+                return;
+            }
+
+            setView(savedView);
+        } catch {
+            setView('dashboard');
         }
-    }, []);
+    }, [supabase, user?.id]);
 
     useEffect(() => {
-        if (view) {
-            localStorage.setItem('appView', view);
+        try {
+            if (!user?.id) return;
+            if (!view) return;
+            localStorage.setItem(`irontracks.appView.v2.${user.id}`, view);
+        } catch {
+            return;
         }
-    }, [view]);
+    }, [view, user?.id]);
 
     useEffect(() => {
-        if (activeSession) {
-            localStorage.setItem('activeSession', JSON.stringify(activeSession));
-        } else {
-            localStorage.removeItem('activeSession');
+        try {
+            if (!user?.id) return;
+            const key = `irontracks.activeSession.v2.${user.id}`;
+            if (!activeSession) {
+                localStorage.removeItem(key);
+                return;
+            }
+
+            const payload = JSON.stringify({ ...(activeSession || {}), _savedAt: Date.now() });
+            const id = setTimeout(() => {
+                try {
+                    localStorage.setItem(key, payload);
+                } catch {}
+            }, 250);
+            return () => clearTimeout(id);
+        } catch {
+            return;
         }
-    }, [activeSession]);
+    }, [activeSession, user?.id]);
+
+    useEffect(() => {
+        const userId = user?.id ? String(user.id) : '';
+        if (!userId) return;
+
+        try {
+            if (serverSessionSyncRef.current?.timer) {
+                try {
+                    clearTimeout(serverSessionSyncRef.current.timer);
+                } catch {}
+            }
+        } catch {}
+
+        const key = (() => {
+            try {
+                return JSON.stringify(activeSession || null);
+            } catch {
+                return '';
+            }
+        })();
+
+        serverSessionSyncRef.current.lastKey = key;
+
+        const run = async () => {
+            try {
+                if (serverSessionSyncRef.current.lastKey !== key) return;
+
+                if (!activeSession) {
+                    const { error } = await supabase.from('active_workout_sessions').delete().eq('user_id', userId);
+                    if (error) {
+                        const msg = String((error && typeof error === 'object' && 'message' in error ? error.message : '') || '').toLowerCase();
+                        const code = String((error && typeof error === 'object' && 'code' in error ? error.code : '') || '').toLowerCase();
+                        const isMissing = code === '42p01' || msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache');
+                        if (isMissing && !serverSessionSyncWarnedRef.current) {
+                            serverSessionSyncWarnedRef.current = true;
+                            try {
+                                setNotification({
+                                    text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
+                                    senderName: 'Aviso do Sistema',
+                                    displayName: 'Sistema',
+                                    photoURL: null,
+                                });
+                            } catch {}
+                        }
+                    }
+                    return;
+                }
+
+                const startedAtRaw = activeSession?.startedAt;
+                const startedAtMs = typeof startedAtRaw === 'number' ? startedAtRaw : new Date(startedAtRaw || 0).getTime();
+                if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return;
+                if (!activeSession?.workout) return;
+
+                const state = { ...(activeSession || {}), _savedAt: Date.now() };
+
+                const { error } = await supabase
+                    .from('active_workout_sessions')
+                    .upsert(
+                        {
+                            user_id: userId,
+                            started_at: new Date(startedAtMs).toISOString(),
+                            state,
+                            updated_at: new Date().toISOString(),
+                        },
+                        { onConflict: 'user_id' }
+                    );
+                if (error) {
+                    const msg = String((error && typeof error === 'object' && 'message' in error ? error.message : '') || '').toLowerCase();
+                    const code = String((error && typeof error === 'object' && 'code' in error ? error.code : '') || '').toLowerCase();
+                    const isMissing = code === '42p01' || msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache');
+                    if (isMissing && !serverSessionSyncWarnedRef.current) {
+                        serverSessionSyncWarnedRef.current = true;
+                        try {
+                            setNotification({
+                                text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
+                                senderName: 'Aviso do Sistema',
+                                displayName: 'Sistema',
+                                photoURL: null,
+                            });
+                        } catch {}
+                    }
+                }
+            } catch {}
+        };
+
+        let timerId = null;
+
+        try {
+            timerId = setTimeout(() => {
+                try {
+                    run();
+                } catch {}
+            }, 900);
+            serverSessionSyncRef.current.timer = timerId;
+        } catch {}
+
+        return () => {
+            try {
+                if (timerId) clearTimeout(timerId);
+            } catch {}
+        };
+    }, [activeSession, supabase, user?.id]);
 
     useEffect(() => {
         if (!activeSession) return;
@@ -350,7 +631,7 @@ function IronTracksApp() {
             cancelled = true;
             supabase.removeChannel(channel);
         };
-    }, [user?.id]);
+    }, [supabase, user?.id]);
 
     useEffect(() => {
         if (!user?.id) return;
@@ -399,7 +680,7 @@ function IronTracksApp() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user?.id, view]);
+    }, [supabase, user?.id, view]);
 
     // LOGICA DE AUTH SIMPLIFICADA E ROBUSTA
     useEffect(() => {
@@ -629,7 +910,7 @@ function IronTracksApp() {
             clearTimeout(recoveryTimer);
             subscription.unsubscribe();
         };
-    }, []);
+    }, [supabase, alert, clearClientSessionState]);
 
     // Sync Profile Separately (Optimized)
     useEffect(() => {
@@ -650,7 +931,7 @@ function IronTracksApp() {
              };
              syncProfile();
         }
-    }, [user?.id, user?.role]);
+    }, [supabase, user?.id, user?.role, user?.email, user?.displayName, user?.photoURL]);
 
     useEffect(() => {
         let cancelled = false;
@@ -693,7 +974,7 @@ function IronTracksApp() {
         return () => {
             cancelled = true;
         };
-    }, [user?.id]);
+    }, [supabase, user?.id, user?.displayName]);
 
     useEffect(() => {
         if (!authLoading && user?.id) {
@@ -884,7 +1165,7 @@ function IronTracksApp() {
                 }
             } catch {}
         }
-    }, [user]);
+    }, [user, workouts.length]);
 
 
     // Handlers de Sessão
@@ -948,7 +1229,8 @@ function IronTracksApp() {
         const first = exercisesList[0] || {};
         const exMin = toMinutesRounded(estimateExerciseSeconds(first));
         const totalMin = toMinutesRounded(exercisesList.reduce((acc, ex) => acc + calculateExerciseDuration(ex), 0));
-        const ok = await confirm(`Iniciar "${workout.title}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`, 'Iniciar Treino');
+        const workoutTitle = String(workout?.title || workout?.name || 'Treino');
+        const ok = await confirm(`Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`, 'Iniciar Treino');
         if (!ok) return;
         playStartSound();
         setActiveSession({
@@ -975,17 +1257,20 @@ function IronTracksApp() {
     };
 
     const handleStartTimer = (duration) => {
-        setActiveSession(prev => ({
-            ...prev,
-            timerTargetTime: Date.now() + (duration * 1000)
-        }));
+        setActiveSession((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                timerTargetTime: Date.now() + (duration * 1000)
+            };
+        });
     };
 
     const handleCloseTimer = () => {
-        setActiveSession(prev => ({
-            ...prev,
-            timerTargetTime: null
-        }));
+        setActiveSession((prev) => {
+            if (!prev) return prev;
+            return { ...prev, timerTargetTime: null };
+        });
     };
 
     const handleFinishSession = async (sessionData, showReport) => {
@@ -1031,13 +1316,15 @@ function IronTracksApp() {
         try {
             if (w.id) {
                 await updateWorkout(w.id, w);
+                setCurrentWorkout(w);
             } else {
-                await createWorkout(w);
+                const created = await createWorkout(w);
+                const id = created?.id ?? null;
+                setCurrentWorkout({ ...w, id });
             }
-            setCurrentWorkout(w);
-            await fetchWorkouts(); // Refresh list
-            setView('dashboard');
-        } catch (e) { await alert("Erro: " + e.message); }
+        } catch (e) {
+            throw e;
+        }
     };
 
     const handleDeleteWorkout = async (id, title) => {
@@ -1252,16 +1539,16 @@ function IronTracksApp() {
                             
                             {/* Removido botão de restaurar dados JSON conforme solicitação */}
 
-                            <div className="flex gap-2">
+                            <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-1 flex gap-1">
                                 <button
                                     onClick={() => setView('dashboard')}
-                                    className={`flex-1 p-3 rounded-xl border font-bold text-sm uppercase ${view === 'dashboard' ? 'bg-yellow-500 text-black border-yellow-600' : 'bg-neutral-800 text-neutral-400 border-neutral-700'}`}
+                                    className={`flex-1 min-h-[44px] p-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${view === 'dashboard' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-transparent text-neutral-300 hover:bg-neutral-700/50'}`}
                                 >
                                     TREINOS
                                 </button>
                                 <button
                                     onClick={() => setView('assessments')}
-                                    className={`flex-1 p-3 rounded-xl border font-bold text-sm uppercase ${view === 'assessments' ? 'bg-yellow-500 text-black border-yellow-600' : 'bg-neutral-800 text-neutral-400 border-neutral-700'}`}
+                                    className={`flex-1 min-h-[44px] p-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${view === 'assessments' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-transparent text-neutral-300 hover:bg-neutral-700/50'}`}
                                 >
                                     AVALIAÇÕES
                                 </button>
@@ -1320,6 +1607,7 @@ function IronTracksApp() {
 							workout={currentWorkout}
 							onCancel={() => setView('dashboard')}
 							onChange={setCurrentWorkout}
+							onSave={handleSaveWorkout}
 							onSaved={() => {
 								fetchWorkouts().catch(() => {});
 								setView('dashboard');

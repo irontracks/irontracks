@@ -6,6 +6,12 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return supabaseResponse
+  }
+
   const redirectWithCookies = (url: URL) => {
     const response = NextResponse.redirect(url)
     try {
@@ -22,18 +28,15 @@ export async function updateSession(request: NextRequest) {
     return response
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  let supabase: ReturnType<typeof createServerClient> | null = null
+  try {
+    supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          )
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -42,8 +45,14 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
-    }
-  )
+    })
+  } catch {
+    return supabaseResponse
+  }
+
+  if (!supabase) {
+    return supabaseResponse
+  }
 
   let isAuthenticated = false
   try {

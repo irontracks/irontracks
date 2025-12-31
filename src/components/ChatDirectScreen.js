@@ -12,6 +12,8 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 
+const CHAT_MEDIA_PREVIEW_SIZE = 800;
+
 const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherUserPhoto, onClose }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -93,6 +95,23 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         }
     }, [alert, resolvedOtherUserId, supabase, user?.id]);
 
+    const markMessagesAsRead = useCallback(async (targetChannelId) => {
+        const safeChannelId = String(targetChannelId || '').trim();
+        if (!safeChannelId) return;
+        try {
+            await supabase
+                .from('direct_messages')
+                .update({ is_read: true })
+                .eq('channel_id', safeChannelId)
+                .eq('sender_id', resolvedOtherUserId)
+                .eq('is_read', false);
+        } catch (error) {
+            const msg = String(error?.message || error || '');
+            if (msg.includes('Abort') || msg.includes('ERR_ABORTED')) return;
+            console.error('Erro ao marcar como lido:', error);
+        }
+    }, [resolvedOtherUserId, supabase]);
+
     const loadMessages = useCallback(async (channelId, beforeTs = null) => {
         try {
             let query = supabase
@@ -145,21 +164,6 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             await alert('Erro ao carregar mensagens: ' + (error?.message || 'Desconhecido'));
         }
     }, [alert, markMessagesAsRead, supabase]);
-
-    const markMessagesAsRead = useCallback(async (channelId) => {
-        try {
-            await supabase
-                .from('direct_messages')
-                .update({ is_read: true })
-                .eq('channel_id', channelId)
-                .eq('sender_id', resolvedOtherUserId)
-                .eq('is_read', false);
-        } catch (error) {
-            const msg = String(error?.message || error || '');
-            if (msg.includes('Abort') || msg.includes('ERR_ABORTED')) return;
-            console.error('Erro ao marcar como lido:', error);
-        }
-    }, [resolvedOtherUserId, supabase]);
 
     const setupRealtime = useCallback((channelId) => {
         const subscription = supabase
@@ -471,9 +475,35 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                             let payload = null;
                                             try { if (typeof message.content === 'string' && message.content.startsWith('{')) payload = JSON.parse(message.content); } catch {}
                                             
-                                            if (payload?.type === 'image') return <img src={payload.thumb_url || payload.media_url} alt="imagem" className="rounded-lg max-h-64 w-full object-cover" onClick={() => window.open(payload.media_url, '_blank')} />;
+                                            if (payload?.type === 'image')
+                                                return (
+                                                    <Image
+                                                        src={payload.thumb_url || payload.media_url}
+                                                        alt="imagem"
+                                                        width={CHAT_MEDIA_PREVIEW_SIZE}
+                                                        height={CHAT_MEDIA_PREVIEW_SIZE}
+                                                        className="rounded-lg max-h-64 w-full object-cover cursor-pointer"
+                                                        onClick={() => {
+                                                            try {
+                                                                const url = payload?.media_url ? String(payload.media_url) : '';
+                                                                if (!url) return;
+                                                                window.open(url, '_blank');
+                                                            } catch {}
+                                                        }}
+                                                    />
+                                                );
                                             if (payload?.type === 'video') return <video src={payload.media_url} controls playsInline className="rounded-lg max-h-64 w-full" />;
-                                            if (payload?.type === 'gif') return <img src={payload.media_url} alt="gif" className="rounded-lg max-h-64 w-full object-cover" />;
+                                            if (payload?.type === 'gif')
+                                                return (
+                                                    <Image
+                                                        src={payload.media_url}
+                                                        alt="gif"
+                                                        width={CHAT_MEDIA_PREVIEW_SIZE}
+                                                        height={CHAT_MEDIA_PREVIEW_SIZE}
+                                                        className="rounded-lg max-h-64 w-full object-cover"
+                                                        unoptimized
+                                                    />
+                                                );
                                             
                                             return <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{payload?.text ?? message.content}</p>;
                                         })()}

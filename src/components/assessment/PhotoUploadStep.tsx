@@ -1,7 +1,10 @@
 import React, { useState, useRef } from 'react';
+import NextImage from 'next/image';
 import { motion } from 'framer-motion';
 import { Camera, Upload, X, CheckCircle } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
+
+const PHOTO_PREVIEW_SIZE = 1024;
 
 interface PhotoUploadStepProps {
   formData: AssessmentFormData;
@@ -142,10 +145,13 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
 
               {existingPhoto ? (
                 <div className="relative">
-                  <img
+                  <NextImage
                     src={existingPhoto.preview}
                     alt={`Foto ${label}`}
+                    width={PHOTO_PREVIEW_SIZE}
+                    height={PHOTO_PREVIEW_SIZE}
                     className="w-full h-48 object-cover rounded-lg"
+                    unoptimized
                   />
                   <button
                     onClick={() => removePhoto(existingPhoto.id)}

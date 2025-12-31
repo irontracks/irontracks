@@ -19,7 +19,9 @@ const ADMIN_EMAIL = 'djmkapple@gmail.com';
 
 const AdminPanelV2 = ({ user, onClose }) => {
     const { alert, confirm } = useDialog();
-    const supabase = createClient();
+    const supabaseRef = useRef(null);
+    if (!supabaseRef.current) supabaseRef.current = createClient();
+    const supabase = supabaseRef.current;
     
     // Permission Logic
     const isAdmin = user?.role === 'admin' || user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
@@ -241,7 +243,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             }
         };
         testConnection();
-    }, []);
+    }, [supabase]);
 
     useEffect(() => {
         const fetchStudents = async () => {
@@ -370,7 +372,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             } finally { setLoading(false); }
         };
         fetchStudents();
-    }, [registering, isAdmin]);
+    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, teachersList.length]);
 
     useEffect(() => {
         if (tab === 'teachers' && isAdmin) {
@@ -405,7 +407,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             };
             fetchTeachers();
         }
-    }, [tab, isAdmin, addingTeacher, editingTeacher]);
+    }, [tab, isAdmin, addingTeacher, editingTeacher, supabase]);
 
     // URL Persistence for Tabs (Fixed)
     useEffect(() => {
@@ -510,7 +512,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             }
         };
         fetchTemplates();
-    }, [tab, isAdmin]);
+    }, [tab, isAdmin, isTeacher, supabase]);
 
     useEffect(() => {
         const fetchMyWorkoutsCount = async () => {
@@ -566,7 +568,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             }
         };
         if (tab === 'dashboard') fetchMyWorkoutsCount();
-    }, [tab]);
+    }, [tab, isAdmin, supabase]);
 
     useEffect(() => {
         if (!selectedStudent) return;
@@ -708,7 +710,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setLoading(false);
         };
         fetchDetails();
-    }, [selectedStudent]);
+    }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher]);
 
     // Ensure teachers list available when viewing a student (for assignment)
     useEffect(() => {
@@ -753,7 +755,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             } catch {}
         };
         loadTeachers();
-    }, [selectedStudent, isAdmin]);
+    }, [selectedStudent, isAdmin, supabase]);
 
     const handleRegisterStudent = async () => {
         if (!newStudent.name || !newStudent.email) return await alert('Preencha nome e email.');

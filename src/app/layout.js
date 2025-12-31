@@ -10,8 +10,9 @@ export const metadata = {
     title: "IronTracks",
   },
   icons: {
-    icon: "/icone.png",
-    apple: "/icone.png",
+    icon: [{ url: "/icone.png", type: "image/png" }],
+    shortcut: ["/icone.png"],
+    apple: [{ url: "/icone.png", type: "image/png" }],
   },
 };
 
@@ -27,6 +28,10 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="pt-BR">
+      <head>
+        <link rel="icon" href="/icone.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/icone.png" />
+      </head>
       <body
         className="antialiased bg-neutral-950 text-white"
       >

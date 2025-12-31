@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Image from 'next/image'
 import { createClient } from '@/utils/supabase/client'
 import { Plus, X, CreditCard, QrCode, ExternalLink, Copy, Settings, ShieldCheck, AlertTriangle } from 'lucide-react'
 
@@ -62,6 +63,8 @@ const formatMoney = (cents: number) => {
 }
 
 const minButtonClass = 'min-h-[44px]'
+
+const PIX_QR_SIZE = 224
 
 const ADMIN_EMAIL = 'djmkapple@gmail.com'
 
@@ -628,10 +631,13 @@ export default function MarketplacePage() {
 
                   {checkoutResult.payment.pix_qr_code ? (
                     <div className="flex items-center justify-center">
-                      <img
+                      <Image
                         src={normalizePixImageSrc(checkoutResult.payment.pix_qr_code)}
                         alt="QR Code Pix"
+                        width={PIX_QR_SIZE}
+                        height={PIX_QR_SIZE}
                         className="w-56 h-56 bg-white rounded-xl"
+                        unoptimized
                       />
                     </div>
                   ) : null}
