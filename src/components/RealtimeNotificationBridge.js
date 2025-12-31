@@ -7,32 +7,51 @@ const RealtimeNotificationBridge = ({ setNotification }) => {
     let channel
     let mounted = true
     ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      try {
+        const { data, error } = await supabase.auth.getUser()
+        if (error) return
+        const user = data?.user ?? null
+        const userId = user?.id ? String(user.id) : ''
+        if (!userId) return
 
-      channel = supabase
-        .channel(`notifications-bridge:${user.id}`)
-        .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`
-        }, (payload) => {
-          if (!mounted) return
-          const n = payload.new
-          setNotification({
-            text: n.message,
-            displayName: n.title,
-            photoURL: null,
-            senderName: n.title
+        channel = supabase
+          .channel(`notifications-bridge:${userId}`)
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`
+          }, (payload) => {
+            try {
+              if (!mounted) return
+              const n = payload?.new && typeof payload.new === 'object' ? payload.new : null
+              if (!n) return
+              const title = String(n?.title ?? '').trim()
+              const message = String(n?.message ?? '').trim()
+              if (!title || !message) return
+              setNotification({
+                text: message,
+                displayName: title,
+                photoURL: null,
+                senderName: title
+              })
+            } catch {
+              return
+            }
           })
-        })
-        .subscribe()
+          .subscribe()
+      } catch {
+        return
+      }
     })()
 
     return () => {
       mounted = false
-      if (channel) { createClient().removeChannel(channel) }
+      try {
+        if (channel) supabase.removeChannel(channel)
+      } catch {
+        return
+      }
     }
   }, [setNotification])
 

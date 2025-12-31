@@ -58,7 +58,8 @@ const ADMIN_EMAIL = 'djmkapple@gmail.com';
 const appId = 'irontracks-production';
 
 const mapWorkoutRow = (w) => {
-	const exs = (w?.exercises || [])
+	const rawExercises = Array.isArray(w?.exercises) ? w.exercises : [];
+	const exs = rawExercises
 		.filter((e) => e && typeof e === 'object')
 		.sort((a, b) => (a.order || 0) - (b.order || 0))
 		.map((e) => {
@@ -1127,25 +1128,25 @@ function IronTracksApp() {
                     }
                 }
                 
-                // Atualiza estatísticas
-                const totalEx = mapped.reduce((acc, w) => acc + (w.exercises || []).length, 0);
-                setStats({ 
-                    workouts: mapped.length, 
-                    exercises: totalEx, 
-                    activeStreak: 0 // Placeholder
-                });
+				// Atualiza estatísticas
+				const totalEx = mapped.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0);
+				setStats({ 
+					workouts: mapped.length, 
+					exercises: totalEx, 
+					activeStreak: 0 // Placeholder
+				});
             } else {
                 console.warn('Fetch sem dados; mantendo estado atual');
             }
-        } catch (e) {
-            const msg = (e && e.message) ? e.message : String(e);
-            if (msg.includes('Failed to fetch') || msg.includes('ERR_ABORTED')) {
-                // Dev HMR aborts or transient network; ignore quietly
-                return;
-            }
-            console.error("Erro ao buscar:", { message: msg, error: e });
-        } finally { isFetching.current = false; }
-    }, [user]); // Depende apenas do usuário para evitar loops de busca
+		} catch (e) {
+			const msg = e?.message ?? String(e);
+			if (msg.includes('Failed to fetch') || msg.includes('ERR_ABORTED')) {
+				// Dev HMR aborts or transient network; ignore quietly
+				return;
+			}
+			console.error("Erro ao buscar:", { message: msg, error: e });
+		} finally { isFetching.current = false; }
+	}, [user]); // Depende apenas do usuário para evitar loops de busca
 
     useEffect(() => {
         if (user) {
@@ -1327,44 +1328,44 @@ function IronTracksApp() {
         }
     };
 
-    const handleDeleteWorkout = async (id, title) => {
-        const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
-        if (!(await confirm(`Apagar o treino "${name}"?`, "Excluir Treino"))) return;
-        try {
-            await deleteWorkout(id);
-            await fetchWorkouts();
-        } catch (e) { await alert("Erro: " + e.message); }
-    };
+	const handleDeleteWorkout = async (id, title) => {
+		const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
+		if (!(await confirm(`Apagar o treino "${name}"?`, "Excluir Treino"))) return;
+		try {
+			await deleteWorkout(id);
+			await fetchWorkouts();
+		} catch (e) { await alert("Erro: " + (e?.message ?? String(e))); }
+	};
 
-    const handleDuplicateWorkout = async (workout) => {
-        if (!(await confirm(`Duplicar "${workout.title}"?`, "Duplicar Treino"))) return;
-        const newWorkout = { ...workout, title: `${workout.title} (Cópia)` };
-        delete newWorkout.id;
-        try {
-            await createWorkout(newWorkout);
-            await fetchWorkouts();
-        } catch (e) { await alert("Erro ao duplicar: " + e.message); }
-    };
+	const handleDuplicateWorkout = async (workout) => {
+		if (!(await confirm(`Duplicar "${workout.title}"?`, "Duplicar Treino"))) return;
+		const newWorkout = { ...workout, title: `${workout.title} (Cópia)` };
+		delete newWorkout.id;
+		try {
+			await createWorkout(newWorkout);
+			await fetchWorkouts();
+		} catch (e) { await alert("Erro ao duplicar: " + (e?.message ?? String(e))); }
+	};
 
     const handleShareWorkout = async (workout) => {
         setExportWorkout(workout);
         setShowExportModal(true);
     };
 
-    const handleExportPdf = async () => {
-        if (!exportWorkout) return;
-        try {
-            const html = workoutPlanHtml(exportWorkout, user);
-            const win = window.open('', '_blank');
-            if (!win) return;
-            win.document.open();
-            win.document.write(html);
-            win.document.close();
-            win.focus();
-            setTimeout(() => { try { win.print(); } catch {} }, 300);
-            setShowExportModal(false);
-        } catch (e) { await alert('Erro ao gerar PDF: ' + e.message); }
-    };
+	const handleExportPdf = async () => {
+		if (!exportWorkout) return;
+		try {
+			const html = workoutPlanHtml(exportWorkout, user);
+			const win = window.open('', '_blank');
+			if (!win) return;
+			win.document.open();
+			win.document.write(html);
+			win.document.close();
+			win.focus();
+			setTimeout(() => { try { win.print(); } catch {} }, 300);
+			setShowExportModal(false);
+		} catch (e) { await alert('Erro ao gerar PDF: ' + (e?.message ?? String(e))); }
+	};
 
     const handleExportJson = () => {
         if (!exportWorkout) return;
@@ -1433,10 +1434,10 @@ function IronTracksApp() {
                     await alert("Dados importados com sucesso!", "Sucesso");
                     setShowJsonImportModal(false);
                 }
-            } catch (err) {
-                await alert("Erro ao ler arquivo JSON: " + err.message);
-            }
-        };
+		} catch (err) {
+			await alert("Erro ao ler arquivo JSON: " + (err?.message ?? String(err)));
+		}
+	};
         reader.readAsText(file);
     };
 
@@ -1508,7 +1509,7 @@ function IronTracksApp() {
 
                 {isCoach && coachPending && (
                     <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center">
-                        Sua conta de Professor está pendente. <button className="underline" onClick={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!'); } else { await alert('Falha ao ativar: ' + (j.error || '')); } } catch (e) { await alert('Erro: ' + e.message); } }}>Aceitar</button>
+                        Sua conta de Professor está pendente. <button className="underline" onClick={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!'); } else { await alert('Falha ao ativar: ' + (j.error || '')); } } catch (e) { await alert('Erro: ' + (e?.message ?? String(e))); } }}>Aceitar</button>
                     </div>
                 )}
 

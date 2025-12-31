@@ -32,23 +32,27 @@ export const TeamWorkoutProvider = ({ children, user }) => {
 
         // Fetch initial pending invites
         const fetchInvites = async () => {
-            const { data } = await supabase
-                .from('invites')
-                .select('*, profiles:from_uid(display_name, photo_url)')
-                .eq('to_uid', user.id)
-                .eq('status', 'pending');
-            if (data) {
-                // Map to match expected structure
-                const mapped = data.map(inv => ({
-                    id: inv.id,
-                    from: {
-                        displayName: inv.profiles?.display_name || 'Unknown',
-                        photoURL: inv.profiles?.photo_url,
-                        uid: inv.from_uid
-                    },
-                    workout: inv.workout_data
-                }));
+            try {
+                const { data } = await supabase
+                    .from('invites')
+                    .select('*, profiles:from_uid(display_name, photo_url)')
+                    .eq('to_uid', user.id)
+                    .eq('status', 'pending');
+                const list = Array.isArray(data) ? data : [];
+                const mapped = list
+                    .filter((inv) => inv && typeof inv === 'object')
+                    .map(inv => ({
+                        id: inv.id,
+                        from: {
+                            displayName: inv.profiles?.display_name || 'Unknown',
+                            photoURL: inv.profiles?.photo_url,
+                            uid: inv.from_uid
+                        },
+                        workout: inv.workout_data
+                    }));
                 setIncomingInvites(mapped);
+            } catch {
+                setIncomingInvites([]);
             }
         };
         fetchInvites();
@@ -66,27 +70,34 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                     filter: `to_uid=eq.${user.id}`
                 },
                 async (payload) => {
-                    console.log("INVITE RECEIVED:", payload);
-                    const newInvite = payload.new;
-                    if (newInvite.status !== 'pending') return;
+                    try {
+                        console.log("INVITE RECEIVED:", payload);
+                        const newInvite = payload?.new;
+                        if (!newInvite || typeof newInvite !== 'object') return;
+                        if (newInvite.status !== 'pending') return;
 
-                    // Fetch sender profile info
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('display_name, photo_url')
-                        .eq('id', newInvite.from_uid)
-                        .single();
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('display_name, photo_url')
+                            .eq('id', newInvite.from_uid)
+                            .single();
 
-                    setIncomingInvites(prev => [...prev, {
-                        id: newInvite.id,
-                        from: {
-                            displayName: profile?.display_name || 'Unknown',
-                            photoURL: profile?.photo_url,
-                            uid: newInvite.from_uid
-                        },
-                        workout: newInvite.workout_data
-                    }]);
-                    try { playStartSound(); } catch {}
+                        setIncomingInvites(prev => {
+                            const current = Array.isArray(prev) ? prev : [];
+                            return [...current, {
+                                id: newInvite.id,
+                                from: {
+                                    displayName: profile?.display_name || 'Unknown',
+                                    photoURL: profile?.photo_url,
+                                    uid: newInvite.from_uid
+                                },
+                                workout: newInvite.workout_data
+                            }];
+                        });
+                        try { playStartSound(); } catch {}
+                    } catch {
+                        return;
+                    }
                 }
             )
             .subscribe((status) => {
@@ -113,15 +124,26 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                     filter: `id=eq.${teamSession.id}`
                 },
                 (payload) => {
-                    const updated = payload.new;
-                    if (updated.status === 'finished') {
-                        setTeamSession(null); // End session
-                    } else {
-                        // Update participants list
-                        setTeamSession(prev => ({
-                            ...prev,
-                            participants: updated.participants || []
-                        }));
+                    try {
+                        const updated = payload?.new;
+                        if (!updated || typeof updated !== 'object') return;
+                        if (updated.status === 'finished') {
+                            setTeamSession(null);
+                            return;
+                        }
+
+                        const nextParticipants = Array.isArray(updated.participants) ? updated.participants : [];
+                        setTeamSession(prev => {
+                            const base = prev && typeof prev === 'object' ? prev : {};
+                            const nextId = base.id ?? teamSession?.id ?? updated.id ?? null;
+                            return {
+                                ...base,
+                                id: nextId,
+                                participants: nextParticipants
+                            };
+                        });
+                    } catch {
+                        return;
                     }
                 }
             )
@@ -133,103 +155,125 @@ export const TeamWorkoutProvider = ({ children, user }) => {
     }, [supabase, teamSession?.id]);
 
     const sendInvite = async (targetUser, workout, currentTeamSessionId = null) => {
-        let sessionId = currentTeamSessionId;
+        try {
+            if (!user?.id) throw new Error('Usuário inválido');
+            const targetUserId = targetUser?.id ? String(targetUser.id) : '';
+            if (!targetUserId) throw new Error('Aluno inválido');
 
-        // Create a session if it doesn't exist yet
-        if (!sessionId) {
-            const { data: session, error } = await supabase
-                .from('team_sessions')
+            let sessionId = currentTeamSessionId;
+
+            if (!sessionId) {
+                const { data: session, error } = await supabase
+                    .from('team_sessions')
+                    .insert({
+                        host_uid: user.id,
+                        status: 'active',
+                        participants: [{ uid: user.id, name: user.displayName, photo: user.photoURL }]
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                sessionId = session?.id;
+                if (!sessionId) throw new Error('Falha ao criar sessão');
+
+                setTeamSession({
+                    id: sessionId,
+                    isHost: true,
+                    hostName: user.displayName,
+                    participants: Array.isArray(session?.participants) ? session.participants : []
+                });
+            }
+
+            const { error: inviteError } = await supabase
+                .from('invites')
                 .insert({
-                    host_uid: user.id,
-                    status: 'active',
-                    participants: [{ uid: user.id, name: user.displayName, photo: user.photoURL }]
-                })
-                .select()
-                .single();
-            
-            if (error) throw error;
-            sessionId = session.id;
-            
-            // Set me as host
-            setTeamSession({
-                id: sessionId,
-                isHost: true,
-                hostName: user.displayName,
-                participants: session.participants
-            });
+                    from_uid: user.id,
+                    to_uid: targetUserId,
+                    workout_data: workout,
+                    team_session_id: sessionId,
+                    status: 'pending'
+                });
+
+            if (inviteError) throw inviteError;
+            return sessionId;
+        } catch (e) {
+            const msg = e?.message || String(e || 'Erro ao enviar convite');
+            throw new Error(msg);
         }
-
-        // Send the invite
-        const { error: inviteError } = await supabase
-            .from('invites')
-            .insert({
-                from_uid: user.id,
-                to_uid: targetUser.id, // targetUser must have 'id' (which is uid)
-                workout_data: workout,
-                team_session_id: sessionId,
-                status: 'pending'
-            });
-
-        if (inviteError) throw inviteError;
-        return sessionId;
     };
 
     const acceptInvite = async (invite, onStartSession) => {
-        // 1. Get the session details
-        const { data: inviteData } = await supabase
-            .from('invites')
-            .select('team_session_id')
-            .eq('id', invite.id)
-            .single();
+        try {
+            const inviteId = invite?.id ? String(invite.id) : '';
+            if (!inviteId) throw new Error('Convite inválido');
+            if (!user?.id) throw new Error('Usuário inválido');
 
-        if (!inviteData) throw new Error("Convite inválido");
+            const { data: inviteData } = await supabase
+                .from('invites')
+                .select('team_session_id')
+                .eq('id', inviteId)
+                .single();
 
-        // 2. Update session participants
-        const { data: sessionData } = await supabase
-            .from('team_sessions')
-            .select('participants')
-            .eq('id', inviteData.team_session_id)
-            .single();
+            const teamSessionId = inviteData?.team_session_id;
+            if (!teamSessionId) throw new Error('Sessão inválida');
 
-        if (sessionData) {
+            const { data: sessionData } = await supabase
+                .from('team_sessions')
+                .select('participants')
+                .eq('id', teamSessionId)
+                .single();
+
+            const existingParticipants = Array.isArray(sessionData?.participants) ? sessionData.participants : [];
             const newParticipants = [
-                ...(sessionData.participants || []),
+                ...existingParticipants,
                 { uid: user.id, name: user.displayName, photo: user.photoURL }
             ];
 
             await supabase
                 .from('team_sessions')
                 .update({ participants: newParticipants })
-                .eq('id', inviteData.team_session_id);
-            
-            // Set local state
+                .eq('id', teamSessionId);
+
             setTeamSession({
-                id: inviteData.team_session_id,
+                id: teamSessionId,
                 isHost: false,
                 participants: newParticipants
             });
+
+            await supabase
+                .from('invites')
+                .update({ status: 'accepted' })
+                .eq('id', inviteId);
+
+            setIncomingInvites(prev => {
+                const current = Array.isArray(prev) ? prev : [];
+                return current.filter(i => String(i?.id || '') !== inviteId);
+            });
+
+            if (onStartSession) onStartSession(invite?.workout);
+        } catch (e) {
+            const msg = e?.message || String(e || 'Erro ao aceitar convite');
+            throw new Error(msg);
         }
-
-        // 3. Mark invite as accepted
-        await supabase
-            .from('invites')
-            .update({ status: 'accepted' })
-            .eq('id', invite.id);
-
-        // 4. Remove from local list
-        setIncomingInvites(prev => prev.filter(i => i.id !== invite.id));
-
-        // 5. Trigger app start
-        if (onStartSession) onStartSession(invite.workout);
     };
 
     const rejectInvite = async (inviteId) => {
-        await supabase
-            .from('invites')
-            .update({ status: 'rejected' })
-            .eq('id', inviteId);
-        
-        setIncomingInvites(prev => prev.filter(i => i.id !== inviteId));
+        try {
+            const safeId = inviteId ? String(inviteId) : '';
+            if (!safeId) return;
+            await supabase
+                .from('invites')
+                .update({ status: 'rejected' })
+                .eq('id', safeId);
+
+            setIncomingInvites(prev => {
+                const current = Array.isArray(prev) ? prev : [];
+                return current.filter(i => String(i?.id || '') !== safeId);
+            });
+        } catch {
+            setIncomingInvites(prev => (Array.isArray(prev) ? prev : []));
+        }
     };
 
     const leaveSession = async () => {

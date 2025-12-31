@@ -133,7 +133,8 @@ const ChatScreen = ({ user, onClose }) => {
                 }
             }
         } catch (e) {
-            alert(`Erro ao conectar no chat global: ${e.message || 'Erro desconhecido'}`);
+            const msg = (e?.message ?? String(e ?? '')).trim();
+            alert(`Erro ao conectar no chat global: ${msg || 'Erro desconhecido'}`);
         }
     }, [alert, fetchGlobalId, globalChannel, supabase])
 
@@ -175,9 +176,24 @@ const ChatScreen = ({ user, onClose }) => {
             .channel(`chat:${activeChannel.id}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${activeChannel.id}` },
                 async (payload) => {
-                    const newMsg = payload.new;
-                    const { data: profile } = await supabase.from('profiles').select('display_name, photo_url').eq('id', newMsg.user_id).single();
-                    setMessages(prev => [...prev, formatMessage({ ...newMsg, profiles: profile })]);
+                    try {
+                        const newMsg = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+                        if (!newMsg) return;
+                        const senderId = newMsg?.user_id ? String(newMsg.user_id) : '';
+                        let profile = null;
+                        if (senderId) {
+                            const { data } = await supabase
+                                .from('profiles')
+                                .select('display_name, photo_url')
+                                .eq('id', senderId)
+                                .maybeSingle();
+                            profile = data || null;
+                        }
+                        setMessages((prev) => [...prev, formatMessage({ ...newMsg, profiles: profile })]);
+                    } catch (e) {
+                        console.error('Erro ao processar mensagem realtime:', e);
+                        return;
+                    }
                 }
             )
             .subscribe();
@@ -296,7 +312,7 @@ const ChatScreen = ({ user, onClose }) => {
                     setView('list');
                 }
             } catch (e) {
-                await alert("Erro ao enviar convite: " + e.message);
+                await alert("Erro ao enviar convite: " + (e?.message ?? String(e)));
             } finally {
                 setSendingInviteTo(null);
             }

@@ -40,15 +40,17 @@ const insertSetsBulkSafe = async (supabase, rows) => {
 // WORKOUTS
 export async function createWorkout(data) {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user ?? null;
     if (!user) throw new Error('Unauthorized');
 
     const { data: workout, error } = await supabase
         .from('workouts')
         .insert({
             user_id: user.id,
-            name: data.title,
-            notes: data.notes,
+            name: String(data?.title ?? ''),
+            notes: String(data?.notes ?? ''),
             is_template: true,
             created_by: user.id
         })
@@ -58,16 +60,19 @@ export async function createWorkout(data) {
     if (error) throw error;
 
     // Insert Exercises
-    if (data.exercises && data.exercises.length > 0) {
-        const exercisesToInsert = data.exercises.map((ex, idx) => ({
+    const sourceExercises = Array.isArray(data?.exercises) ? data.exercises : []
+    if (sourceExercises.length > 0) {
+        const exercisesToInsert = sourceExercises
+            .filter((ex) => ex && typeof ex === 'object')
+            .map((ex, idx) => ({
             workout_id: workout.id,
-            name: ex.name,
-            muscle_group: ex.muscleGroup, // Assuming mapping
-            notes: ex.notes,
-            video_url: ex.videoUrl,
-            rest_time: ex.restTime,
-            cadence: ex.cadence,
-            method: ex.method,
+            name: String(ex?.name ?? ''),
+            muscle_group: ex?.muscleGroup ?? null,
+            notes: String(ex?.notes ?? ''),
+            video_url: ex?.videoUrl ?? null,
+            rest_time: ex?.restTime ?? null,
+            cadence: ex?.cadence ?? null,
+            method: ex?.method ?? null,
             "order": idx
         }));
 
@@ -112,15 +117,17 @@ export async function createWorkout(data) {
 
 export async function updateWorkout(id, data) {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user ?? null;
     if (!user) throw new Error('Unauthorized');
 
     // Update Workout
     const { error } = await supabase
         .from('workouts')
         .update({
-            name: data.title,
-            notes: data.notes
+            name: String(data?.title ?? ''),
+            notes: String(data?.notes ?? '')
         })
         .eq('id', id)
         .eq('user_id', user.id);
@@ -132,15 +139,18 @@ export async function updateWorkout(id, data) {
     await supabase.from('exercises').delete().eq('workout_id', id);
 
     // Re-insert logic (same as create)
-    if (data.exercises && data.exercises.length > 0) {
-        const exercisesToInsert = data.exercises.map((ex, idx) => ({
+    const sourceExercises = Array.isArray(data?.exercises) ? data.exercises : []
+    if (sourceExercises.length > 0) {
+        const exercisesToInsert = sourceExercises
+            .filter((ex) => ex && typeof ex === 'object')
+            .map((ex, idx) => ({
             workout_id: id,
-            name: ex.name,
-            notes: ex.notes,
-            video_url: ex.videoUrl,
-            rest_time: ex.restTime,
-            cadence: ex.cadence,
-            method: ex.method,
+            name: String(ex?.name ?? ''),
+            notes: String(ex?.notes ?? ''),
+            video_url: ex?.videoUrl ?? null,
+            rest_time: ex?.restTime ?? null,
+            cadence: ex?.cadence ?? null,
+            method: ex?.method ?? null,
             "order": idx
         }));
 
@@ -185,7 +195,9 @@ export async function updateWorkout(id, data) {
 
 export async function deleteWorkout(id) {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user ?? null;
     if (!user) throw new Error('Unauthorized');
 
     // SECURITY: Ensure user owns the workout before deletion attempt
@@ -217,7 +229,9 @@ export async function deleteWorkout(id) {
 // IMPORT JSON ACTION
 export async function importData(jsonData) {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    const user = authData?.user ?? null;
     if (!user) throw new Error('Unauthorized');
 
     // 1. Import Workouts
@@ -313,8 +327,9 @@ export async function importData(jsonData) {
 
     // 2. Import History? (Optional but requested "Importar JSON para Supabase")
     // The backup contains 'history'. Ideally we should import it too.
-    if (jsonData.history) {
-        for (const h of jsonData.history) {
+    const history = Array.isArray(jsonData?.history) ? jsonData.history : []
+    if (history.length) {
+        for (const h of history) {
             const { data: newH, error: hErr } = await supabase.from('workouts').insert({
                 user_id: user.id,
                 name: h.workoutTitle || "Treino Realizado",

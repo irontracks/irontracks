@@ -115,7 +115,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
                 onStartSession(item.data.workout);
             }
         } catch (e) {
-            await alert("Erro ao aceitar: " + e.message);
+            await alert("Erro ao aceitar: " + (e?.message ?? String(e)));
         }
     };
 

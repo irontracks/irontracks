@@ -51,3 +51,34 @@ BEGIN
     END IF;
   END IF;
 END $$;
+
+CREATE TABLE IF NOT EXISTS public.client_error_events (
+  id bigserial PRIMARY KEY,
+  user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  kind text NOT NULL,
+  message text NOT NULL,
+  stack text,
+  url text,
+  user_agent text,
+  meta jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS client_error_events_user_id_idx ON public.client_error_events(user_id);
+CREATE INDEX IF NOT EXISTS client_error_events_created_at_idx ON public.client_error_events(created_at);
+
+ALTER TABLE public.client_error_events ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS client_error_events_select ON public.client_error_events;
+CREATE POLICY client_error_events_select
+ON public.client_error_events
+FOR SELECT
+TO authenticated
+USING (user_id = auth.uid() OR public.is_admin());
+
+DROP POLICY IF EXISTS client_error_events_insert ON public.client_error_events;
+CREATE POLICY client_error_events_insert
+ON public.client_error_events
+FOR INSERT
+TO authenticated
+WITH CHECK (user_id = auth.uid() OR public.is_admin());

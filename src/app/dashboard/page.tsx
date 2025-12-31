@@ -46,7 +46,8 @@ export default async function DashboardPage() {
   }
 
   const mapWorkoutRow = (w: any) => {
-    const exs = (w?.exercises || [])
+    const rawExercises = Array.isArray(w?.exercises) ? w.exercises : []
+    const exs = rawExercises
       .filter((e: any) => e && typeof e === 'object')
       .sort((a: any, b: any) => (a?.order || 0) - (b?.order || 0))
       .map((e: any) => {

@@ -176,25 +176,40 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     filter: `channel_id=eq.${channelId}`
                 },
                 async (payload) => {
-                    const newMessage = payload.new;
-                    const { data: senderData } = await supabase
-                        .from('profiles')
-                        .select('display_name, photo_url')
-                        .eq('id', newMessage.sender_id)
-                        .single();
+                    try {
+                        const newMessage = payload?.new && typeof payload.new === 'object' ? payload.new : null
+                        if (!newMessage) return
+                        const senderId = newMessage?.sender_id ? String(newMessage.sender_id) : ''
 
-                    const messageWithSender = {
-                        ...newMessage,
-                        sender: senderData
-                    };
+                        let senderData = null
+                        if (senderId) {
+                            const { data } = await supabase
+                                .from('profiles')
+                                .select('display_name, photo_url')
+                                .eq('id', senderId)
+                                .maybeSingle()
+                            senderData = data || null
+                        }
 
-                    setMessages(prev => {
-                        if (prev.some(m => m.id === newMessage.id)) return prev;
-                        return [...prev, messageWithSender];
-                    });
-                    
-                    if (newMessage.sender_id !== user.id && !newMessage.is_read) {
-                        await markMessagesAsRead(channelId);
+                        const messageWithSender = {
+                            ...newMessage,
+                            sender: senderData
+                        }
+
+                        setMessages((prev) => {
+                            const safePrev = Array.isArray(prev) ? prev : []
+                            const msgId = newMessage?.id ? String(newMessage.id) : ''
+                            if (msgId && safePrev.some((m) => String(m?.id || '') === msgId)) return safePrev
+                            return [...safePrev, messageWithSender]
+                        })
+
+                        const myId = user?.id ? String(user.id) : ''
+                        if (senderId && myId && senderId !== myId && !newMessage?.is_read) {
+                            await markMessagesAsRead(channelId)
+                        }
+                    } catch (e) {
+                        console.error('Erro ao processar mensagem realtime (direct):', e)
+                        return
                     }
                 }
             )

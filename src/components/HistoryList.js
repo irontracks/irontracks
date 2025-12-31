@@ -65,7 +65,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             setSelectedIds(new Set());
             await alert('Itens excluídos com sucesso');
         } catch (e) {
-            await alert('Erro ao excluir: ' + e.message);
+            await alert('Erro ao excluir: ' + (e?.message ?? String(e)));
         }
     };
 
@@ -256,7 +256,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
             await alert('Histórico adicionado');
         } catch (e) {
-            await alert('Erro: ' + e.message);
+            await alert('Erro: ' + (e?.message ?? String(e)));
         }
     };
 
@@ -298,7 +298,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
             await alert('Histórico adicionado');
         } catch (e) {
-            await alert('Erro: ' + e.message);
+            await alert('Erro: ' + (e?.message ?? String(e)));
         }
     };
 
@@ -321,7 +321,8 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     useEffect(() => {
         const buildManualFromTemplate = async () => {
             if (!selectedTemplate) { setManualExercises([]); return; }
-            const exIds = (selectedTemplate.exercises || []).map(e => e.id).filter(Boolean);
+            const sourceExercises = Array.isArray(selectedTemplate?.exercises) ? selectedTemplate.exercises : [];
+            const exIds = sourceExercises.map(e => e.id).filter(Boolean);
             let setsMap = {};
             if (exIds.length > 0) {
                 const { data: setsData } = await supabase
@@ -334,7 +335,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                     arr.push(s);
                 });
             }
-            const exs = (selectedTemplate.exercises || []).map(e => ({
+            const exs = sourceExercises.map(e => ({
                 name: e.name || '',
                 sets: (setsMap[e.id] || []).length || (Number(e.sets) || 0),
                 reps: e.reps || '',
@@ -390,12 +391,12 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             if (error) throw error;
             setHistory(prev => prev.filter(h => h.id !== session.id));
         } catch (error) {
-            await alert("Erro ao excluir: " + error.message);
+            await alert("Erro ao excluir: " + (error?.message ?? String(error)));
         }
     };
 
     const openEdit = (session) => {
-        const raw = session.rawSession || (typeof session.notes === 'string' && session.notes?.startsWith('{') ? JSON.parse(session.notes) : null);
+        const raw = session.rawSession || (typeof session.notes === 'string' && session.notes?.startsWith('{') ? (() => { try { return JSON.parse(session.notes); } catch { return null; } })() : null);
         setEditId(session.id);
         setEditTitle(session.workoutTitle || raw?.workoutTitle || 'Treino');
         const d = raw?.date ? new Date(raw.date) : new Date(session.date);
@@ -460,7 +461,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             setHistory(prev => prev.map(h => h.id === editId ? { ...h, workoutTitle: editTitle, date: new Date(editDate), totalTime: parseInt(editDuration||'0',10)*60, rawSession: session } : h));
             await alert('Histórico atualizado');
         } catch (e) {
-            await alert('Erro: ' + e.message);
+            await alert('Erro: ' + (e?.message ?? String(e)));
         }
     };
 

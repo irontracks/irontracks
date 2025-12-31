@@ -112,10 +112,12 @@ export async function POST(req: Request) {
       )
     }
 
+    const exercisesLen = (row: any) => (Array.isArray(row?.exercises) ? row.exercises.length : 0)
+
     const pickBestByLetter = (rows: any[], letterRaw: string) => {
       const letter = String(letterRaw || '').toLowerCase()
       const candidates = (rows || []).filter((r) => matchesGroupForLetter(r?.name || '', letter))
-      candidates.sort((a, b) => (b?.exercises || []).length - (a?.exercises || []).length)
+      candidates.sort((a, b) => exercisesLen(b) - exercisesLen(a))
       return candidates[0] || null
     }
 
@@ -253,8 +255,8 @@ export async function POST(req: Request) {
     const teacherTemplates = picked.reduce((map: Record<string, any>, t: any) => {
       const key = normalizeName(t.name || '')
       const current = map[key]
-      const len = (t.exercises || []).length
-      if (!current || len > (current.exercises || []).length) map[key] = t
+      const len = exercisesLen(t)
+      if (!current || len > exercisesLen(current)) map[key] = t
       return map
     }, {})
     const teacherTemplatesList: any[] = Object.values(teacherTemplates)
@@ -273,7 +275,7 @@ export async function POST(req: Request) {
       const tName = normalizeName(t.name || '')
       if (!tName) continue
       const targetWorkout = existingMap.get(tName)
-      const exs = t.exercises || []
+      const exs = Array.isArray(t?.exercises) ? t.exercises.filter((x: any) => x && typeof x === 'object') : []
 
       try {
         if (targetWorkout) {
@@ -402,4 +404,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

@@ -40,10 +40,6 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     const router = useRouter();
 
-    useEffect(() => {
-        if (unauthorized) onClose && onClose();
-    }, [unauthorized, onClose]);
-
     const [tab, setTab] = useState('dashboard');
     const [usersList, setUsersList] = useState([]);
     const [teachersList, setTeachersList] = useState([]);
@@ -74,6 +70,19 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [teacherQuery, setTeacherQuery] = useState('');
     const [teacherStatusFilter, setTeacherStatusFilter] = useState('all');
     const [templateQuery, setTemplateQuery] = useState('');
+
+    useEffect(() => {
+        if (unauthorized) onClose && onClose();
+    }, [unauthorized, onClose]);
+
+    useEffect(() => {
+        if (!moreTabsOpen) return;
+        const onKeyDown = (e) => {
+            if (e?.key === 'Escape') setMoreTabsOpen(false);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [moreTabsOpen]);
 
     const normalizeText = useCallback((value) => String(value || '').toLowerCase(), []);
 
@@ -145,7 +154,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             a.download = `irontracks_full_backup_${new Date().toISOString()}.json`;
             document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         } catch (e) {
-            await alert('Erro ao exportar: ' + e.message);
+            await alert('Erro ao exportar: ' + (e?.message ?? String(e)));
         } finally {
             setSystemExporting(false);
         }
@@ -167,7 +176,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             if (res?.error) throw new Error(res.error);
             await alert('Backup importado com sucesso!');
         } catch (err) {
-            await alert('Erro ao importar: ' + err.message);
+            await alert('Erro ao importar: ' + (err?.message ?? String(err)));
         } finally {
             setSystemImporting(false);
             if (e?.target) e.target.value = '';
@@ -198,7 +207,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setTimeout(() => { try { win.print(); } catch {} }, 300);
             setExportOpen(false);
         } catch (e) {
-            await alert('Erro ao gerar PDF: ' + e.message);
+            await alert('Erro ao gerar PDF: ' + (e?.message ?? String(e)));
         }
     };
 
@@ -300,7 +309,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 }
             } catch (e) {
                 console.error("ERRO DE CONEXÃO/FETCH:", e);
-                setDebugError("Erro Catch: " + e.message);
+                setDebugError("Erro Catch: " + (e?.message ?? String(e)));
             }
         };
         testConnection();
@@ -832,7 +841,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setNewStudent({ name: '', email: '' });
             await alert('Aluno cadastrado com sucesso!', 'Sucesso');
         } catch (e) {
-            await alert('Erro ao cadastrar: ' + e.message);
+            await alert('Erro ao cadastrar: ' + (e?.message ?? String(e)));
         } finally {
             setRegistering(false);
         }
@@ -920,7 +929,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setStudentWorkouts(refreshed || []);
             await alert('Treino enviado com sucesso!', 'Sucesso');
         } catch (e) {
-            await alert('Erro ao enviar: ' + e.message);
+            await alert('Erro ao enviar: ' + (e?.message ?? String(e)));
         }
     };
 
@@ -934,7 +943,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setBroadcastTitle('');
             setBroadcastMsg('');
         } catch (e) {
-            await alert('Erro ao enviar: ' + e.message);
+            await alert('Erro ao enviar: ' + (e?.message ?? String(e)));
         } finally {
             setSendingBroadcast(false);
         }
@@ -959,7 +968,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setEditingStudent(false);
             await alert('Dados do aluno atualizados.');
         } catch (e) {
-            await alert('Erro ao salvar: ' + e.message);
+            await alert('Erro ao salvar: ' + (e?.message ?? String(e)));
         }
     };
 
@@ -976,7 +985,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             // Trigger refresh (simple way)
             setTab('dashboard'); setTimeout(() => setTab('teachers'), 100);
         } catch (e) {
-            await alert('Erro ao adicionar professor: ' + e.message);
+            await alert('Erro ao adicionar professor: ' + (e?.message ?? String(e)));
         } finally {
             setAddingTeacher(false);
         }
@@ -997,7 +1006,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             // Trigger refresh
             setTab('dashboard'); setTimeout(() => setTab('teachers'), 100);
         } catch (e) {
-            await alert('Erro ao atualizar professor: ' + e.message);
+            await alert('Erro ao atualizar professor: ' + (e?.message ?? String(e)));
         }
     };
 
@@ -1014,7 +1023,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setTeachersList([]);
             setTemplates([]);
         } catch (e) {
-            await alert(`Erro ao executar ${actionName}: ` + e.message);
+            await alert(`Erro ao executar ${actionName}: ` + (e?.message ?? String(e)));
         }
     };
 
@@ -1033,6 +1042,16 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const studentsWithTeacher = Array.isArray(usersList) ? usersList.filter(s => !!s.teacher_id).length : 0;
     const studentsWithoutTeacher = Array.isArray(usersList) ? usersList.filter(s => !s.teacher_id).length : 0;
     const totalTeachers = Array.isArray(teachersList) ? teachersList.length : 0;
+
+    const selectedStatus = normalizeText(selectedStudent?.status || '');
+    const selectedStatusLabel = String(selectedStudent?.status || 'pendente');
+    const selectedStatusTone = selectedStatus === 'pago'
+        ? 'bg-green-500/10 text-green-400 border-green-500/30'
+        : (selectedStatus === 'atrasado'
+            ? 'bg-red-500/10 text-red-400 border-red-500/30'
+            : (selectedStatus === 'cancelar'
+                ? 'bg-neutral-500/10 text-neutral-300 border-neutral-500/25'
+                : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'));
 
     return (
         <div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col overflow-hidden">
@@ -1121,6 +1140,55 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 </div>
             </div>
+
+            {moreTabsOpen && extraTabs.length > 0 && (
+                <div
+                    className="md:hidden fixed inset-0 z-[60]"
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={() => setMoreTabsOpen(false)}
+                >
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                    <div className="absolute inset-x-0 bottom-0 pb-safe" onClick={(e) => e.stopPropagation()}>
+                        <div className="mx-auto w-full max-w-md rounded-t-3xl bg-neutral-950 border border-neutral-800 shadow-[0_-20px_60px_rgba(0,0,0,0.65)] overflow-hidden">
+                            <div className="px-4 pt-3 pb-2 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Mais</div>
+                                    <div className="text-base font-black text-white">Navegação</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setMoreTabsOpen(false)}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-3 grid gap-2">
+                                {(Array.isArray(extraTabs) ? extraTabs : []).map((key) => {
+                                    const isActive = tab === key;
+                                    return (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => { setTab(key); setSelectedStudent(null); setMoreTabsOpen(false); }}
+                                            className={`w-full min-h-[48px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 active:scale-[0.99] ${
+                                                isActive
+                                                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
+                                                    : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                            }`}
+                                        >
+                                            <span className="font-black text-[12px] uppercase tracking-widest truncate">{TAB_LABELS[key] || key}</span>
+                                            <ChevronDown size={18} className={`transition-transform ${isActive ? 'rotate-180' : '-rotate-90'}`} />
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-20 pb-safe">
                 {tab === 'dashboard' && !selectedStudent && (
@@ -1362,7 +1430,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                         await deleteWorkout(t.id);
                                                         setTemplates(prev => prev.filter(x => x.id !== t.id));
                                                     } catch (err) {
-                                                        await alert('Erro ao excluir: ' + err.message);
+                                                        await alert('Erro ao excluir: ' + (err?.message ?? String(err)));
                                                     }
                                                 }}
                                                 className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 hover:border-red-500/40 hover:bg-red-900/20 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all duration-300 active:scale-95"
@@ -1560,7 +1628,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                             if (!json.ok) throw new Error(json.error || 'Falha ao excluir');
                                                             setTeachersList(prev => prev.filter(x => x.id !== t.id));
                                                         } catch (err) {
-                                                            await alert('Erro: ' + err.message);
+                                                            await alert('Erro: ' + (err?.message ?? String(err)));
                                                         }
                                                     }
                                                 }}
@@ -1577,7 +1645,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                             if (!json.ok) throw new Error(json.error || '');
                                                             setTeachersList(prev => prev.map(x => x.id === t.id ? { ...x, status: 'active' } : x));
                                                         } catch (err) {
-                                                            await alert('Erro ao aprovar: ' + err.message);
+                                                            await alert('Erro ao aprovar: ' + (err?.message ?? String(err)));
                                                         }
                                                     }}
                                                     className="min-h-[40px] px-3 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
@@ -1596,98 +1664,205 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 {selectedStudent && (
                     <div className="animate-slide-up">
                         {editingStudent ? (
-                            <div className="bg-neutral-800 p-6 rounded-xl border border-neutral-700 mb-6">
-                                <h3 className="text-lg font-bold text-white mb-4">Editar Informações do Aluno</h3>
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.35)] mb-6">
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Aluno</div>
+                                        <h3 className="text-base md:text-lg font-black text-white truncate">Editar informações</h3>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingStudent(false)}
+                                        className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                        aria-label="Fechar"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-neutral-300 mb-2">Nome</label>
-                                        <input type="text" value={editedStudent.name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, name: e.target.value }))} className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-3 py-2 text-white focus:border-yellow-500 focus:outline-none" />
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2">Nome</label>
+                                        <input type="text" value={editedStudent.name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, name: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-neutral-300 mb-2">Email</label>
-                                        <input type="email" value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-3 py-2 text-white focus:border-yellow-500 focus:outline-none" />
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2">Email</label>
+                                        <input type="email" value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
                                     </div>
                                     <div className="flex gap-3 pt-4">
-                                        <button onClick={handleSaveStudentEdit} className="flex-1 py-2 bg-yellow-500 text-black rounded-lg font-bold hover:bg-yellow-400 transition-colors">Salvar</button>
-                                        <button onClick={() => setEditingStudent(false)} className="flex-1 py-2 bg-neutral-700 text-neutral-300 rounded-lg font-bold hover:bg-neutral-600 transition-colors">Cancelar</button>
+                                        <button onClick={handleSaveStudentEdit} className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95">Salvar</button>
+                                        <button onClick={() => setEditingStudent(false)} className="flex-1 min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95">Cancelar</button>
                                     </div>
                                 </div>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-2xl">{(selectedStudent.name || selectedStudent.email || '?')[0]}</div>
-                                <div className="flex-1">
-                                    <h2 className="text-2xl font-black text-white">{selectedStudent.name || selectedStudent.email}</h2>
-                                    <p className="text-neutral-400 text-sm">{selectedStudent.email}</p>
-                                    {isAdmin && teachersList.length > 0 && (
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <span className="text-xs text-neutral-400">Professor:</span>
-                                            {(() => {
-                                                const currentUid = selectedStudent.teacher_id || '';
-                                                const list = Array.isArray(teachersList) ? [...teachersList] : [];
-                                                if (currentUid && !list.some(t => t.user_id === currentUid)) {
-                                                    list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
-                                                }
-                                                return (
-                                            <select value={currentUid} onChange={async (e) => {
-                                                const teacherUserId = e.target.value || '';
-                                                const opt = Array.from(e.target.options).find(o => o.selected)
-                                                const teacherEmail = opt ? opt.getAttribute('data-email') || '' : ''
-                                                try {
-                                                    const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null, teacher_email: teacherEmail })});
-                                                    const json = await res.json();
-                                                    if (json.ok) {
-                                                        const nextTid = json.teacher_user_id || teacherUserId || null;
-                                                        setSelectedStudent(prev => ({ ...prev, teacher_id: nextTid }));
-                                                        setUsersList(prev => prev.map(x => (
-                                                            (x.id === selectedStudent.id)
-                                                            || (x.user_id === selectedStudent.user_id)
-                                                            || ((x.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase())
-                                                        ) ? { ...x, teacher_id: nextTid } : x));
-                                                        try { if (selectedStudent.email) localStorage.setItem('student_teacher_'+selectedStudent.email, nextTid || ''); } catch {}
-                                                        try {
-                                                            const resp = await fetch('/api/admin/students/list');
-                                                            const js = await resp.json();
-                                                            if (js.ok) setUsersList(js.students || []);
-                                                        } catch {}
-                                                    } else {
-                                                        await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'))
-                                                    }
-                                                } catch {}
-                                            }} className="bg-neutral-800 text-neutral-200 rounded-lg px-2 py-1 text-xs border border-neutral-700">
-                                                <option value="">Sem Professor</option>
-                                                {list.map(t => (
-                                                    <option key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)} value={t.user_id || ''} data-email={t.email || ''}>
-                                                        {t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                                )
-                                            })()}
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.35)] mb-6">
+                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                                    <div className="flex items-start gap-3 md:gap-4 min-w-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setSelectedStudent(null); setSubTab('workouts'); }}
+                                            className="w-11 h-11 rounded-2xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 flex items-center justify-center transition-all duration-300 active:scale-95"
+                                            aria-label="Voltar"
+                                        >
+                                            <ArrowLeft size={18} />
+                                        </button>
+                                        <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center font-black text-lg md:text-xl text-neutral-100 flex-shrink-0">
+                                            {(selectedStudent?.name || selectedStudent?.email || '?')[0]}
                                         </div>
-                                    )}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <h2 className="text-lg md:text-2xl font-black text-white truncate">{selectedStudent?.name || selectedStudent?.email}</h2>
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedStatusTone}`}> {selectedStatusLabel}</span>
+                                            </div>
+                                            <p className="text-xs md:text-sm text-neutral-400 font-semibold truncate">{selectedStudent?.email}</p>
+                                            {isAdmin && (Array.isArray(teachersList) ? teachersList.length : 0) > 0 && (
+                                                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
+                                                    <span className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Professor</span>
+                                                    {(() => {
+                                                        const currentUid = selectedStudent.teacher_id || '';
+                                                        const list = Array.isArray(teachersList) ? [...teachersList] : [];
+                                                        if (currentUid && !list.some(t => t.user_id === currentUid)) {
+                                                            list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
+                                                        }
+                                                        return (
+                                                            <select
+                                                                value={currentUid}
+                                                                onChange={async (e) => {
+                                                                    const teacherUserId = e.target.value || '';
+                                                                    const opt = Array.from(e.target.options).find(o => o.selected);
+                                                                    const teacherEmail = opt ? opt.getAttribute('data-email') || '' : '';
+                                                                    try {
+                                                                        const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null, teacher_email: teacherEmail })});
+                                                                        const json = await res.json();
+                                                                        if (json.ok) {
+                                                                            const nextTid = json.teacher_user_id || teacherUserId || null;
+                                                                            setSelectedStudent(prev => ({ ...prev, teacher_id: nextTid }));
+                                                                            setUsersList(prev => prev.map(x => (
+                                                                                (x.id === selectedStudent.id)
+                                                                                || (x.user_id === selectedStudent.user_id)
+                                                                                || ((x.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase())
+                                                                            ) ? { ...x, teacher_id: nextTid } : x));
+                                                                            try { if (selectedStudent.email) localStorage.setItem('student_teacher_'+selectedStudent.email, nextTid || ''); } catch {}
+                                                                            try {
+                                                                                const resp = await fetch('/api/admin/students/list');
+                                                                                const js = await resp.json();
+                                                                                if (js.ok) setUsersList(js.students || []);
+                                                                            } catch {}
+                                                                        } else {
+                                                                            await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));
+                                                                        }
+                                                                    } catch {}
+                                                                }}
+                                                                className="min-h-[44px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs w-full sm:w-auto max-w-full border border-neutral-800 focus:border-yellow-500 focus:outline-none"
+                                                            >
+                                                                <option value="">Sem Professor</option>
+                                                                {list.map(t => (
+                                                                    <option key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)} value={t.user_id || ''} data-email={t.email || ''}>
+                                                                        {t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditingStudent(true)}
+                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                            title="Editar"
+                                        >
+                                            <Edit3 size={18} className="text-yellow-500" /> Editar
+                                        </button>
+                                    </div>
                                 </div>
-                                <button onClick={() => setEditingStudent(true)} className="p-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg transition-colors" title="Editar"><Edit3 size={18} className="text-neutral-300" /></button>
+
+                                <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <div className="bg-neutral-950/40 border border-neutral-800 rounded-2xl p-3">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Treinos</div>
+                                        <div className="mt-1 text-lg font-black text-white">{(Array.isArray(studentWorkouts) ? studentWorkouts.length : 0) + (Array.isArray(syncedWorkouts) ? syncedWorkouts.length : 0)}</div>
+                                    </div>
+                                    <div className="bg-neutral-950/40 border border-neutral-800 rounded-2xl p-3">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Avaliações</div>
+                                        <div className="mt-1 text-lg font-black text-white">{Array.isArray(assessments) ? assessments.length : 0}</div>
+                                    </div>
+                                    <div className="bg-neutral-950/40 border border-neutral-800 rounded-2xl p-3">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Status</div>
+                                        <div className="mt-1 text-lg font-black text-white truncate">{selectedStatusLabel}</div>
+                                    </div>
+                                </div>
                             </div>
                         )}
 
-                        <div className="flex gap-2 mb-6">
-                            <button onClick={() => setSubTab('workouts')} className={`flex-1 py-2 rounded-lg font-bold text-xs uppercase ${subTab === 'workouts' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}>Treinos</button>
-                            <button onClick={() => setSubTab('evolution')} className={`flex-1 py-2 rounded-lg font-bold text-xs uppercase ${subTab === 'evolution' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}>Evolução</button>
+                        <div className="mb-6">
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-full p-1 flex items-center gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+                                <button
+                                    type="button"
+                                    onClick={() => setSubTab('workouts')}
+                                    className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${
+                                        subTab === 'workouts'
+                                            ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                            : 'text-neutral-200'
+                                    }`}
+                                >
+                                    Treinos
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSubTab('evolution')}
+                                    className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${
+                                        subTab === 'evolution'
+                                            ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                            : 'text-neutral-200'
+                                    }`}
+                                >
+                                    Evolução
+                                </button>
+                            </div>
                         </div>
 
                         {loading && <p className="text-center animate-pulse">Carregando dados...</p>}
 
                         {!loading && subTab === 'workouts' && (
                             <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-bold text-white">Treinos do Aluno</h3>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => setHistoryOpen(true)} className="px-3 py-2 bg-neutral-800 border border-yellow-500/30 text-yellow-500 rounded-lg text-xs font-bold flex items-center gap-2 hover:bg-yellow-500/10">
-                                            <History size={16} /> Histórico
-                                        </button>
-                                        <button onClick={() => setShowImportModal(true)} className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-lg text-xs font-bold">Importar Template</button>
-                                        <button onClick={() => setEditingStudentWorkout({ id: null, title: '', exercises: [] })} className="px-3 py-2 bg-yellow-500 text-black rounded-lg text-xs font-bold">Criar Treino</button>
+                                <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <Dumbbell size={18} className="text-yellow-500" />
+                                                <h3 className="text-base font-black text-white tracking-tight">Treinos do aluno</h3>
+                                            </div>
+                                            <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                                {(Array.isArray(studentWorkouts) ? studentWorkouts.length : 0) + (Array.isArray(syncedWorkouts) ? syncedWorkouts.length : 0)} atribuídos
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setHistoryOpen(true)}
+                                                className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
+                                            >
+                                                <History size={16} /> Histórico
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowImportModal(true)}
+                                                className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 text-neutral-200 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-neutral-900 transition-all duration-300 active:scale-95"
+                                            >
+                                                Importar template
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditingStudentWorkout({ id: null, title: '', exercises: [] })}
+                                                className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
+                                            >
+                                                Criar treino
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                                 {templates.length > 0 && (
@@ -1790,7 +1965,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             } else {
                                                 await alert('Erro: ' + (json.error || 'Falha ao sincronizar'))
                                             }
-                                        } catch (e) { await alert('Erro ao sincronizar: ' + e.message) }
+                                        } catch (e) { await alert('Erro ao sincronizar: ' + (e?.message ?? String(e))) }
                                     }} className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-lg text-xs font-bold">Sincronizar com Meus Treinos</button>
                                 )}
                                 {syncedWorkouts.length > 0 && (
@@ -1804,7 +1979,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16}/></button>
-                                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); setSyncedWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + e.message); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
+                                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); setSyncedWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + (e?.message ?? String(e))); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
                                                 </div>
                                             </div>
                                         ))}
@@ -1819,7 +1994,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16}/></button>
-                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + e.message); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
+                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + (e?.message ?? String(e))); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
                         </div>
                     </div>
                 ))}
@@ -1900,7 +2075,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 .order('name');
                                             setTemplates(refreshed || []);
                                             setEditingTemplate(null);
-                                        } catch (e) { await alert('Erro ao salvar: ' + e.message); }
+                                        } catch (e) { await alert('Erro ao salvar: ' + (e?.message ?? String(e))); }
                                     }}
                                     onCancel={() => setEditingTemplate(null)}
                                 />
@@ -1965,7 +2140,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     .order('name');
                 setStudentWorkouts(refreshed || []);
                 setEditingStudentWorkout(null);
-            } catch (e) { await alert('Erro ao salvar: ' + e.message); }
+            } catch (e) { await alert('Erro ao salvar: ' + (e?.message ?? String(e))); }
                                     }}
                                     onCancel={() => setEditingStudentWorkout(null)}
                                 />

@@ -699,7 +699,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
             onFinish({ ...sessionData, date: new Date(), id: historyEntry.id }, showReport); 
         } catch (e) {
             console.error("Erro detalhado ao salvar:", e);
-            await alert(`Erro ao salvar: ${e.message}`);
+            await alert(`Erro ao salvar: ${e?.message ?? String(e)}`);
         }
     };
 

@@ -5,9 +5,25 @@ import { createClient } from '@/utils/supabase/server'
 
 const ADMIN_EMAIL = 'djmkapple@gmail.com'
 
+function getErrorMessage(err) {
+    try {
+        if (err instanceof Error && typeof err.message === 'string' && err.message.trim()) return err.message
+        if (err && typeof err === 'object' && 'message' in err) {
+            const msg = err.message
+            if (typeof msg === 'string' && msg.trim()) return msg
+        }
+        const s = String(err ?? '').trim()
+        return s || 'Erro desconhecido'
+    } catch {
+        return 'Erro desconhecido'
+    }
+}
+
 async function checkAdmin() {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw error
+    const user = data?.user ?? null
     const email = (user?.email || '').toLowerCase().trim()
     const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
     if (!user || email !== adminEmail) {
@@ -25,8 +41,12 @@ export async function sendBroadcastMessage(title, message) {
         const { data: profiles, error: pError } = await adminDb.from('profiles').select('id')
         if (pError) throw pError
 
+        const safeProfiles = Array.isArray(profiles) ? profiles : []
+
         // 2. Prepare notifications
-        const notifications = profiles.map(p => ({
+        const notifications = safeProfiles
+            .filter((p) => p && typeof p === 'object' && p.id)
+            .map((p) => ({
             user_id: p.id,
             title,
             message,
@@ -45,7 +65,7 @@ export async function sendBroadcastMessage(title, message) {
 
         return { success: true, count: notifications.length }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -78,7 +98,7 @@ export async function registerStudent(email, password, name) {
 
         return { success: true, user: data.user }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -125,7 +145,7 @@ export async function addTeacher(name, email, phone, birth_date, status = 'pendi
         }
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -137,7 +157,7 @@ export async function clearAllStudents() {
         if (error) throw error
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -149,7 +169,7 @@ export async function clearAllTeachers() {
         if (error) throw error
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -161,7 +181,7 @@ export async function clearAllWorkouts() {
         if (error) throw error
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -235,7 +255,7 @@ export async function updateTeacher(id, data) {
 
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -243,11 +263,13 @@ export async function deleteTeacher(id) {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
-        const { error } = await adminDb.from('teachers').delete().eq('id', id)
+        const safeId = String(id || '').trim()
+        if (!safeId) throw new Error('Missing teacher id')
+        const { error } = await adminDb.from('teachers').delete().eq('id', safeId)
         if (error) throw error
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -259,7 +281,7 @@ export async function clearPublicRegistry() {
         if (error) throw error
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -327,6 +349,8 @@ export async function assignWorkoutToStudent(studentId, template) {
                 .select();
             if (exError) throw exError;
 
+            const safeInsertedExs = Array.isArray(insertedExs) ? insertedExs : []
+
             const insertSetSafe = async (payload) => {
                 try {
                     const { error } = await adminDb.from('sets').insert(payload);
@@ -353,8 +377,8 @@ export async function assignWorkoutToStudent(studentId, template) {
                 }
             };
 
-            for (let i = 0; i < insertedExs.length; i++) {
-                const dstEx = insertedExs[i];
+            for (let i = 0; i < safeInsertedExs.length; i++) {
+                const dstEx = safeInsertedExs[i];
                 const srcEx = template.exercises[i] || {};
                 const setsArr = Array.isArray(srcEx.sets) ? srcEx.sets : [];
                 if (dstEx?.id && setsArr.length > 0) {
@@ -376,7 +400,7 @@ export async function assignWorkoutToStudent(studentId, template) {
 
         return { success: true, workoutId: newWorkout.id, workout: newWorkout };
     } catch (e) {
-        return { error: e.message };
+        return { error: getErrorMessage(e) };
     }
 }
 
@@ -416,7 +440,7 @@ export async function getStudentWorkouts(studentId) {
         if (error) throw error;
         return { data };
     } catch (e) {
-        return { error: e.message };
+        return { error: getErrorMessage(e) };
     }
 }
 
@@ -424,11 +448,13 @@ export async function removeWorkoutFromStudent(workoutId) {
     try {
         await checkAdmin();
         const adminDb = createAdminClient();
-        const { error } = await adminDb.from('workouts').delete().eq('id', workoutId);
+        const safeWorkoutId = String(workoutId || '').trim()
+        if (!safeWorkoutId) throw new Error('Missing workout id')
+        const { error } = await adminDb.from('workouts').delete().eq('id', safeWorkoutId);
         if (error) throw error;
         return { success: true };
     } catch (e) {
-        return { error: e.message };
+        return { error: getErrorMessage(e) };
     }
 }
 
@@ -463,27 +489,27 @@ export async function exportAllData() {
             messages: messages || [],
             invites: invites || [],
             team_sessions: team_sessions || [],
-            workouts: (workouts || []).map(w => ({
-                id: w.id,
-                user_id: w.user_id,
-                student_id: w.student_id,
-                title: w.name,
-                notes: w.notes,
-                is_template: !!w.is_template,
-                created_by: w.created_by,
-                exercises: (w.exercises || []).map(e => ({
-                    id: e.id,
-                    name: e.name,
-                    notes: e.notes,
-                    video_url: e.video_url,
-                    rest_time: e.rest_time,
-                    cadence: e.cadence,
-                    method: e.method,
-                    order: e.order,
-                    sets: (e.sets || []).map(s => ({
-                        reps: s.reps,
-                        rpe: s.rpe,
-                        set_number: s.set_number
+            workouts: (Array.isArray(workouts) ? workouts : []).map(w => ({
+                id: w?.id,
+                user_id: w?.user_id ?? null,
+                student_id: w?.student_id ?? null,
+                title: w?.name ?? '',
+                notes: w?.notes ?? null,
+                is_template: !!w?.is_template,
+                created_by: w?.created_by ?? null,
+                exercises: (Array.isArray(w?.exercises) ? w.exercises : []).map(e => ({
+                    id: e?.id,
+                    name: e?.name ?? '',
+                    notes: e?.notes ?? null,
+                    video_url: e?.video_url ?? null,
+                    rest_time: e?.rest_time ?? null,
+                    cadence: e?.cadence ?? null,
+                    method: e?.method ?? null,
+                    order: e?.order ?? null,
+                    sets: (Array.isArray(e?.sets) ? e.sets : []).map(s => ({
+                        reps: s?.reps ?? null,
+                        rpe: s?.rpe ?? null,
+                        set_number: s?.set_number ?? null
                     }))
                 }))
             }))
@@ -491,7 +517,7 @@ export async function exportAllData() {
 
         return { success: true, data: payload }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -720,6 +746,6 @@ export async function importAllData(json) {
 
         return { success: true }
     } catch (e) {
-        return { error: e.message }
+        return { error: getErrorMessage(e) }
     }
 }

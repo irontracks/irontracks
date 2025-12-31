@@ -74,7 +74,8 @@ type Props = {
 }
 
 const mapWorkoutRow = (w: any) => {
-  const exs = (w?.exercises || [])
+  const rawExercises = Array.isArray(w?.exercises) ? w.exercises : []
+  const exs = rawExercises
     .filter((e: any) => e && typeof e === 'object')
     .sort((a: any, b: any) => (a?.order || 0) - (b?.order || 0))
     .map((e: any) => {
@@ -188,6 +189,12 @@ function DashboardInner(props: Props) {
   const [workouts, setWorkouts] = useState<DashboardWorkout[]>(Array.isArray(props.initialWorkouts) ? props.initialWorkouts : [])
   const [currentWorkout, setCurrentWorkout] = useState<any>(null)
   const [activeSession, setActiveSession] = useState<any>(null)
+  const clientErrorContextRef = useRef<{ view: string; workoutId: string | null; teamSessionId: string | null }>({
+    view: 'dashboard',
+    workoutId: null,
+    teamSessionId: null,
+  })
+  const lastClientErrorSentRef = useRef<{ key: string; ts: number }>({ key: '', ts: 0 })
   const serverSessionSyncRef = useRef<{ timer: any; key: string }>({ timer: null, key: '' })
   const restoredSessionForUserRef = useRef<string>('')
   const serverSessionSyncWarnedRef = useRef<boolean>(false)
@@ -212,6 +219,93 @@ function DashboardInner(props: Props) {
 
   const [exportingAll, setExportingAll] = useState(false)
   const [directChat, setDirectChat] = useState<DirectChat | null>(null)
+
+  useEffect(() => {
+    try {
+      const workoutId = activeSession?.workout?.id ? String(activeSession.workout.id) : null
+      const teamSessionId = activeSession?.teamSessionId ? String(activeSession.teamSessionId) : null
+      clientErrorContextRef.current = {
+        view: String(view),
+        workoutId,
+        teamSessionId,
+      }
+    } catch {
+      clientErrorContextRef.current = { view: String(view), workoutId: null, teamSessionId: null }
+    }
+  }, [view, activeSession?.workout?.id, activeSession?.teamSessionId])
+
+  const reportClientError = useCallback(
+    async (kind: string, err: any, extra?: any) => {
+      try {
+        const url = typeof window !== 'undefined' ? window.location.href : null
+        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : null
+        const userId = props.user?.id ? String(props.user.id) : null
+
+        let message = ''
+        let stack: string | null = null
+        if (typeof err === 'string') {
+          message = err
+        } else if (err && typeof err === 'object') {
+          message = String((err as any)?.message || (err as any)?.reason || (err as any)?.name || 'unknown_error')
+          stack = typeof (err as any)?.stack === 'string' ? String((err as any).stack) : null
+        } else {
+          message = String(err || 'unknown_error')
+        }
+
+        const ctx = clientErrorContextRef.current
+        const meta = {
+          ...(ctx && typeof ctx === 'object' ? ctx : {}),
+          ...(extra && typeof extra === 'object' ? extra : {}),
+        }
+
+        const key = `${kind}:${message}:${String(stack || '').slice(0, 120)}:${String(url || '')}`
+        const now = Date.now()
+        const last = lastClientErrorSentRef.current
+        if (last?.key === key && Number.isFinite(last?.ts) && now - last.ts < 15000) return
+        lastClientErrorSentRef.current = { key, ts: now }
+
+        const { error } = await (supabase as any)
+          .from('client_error_events')
+          .insert({ user_id: userId, kind, message, stack, url, user_agent: userAgent, meta })
+        if (error) return
+      } catch {
+        return
+      }
+    },
+    [supabase, props.user?.id]
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const onError = (event: any) => {
+      try {
+        void reportClientError('error', event?.error ?? event?.message ?? 'window_error', {
+          filename: event?.filename ?? null,
+          lineno: event?.lineno ?? null,
+          colno: event?.colno ?? null,
+        })
+      } catch {}
+    }
+
+    const onUnhandledRejection = (event: any) => {
+      try {
+        void reportClientError('unhandledrejection', event?.reason ?? 'unhandledrejection', {})
+      } catch {}
+    }
+
+    try {
+      window.addEventListener('error', onError)
+      window.addEventListener('unhandledrejection', onUnhandledRejection)
+    } catch {}
+
+    return () => {
+      try {
+        window.removeEventListener('error', onError)
+        window.removeEventListener('unhandledrejection', onUnhandledRejection)
+      } catch {}
+    }
+  }, [reportClientError])
 
   const canCloseActiveModal = useMemo(() => {
     if (!activeModal) return true

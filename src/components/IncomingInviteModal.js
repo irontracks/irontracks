@@ -31,7 +31,7 @@ const IncomingInviteModal = ({ onStartSession }) => {
                 onStartSession(workout);
             }
         } catch (e) {
-            await alert("Erro: " + e.message);
+            await alert("Erro: " + (e?.message ?? String(e)));
         }
     };
 

@@ -9,13 +9,13 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
     const fileInputRef = React.useRef(null);
 
-    React.useEffect(() => {
-        if (!workout?.exercises) return;
-        const validExercises = workout.exercises.filter(e => e && typeof e === 'object');
-        if (validExercises.length !== workout.exercises.length) {
-            onChange?.({ ...workout, exercises: validExercises });
-        }
-    }, [workout, onChange]);
+	React.useEffect(() => {
+		if (!Array.isArray(workout?.exercises)) return;
+		const validExercises = workout.exercises.filter(e => e && typeof e === 'object');
+		if (validExercises.length !== workout.exercises.length) {
+			onChange?.({ ...workout, exercises: validExercises });
+		}
+	}, [workout, onChange]);
 
     if (!workout) return null;
 

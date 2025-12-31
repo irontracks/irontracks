@@ -77,7 +77,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             setPdfBlob(blob);
             setPdfUrl(url);
         } catch (e) {
-            alert('Não foi possível abrir impressão: ' + e.message + '\nPermita pop-ups para este site.');
+            alert('Não foi possível abrir impressão: ' + (e?.message ?? String(e)) + '\nPermita pop-ups para este site.');
         } finally {
             setIsGenerating(false);
             setTimeout(() => setIsGenerating(false), 500);

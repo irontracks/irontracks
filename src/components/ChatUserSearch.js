@@ -54,14 +54,26 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
         const sub = supabase
             .channel('profiles_presence')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
-                const p = payload.new;
-                setUsers(prev => {
-                    const idx = prev.findIndex(u => u.id === p.id);
-                    if (idx === -1) return prev;
-                    const next = [...prev];
-                    next[idx] = { ...next[idx], display_name: p.display_name, photo_url: p.photo_url, last_seen: p.last_seen };
-                    return next;
-                });
+                try {
+                    const p = payload?.new && typeof payload.new === 'object' ? payload.new : null
+                    const pid = p?.id ? String(p.id) : ''
+                    if (!pid) return
+                    setUsers((prev) => {
+                        const safePrev = Array.isArray(prev) ? prev : []
+                        const idx = safePrev.findIndex((u) => u && typeof u === 'object' && String(u.id || '') === pid)
+                        if (idx === -1) return safePrev
+                        const next = [...safePrev]
+                        next[idx] = {
+                            ...next[idx],
+                            display_name: p?.display_name,
+                            photo_url: p?.photo_url,
+                            last_seen: p?.last_seen,
+                        }
+                        return next
+                    })
+                } catch {
+                    return
+                }
             })
             .subscribe();
         return () => { supabase.removeChannel(sub); };
