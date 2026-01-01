@@ -64,6 +64,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const systemFileInputRef = useRef(null);
     const [dangerOpen, setDangerOpen] = useState(false);
     const [moreTabsOpen, setMoreTabsOpen] = useState(false);
+    const [dangerStudentsConfirm, setDangerStudentsConfirm] = useState('');
+    const [dangerTeachersConfirm, setDangerTeachersConfirm] = useState('');
+    const [dangerWorkoutsConfirm, setDangerWorkoutsConfirm] = useState('');
+    const [dangerActionLoading, setDangerActionLoading] = useState(null);
 
     const [studentQuery, setStudentQuery] = useState('');
     const [studentStatusFilter, setStudentStatusFilter] = useState('all');
@@ -1011,19 +1015,30 @@ const AdminPanelV2 = ({ user, onClose }) => {
     };
 
     const handleDangerAction = async (actionName, actionFn) => {
-        if (!(await confirm(`Tem certeza que deseja ${actionName}?`, 'ATENÇÃO - PERIGO'))) return;
-        if (!(await confirm(`Esta ação é IRREVERSÍVEL. Todos os dados serão perdidos. Confirmar mesmo?`, 'CONFIRMAÇÃO FINAL'))) return;
-        
+        if (!(await confirm(`Tem certeza que deseja ${actionName}?`, 'ATENÇÃO - PERIGO'))) return false;
+        if (!(await confirm(`Esta ação é IRREVERSÍVEL. Todos os dados serão perdidos. Confirmar mesmo?`, 'CONFIRMAÇÃO FINAL'))) return false;
+
         try {
             const res = await actionFn();
-            if (res.error) throw new Error(res.error);
+            if (res?.error) throw new Error(res.error);
             await alert(`${actionName} realizado com sucesso.`, 'Sucesso');
-            // Refresh data
             setUsersList([]);
             setTeachersList([]);
             setTemplates([]);
+            return true;
         } catch (e) {
             await alert(`Erro ao executar ${actionName}: ` + (e?.message ?? String(e)));
+            return false;
+        }
+    };
+
+    const runDangerAction = async (actionKey, actionName, actionFn, resetInput) => {
+        setDangerActionLoading(actionKey);
+        try {
+            const ok = await handleDangerAction(actionName, actionFn);
+            if (ok) resetInput();
+        } finally {
+            setDangerActionLoading(null);
         }
     };
 
@@ -1515,27 +1530,129 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </button>
 
                             {dangerOpen && (
-                                <div className="mt-4 space-y-2">
-                                    <button
-                                        onClick={() => handleDangerAction('ZERAR TODOS OS ALUNOS', clearAllStudents)}
-                                        className="w-full min-h-[44px] px-4 py-3 bg-red-900/20 border border-red-500/40 hover:bg-red-900/35 text-red-300 font-black rounded-xl flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
-                                    >
-                                        <Trash2 size={18} /> ZERAR TODOS OS ALUNOS
-                                    </button>
+                                <div className="mt-4 space-y-3">
+                                    <div className="bg-red-900/20 border border-red-500/40 rounded-2xl p-3 space-y-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 rounded-2xl bg-red-950/60 border border-red-500/60 flex items-center justify-center flex-shrink-0">
+                                                    <Trash2 size={16} className="text-red-300" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-[12px] font-black uppercase tracking-widest text-red-300 truncate">Zerar todos os alunos</div>
+                                                    <div className="text-[11px] text-neutral-300">Remove definitivamente todos os cadastros de alunos e seus vínculos.</div>
+                                                </div>
+                                            </div>
+                                            <span className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-950/80 border border-red-500/60 text-red-300">Irreversível</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="text-[11px] text-neutral-300 font-semibold">Para confirmar, digite <span className="font-black text-red-300">APAGAR</span> no campo abaixo.</div>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <input
+                                                    value={dangerStudentsConfirm}
+                                                    onChange={(e) => setDangerStudentsConfirm(e.target.value)}
+                                                    placeholder="Digite APAGAR para confirmar"
+                                                    className="flex-1 min-h-[40px] bg-neutral-950/80 border border-red-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-red-500"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={
+                                                        dangerActionLoading === 'students' ||
+                                                        String(dangerStudentsConfirm || '').trim().toUpperCase() !== 'APAGAR'
+                                                    }
+                                                    onClick={() =>
+                                                        runDangerAction('students', 'ZERAR TODOS OS ALUNOS', clearAllStudents, () =>
+                                                            setDangerStudentsConfirm('')
+                                                        )
+                                                    }
+                                                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 bg-red-600 hover:bg-red-500 text-white border border-red-400 shadow-[0_0_25px_rgba(248,113,113,0.35)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    {dangerActionLoading === 'students' ? 'Executando...' : 'Apagar tudo'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                    <button
-                                        onClick={() => handleDangerAction('ZERAR TODOS OS PROFESSORES', clearAllTeachers)}
-                                        className="w-full min-h-[44px] px-4 py-3 bg-red-900/20 border border-red-500/40 hover:bg-red-900/35 text-red-300 font-black rounded-xl flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
-                                    >
-                                        <Trash2 size={18} /> ZERAR TODOS OS PROFESSORES
-                                    </button>
+                                    <div className="bg-red-900/20 border border-red-500/40 rounded-2xl p-3 space-y-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 rounded-2xl bg-red-950/60 border border-red-500/60 flex items-center justify-center flex-shrink-0">
+                                                    <Trash2 size={16} className="text-red-300" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-[12px] font-black uppercase tracking-widest text-red-300 truncate">Zerar todos os professores</div>
+                                                    <div className="text-[11px] text-neutral-300">Exclui todos os professores cadastrados e seus acessos à plataforma.</div>
+                                                </div>
+                                            </div>
+                                            <span className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-950/80 border border-red-500/60 text-red-300">Irreversível</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="text-[11px] text-neutral-300 font-semibold">Para confirmar, digite <span className="font-black text-red-300">APAGAR</span> no campo abaixo.</div>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <input
+                                                    value={dangerTeachersConfirm}
+                                                    onChange={(e) => setDangerTeachersConfirm(e.target.value)}
+                                                    placeholder="Digite APAGAR para confirmar"
+                                                    className="flex-1 min-h-[40px] bg-neutral-950/80 border border-red-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-red-500"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={
+                                                        dangerActionLoading === 'teachers' ||
+                                                        String(dangerTeachersConfirm || '').trim().toUpperCase() !== 'APAGAR'
+                                                    }
+                                                    onClick={() =>
+                                                        runDangerAction('teachers', 'ZERAR TODOS OS PROFESSORES', clearAllTeachers, () =>
+                                                            setDangerTeachersConfirm('')
+                                                        )
+                                                    }
+                                                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 bg-red-600 hover:bg-red-500 text-white border border-red-400 shadow-[0_0_25px_rgba(248,113,113,0.35)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    {dangerActionLoading === 'teachers' ? 'Executando...' : 'Apagar tudo'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                    <button
-                                        onClick={() => handleDangerAction('ZERAR TODOS OS TREINOS', clearAllWorkouts)}
-                                        className="w-full min-h-[44px] px-4 py-3 bg-red-900/20 border border-red-500/40 hover:bg-red-900/35 text-red-300 font-black rounded-xl flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
-                                    >
-                                        <Trash2 size={18} /> ZERAR TODOS OS TREINOS
-                                    </button>
+                                    <div className="bg-red-900/20 border border-red-500/40 rounded-2xl p-3 space-y-3">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 rounded-2xl bg-red-950/60 border border-red-500/60 flex items-center justify-center flex-shrink-0">
+                                                    <Trash2 size={16} className="text-red-300" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-[12px] font-black uppercase tracking-widest text-red-300 truncate">Zerar todos os treinos</div>
+                                                    <div className="text-[11px] text-neutral-300">Remove todos os treinos cadastrados, incluindo templates e históricos associados.</div>
+                                                </div>
+                                            </div>
+                                            <span className="px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-950/80 border border-red-500/60 text-red-300">Irreversível</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="text-[11px] text-neutral-300 font-semibold">Para confirmar, digite <span className="font-black text-red-300">APAGAR</span> no campo abaixo.</div>
+                                            <div className="flex flex-col sm:flex-row gap-2">
+                                                <input
+                                                    value={dangerWorkoutsConfirm}
+                                                    onChange={(e) => setDangerWorkoutsConfirm(e.target.value)}
+                                                    placeholder="Digite APAGAR para confirmar"
+                                                    className="flex-1 min-h-[40px] bg-neutral-950/80 border border-red-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-red-500"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    disabled={
+                                                        dangerActionLoading === 'workouts' ||
+                                                        String(dangerWorkoutsConfirm || '').trim().toUpperCase() !== 'APAGAR'
+                                                    }
+                                                    onClick={() =>
+                                                        runDangerAction('workouts', 'ZERAR TODOS OS TREINOS', clearAllWorkouts, () =>
+                                                            setDangerWorkoutsConfirm('')
+                                                        )
+                                                    }
+                                                    className="w-full sm:w-auto min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 bg-red-600 hover:bg-red-500 text-white border border-red-400 shadow-[0_0_25px_rgba(248,113,113,0.35)] disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    {dangerActionLoading === 'workouts' ? 'Executando...' : 'Apagar tudo'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
                         </div>
