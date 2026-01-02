@@ -168,7 +168,8 @@ function IronTracksApp() {
     const [showCompleteProfile, setShowCompleteProfile] = useState(false);
 
     // Estado Global da Sessão Ativa
-    const [activeSession, setActiveSession] = useState(null);
+	const [activeSession, setActiveSession] = useState(null);
+	const suppressForeignFinishToastUntilRef = useRef(0);
     const [sessionTicker, setSessionTicker] = useState(0);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
 
@@ -353,13 +354,17 @@ function IronTracksApp() {
                     (payload) => {
                         try {
                             if (!mounted) return;
-                            const ev = String(payload?.eventType || '').toUpperCase();
-                            if (ev === 'DELETE') {
-                                setActiveSession(null);
-                                setView('dashboard');
-                                try {
-                                    localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
-                                } catch {}
+						const ev = String(payload?.eventType || '').toUpperCase();
+						if (ev === 'DELETE') {
+							if (Date.now() < (suppressForeignFinishToastUntilRef.current || 0)) {
+								suppressForeignFinishToastUntilRef.current = 0;
+								return;
+							}
+							setActiveSession(null);
+							setView('dashboard');
+							try {
+								localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
+							} catch {}
                                 try {
                                     setNotification({
                                         text: 'Treino finalizado em outro dispositivo.',
@@ -1274,12 +1279,13 @@ function IronTracksApp() {
         });
     };
 
-    const handleFinishSession = async (sessionData, showReport) => {
-        setActiveSession(null);
-        if (showReport === false) {
-            setView('dashboard');
-            return;
-        }
+	const handleFinishSession = async (sessionData, showReport) => {
+		suppressForeignFinishToastUntilRef.current = Date.now() + 8000;
+		setActiveSession(null);
+		if (showReport === false) {
+			setView('dashboard');
+			return;
+		}
         setReportData({ current: sessionData, previous: null });
         setView('report');
     };

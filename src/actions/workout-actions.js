@@ -28,12 +28,30 @@ const insertSetsBulkSafe = async (supabase, rows) => {
             if (!row || typeof row !== 'object') return row;
             const next = { ...row };
             delete next.advanced_config;
-            delete next.is_warmup;
             return next;
         });
 
         const { error: reducedErr } = await supabase.from('sets').insert(reducedBatch);
-        if (reducedErr) throw reducedErr;
+        if (!reducedErr) continue;
+
+        const reducedMsg = String(reducedErr?.message || '').toLowerCase();
+        if (!reducedMsg.includes('is_warmup')) throw reducedErr;
+
+        const batchHasWarmup = batch.some((row) => !!(row && typeof row === 'object' && row.is_warmup));
+        if (batchHasWarmup) {
+            throw new Error('Seu Supabase não tem a coluna "is_warmup" na tabela "sets". Rode a migration 20251222120000_sets_advanced_logic.sql e tente novamente.');
+        }
+
+        const finalBatch = batch.map((row) => {
+            if (!row || typeof row !== 'object') return row;
+            const next = { ...row };
+            delete next.advanced_config;
+            delete next.is_warmup;
+            return next;
+        });
+
+        const { error: finalErr } = await supabase.from('sets').insert(finalBatch);
+        if (finalErr) throw finalErr;
     }
 };
 

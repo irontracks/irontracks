@@ -1,13 +1,19 @@
 import React from 'react';
-import { Trash2, Plus, ArrowLeft, Save, Upload, Link2 } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Image as ImageIcon } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
+
+const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
+const DEFAULT_CARDIO_OPTION = 'Esteira';
 
 const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 	const { confirm, alert, closeDialog, showLoading } = useDialog();
     const [saving, setSaving] = React.useState(false);
+    const [scannerLoading, setScannerLoading] = React.useState(false);
+    const [scannerError, setScannerError] = React.useState('');
 
     const fileInputRef = React.useRef(null);
+    const scannerFileInputRef = React.useRef(null);
 
 	React.useEffect(() => {
 		if (!Array.isArray(workout?.exercises)) return;
@@ -17,7 +23,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 		}
 	}, [workout, onChange]);
 
-    if (!workout) return null;
+	if (!workout) return null;
 
     const normalizeMethod = (method) => {
         const raw = String(method || '').trim();
@@ -30,6 +36,115 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         if (lower === 'cluster' || lower === 'cluster set' || lower === 'clusterset') return 'Cluster';
         if (lower === 'cardio') return 'Cardio';
         return raw;
+    };
+
+    const detectRestPauseConfig = (name, reps, notes) => {
+        const text = `${String(name || '')} ${String(reps || '')} ${String(notes || '')}`.toLowerCase();
+        const hasRestPause = text.includes('rest-pause') || text.includes('rest pause') || text.includes('restpause');
+        if (!hasRestPause) return null;
+
+        const source = String(reps || notes || '');
+
+        const plusPattern = /(\d+)\s*\+\s*(\d+)(?:\s*\+\s*(\d+))*/i;
+        const plusMatch = source.match(plusPattern);
+        if (plusMatch) {
+            const numbers = plusMatch[0]
+                .split('+')
+                .map((part) => parseInt(part.trim(), 10))
+                .filter((n) => Number.isFinite(n) && n > 0);
+            if (numbers.length) {
+                const initialReps = numbers[0];
+                const miniSets = Math.max(0, numbers.length - 1);
+                const cleanedNotes = String(notes || '')
+                    .replace(plusMatch[0], `rest-pause ${numbers.join('+')}`)
+                    .trim();
+
+                return {
+                    method: 'Rest-Pause',
+                    normalizedReps: String(reps || initialReps).trim() || String(initialReps),
+                    cleanedNotes,
+                    config: {
+                        initial_reps: initialReps,
+                        mini_sets: miniSets || null,
+                        rest_time_sec: REST_PAUSE_DEFAULT_PAUSE_SEC
+                    }
+                };
+            }
+        }
+
+        const rangePattern = /(\d+)\s*(?:a|-|to)\s*(\d+)/i;
+        const rangeMatch = source.match(rangePattern);
+        if (rangeMatch) {
+            const first = parseInt(rangeMatch[1], 10);
+            const second = parseInt(rangeMatch[2], 10);
+            const low = Number.isFinite(first) ? first : second;
+            const high = Number.isFinite(second) ? second : first;
+            const initialReps = Number.isFinite(high) ? high : low;
+            const normalizedReps = `${low}-${high}`;
+            const cleanedNotes = String(notes || '')
+                .replace(/rest[- ]?pause/gi, '')
+                .trim();
+
+            return {
+                method: 'Rest-Pause',
+                normalizedReps,
+                cleanedNotes,
+                config: {
+                    initial_reps: initialReps,
+                    mini_sets: 2,
+                    rest_time_sec: REST_PAUSE_DEFAULT_PAUSE_SEC
+                }
+            };
+        }
+
+        return {
+            method: 'Rest-Pause',
+            normalizedReps: String(reps || '').trim() || '10',
+            cleanedNotes: String(notes || '').trim(),
+            config: {
+                initial_reps: null,
+                mini_sets: null,
+                rest_time_sec: REST_PAUSE_DEFAULT_PAUSE_SEC
+            }
+        };
+    };
+
+    const extractRepsTargets = (primaryReps, notes) => {
+        const normalize = (value) => {
+            const raw = String(value || '').trim();
+            if (!raw) return '';
+            const rangePattern = /(\d+)\s*(?:a|-|to)\s*(\d+)/i;
+            const rangeMatch = raw.match(rangePattern);
+            if (rangeMatch) {
+                const first = parseInt(rangeMatch[1], 10);
+                const second = parseInt(rangeMatch[2], 10);
+                if (Number.isFinite(first) && Number.isFinite(second)) return `${first}-${second}`;
+            }
+            const numMatch = raw.match(/\d+/);
+            if (numMatch) return numMatch[0];
+            return raw;
+        };
+
+        const targets = [];
+        const normalizedPrimary = normalize(primaryReps);
+        if (normalizedPrimary) targets.push(normalizedPrimary);
+
+        const text = String(notes || '');
+        const parts = text
+            .split(/\n|,|;|\|/)
+            .map((p) => String(p || '').trim())
+            .filter((p) => p.length > 0);
+
+        for (let i = 0; i < parts.length; i += 1) {
+            const part = parts[i];
+            const normalized = normalize(part);
+            if (!normalized) continue;
+            const prev = targets[targets.length - 1];
+            if (prev === normalized) continue;
+            targets.push(normalized);
+        }
+
+        return targets;
     };
 
     const buildDefaultSetDetail = (exercise, setNumber) => {
@@ -66,7 +181,20 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         const setsCount = Math.max(0, parseInt(ex?.sets) || 0);
         const setDetails = ensureSetDetails(ex, setsCount);
         const current = setDetails[setIndex] || buildDefaultSetDetail(ex, setIndex + 1);
-        setDetails[setIndex] = { ...current, ...patch };
+        const next = { ...current, ...patch };
+        setDetails[setIndex] = next;
+
+        if (Object.prototype.hasOwnProperty.call(patch || {}, 'is_warmup')) {
+            if (setIndex !== 0 && next.is_warmup) {
+                setDetails[setIndex] = { ...next, is_warmup: false };
+            }
+            if (setIndex === 0 && next.is_warmup) {
+                for (let i = 1; i < setDetails.length; i += 1) {
+                    const other = setDetails[i] || buildDefaultSetDetail(ex, i + 1);
+                    setDetails[i] = { ...other, is_warmup: false };
+                }
+            }
+        }
         newExercises[exerciseIndex] = { ...ex, setDetails };
         onChange?.({ ...workout, exercises: newExercises });
     };
@@ -159,11 +287,225 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         }
     };
 
-    const CARDIO_OPTIONS = ['Escada', 'Esteira', 'Bicicleta', 'Corrida', 'Caminhada', 'Elíptico'];
+    const CARDIO_OPTIONS = ['Escada', 'Esteira', 'Bicicleta', 'Bike Outdoor', 'Corrida', 'Caminhada', 'Elíptico'];
 
     const getExerciseType = (ex) => {
         if (ex.type) return ex.type;
         return ex.method === 'Cardio' ? 'cardio' : 'strength';
+    };
+
+    const detectCardioFromScanner = (name, reps, notes) => {
+        const rawName = String(name || '').trim();
+        const text = `${rawName} ${String(reps || '')} ${String(notes || '')}`.toLowerCase();
+
+        const looksLikeCardio =
+            text.includes('cardio') ||
+            text.includes('min') ||
+            text.includes('minuto') ||
+            text.includes('esteira') ||
+            text.includes('treadmill') ||
+            text.includes('bike') ||
+            text.includes('bici') ||
+            text.includes('bicicleta') ||
+            text.includes('spinning') ||
+            text.includes('escada') ||
+            text.includes('corrida') ||
+            text.includes('caminhada') ||
+            text.includes('eliptico') ||
+            text.includes('elíptico');
+
+        if (!looksLikeCardio) return null;
+
+        let modality = '';
+        const isOutdoor = text.includes('out') || text.includes('rua') || text.includes('extern') || text.includes('outdoor');
+        const isBike = text.includes('bicicleta') || text.includes('bike') || text.includes('bici') || text.includes('spinning') || text.includes('cicl') || text.includes('pedal');
+        if (isBike && isOutdoor) {
+            modality = 'Bike Outdoor';
+        } else if (isBike) {
+            modality = 'Bicicleta';
+        } else if (text.includes('esteira') || text.includes('treadmill')) {
+            modality = 'Esteira';
+        } else if (text.includes('escada')) {
+            modality = 'Escada';
+        } else if (text.includes('corrida')) {
+            modality = 'Corrida';
+        } else if (text.includes('caminhada')) {
+            modality = 'Caminhada';
+        } else if (text.includes('eliptico') || text.includes('elíptico')) {
+            modality = 'Elíptico';
+        }
+
+        const nameIsKnownCardio = CARDIO_OPTIONS.includes(rawName);
+        const resolvedModality = nameIsKnownCardio
+            ? rawName
+            : (CARDIO_OPTIONS.includes(modality) ? modality : DEFAULT_CARDIO_OPTION);
+
+        const minutesMatch = text.match(/(\d+)\s*(?:min|mins|minuto|minutos)/i) || text.match(/\b(\d+)\b/);
+        const minutes = minutesMatch ? parseInt(minutesMatch[1], 10) : NaN;
+        const resolvedMinutes = Number.isFinite(minutes) && minutes > 0 ? minutes : 20;
+
+        return {
+            modality: resolvedModality,
+            minutes: resolvedMinutes
+        };
+    };
+
+    const handleScannerFileClick = () => {
+        if (scannerLoading) return;
+        if (scannerFileInputRef.current) {
+            scannerFileInputRef.current.click();
+        }
+    };
+
+    const handleScannerFileChange = async (e) => {
+        try {
+            setScannerError('');
+            const files = e?.target?.files;
+            if (!files || files.length === 0) return;
+
+            const selectedFiles = Array.from(files).filter((f) => !!f);
+            if (selectedFiles.length === 0) return;
+
+            setScannerLoading(true);
+
+            const allRawExercises = [];
+
+            for (let i = 0; i < selectedFiles.length; i += 1) {
+                const file = selectedFiles[i];
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const res = await fetch('/api/iron-scanner', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const json = await res.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor' }));
+                if (!res.ok || !json?.ok) {
+                    const msg = json?.error || 'Não conseguimos ler o treino. Tente uma foto mais nítida.';
+                    setScannerError(msg);
+                    await alert(msg, 'Falha na importação');
+                    return;
+                }
+
+                const list = Array.isArray(json.exercises) ? json.exercises : [];
+                if (list.length === 0) {
+                    const msg = 'Não encontramos exercícios válidos em uma das imagens.';
+                    setScannerError(msg);
+                    await alert(msg, 'Sem exercícios detectados');
+                    return;
+                }
+
+                allRawExercises.push(...list);
+            }
+
+            if (allRawExercises.length === 0) {
+                const msg = 'Não encontramos exercícios válidos nas imagens selecionadas.';
+                setScannerError(msg);
+                await alert(msg, 'Sem exercícios válidos');
+                return;
+            }
+
+            const mappedExercises = allRawExercises
+                .map((item) => {
+                    const name = String(item?.name || '').trim();
+                    const setsRaw = item?.sets;
+                    const setsNum = typeof setsRaw === 'number' ? setsRaw : parseInt(String(setsRaw || '0')) || 0;
+                    const repsRaw = String(item?.reps ?? '').trim();
+                    const notesRaw = String(item?.notes ?? '').trim();
+                    const baseSets = Number.isFinite(setsNum) && setsNum > 0 ? setsNum : 4;
+
+                    const cardioInfo = detectCardioFromScanner(name, repsRaw, notesRaw);
+                    if (cardioInfo) {
+                        const minutesStr = String(cardioInfo.minutes);
+                        const exercise = {
+                            name: cardioInfo.modality,
+                            type: 'cardio',
+                            method: 'Cardio',
+                            sets: 1,
+                            reps: minutesStr,
+                            rpe: '5',
+                            cadence: '',
+                            restTime: 0,
+                            videoUrl: '',
+                            notes: notesRaw
+                        };
+                        const setDetails = ensureSetDetails(exercise, 1);
+                        setDetails[0] = { ...(setDetails[0] || buildDefaultSetDetail(exercise, 1)), reps: minutesStr };
+                        return { ...exercise, setDetails };
+                    }
+
+                    const restPauseInfo = detectRestPauseConfig(name, repsRaw, notesRaw);
+                    const method = restPauseInfo?.method || 'Normal';
+                    const reps = restPauseInfo?.normalizedReps || repsRaw || '10';
+                    const notes = restPauseInfo?.cleanedNotes ?? notesRaw;
+
+                    const exercise = {
+                        name,
+                        sets: baseSets,
+                        reps,
+                        rpe: '8',
+                        cadence: '2020',
+                        restTime: 60,
+                        method,
+                        videoUrl: '',
+                        notes
+                    };
+
+                    const setDetails = ensureSetDetails(exercise, baseSets);
+
+                    const repsTargets = extractRepsTargets(reps, notesRaw);
+                    for (let i = 0; i < setDetails.length; i += 1) {
+                        const target = repsTargets[i];
+                        if (!target) continue;
+                        const current = setDetails[i] || buildDefaultSetDetail(exercise, i + 1);
+                        setDetails[i] = { ...current, reps: target };
+                    }
+
+                    if (method === 'Rest-Pause' && restPauseInfo?.config && setDetails.length > 0) {
+                        const lastIndex = setDetails.length - 1;
+                        const last = setDetails[lastIndex] || buildDefaultSetDetail(exercise, lastIndex + 1);
+                        setDetails[lastIndex] = {
+                            ...last,
+                            advanced_config: {
+                                ...(last.advanced_config && typeof last.advanced_config === 'object' ? last.advanced_config : {}),
+                                ...restPauseInfo.config
+                            }
+                        };
+                    }
+
+                    return {
+                        ...exercise,
+                        setDetails
+                    };
+                })
+                .filter((ex) => String(ex.name || '').trim().length > 0);
+
+            if (!mappedExercises.length) {
+                const msg = 'Não encontramos exercícios utilizáveis nas imagens.';
+                setScannerError(msg);
+                await alert(msg, 'Sem exercícios válidos');
+                return;
+            }
+
+            const nextWorkout = {
+                ...(workout || {}),
+                exercises: mappedExercises
+            };
+
+            onChange?.(nextWorkout);
+            await alert('Treino importado pela IA. Revise antes de salvar.', 'Importação concluída');
+        } catch (err) {
+            const msg = err?.message ? String(err.message) : String(err);
+            const friendly = msg || 'Não conseguimos ler o treino. Tente uma foto mais nítida.';
+            setScannerError(friendly);
+            await alert(friendly, 'Erro na importação');
+        } finally {
+            setScannerLoading(false);
+            if (e?.target) {
+                e.target.value = '';
+            }
+        }
     };
 
     const toggleExerciseType = (index, currentType) => {
@@ -177,7 +519,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                 type: 'cardio',
                 method: 'Cardio',
                 sets: 1,
-                name: CARDIO_OPTIONS.includes(ex.name) ? ex.name : CARDIO_OPTIONS[0],
+                name: CARDIO_OPTIONS.includes(ex.name) ? ex.name : DEFAULT_CARDIO_OPTION,
                 reps: ex.reps || '20',
                 rpe: ex.rpe || 5
             };
@@ -369,12 +711,30 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                 if (!row || typeof row !== 'object') return row;
                                 const next = { ...row };
                                 delete next.advanced_config;
-                                delete next.is_warmup;
                                 return next;
                             });
 
                             const { error: reducedErr } = await supabase.from('sets').insert(reducedBatch);
-                            if (reducedErr) throw reducedErr;
+                            if (!reducedErr) continue;
+
+                            const reducedMsg = String(reducedErr?.message || '').toLowerCase();
+                            if (!reducedMsg.includes('is_warmup')) throw reducedErr;
+
+                            const batchHasWarmup = batch.some((row) => !!(row && typeof row === 'object' && row.is_warmup));
+                            if (batchHasWarmup) {
+                                throw new Error('Seu Supabase não tem a coluna "is_warmup" na tabela "sets". Rode a migration 20251222120000_sets_advanced_logic.sql e tente novamente.');
+                            }
+
+                            const finalBatch = batch.map((row) => {
+                                if (!row || typeof row !== 'object') return row;
+                                const next = { ...row };
+                                delete next.advanced_config;
+                                delete next.is_warmup;
+                                return next;
+                            });
+
+                            const { error: finalErr } = await supabase.from('sets').insert(finalBatch);
+                            if (finalErr) throw finalErr;
                         }
                     };
 
@@ -426,34 +786,61 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
 	return (
 		<div className="h-full flex flex-col bg-neutral-900">
-            <div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between bg-neutral-950 sticky top-0 z-30 pt-safe">
-                <div className="w-full flex items-center justify-between gap-3 min-h-[48px]">
-                    <h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap">
-                        Editar Treino
-                    </h2>
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={handleImportJsonClick}
-                            className="flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
-                            title="Carregar JSON"
-                        >
-                            <Upload size={18} />
-                            <span className="text-sm font-bold">Carregar JSON</span>
-                        </button>
-                        <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportJson} />
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
-                        >
-                            <Save size={18} />
-                            <span>{saving ? 'SALVANDO...' : 'SALVAR'}</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
+			<div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between bg-neutral-950 sticky top-0 z-30 pt-safe">
+				<div className="w-full flex items-center justify-between gap-3 min-h-[48px]">
+					<h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap">
+						Editar Treino
+					</h2>
+					<div className="flex items-center gap-2">
+						<button
+							onClick={handleScannerFileClick}
+							disabled={scannerLoading}
+							className="flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
+							title="Importar treino via IA (foto/PDF)"
+						>
+							<ImageIcon size={18} />
+							<span className="text-sm font-bold">Importar Treino (Foto/PDF)</span>
+						</button>
+						<input
+							ref={scannerFileInputRef}
+							type="file"
+							accept="image/*,application/pdf"
+							multiple
+							className="hidden"
+							onChange={handleScannerFileChange}
+						/>
+						<button
+							onClick={handleImportJsonClick}
+							className="flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
+							title="Carregar JSON"
+						>
+							<Upload size={18} />
+							<span className="text-sm font-bold">Carregar JSON</span>
+						</button>
+						<input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportJson} />
+						<button
+							onClick={handleSave}
+							disabled={saving}
+							className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
+						>
+							<Save size={18} />
+							<span>{saving ? 'SALVANDO...' : 'SALVAR'}</span>
+						</button>
+					</div>
+				</div>
+			</div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+				<div className="flex-1 overflow-y-auto p-4 space-y-6">
+					{scannerLoading && (
+						<div className="mb-3 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5 text-yellow-200 text-xs font-semibold">
+							A IA está lendo seu treino...
+						</div>
+					)}
+					{!scannerLoading && scannerError && (
+						<div className="mb-3 p-3 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-xs font-semibold">
+							{scannerError}
+						</div>
+					)}
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
@@ -563,21 +950,26 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                         />
                                     )}
 
-                                    {exerciseType === 'cardio' ? (
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Tempo (minutos)</label>
-                                                <input
-                                                    type="number"
-                                                    value={exercise.reps || ''}
-                                                    onChange={e => updateExercise(index, 'reps', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-blue-500 border border-neutral-700"
-                                                    placeholder="30"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</label>
-                                                <input
+									{exerciseType === 'cardio' ? (
+										<div className="grid grid-cols-2 gap-4">
+											<div>
+												<label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
+													{String(exercise?.name || '').toLowerCase() === 'bike outdoor'
+														? 'Tempo (minutos) (opcional)'
+														: 'Tempo (minutos)'}
+												</label>
+									<input
+										type="number"
+										min={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? undefined : 1}
+										value={exercise.reps || ''}
+										onChange={e => updateExercise(index, 'reps', e.target.value)}
+										className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-blue-500 border border-neutral-700"
+										placeholder={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? 'Livre' : '30'}
+									/>
+											</div>
+											<div>
+												<label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</label>
+												<input
                                                     type="number"
                                                     min="1"
                                                     value={exercise.rpe || ''}
@@ -704,23 +1096,25 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             <div className="flex items-center gap-3">
                                                                 <div className="text-xs font-bold text-white">Série {s?.set_number ?? (setIdx + 1)}</div>
                                                                 <label className="flex items-center gap-2 text-[10px] text-neutral-300 font-bold">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isWarmup}
-                                                                        onChange={(e) => updateSetDetail(index, setIdx, { is_warmup: !!e.target.checked })}
-                                                                        className="accent-yellow-500"
-                                                                    />
-                                                                    Série de Aquecimento
+                                                                    {setIdx === 0 && (
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isWarmup}
+                                                                            onChange={(e) => updateSetDetail(index, setIdx, { is_warmup: !!e.target.checked })}
+                                                                            className="accent-yellow-500"
+                                                                        />
+                                                                    )}
+                                                                    {setIdx === 0 && 'Série de Aquecimento'}
                                                                 </label>
                                                             </div>
                                                         </div>
 
-                                                        {(safeMethod === 'Normal' || safeMethod === 'Bi-Set') && (
-                                                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</label>
-                                                                    <input
-                                                                        type="number"
+												{(safeMethod === 'Normal' || safeMethod === 'Bi-Set' || (safeMethod === 'Rest-Pause' && !config)) && (
+													<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+														<div>
+															<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</label>
+															<input
+																type="number"
                                                                         value={(s?.weight ?? '')}
                                                                         onChange={(e) => updateSetDetail(index, setIdx, { weight: e.target.value === '' ? null : Number(e.target.value) })}
                                                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
@@ -810,12 +1204,12 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-                                                        {safeMethod === 'Rest-Pause' && (
-                                                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
-                                                                    <input
-                                                                        type="number"
+													{safeMethod === 'Rest-Pause' && config && typeof config === 'object' && (
+														<div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+															<div>
+																<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
+																<input
+																	type="number"
                                                                         value={(config?.weight ?? '')}
                                                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
                                                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"

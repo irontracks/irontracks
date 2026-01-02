@@ -14,6 +14,16 @@ const GlobalDialog = () => {
 
 	if (!dialog) return null;
 
+	const handleClose = () => {
+		try {
+			if ((dialog.type === 'confirm' || dialog.type === 'prompt') && typeof dialog.onCancel === 'function') {
+				dialog.onCancel();
+				return;
+			}
+		} catch {}
+		closeDialog();
+	};
+
 	const handleConfirm = () => {
 		if (dialog.type === 'prompt') {
 			const value = inputRef.current?.value ?? dialog.defaultValue ?? '';
@@ -53,10 +63,10 @@ const GlobalDialog = () => {
 						{getIcon()}
 						{dialog.title}
 					</h3>
-					<button onClick={closeDialog} className="text-neutral-500 hover:text-white transition-colors">
-						<X size={20} />
-					</button>
-				</div>
+				<button onClick={handleClose} className="text-neutral-500 hover:text-white transition-colors">
+					<X size={20} />
+				</button>
+			</div>
 
 				<div className="p-6">
 					<p className="text-neutral-300 text-center text-sm leading-relaxed whitespace-pre-line mb-4">
@@ -78,25 +88,24 @@ const GlobalDialog = () => {
 				{dialog.type !== 'loading' && (
 					<div className="p-4 bg-neutral-950/50 flex gap-3">
 						{(dialog.type === 'confirm' || dialog.type === 'prompt') && (
-							<button
-								onClick={dialog.onCancel}
-								className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-400 font-bold hover:bg-neutral-700 transition-colors text-sm"
-							>
-								Cancelar
-							</button>
-						)}
 						<button
-							onClick={handleConfirm}
-							className={`flex-1 py-3 rounded-xl font-bold text-black transition-colors text-sm shadow-lg ${getConfirmButtonColor()}`}
+							onClick={dialog.onCancel}
+							className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-400 font-bold hover:bg-neutral-700 transition-colors text-sm"
 						>
-							{dialog.type === 'confirm' ? 'Confirmar' : 'OK'}
+							{dialog.cancelText || 'Cancelar'}
 						</button>
-					</div>
-				)}
+					)}
+					<button
+						onClick={handleConfirm}
+						className={`flex-1 py-3 rounded-xl font-bold text-black transition-colors text-sm shadow-lg ${getConfirmButtonColor()}`}
+					>
+						{dialog.type === 'confirm' ? (dialog.confirmText || 'Confirmar') : (dialog.confirmText || 'OK')}
+					</button>
+				</div>
+			)}
 			</div>
 		</div>
 	);
 };
 
 export default GlobalDialog;
-

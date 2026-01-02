@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
     ArrowLeft,
     Clock,
     UserPlus,
     CheckCircle2,
     Plus,
+    Pencil,
     Video,
     Users,
     List,
@@ -13,6 +14,7 @@ import {
     Repeat
 } from 'lucide-react';
 import InviteManager from './InviteManager'; 
+import ExerciseEditor from './ExerciseEditor';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'; 
 import { useDialog } from '@/contexts/DialogContext';
 import { playFinishSound, playTick } from '@/lib/sounds';
@@ -21,7 +23,18 @@ import { createClient } from '@/utils/supabase/client';
 
 const appId = 'irontracks-production';
 
+const BIKE_GPS_MAX_ACCURACY_METERS = 50;
+const BIKE_ROUTE_MIN_METERS = 5;
+const BIKE_ROUTE_MAX_GAP_SECONDS = 10;
+const BIKE_ROUTE_MAX_POINTS = 4000;
+
+const BIKE_WEIGHT_MIN_KG = 30;
+const BIKE_WEIGHT_MAX_KG = 300;
+const BIKE_HEIGHT_MIN_CM = 100;
+const BIKE_HEIGHT_MAX_CM = 250;
+
 const WORKOUT_PATCH_EVENT = 'workout_patch';
+const WORKOUT_SYNC_EVENT = 'workout_sync';
 const DEFAULT_ADDED_EXERCISE = {
     sets: 4,
     reps: '10',
@@ -34,6 +47,61 @@ const DEFAULT_ADDED_EXERCISE = {
 const METHOD_OPTIONS = ['Normal', 'Bi-Set', 'Drop-set', 'Rest-Pause', 'Cluster', 'Cardio'];
 
 const EMPTY_LOGS = {};
+
+const haversineMeters = (aLat, aLng, bLat, bLng) => {
+    const toRad = (v) => (Number(v) * Math.PI) / 180;
+    const R = 6371000;
+    const dLat = toRad(Number(bLat) - Number(aLat));
+    const dLng = toRad(Number(bLng) - Number(aLng));
+    const lat1 = toRad(Number(aLat));
+    const lat2 = toRad(Number(bLat));
+    const sinDLat = Math.sin(dLat / 2);
+    const sinDLng = Math.sin(dLng / 2);
+    const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+};
+
+const isBikeOutdoorExercise = (ex) => {
+    try {
+        const method = String(ex?.method || '').toLowerCase();
+        if (method !== 'cardio') return false;
+        const name = String(ex?.name || '').toLowerCase();
+        const isBike = name.includes('bike') || name.includes('bicic') || name.includes('bici') || name.includes('cicl') || name.includes('pedal');
+        if (!isBike) return false;
+        const isOutdoor = name.includes('out') || name.includes('rua') || name.includes('extern') || name.includes('outdoor');
+        return isOutdoor;
+    } catch {
+        return false;
+    }
+};
+
+const estimateBikeCalories = ({ weightKg, durationSeconds, avgSpeedKmh }) => {
+    const w = Number(weightKg);
+    const d = Number(durationSeconds);
+    const v = Number(avgSpeedKmh);
+    if (!Number.isFinite(w) || w <= 0) return null;
+    if (!Number.isFinite(d) || d <= 0) return null;
+    const hours = d / 3600;
+    const met = (() => {
+        if (!Number.isFinite(v) || v <= 0) return 8;
+        if (v < 16) return 6.8;
+        if (v < 19) return 8;
+        if (v < 22) return 10;
+        return 12;
+    })();
+    const kcal = met * w * hours;
+    const rounded = Math.round(kcal);
+    return Number.isFinite(rounded) && rounded > 0 ? rounded : null;
+};
+
+const parsePositiveNumber = (raw) => {
+    try {
+        const n = Number(String(raw ?? '').replace(',', '.'));
+        return Number.isFinite(n) && n > 0 ? n : null;
+    } catch {
+        return null;
+    }
+};
 
 const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTimer, isCoach, onUpdateSession, nextWorkout }) => {
     const { confirm, alert } = useDialog();
@@ -52,6 +120,8 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
     const [showInvite, setShowInvite] = useState(false);
     const [previousLogs, setPreviousLogs] = useState({});
     const [showFullList, setShowFullList] = useState(false);
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [editWorkoutDraft, setEditWorkoutDraft] = useState(null);
     const [exerciseStartTs, setExerciseStartTs] = useState(() => {
         try {
             const raw = session?.ui?.exerciseStartTs;
@@ -69,6 +139,58 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
             return [];
         }
     });
+
+    const [bikeGps, setBikeGps] = useState(() => {
+        try {
+            const raw = session?.ui?.bikeGps;
+            const safe = raw && typeof raw === 'object' ? raw : null;
+            return {
+                status: typeof safe?.status === 'string' ? safe.status : 'idle',
+                isTracking: !!safe?.isTracking,
+                distanceMeters: Number.isFinite(Number(safe?.distanceMeters)) ? Number(safe.distanceMeters) : 0,
+                currentSpeedMps: Number.isFinite(Number(safe?.currentSpeedMps)) ? Number(safe.currentSpeedMps) : 0,
+                maxSpeedMps: Number.isFinite(Number(safe?.maxSpeedMps)) ? Number(safe.maxSpeedMps) : 0,
+                startedAt: Number.isFinite(Number(safe?.startedAt)) ? Number(safe.startedAt) : null,
+                lastFixAt: Number.isFinite(Number(safe?.lastFixAt)) ? Number(safe.lastFixAt) : null,
+                accuracyMeters: Number.isFinite(Number(safe?.accuracyMeters)) ? Number(safe.accuracyMeters) : null,
+                weightKg: Number.isFinite(Number(safe?.weightKg)) ? Number(safe.weightKg) : null,
+                heightCm: Number.isFinite(Number(safe?.heightCm)) ? Number(safe.heightCm) : null,
+                caloriesKcal: Number.isFinite(Number(safe?.caloriesKcal)) ? Number(safe.caloriesKcal) : null,
+                error: typeof safe?.error === 'string' ? safe.error : '',
+            };
+        } catch {
+            return {
+                status: 'idle',
+                isTracking: false,
+                distanceMeters: 0,
+                currentSpeedMps: 0,
+                maxSpeedMps: 0,
+                startedAt: null,
+                lastFixAt: null,
+                accuracyMeters: null,
+                weightKg: null,
+                heightCm: null,
+                caloriesKcal: null,
+                error: '',
+            };
+        }
+    });
+
+    const [bikeAnthroDraft, setBikeAnthroDraft] = useState(() => {
+        try {
+            const raw = session?.ui?.bikeGps;
+            const safe = raw && typeof raw === 'object' ? raw : null;
+            const w = Number(safe?.weightKg);
+            const h = Number(safe?.heightCm);
+            return {
+                weightKg: Number.isFinite(w) && w > 0 ? String(w) : '',
+                heightCm: Number.isFinite(h) && h > 0 ? String(h) : '',
+            };
+        } catch {
+            return { weightKg: '', heightCm: '' };
+        }
+    });
+
     const [pacerRemaining, setPacerRemaining] = useState(0);
     const [showTransition, setShowTransition] = useState(false);
     const [showSwapModal, setShowSwapModal] = useState(false);
@@ -105,10 +227,195 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
 
     const workoutRef = useRef(null);
     const currentExIdxRef = useRef(0);
+    const hasAnyProgressRef = useRef(false);
     const channelRef = useRef(null);
     const hasLeaveGuardRef = useRef(false);
     const requestLeaveRef = useRef(null);
     const lastUiSyncRef = useRef('');
+
+    const bikeWatchIdRef = useRef(null);
+    const bikeLastCoordRef = useRef(null);
+    const bikeRouteRef = useRef([]);
+    const bikeLastRouteRef = useRef(null);
+    const bikeDistanceRef = useRef(0);
+    const bikeMaxSpeedRef = useRef(0);
+    const bikeStartedAtRef = useRef(null);
+    const bikeMovingSecondsRef = useRef(0);
+    const bikeLastSyncAtRef = useRef(0);
+    const bikeWeightKgRef = useRef(null);
+    const bikeHeightCmRef = useRef(null);
+    const bikeHasEverTrackedRef = useRef(false);
+
+    const wakeLockRef = useRef(null);
+    const audioCtxRef = useRef(null);
+    const audioOscRef = useRef(null);
+    const audioGainRef = useRef(null);
+
+    const [keepScreenAwake, setKeepScreenAwake] = useState(() => {
+        try {
+            const raw = session?.ui?.bikeKeepScreenAwake;
+            return raw == null ? true : !!raw;
+        } catch {
+            return true;
+        }
+    });
+    const [bikeBackgroundActive, setBikeBackgroundActive] = useState(false);
+
+    const makeSessionExerciseKey = () => {
+        try {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                return crypto.randomUUID();
+            }
+        } catch {}
+        try {
+            return `k_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        } catch {
+            return String(Date.now());
+        }
+    };
+
+    const ensureSessionKeys = (exercises) => {
+        try {
+            const list = Array.isArray(exercises) ? exercises : [];
+            const used = new Set();
+            const out = [];
+            for (const raw of list) {
+                if (!raw || typeof raw !== 'object') continue;
+                const currentKey = typeof raw._sessionKey === 'string' && raw._sessionKey ? raw._sessionKey : null;
+                const key = !currentKey || used.has(currentKey) ? makeSessionExerciseKey() : currentKey;
+                used.add(key);
+                out.push(currentKey === key ? raw : { ...raw, _sessionKey: key });
+            }
+            return out;
+        } catch {
+            return [];
+        }
+    };
+
+    const openEditWorkout = () => {
+        try {
+            const currentWorkout = workoutRef.current || workout || null;
+            if (!currentWorkout) return;
+            const currentExercises = Array.isArray(currentWorkout?.exercises) ? currentWorkout.exercises : [];
+            const ensuredExercises = ensureSessionKeys(currentExercises);
+            const hadMissing = ensuredExercises.length !== currentExercises.length || ensuredExercises.some((ex, i) => {
+                const before = currentExercises[i];
+                const beforeKey = before && typeof before === 'object' ? before._sessionKey : null;
+                return (ex?._sessionKey ?? null) !== (beforeKey ?? null);
+            });
+
+            if (hadMissing && typeof onUpdateSession === 'function') {
+                try {
+                    onUpdateSession({
+                        workout: {
+                            ...(currentWorkout || {}),
+                            exercises: ensuredExercises
+                        }
+                    });
+                } catch {}
+            }
+
+            setEditWorkoutDraft({
+                ...(currentWorkout || {}),
+                exercises: ensuredExercises
+            });
+            setShowEditModal(true);
+        } catch {
+            return;
+        }
+    };
+
+    const handleEditWorkoutChange = (next) => {
+        try {
+            const safeNext = next && typeof next === 'object' ? next : {};
+            const ensuredExercises = ensureSessionKeys(safeNext?.exercises);
+            setEditWorkoutDraft((prev) => ({
+                ...(prev && typeof prev === 'object' ? prev : {}),
+                ...safeNext,
+                exercises: ensuredExercises
+            }));
+        } catch {
+            return;
+        }
+    };
+
+    const applyEditWorkout = async (nextFromEditor) => {
+        try {
+            const currentWorkout = workoutRef.current || workout || null;
+            if (!currentWorkout) return;
+            if (typeof onUpdateSession !== 'function') return;
+
+            const oldExercises = ensureSessionKeys(currentWorkout?.exercises);
+            const nextWorkoutValue = (nextFromEditor && typeof nextFromEditor === 'object')
+                ? nextFromEditor
+                : (editWorkoutDraft && typeof editWorkoutDraft === 'object' ? editWorkoutDraft : {});
+
+            const newExercises = ensureSessionKeys(nextWorkoutValue?.exercises);
+
+            const maxLoggedIdx = getMaxLoggedExerciseIndex();
+            const activeIdx = Number.isFinite(currentExIdxRef.current) ? currentExIdxRef.current : 0;
+            const lockedCount = Math.max(0, Math.max(maxLoggedIdx + 1, activeIdx + 1));
+
+            if (newExercises.length < lockedCount) {
+                await alert('Para não perder progresso, mantenha os exercícios já iniciados e edite do atual em diante.', 'Edição bloqueada');
+                return;
+            }
+
+            for (let i = 0; i < lockedCount; i += 1) {
+                const oldKey = oldExercises?.[i]?._sessionKey;
+                const newKey = newExercises?.[i]?._sessionKey;
+                if (!oldKey || !newKey || oldKey !== newKey) {
+                    await alert('Para não perder progresso, não reordene/remova exercícios já iniciados. Edite apenas do atual em diante.', 'Edição bloqueada');
+                    return;
+                }
+            }
+
+            const mergedLocked = oldExercises.slice(0, lockedCount).map((oldEx, i) => {
+                const incoming = newExercises[i] || {};
+                const key = oldEx?._sessionKey || incoming?._sessionKey || makeSessionExerciseKey();
+                return { ...(oldEx || {}), ...(incoming || {}), _sessionKey: key };
+            });
+            const mergedExercises = [...mergedLocked, ...newExercises.slice(lockedCount)];
+
+            const durationByKey = (() => {
+                try {
+                    const d = Array.isArray(exerciseDurations) ? exerciseDurations : [];
+                    const map = {};
+                    for (let i = 0; i < oldExercises.length; i += 1) {
+                        const k = oldExercises?.[i]?._sessionKey;
+                        const v = d?.[i];
+                        if (!k) continue;
+                        const n = Number(v);
+                        map[k] = Number.isFinite(n) && n >= 0 ? n : 0;
+                    }
+                    return map;
+                } catch {
+                    return {};
+                }
+            })();
+
+            const nextDurations = mergedExercises.map((ex) => {
+                const key = ex?._sessionKey;
+                const v = key ? durationByKey[key] : 0;
+                const n = Number(v);
+                return Number.isFinite(n) && n >= 0 ? n : 0;
+            });
+
+            setExerciseDurations(nextDurations);
+            onUpdateSession({
+                workout: {
+                    ...(currentWorkout || {}),
+                    ...(nextWorkoutValue || {}),
+                    exercises: mergedExercises
+                }
+            });
+
+            setShowEditModal(false);
+            setEditWorkoutDraft(null);
+        } catch (e) {
+            await alert(e?.message || String(e || 'Erro ao aplicar edição'), 'Erro');
+        }
+    };
 
     useEffect(() => {
         workoutRef.current = workout || null;
@@ -141,6 +448,544 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
         }
     }, [currentExIdx, exerciseStartTs, exerciseDurations, onUpdateSession, session?.ui]);
 
+    const persistBikeGpsUi = useCallback((nextState, force = false) => {
+        try {
+            if (typeof onUpdateSession !== 'function') return;
+            const now = Date.now();
+            const last = Number(bikeLastSyncAtRef.current || 0);
+            if (!force && now - last < 5000) return;
+            bikeLastSyncAtRef.current = now;
+
+            const currentUi = session?.ui && typeof session.ui === 'object' ? session.ui : null;
+            const payload = {
+                status: typeof nextState?.status === 'string' ? nextState.status : 'idle',
+                isTracking: !!nextState?.isTracking,
+                distanceMeters: Number.isFinite(Number(nextState?.distanceMeters)) ? Number(nextState.distanceMeters) : 0,
+                currentSpeedMps: Number.isFinite(Number(nextState?.currentSpeedMps)) ? Number(nextState.currentSpeedMps) : 0,
+                maxSpeedMps: Number.isFinite(Number(nextState?.maxSpeedMps)) ? Number(nextState.maxSpeedMps) : 0,
+                startedAt: Number.isFinite(Number(nextState?.startedAt)) ? Number(nextState.startedAt) : null,
+                lastFixAt: Number.isFinite(Number(nextState?.lastFixAt)) ? Number(nextState.lastFixAt) : null,
+                accuracyMeters: Number.isFinite(Number(nextState?.accuracyMeters)) ? Number(nextState.accuracyMeters) : null,
+                weightKg: Number.isFinite(Number(nextState?.weightKg)) ? Number(nextState.weightKg) : null,
+                heightCm: Number.isFinite(Number(nextState?.heightCm)) ? Number(nextState.heightCm) : null,
+                caloriesKcal: Number.isFinite(Number(nextState?.caloriesKcal)) ? Number(nextState.caloriesKcal) : null,
+                error: typeof nextState?.error === 'string' ? nextState.error : '',
+            };
+
+            const apply = () => {
+                try {
+                    onUpdateSession({ ui: { ...(currentUi || {}), bikeGps: payload } });
+                } catch {
+                    return;
+                }
+            };
+
+            try {
+                if (typeof queueMicrotask === 'function') {
+                    queueMicrotask(apply);
+                } else {
+                    Promise.resolve().then(apply);
+                }
+            } catch {
+                apply();
+            }
+        } catch {
+            return;
+        }
+    }, [onUpdateSession, session?.ui]);
+
+    const stopBikeWatch = useCallback(() => {
+        try {
+            const id = bikeWatchIdRef.current;
+            if (id == null) return;
+            if (typeof navigator === 'undefined') return;
+            if (!navigator.geolocation || typeof navigator.geolocation.clearWatch !== 'function') return;
+            navigator.geolocation.clearWatch(id);
+        } catch {
+        } finally {
+            bikeWatchIdRef.current = null;
+        }
+    }, []);
+
+    const persistBikeKeepScreenAwakeUi = useCallback((nextValue) => {
+        try {
+            if (typeof onUpdateSession !== 'function') return;
+            const currentUi = session?.ui && typeof session.ui === 'object' ? session.ui : null;
+            onUpdateSession({ ui: { ...(currentUi || {}), bikeKeepScreenAwake: !!nextValue } });
+        } catch {
+            return;
+        }
+    }, [onUpdateSession, session?.ui]);
+
+    const releaseWakeLock = useCallback(async () => {
+        try {
+            const sentinel = wakeLockRef.current;
+            if (!sentinel) return;
+            if (typeof sentinel.release === 'function') {
+                await sentinel.release();
+            }
+        } catch {
+        } finally {
+            wakeLockRef.current = null;
+        }
+    }, []);
+
+    const requestWakeLock = useCallback(async () => {
+        try {
+            if (!keepScreenAwake) return false;
+            if (wakeLockRef.current) return true;
+            if (typeof navigator === 'undefined') return false;
+            const wl = navigator?.wakeLock;
+            if (!wl || typeof wl.request !== 'function') return false;
+            const sentinel = await wl.request('screen');
+            wakeLockRef.current = sentinel;
+            if (sentinel && typeof sentinel.addEventListener === 'function') {
+                sentinel.addEventListener('release', () => {
+                    wakeLockRef.current = null;
+                });
+            }
+            return true;
+        } catch {
+            wakeLockRef.current = null;
+            return false;
+        }
+    }, [keepScreenAwake]);
+
+    const stopAudioKeeper = useCallback(async () => {
+        try {
+            try {
+                const osc = audioOscRef.current;
+                if (osc && typeof osc.stop === 'function') osc.stop();
+            } catch {}
+            try {
+                const osc = audioOscRef.current;
+                if (osc && typeof osc.disconnect === 'function') osc.disconnect();
+            } catch {}
+            try {
+                const gain = audioGainRef.current;
+                if (gain && typeof gain.disconnect === 'function') gain.disconnect();
+            } catch {}
+            try {
+                const ctx = audioCtxRef.current;
+                if (ctx && typeof ctx.close === 'function') await ctx.close();
+            } catch {}
+        } finally {
+            audioOscRef.current = null;
+            audioGainRef.current = null;
+            audioCtxRef.current = null;
+            setBikeBackgroundActive(false);
+        }
+    }, []);
+
+    const startAudioKeeper = useCallback(async () => {
+        try {
+            if (typeof window === 'undefined') return false;
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return false;
+
+            if (audioCtxRef.current) {
+                try {
+                    if (typeof audioCtxRef.current.resume === 'function') {
+                        await audioCtxRef.current.resume();
+                    }
+                } catch {}
+                setBikeBackgroundActive(true);
+                return true;
+            }
+
+            const ctx = new AudioCtx();
+            const gain = ctx.createGain();
+            gain.gain.value = 0.00001;
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = 18;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+
+            audioCtxRef.current = ctx;
+            audioGainRef.current = gain;
+            audioOscRef.current = osc;
+
+            try {
+                if (typeof ctx.resume === 'function') await ctx.resume();
+            } catch {}
+
+            setBikeBackgroundActive(true);
+            return true;
+        } catch {
+            await stopAudioKeeper();
+            return false;
+        }
+    }, [stopAudioKeeper]);
+
+    const finalizeBikeSummary = () => {
+        try {
+            const startedAt = Number(bikeStartedAtRef.current || bikeGps?.startedAt || 0);
+            if (!Number.isFinite(startedAt) || startedAt <= 0) return null;
+            const endAt = Number(bikeGps?.isTracking ? Date.now() : (bikeGps?.lastFixAt || Date.now()));
+            const durationSeconds = Math.max(0, Math.round((endAt - startedAt) / 1000));
+            const distanceMeters = Number.isFinite(Number(bikeDistanceRef.current)) ? Number(bikeDistanceRef.current) : Number(bikeGps?.distanceMeters || 0);
+            const distanceKm = distanceMeters > 0 ? distanceMeters / 1000 : 0;
+            const avgSpeedKmh = durationSeconds > 0 ? (distanceKm / (durationSeconds / 3600)) : 0;
+            const maxSpeedMps = Number.isFinite(Number(bikeMaxSpeedRef.current)) ? Number(bikeMaxSpeedRef.current) : Number(bikeGps?.maxSpeedMps || 0);
+            const maxSpeedKmh = maxSpeedMps > 0 ? (maxSpeedMps * 3.6) : 0;
+            const weightKg = Number.isFinite(Number(bikeWeightKgRef.current))
+                ? Number(bikeWeightKgRef.current)
+                : (Number.isFinite(Number(bikeGps?.weightKg)) ? Number(bikeGps.weightKg) : null);
+            const heightCm = Number.isFinite(Number(bikeHeightCmRef.current))
+                ? Number(bikeHeightCmRef.current)
+                : (Number.isFinite(Number(bikeGps?.heightCm)) ? Number(bikeGps.heightCm) : null);
+            const caloriesKcal = estimateBikeCalories({ weightKg, durationSeconds, avgSpeedKmh });
+            const routeCoordinates = Array.isArray(bikeRouteRef.current) ? bikeRouteRef.current : [];
+            if (distanceMeters <= 0 && durationSeconds <= 0) return null;
+            return {
+                kind: 'bike_outdoor',
+                startedAt,
+                endedAt: endAt,
+                durationSeconds,
+                distanceMeters,
+                avgSpeedKmh: Number.isFinite(avgSpeedKmh) ? Number(avgSpeedKmh) : 0,
+                maxSpeedKmh: Number.isFinite(maxSpeedKmh) ? Number(maxSpeedKmh) : 0,
+                weightKg: weightKg ?? null,
+                heightCm: heightCm ?? null,
+                caloriesKcal: caloriesKcal ?? null,
+                routeCoordinates,
+            };
+        } catch {
+            return null;
+        }
+    };
+
+    const pauseBikeGps = useCallback((opts = {}) => {
+        const { persist = true } = opts && typeof opts === 'object' ? opts : {};
+        stopBikeWatch();
+        try {
+            releaseWakeLock();
+        } catch {}
+        try {
+            stopAudioKeeper();
+        } catch {}
+        setBikeGps((prev) => {
+            const next = {
+                ...prev,
+                isTracking: false,
+                status: (prev?.status === 'unavailable' || prev?.status === 'error') ? prev.status : 'paused',
+                currentSpeedMps: 0,
+            };
+            if (persist) persistBikeGpsUi(next, true);
+            return next;
+        });
+    }, [persistBikeGpsUi, releaseWakeLock, stopAudioKeeper, stopBikeWatch]);
+
+    const resetBikeGps = async () => {
+        stopBikeWatch();
+        await releaseWakeLock();
+        await stopAudioKeeper();
+        bikeLastCoordRef.current = null;
+        bikeRouteRef.current = [];
+        bikeLastRouteRef.current = null;
+        bikeDistanceRef.current = 0;
+        bikeMaxSpeedRef.current = 0;
+        bikeStartedAtRef.current = null;
+        bikeMovingSecondsRef.current = 0;
+        bikeHasEverTrackedRef.current = false;
+        setBikeGps((prev) => {
+            const next = {
+                ...prev,
+                status: 'idle',
+                isTracking: false,
+                distanceMeters: 0,
+                currentSpeedMps: 0,
+                maxSpeedMps: 0,
+                startedAt: null,
+                lastFixAt: null,
+                accuracyMeters: null,
+                caloriesKcal: null,
+                error: '',
+            };
+            persistBikeGpsUi(next, true);
+            return next;
+        });
+    };
+
+    const loadLatestAnthro = async () => {
+        try {
+            const cachedWeight = bikeWeightKgRef.current;
+            const cachedHeight = bikeHeightCmRef.current;
+            const cachedW = Number.isFinite(Number(cachedWeight)) && Number(cachedWeight) > 0 ? Number(cachedWeight) : null;
+            const cachedH = Number.isFinite(Number(cachedHeight)) && Number(cachedHeight) > 0 ? Number(cachedHeight) : null;
+            if (cachedW && cachedH) return { weightKg: cachedW, heightCm: cachedH };
+            const studentId = user?.id;
+            if (!studentId) return null;
+            const { data, error } = await supabase
+                .from('assessments')
+                .select('weight, height, assessment_date, created_at')
+                .eq('student_id', studentId)
+                .order('assessment_date', { ascending: false })
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            if (error) return null;
+            const w = parsePositiveNumber(data?.weight);
+            const h = parsePositiveNumber(data?.height);
+            if (!w || !h) return null;
+            bikeWeightKgRef.current = w;
+            bikeHeightCmRef.current = h;
+            setBikeAnthroDraft({ weightKg: String(w), heightCm: String(h) });
+            setBikeGps((prev) => {
+                const next = { ...prev, weightKg: w, heightCm: h };
+                persistBikeGpsUi(next, true);
+                return next;
+            });
+            return { weightKg: w, heightCm: h };
+        } catch {
+            return null;
+        }
+    };
+
+    const syncBikeAnthroFromDraft = useCallback((nextDraft) => {
+        try {
+            const weight = parsePositiveNumber(nextDraft?.weightKg);
+            const height = parsePositiveNumber(nextDraft?.heightCm);
+
+            const validWeight = weight && weight >= BIKE_WEIGHT_MIN_KG && weight <= BIKE_WEIGHT_MAX_KG ? weight : null;
+            const validHeight = height && height >= BIKE_HEIGHT_MIN_CM && height <= BIKE_HEIGHT_MAX_CM ? height : null;
+
+            if (validWeight) bikeWeightKgRef.current = validWeight;
+            if (validHeight) bikeHeightCmRef.current = validHeight;
+
+            setBikeGps((prev) => {
+                const next = {
+                    ...prev,
+                    weightKg: validWeight ?? prev?.weightKg ?? null,
+                    heightCm: validHeight ?? prev?.heightCm ?? null,
+                };
+                persistBikeGpsUi(next, true);
+                return next;
+            });
+        } catch {
+            return;
+        }
+    }, [persistBikeGpsUi]);
+
+    const startBikeGps = async () => {
+        try {
+            if (typeof navigator === 'undefined' || !navigator.geolocation) {
+                const next = { ...bikeGps, status: 'unavailable', isTracking: false, error: 'Geolocation indisponível.' };
+                setBikeGps(next);
+                persistBikeGpsUi(next, true);
+                await alert('Geolocalização indisponível neste dispositivo/navegador.', 'GPS');
+                return;
+            }
+
+            await loadLatestAnthro();
+
+            const draftWeight = parsePositiveNumber(bikeAnthroDraft?.weightKg);
+            const draftHeight = parsePositiveNumber(bikeAnthroDraft?.heightCm);
+            if (draftWeight) bikeWeightKgRef.current = draftWeight;
+            if (draftHeight) bikeHeightCmRef.current = draftHeight;
+
+            const weightCandidate = Number.isFinite(Number(bikeWeightKgRef.current))
+                ? Number(bikeWeightKgRef.current)
+                : parsePositiveNumber(bikeGps?.weightKg);
+            const heightCandidate = Number.isFinite(Number(bikeHeightCmRef.current))
+                ? Number(bikeHeightCmRef.current)
+                : parsePositiveNumber(bikeGps?.heightCm);
+            const validWeight = weightCandidate && weightCandidate >= BIKE_WEIGHT_MIN_KG && weightCandidate <= BIKE_WEIGHT_MAX_KG ? weightCandidate : null;
+            const validHeight = heightCandidate && heightCandidate >= BIKE_HEIGHT_MIN_CM && heightCandidate <= BIKE_HEIGHT_MAX_CM ? heightCandidate : null;
+
+            if (!validWeight || !validHeight) {
+                await alert('Informe peso e altura para calcular as calorias do pedal.', 'Dados do atleta');
+                return;
+            }
+
+            syncBikeAnthroFromDraft({ weightKg: String(validWeight), heightCm: String(validHeight) });
+
+            await startAudioKeeper();
+            await requestWakeLock();
+
+            const opts = { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 };
+
+            const ensureStart = () => {
+                const now = Date.now();
+                if (!Number.isFinite(Number(bikeStartedAtRef.current)) || Number(bikeStartedAtRef.current) <= 0) {
+                    bikeStartedAtRef.current = now;
+                }
+                bikeHasEverTrackedRef.current = true;
+                setBikeGps((prev) => {
+                    const startedAt = Number(bikeStartedAtRef.current);
+                    const next = {
+                        ...prev,
+                        status: 'tracking',
+                        isTracking: true,
+                        startedAt: Number.isFinite(startedAt) && startedAt > 0 ? startedAt : (prev.startedAt || now),
+                        error: '',
+                    };
+                    persistBikeGpsUi(next, true);
+                    return next;
+                });
+            };
+
+            const onPos = (pos) => {
+                try {
+                    const coords = pos?.coords;
+                    const lat = Number(coords?.latitude);
+                    const lng = Number(coords?.longitude);
+                    const acc = Number(coords?.accuracy);
+                    const ts = Number(pos?.timestamp || Date.now());
+                    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) return;
+
+                    if (Number.isFinite(acc) && acc > BIKE_GPS_MAX_ACCURACY_METERS) return;
+
+                    ensureStart();
+
+                    const last = bikeLastCoordRef.current;
+                    let deltaMeters = 0;
+                    let dt = 0;
+                    if (last && Number.isFinite(last.lat) && Number.isFinite(last.lng) && Number.isFinite(last.ts)) {
+                        dt = Math.max(0, (ts - Number(last.ts)) / 1000);
+                        if (dt > 0) {
+                            deltaMeters = haversineMeters(last.lat, last.lng, lat, lng);
+                            if (deltaMeters > 200 && dt < 6) {
+                                deltaMeters = 0;
+                            }
+                        }
+                    }
+
+                    bikeLastCoordRef.current = { lat, lng, ts };
+
+                    try {
+                        const lastRoute = bikeLastRouteRef.current;
+                        const dtRoute = (lastRoute && Number.isFinite(lastRoute.ts)) ? Math.max(0, (ts - Number(lastRoute.ts)) / 1000) : null;
+                        const dRoute = (lastRoute && Number.isFinite(lastRoute.lat) && Number.isFinite(lastRoute.lng))
+                            ? haversineMeters(lastRoute.lat, lastRoute.lng, lat, lng)
+                            : null;
+                        const shouldPush = !lastRoute || (Number.isFinite(dRoute) && dRoute >= BIKE_ROUTE_MIN_METERS) || (Number.isFinite(dtRoute) && dtRoute >= BIKE_ROUTE_MAX_GAP_SECONDS);
+                        if (shouldPush) {
+                            const nextPoint = { lat, lng, ts, accuracy: Number.isFinite(acc) ? acc : null };
+                            const list = Array.isArray(bikeRouteRef.current) ? bikeRouteRef.current : [];
+                            list.push(nextPoint);
+                            if (list.length > BIKE_ROUTE_MAX_POINTS) {
+                                bikeRouteRef.current = list.slice(list.length - BIKE_ROUTE_MAX_POINTS);
+                            } else {
+                                bikeRouteRef.current = list;
+                            }
+                            bikeLastRouteRef.current = nextPoint;
+                        }
+                    } catch {}
+
+                    if (deltaMeters > 0) {
+                        bikeDistanceRef.current = Number(bikeDistanceRef.current || 0) + deltaMeters;
+                    }
+
+                    const rawSpeed = Number(coords?.speed);
+                    const computedSpeed = (Number.isFinite(rawSpeed) && rawSpeed >= 0)
+                        ? rawSpeed
+                        : (dt > 0 ? (deltaMeters / dt) : 0);
+
+                    const speedMps = Number.isFinite(computedSpeed) && computedSpeed > 0 ? computedSpeed : 0;
+                    bikeMaxSpeedRef.current = Math.max(Number(bikeMaxSpeedRef.current || 0), speedMps);
+                    if (speedMps >= 1) {
+                        bikeMovingSecondsRef.current = Number(bikeMovingSecondsRef.current || 0) + (dt > 0 ? dt : 0);
+                    }
+
+                    setBikeGps((prev) => {
+                        const startedAt = Number(bikeStartedAtRef.current || 0);
+                        const durationSeconds = (Number.isFinite(startedAt) && startedAt > 0)
+                            ? Math.max(0, Math.round((ts - startedAt) / 1000))
+                            : 0;
+                        const km = Number(bikeDistanceRef.current || 0) / 1000;
+                        const avgSpeedKmh = durationSeconds > 0 ? (km / (durationSeconds / 3600)) : 0;
+                        const weightForCalories = Number.isFinite(Number(bikeWeightKgRef.current)) ? Number(bikeWeightKgRef.current) : parsePositiveNumber(prev?.weightKg);
+                        const caloriesKcal = estimateBikeCalories({ weightKg: weightForCalories, durationSeconds, avgSpeedKmh });
+                        const next = {
+                            ...prev,
+                            status: 'tracking',
+                            isTracking: true,
+                            distanceMeters: Number(bikeDistanceRef.current || 0),
+                            currentSpeedMps: speedMps,
+                            maxSpeedMps: Number(bikeMaxSpeedRef.current || 0),
+                            lastFixAt: ts,
+                            accuracyMeters: Number.isFinite(acc) ? acc : prev.accuracyMeters,
+                            caloriesKcal: caloriesKcal ?? prev?.caloriesKcal ?? null,
+                        };
+                        persistBikeGpsUi(next);
+                        return next;
+                    });
+                } catch {
+                    return;
+                }
+            };
+
+            const onErr = (err) => {
+                stopBikeWatch();
+                try {
+                    releaseWakeLock();
+                } catch {}
+                try {
+                    stopAudioKeeper();
+                } catch {}
+                const msg = String(err?.message || 'Falha ao obter localização.');
+                setBikeGps((prev) => {
+                    const next = { ...prev, status: 'error', isTracking: false, currentSpeedMps: 0, error: msg };
+                    persistBikeGpsUi(next, true);
+                    return next;
+                });
+            };
+
+            try {
+                navigator.geolocation.getCurrentPosition(onPos, onErr, opts);
+            } catch {}
+
+            const id = navigator.geolocation.watchPosition(onPos, onErr, opts);
+            bikeWatchIdRef.current = id;
+            ensureStart();
+        } catch (e) {
+            try {
+                await releaseWakeLock();
+            } catch {}
+            try {
+                await stopAudioKeeper();
+            } catch {}
+            const msg = e?.message || String(e || 'Erro ao iniciar GPS');
+            setBikeGps((prev) => {
+                const next = { ...prev, status: 'error', isTracking: false, error: msg };
+                persistBikeGpsUi(next, true);
+                return next;
+            });
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            stopBikeWatch();
+            try {
+                releaseWakeLock();
+            } catch {}
+            try {
+                stopAudioKeeper();
+            } catch {}
+        };
+    }, [releaseWakeLock, stopAudioKeeper, stopBikeWatch]);
+
+    const activeExercise = useMemo(() => {
+        try {
+            const list = Array.isArray(workout?.exercises) ? workout.exercises : [];
+            return list[currentExIdx] && typeof list[currentExIdx] === 'object' ? list[currentExIdx] : null;
+        } catch {
+            return null;
+        }
+    }, [workout?.exercises, currentExIdx]);
+
+    const isBikeActive = useMemo(() => isBikeOutdoorExercise(activeExercise), [activeExercise]);
+
+    useEffect(() => {
+        if (!bikeGps?.isTracking) return;
+        if (isBikeActive) return;
+        pauseBikeGps({ persist: true });
+    }, [isBikeActive, bikeGps?.isTracking, pauseBikeGps]);
+
     const hasAnyProgress = useMemo(() => {
         try {
             const source = logs && typeof logs === 'object' ? logs : {};
@@ -157,6 +1002,10 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
             return false;
         }
     }, [logs, exerciseDurations, elapsed]);
+
+    useEffect(() => {
+        hasAnyProgressRef.current = !!hasAnyProgress;
+    }, [hasAnyProgress]);
 
     const guardActive = !!session?.startedAt;
 
@@ -427,6 +1276,54 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
             }
         });
 
+        channel.on('broadcast', { event: WORKOUT_SYNC_EVENT }, async ({ payload }) => {
+            try {
+                const senderId = payload?.senderId ? String(payload.senderId) : null;
+                const myId = user?.id ? String(user.id) : null;
+                if (senderId && myId && senderId === myId) return;
+
+                const mode = payload?.mode ? String(payload.mode) : '';
+
+                if (mode === 'request') {
+                    if (!teamSession?.isHost) return;
+                    if (hasAnyProgressRef.current) return;
+                    const currentWorkout = workoutRef.current;
+                    const exercises = Array.isArray(currentWorkout?.exercises) ? currentWorkout.exercises : [];
+                    await sendWorkoutSync({ mode: 'full', workout: { ...(currentWorkout || {}), exercises }, requestedBy: senderId ?? null });
+                    return;
+                }
+
+                if (mode === 'full') {
+                    const nextWorkout = payload?.workout && typeof payload.workout === 'object' ? payload.workout : null;
+                    if (!nextWorkout) return;
+                    const nextExercises = Array.isArray(nextWorkout?.exercises)
+                        ? nextWorkout.exercises.filter((ex) => ex && typeof ex === 'object')
+                        : [];
+
+                    setExerciseDurations((prev) => {
+                        const base = Array.isArray(prev) ? [...prev] : [];
+                        if (base.length === nextExercises.length) return base;
+                        if (base.length < nextExercises.length) {
+                            return [...base, ...Array(nextExercises.length - base.length).fill(0)];
+                        }
+                        return base.slice(0, nextExercises.length);
+                    });
+
+                    if (typeof onUpdateSession === 'function') {
+                        onUpdateSession({
+                            workout: {
+                                ...(workoutRef.current || {}),
+                                ...(nextWorkout || {}),
+                                exercises: nextExercises
+                            }
+                        });
+                    }
+                }
+            } catch {
+                return;
+            }
+        });
+
         channel.subscribe();
 
         return () => {
@@ -436,7 +1333,23 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                 return;
             }
         };
-    }, [supabase, teamSession?.id, user?.id, onUpdateSession]);
+    }, [supabase, teamSession?.id, teamSession?.isHost, user?.id, onUpdateSession, sendWorkoutSync]);
+
+    useEffect(() => {
+        if (!teamSession?.id) return;
+        if (teamSession?.isHost) return;
+        if (hasAnyProgressRef.current) return;
+
+        const t = setTimeout(() => {
+            try {
+                sendWorkoutSync({ mode: 'request' });
+            } catch {
+                return;
+            }
+        }, 800);
+
+        return () => clearTimeout(t);
+    }, [teamSession?.id, teamSession?.isHost, sendWorkoutSync]);
 
     useEffect(() => {
         if (!showAddModal) return;
@@ -476,7 +1389,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
         };
     }, [showAddModal, addQuery]);
 
-    const sendWorkoutPatch = async (payload) => {
+    const sendWorkoutPatch = useCallback(async (payload) => {
         if (!teamSession?.id) return;
         const channel = channelRef.current;
         if (!channel) return;
@@ -494,7 +1407,27 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
         } catch {
             return;
         }
-    };
+    }, [teamSession?.id, user?.id]);
+
+    const sendWorkoutSync = useCallback(async (payload) => {
+        if (!teamSession?.id) return;
+        const channel = channelRef.current;
+        if (!channel) return;
+
+        try {
+            await channel.send({
+                type: 'broadcast',
+                event: WORKOUT_SYNC_EVENT,
+                payload: {
+                    ...(payload && typeof payload === 'object' ? payload : {}),
+                    senderId: user?.id ?? null,
+                    sentAt: Date.now()
+                }
+            });
+        } catch {
+            return;
+        }
+    }, [teamSession?.id, user?.id]);
 
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
@@ -532,6 +1465,25 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
         }
     };
 
+    const getTeamSize = () => {
+        try {
+            if (!teamSession) return 1;
+            const participants = Array.isArray(teamSession?.participants) ? teamSession.participants : [];
+            const myUid = user?.id ? String(user.id) : null;
+            const hasMe = myUid
+                ? participants.some((p) => {
+                    const pid = p?.uid ?? p?.id ?? p?.user_id ?? p?.userId ?? null;
+                    return pid != null && String(pid) === myUid;
+                })
+                : false;
+            const size = participants.length + (hasMe ? 0 : 1);
+            const safe = Number(size);
+            return Number.isFinite(safe) && safe > 0 ? safe : 1;
+        } catch {
+            return 1;
+        }
+    };
+
     // Nova função de envio usando Contexto
     const onSendInvite = async (student) => {
         const displayName = student?.displayName || student?.email || '';
@@ -561,9 +1513,12 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
         if (!force && !(await confirm("Finalizar treino?", "Concluir"))) return;
 
         let showReport = true;
-        if (!force) showReport = await confirm("Quer o relatório do treino?", "Relatório");
+        if (!force) showReport = await confirm("Quer o relatório do treino?", "Relatório", { confirmText: 'SIM', cancelText: 'NÃO' });
 
         try {
+            try {
+                pauseBikeGps({ persist: true });
+            } catch {}
             const workoutId = workout?.id;
             const workoutTitle = workout?.title;
             const startedAt = session?.startedAt;
@@ -573,6 +1528,11 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                 await alert('Sessão inválida. Tente iniciar o treino novamente.', 'Erro');
                 return;
             }
+
+            const totalTimeSeconds = (Date.now() - startedAtMs) / 1000;
+            const shouldSaveHistory = (!force && Number.isFinite(totalTimeSeconds) && totalTimeSeconds > 0 && totalTimeSeconds < 300)
+                ? await confirm('Esse treino tem menos de 5 minutos. Quer que salve no histórico?', 'Treino muito curto', { confirmText: 'SIM', cancelText: 'NÃO' })
+                : true;
 
             const exercisesArr = Array.isArray(workout?.exercises) ? workout.exercises : [];
             const cleanExercises = exercisesArr.map(ex => {
@@ -628,7 +1588,8 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
 
             const realTotalTime = finalExerciseDurations.reduce((acc, v) => acc + (Number(v) || 0), 0);
 
-            const teamMeta = teamSession && Array.isArray(teamSession.participants) && teamSession.participants.length > 1
+            const teamSize = getTeamSize();
+            const teamMeta = teamSession && teamSize > 1
                 ? {
                     sessionId: teamSession.id || null,
                     isHost: !!teamSession.isHost,
@@ -636,19 +1597,20 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                 }
                 : null;
 
+            const outdoorBike = bikeHasEverTrackedRef.current ? finalizeBikeSummary() : null;
+
             const sessionData = {
                 workoutId,
                 workoutTitle: workoutTitle || 'Treino',
                 date: new Date().toISOString(),
-                totalTime: (Date.now() - startedAtMs) / 1000,
+                totalTime: totalTimeSeconds,
                 realTotalTime,
                 exerciseDurations: finalExerciseDurations,
                 logs: cleanLogs,
                 exercises: cleanExercises,
-                teamMeta
+                teamMeta,
+                outdoorBike
             };
-
-            console.log('SAVE SESSION (ActiveWorkout):', sessionData);
 
             // Save to Supabase
             // We'll treat this as a "finished workout" (is_template = false)
@@ -656,33 +1618,35 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
             // For now, try server endpoint, fallback to client insert
 
             let historyEntry = null;
-            try {
-                const resp = await fetch('/api/workouts/finish', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session: sessionData })
-                });
-                const json = await resp.json();
-                if (json.ok) {
-                    historyEntry = { id: json.saved.id };
-                } else {
-                    throw new Error(json.error || 'Falha no endpoint');
+            if (shouldSaveHistory) {
+                try {
+                    const resp = await fetch('/api/workouts/finish', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ session: sessionData })
+                    });
+                    const json = await resp.json();
+                    if (json.ok) {
+                        historyEntry = { id: json.saved.id };
+                    } else {
+                        throw new Error(json.error || 'Falha no endpoint');
+                    }
+                } catch (err) {
+                    const { data: inserted, error } = await supabase
+                        .from('workouts')
+                        .insert({
+                            user_id: userId,
+                            name: workoutTitle || 'Treino',
+                            date: new Date(),
+                            completed_at: new Date().toISOString(),
+                            is_template: false,
+                            notes: JSON.stringify(sessionData)
+                        })
+                        .select()
+                        .single();
+                    if (error) throw error;
+                    historyEntry = inserted;
                 }
-            } catch (err) {
-                const { data: inserted, error } = await supabase
-                    .from('workouts')
-                    .insert({
-                        user_id: userId,
-                        name: workoutTitle || 'Treino',
-                        date: new Date(),
-                        completed_at: new Date().toISOString(),
-                        is_template: false,
-                        notes: JSON.stringify(sessionData)
-                    })
-                    .select()
-                    .single();
-                if (error) throw error;
-                historyEntry = inserted;
             }
 
             // Se eu sou o HOST da sessão ativa no contexto, finalizo para todos
@@ -696,7 +1660,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
             }
 
             playFinishSound();
-            onFinish({ ...sessionData, date: new Date(), id: historyEntry.id }, showReport); 
+            onFinish({ ...sessionData, date: new Date(), id: historyEntry?.id ?? null }, showReport);
         } catch (e) {
             console.error("Erro detalhado ao salvar:", e);
             await alert(`Erro ao salvar: ${e?.message ?? String(e)}`);
@@ -1096,7 +2060,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
             return { totalSets: 4, activeSetIndex: 0 };
         }
     };
-    const groupSize = Math.max(1, Number(teamSession?.participants?.length || 1));
+    const groupSize = Math.max(1, getTeamSize());
     const estimatedSoloSeconds = safeExercisesForEstimate.reduce((acc, ex) => acc + calculateExerciseDuration(ex), 0);
     const estimatedGroupSeconds = estimateWorkoutSecondsForGroup(safeExercisesForEstimate, groupSize);
 
@@ -1147,7 +2111,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                                 <div className="flex items-center gap-1 mt-0.5 animate-pulse">
                                     <Users size={10} className="text-green-500" />
                                     <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">
-                                        {teamSession.participants?.length || 1} treinando
+                                        {groupSize} treinando
                                     </span>
                                 </div>
                             )}
@@ -1167,6 +2131,14 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                         >
                             <CheckCircle2 size={18} className="pointer-events-none" />
                             <span className="text-xs font-black uppercase tracking-wider pointer-events-none">Finalizar</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={openEditWorkout}
+                            className="cursor-pointer relative z-10 w-11 h-11 bg-neutral-800 text-white rounded-full flex items-center justify-center hover:bg-neutral-700 transition-colors"
+                            title="Editar treino em andamento"
+                        >
+                            <Pencil size={18} className="pointer-events-none" />
                         </button>
                         <button type="button" onClick={() => setShowInvite(true)} className="cursor-pointer relative z-10 w-8 h-8 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-500 hover:text-white transition-colors">
                             <UserPlus size={16} className="pointer-events-none" />
@@ -1289,6 +2261,7 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                         const prevByName = previousLogs && typeof previousLogs === 'object' ? (previousLogs[safeName] || null) : null;
                         const { totalSets, activeSetIndex } = getExerciseSetMeta(exIdx, ex);
                         const isCardio = isCardioExercise(ex);
+                        const isBikeOutdoor = isBikeOutdoorExercise(ex);
                         const restTime = ex?.restTime ?? ex?.rest_time;
 
                         return (
@@ -1306,97 +2279,320 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                                 ) : null}
 
                                 <div className="space-y-3">
-                                    {Array.from({ length: totalSets }).map((_, i) => {
-                                        const key = `${exIdx}-${i}`;
-                                        const log = logs[key] || {};
-                                        const prevLog = (prevByName && prevByName[i]) ? prevByName[i] : {};
-                                        const isActiveSet = i === activeSetIndex && !log.done;
+                                    {isBikeOutdoor ? (
+                                        <div className="rounded-xl border border-neutral-700 bg-neutral-900/40 p-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Bike Outdoor (GPS)</div>
+                                                    <div className="text-xs text-neutral-500">
+                                                        {(() => {
+                                                            const s = String(bikeGps?.status || 'idle');
+                                                            if (s === 'tracking') return 'Rastreando';
+                                                            if (s === 'paused') return 'Pausado';
+                                                            if (s === 'error') return 'Erro';
+                                                            if (s === 'unavailable') return 'Indisponível';
+                                                            return 'Pronto';
+                                                        })()}
+                                                    </div>
+                                                </div>
 
-                                        return (
-                                            <div
-                                                key={i}
-                                                className={`p-3 rounded-xl border-2 transition-all ${
-                                                    log.done
-                                                        ? 'bg-green-900/20 border-green-500/60'
-                                                        : isActiveSet
-                                                            ? 'bg-neutral-900 border-yellow-500/70 shadow-[0_0_0_1px_rgba(250,204,21,0.4)]'
-                                                            : 'bg-neutral-800 border-neutral-800'
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-neutral-400 text-sm">{i + 1}</div>
+                                                <div className="text-right">
+                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Precisão</div>
+                                                    <div className="text-sm font-mono font-bold text-neutral-200">
+                                                        {Number.isFinite(Number(bikeGps?.accuracyMeters)) ? `±${Math.round(Number(bikeGps.accuracyMeters))}m` : '-'}
+                                                    </div>
+                                                </div>
+                                            </div>
 
-                                                    <div className="flex-1 grid grid-cols-3 gap-2">
+                                            {bikeGps?.error ? (
+                                                <div className="mt-2 text-xs text-red-300 bg-red-900/20 border border-red-500/30 rounded-xl p-2">
+                                                    {bikeGps.error}
+                                                </div>
+                                            ) : null}
+
+                                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
+                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Peso (kg)</div>
+                                                    <input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        min={BIKE_WEIGHT_MIN_KG}
+                                                        max={BIKE_WEIGHT_MAX_KG}
+                                                        placeholder={bikeGps?.weightKg ? String(bikeGps.weightKg) : 'Ex: 80'}
+                                                        value={bikeAnthroDraft?.weightKg ?? ''}
+                                                        onChange={(e) => {
+                                                            const nextDraft = { ...(bikeAnthroDraft || {}), weightKg: e?.target?.value ?? '' };
+                                                            setBikeAnthroDraft(nextDraft);
+                                                        }}
+                                                        onBlur={() => syncBikeAnthroFromDraft(bikeAnthroDraft)}
+                                                        className="w-full min-h-[44px] bg-black/20 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500 border border-neutral-800"
+                                                    />
+                                                </div>
+                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
+                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Altura (cm)</div>
+                                                    <input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        min={BIKE_HEIGHT_MIN_CM}
+                                                        max={BIKE_HEIGHT_MAX_CM}
+                                                        placeholder={bikeGps?.heightCm ? String(bikeGps.heightCm) : 'Ex: 175'}
+                                                        value={bikeAnthroDraft?.heightCm ?? ''}
+                                                        onChange={(e) => {
+                                                            const nextDraft = { ...(bikeAnthroDraft || {}), heightCm: e?.target?.value ?? '' };
+                                                            setBikeAnthroDraft(nextDraft);
+                                                        }}
+                                                        onBlur={() => syncBikeAnthroFromDraft(bikeAnthroDraft)}
+                                                        className="w-full min-h-[44px] bg-black/20 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500 border border-neutral-800"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-3 grid grid-cols-2 gap-2">
+                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
+                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Distância</div>
+                                                    <div className="text-lg font-mono font-black text-white">
+                                                        {(() => {
+                                                            const km = (Number(bikeGps?.distanceMeters || 0) || 0) / 1000;
+                                                            return `${km.toFixed(2)} km`;
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
+                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Vel. Atual</div>
+                                                    <div className="text-lg font-mono font-black text-white">
+                                                        {(() => {
+                                                            const v = (Number(bikeGps?.currentSpeedMps || 0) || 0) * 3.6;
+                                                            return `${v.toFixed(1)} km/h`;
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
+                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Vel. Média</div>
+                                                    <div className="text-lg font-mono font-black text-white">
+                                                        {(() => {
+                                                            const startedAt = Number(bikeGps?.startedAt || 0);
+                                                            const endAt = Number(bikeGps?.isTracking ? Date.now() : (bikeGps?.lastFixAt || Date.now()));
+                                                            const durationSeconds = (Number.isFinite(startedAt) && startedAt > 0) ? Math.max(0, Math.round((endAt - startedAt) / 1000)) : 0;
+                                                            const km = (Number(bikeGps?.distanceMeters || 0) || 0) / 1000;
+                                                            const avg = durationSeconds > 0 ? (km / (durationSeconds / 3600)) : 0;
+                                                            return `${avg.toFixed(1)} km/h`;
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
+                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Vel. Máx</div>
+                                                    <div className="text-lg font-mono font-black text-white">
+                                                        {(() => {
+                                                            const v = (Number(bikeGps?.maxSpeedMps || 0) || 0) * 3.6;
+                                                            return `${v.toFixed(1)} km/h`;
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-3 grid grid-cols-3 gap-2">
+                                                <button
+                                                    type="button"
+                                                    disabled={!isBikeActive || bikeGps?.status === 'unavailable'}
+                                                    onClick={() => {
+                                                        if (bikeGps?.isTracking) return;
+                                                        startBikeGps();
+                                                    }}
+                                                    className="min-h-[44px] rounded-xl bg-yellow-500 text-black font-black disabled:opacity-50 hover:bg-yellow-400 transition-colors"
+                                                >
+                                                    {bikeGps?.isTracking ? 'ATIVO' : 'INICIAR PEDAL'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => pauseBikeGps({ persist: true })}
+                                                    className="min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 transition-colors"
+                                                >
+                                                    PAUSAR
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={resetBikeGps}
+                                                    className="min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 transition-colors"
+                                                >
+                                                    ZERAR
+                                                </button>
+                                            </div>
+
+                                            <div className="mt-2 text-[10px] text-neutral-500">
+                                                Dica: em alguns celulares o GPS pode pausar com a tela bloqueada.
+                                            </div>
+
+                                            <div className="mt-2 flex items-center justify-between gap-2">
+                                                {bikeBackgroundActive ? (
+                                                    <div className="text-[10px] text-yellow-500 font-bold">Modo Background Ativo 🎵</div>
+                                                ) : (
+                                                    <div className="text-[10px] text-neutral-500">Modo Background Inativo</div>
+                                                )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        try {
+                                                            const next = !keepScreenAwake;
+                                                            setKeepScreenAwake(next);
+                                                            persistBikeKeepScreenAwakeUi(next);
+                                                            if (next) {
+                                                                requestWakeLock();
+                                                            } else {
+                                                                releaseWakeLock();
+                                                            }
+                                                        } catch {}
+                                                    }}
+                                                    className={`min-h-[44px] px-3 rounded-xl border font-bold transition-colors ${keepScreenAwake ? 'bg-yellow-500 text-black border-yellow-500 hover:bg-yellow-400' : 'bg-neutral-800 text-neutral-200 border-neutral-700 hover:bg-neutral-700'}`}
+                                                >
+                                                    Manter Tela Ligada: {keepScreenAwake ? 'ON' : 'OFF'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : null}
+
+                                    {isBikeOutdoor ? (
+                                        (() => {
+                                            const key = `${exIdx}-0`;
+                                            const log = logs[key] || {};
+                                            return (
+                                                <div className="rounded-xl border border-neutral-800 bg-black/20 p-3">
+                                                    <div className="grid grid-cols-2 gap-2">
                                                         <div>
-                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Kg {prevLog.weight && <span className="text-neutral-600">({prevLog.weight})</span>}</label>
-                                                            <input
-                                                                type="number"
-                                                                inputMode="decimal"
-                                                                placeholder={prevLog.weight || '-'}
-                                                                value={log.weight || ''}
-                                                                onChange={e => updateLogValue(exIdx, i, 'weight', e.target.value)}
-                                                                className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">{isCardio ? 'Tempo (min)' : 'Reps'} {prevLog.reps && <span className="text-neutral-600">({prevLog.reps})</span>}</label>
-                                                            <input
-                                                                type="number"
-                                                                inputMode="decimal"
-                                                                step="0.5"
-                                                                placeholder={ex?.reps || '-'}
-                                                                value={log.reps || ''}
-                                                                onChange={e => {
-                                                                    const raw = e.target.value || '';
-                                                                    const normalized = raw.replace(',', '.');
-                                                                    updateLogValue(exIdx, i, 'reps', normalized);
-                                                                }}
-                                                                className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                            />
-                                                            <p className="text-[9px] text-neutral-500 mt-0.5">Use .5 para meia repetição (ex: 6.5 = 6 e ½).</p>
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">RPE {prevLog.rpe && <span className="text-neutral-600">({prevLog.rpe})</span>}</label>
+                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">RPE (opcional)</label>
                                                             <input
                                                                 type="number"
                                                                 inputMode="numeric"
                                                                 min="1"
                                                                 max="10"
-                                                                placeholder={prevLog.rpe || '1-10'}
+                                                                placeholder="1-10"
                                                                 value={log.rpe || ''}
-                                                                onChange={e => updateLogValue(exIdx, i, 'rpe', e.target.value)}
+                                                                onChange={e => updateLogValue(exIdx, 0, 'rpe', e.target.value)}
                                                                 className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
                                                             />
-                                                            <p className="text-[9px] text-neutral-500 mt-0.5">RPE: 1 = muito fácil, 10 = esforço máximo.</p>
+                                                        </div>
+                                                        <div className="flex items-end">
+                                                            <div className="text-[10px] text-neutral-500">
+                                                                GPS registra distância, velocidade e duração.
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    <div className="mt-2">
+                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Observação (opcional)</label>
+                                                        <textarea
+                                                            rows={2}
+                                                            placeholder="Vento, subidas, como se sentiu..."
+                                                            value={log.note || ''}
+                                                            onChange={e => updateLogValue(exIdx, 0, 'note', e.target.value)}
+                                                            className="w-full bg-black/30 text-white p-2 rounded-lg text-xs outline-none focus:ring-1 ring-yellow-500 resize-none"
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div className="mt-2">
-                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Observação</label>
-                                                    <textarea
-                                                        rows={2}
-                                                        placeholder="Como foi essa série? Técnica, dificuldade, dor..."
-                                                        value={log.note || ''}
-                                                        onChange={e => updateLogValue(exIdx, i, 'note', e.target.value)}
-                                                        className="w-full bg-black/30 text-white p-2 rounded-lg text-xs outline-none focus:ring-1 ring-yellow-500 resize-none"
-                                                    />
-                                                </div>
+                                            );
+                                        })()
+                                    ) : (
+                                        <>
+                                            {Array.from({ length: totalSets }).map((_, i) => {
+                                                const key = `${exIdx}-${i}`;
+                                                const log = logs[key] || {};
+                                                const prevLog = (prevByName && prevByName[i]) ? prevByName[i] : {};
+                                                const isActiveSet = i === activeSetIndex && !log.done;
+                                                const isWarmup = !!(log?.is_warmup ?? log?.isWarmup);
 
-                                                <div className="mt-2 flex justify-end">
-                                                    <button
-                                                        onClick={() => toggleSet(exIdx, i, restTime)}
-                                                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${log.done ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'}`}
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className={`p-3 rounded-xl border-2 transition-all ${
+                                                            log.done
+                                                                ? 'bg-green-900/20 border-green-500/60'
+                                                                : isActiveSet
+                                                                    ? 'bg-neutral-900 border-yellow-500/70 shadow-[0_0_0_1px_rgba(250,204,21,0.4)]'
+                                                                    : 'bg-neutral-800 border-neutral-800'
+                                                        }`}
                                                     >
-                                                        <CheckCircle2 size={24} className={log.done ? 'scale-110' : ''} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-neutral-400 text-sm">{i + 1}</div>
+                                                                {isWarmup ? (
+                                                                    <div className="px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-black uppercase tracking-widest">
+                                                                        Aquecimento
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
 
-                                    <button onClick={() => handleAddSet(exIdx, totalSets)} className="w-full py-3 rounded-xl border-2 border-dashed border-neutral-700 text-neutral-500 font-bold hover:bg-neutral-800 hover:text-white transition-colors flex items-center justify-center gap-2">
-                                        <Plus size={18} /> Adicionar Série
-                                    </button>
+                                                            <div className="flex-1 grid grid-cols-3 gap-2">
+                                                                <div>
+                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Kg {prevLog.weight && <span className="text-neutral-600">({prevLog.weight})</span>}</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        inputMode="decimal"
+                                                                        placeholder={prevLog.weight || '-'}
+                                                                        value={log.weight || ''}
+                                                                        onChange={e => updateLogValue(exIdx, i, 'weight', e.target.value)}
+                                                                        className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">{isCardio ? 'Tempo (min)' : 'Reps'} {prevLog.reps && <span className="text-neutral-600">({prevLog.reps})</span>}</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        inputMode="decimal"
+                                                                        step="0.5"
+                                                                        placeholder={ex?.reps || '-'}
+                                                                        value={log.reps || ''}
+                                                                        onChange={e => {
+                                                                            const raw = e.target.value || '';
+                                                                            const normalized = raw.replace(',', '.');
+                                                                            updateLogValue(exIdx, i, 'reps', normalized);
+                                                                        }}
+                                                                        className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
+                                                                    />
+                                                                    <p className="text-[9px] text-neutral-500 mt-0.5">Use .5 para meia repetição (ex: 6.5 = 6 e ½).</p>
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">RPE {prevLog.rpe && <span className="text-neutral-600">({prevLog.rpe})</span>}</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        inputMode="numeric"
+                                                                        min="1"
+                                                                        max="10"
+                                                                        placeholder={prevLog.rpe || '1-10'}
+                                                                        value={log.rpe || ''}
+                                                                        onChange={e => updateLogValue(exIdx, i, 'rpe', e.target.value)}
+                                                                        className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
+                                                                    />
+                                                                    <p className="text-[9px] text-neutral-500 mt-0.5">RPE: 1 = muito fácil, 10 = esforço máximo.</p>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-2">
+                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Observação</label>
+                                                            <textarea
+                                                                rows={2}
+                                                                placeholder="Como foi essa série? Técnica, dificuldade, dor..."
+                                                                value={log.note || ''}
+                                                                onChange={e => updateLogValue(exIdx, i, 'note', e.target.value)}
+                                                                className="w-full bg-black/30 text-white p-2 rounded-lg text-xs outline-none focus:ring-1 ring-yellow-500 resize-none"
+                                                            />
+                                                        </div>
+
+                                                        <div className="mt-2 flex justify-end">
+                                                            <button
+                                                                onClick={() => toggleSet(exIdx, i, restTime)}
+                                                                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${log.done ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'}`}
+                                                            >
+                                                                <CheckCircle2 size={24} className={log.done ? 'scale-110' : ''} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            <button onClick={() => handleAddSet(exIdx, totalSets)} className="w-full py-3 rounded-xl border-2 border-dashed border-neutral-700 text-neutral-500 font-bold hover:bg-neutral-800 hover:text-white transition-colors flex items-center justify-center gap-2">
+                                                <Plus size={18} /> Adicionar Série
+                                            </button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -1443,6 +2639,26 @@ const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTi
                     </div>
                 </div>
             </div>
+
+            {showEditModal && editWorkoutDraft && (
+                <div className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-sm">
+                    <div className="w-full h-full">
+                        <ExerciseEditor
+                            workout={editWorkoutDraft}
+                            onChange={handleEditWorkoutChange}
+                            onCancel={() => {
+                                setShowEditModal(false);
+                                setEditWorkoutDraft(null);
+                            }}
+                            onSave={applyEditWorkout}
+                            onSaved={() => {
+                                setShowEditModal(false);
+                                setEditWorkoutDraft(null);
+                            }}
+                        />
+                    </div>
+                </div>
+            )}
             {showTransition && !isLast && (
                 <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowTransition(false)}>
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>

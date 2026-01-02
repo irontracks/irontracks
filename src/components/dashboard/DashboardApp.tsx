@@ -198,6 +198,7 @@ function DashboardInner(props: Props) {
   const serverSessionSyncRef = useRef<{ timer: any; key: string }>({ timer: null, key: '' })
   const restoredSessionForUserRef = useRef<string>('')
   const serverSessionSyncWarnedRef = useRef<boolean>(false)
+  const suppressForeignFinishToastUntilRef = useRef<number>(0)
   const [reportData, setReportData] = useState<{ current: any; previous: any } | null>(null)
   const [exportWorkout, setExportWorkout] = useState<any>(null)
   const [quickViewWorkout, setQuickViewWorkout] = useState<any>(null)
@@ -494,6 +495,10 @@ function DashboardInner(props: Props) {
               if (!mounted) return
               const ev = String(payload?.eventType || '').toUpperCase()
               if (ev === 'DELETE') {
+                if (Date.now() < (suppressForeignFinishToastUntilRef.current || 0)) {
+                  suppressForeignFinishToastUntilRef.current = 0
+                  return
+                }
                 setActiveSession(null)
                 navigateToView('dashboard', { resetStack: true, replace: true, scroll: 'top' })
                 try {
@@ -921,6 +926,7 @@ function DashboardInner(props: Props) {
   }
 
   const handleFinishSession = async (sessionData: any, showReport: boolean) => {
+    suppressForeignFinishToastUntilRef.current = Date.now() + 8000
     setActiveSession(null)
     if (showReport === false) {
       navigateToView('dashboard', { resetStack: true, replace: true, scroll: 'top' })

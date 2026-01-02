@@ -10,6 +10,22 @@ export function isCardioExercise(ex: any): boolean {
   return method === 'cardio' || type === 'cardio' || /cardio|run|corrida|bike|cicl|esteira/.test(name);
 }
 
+function isBikeOutdoorCardio(ex: any): boolean {
+  try {
+    const method = (ex?.method || '').toLowerCase();
+    const type = (ex?.type || '').toLowerCase();
+    const name = (ex?.name || '').toLowerCase();
+    const isCardio = method === 'cardio' || type === 'cardio' || name.includes('cardio');
+    if (!isCardio) return false;
+    const isBike = /bike|bicic|bici|cicl|pedal/.test(name);
+    if (!isBike) return false;
+    const isOutdoor = /outdoor|\bout\b|rua|extern/.test(name);
+    return isOutdoor;
+  } catch {
+    return false;
+  }
+}
+
 export function parseCadenceSecondsPerRep(cadence: string | undefined): number {
   try {
     if (!cadence || typeof cadence !== 'string') return DEFAULT_SECONDS_PER_REP;
@@ -24,15 +40,17 @@ export function parseCadenceSecondsPerRep(cadence: string | undefined): number {
 
 export function calculateExerciseDuration(ex: any): number {
   if (!ex) return 0;
+  if (isCardioExercise(ex)) {
+    const minutesRaw = Number.parseInt(String(ex?.reps ?? ''), 10);
+    const minutes = Number.isFinite(minutesRaw) && minutesRaw > 0 ? minutesRaw : null;
+    if (isBikeOutdoorCardio(ex)) return minutes ? minutes * 60 : 0;
+    return (minutes ?? DEFAULT_CARDIO_MINUTES) * 60;
+  }
+
   const reps = parseInt(ex.reps) || 10;
   const sets = parseInt(ex.sets) || 1;
   const restRaw = parseInt(ex.restTime);
   const rest = Number.isFinite(restRaw) && restRaw > 0 ? restRaw : DEFAULT_REST_SECONDS;
-
-  if (isCardioExercise(ex)) {
-    const minutes = reps || DEFAULT_CARDIO_MINUTES;
-    return minutes * 60;
-  }
 
   const perRep = parseCadenceSecondsPerRep(String(ex.cadence || ''));
   const perSetExecution = (perRep * reps) + SET_OVERHEAD_SECONDS;

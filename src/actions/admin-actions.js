@@ -359,8 +359,17 @@ export async function assignWorkoutToStudent(studentId, template) {
                     if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
                         const reduced = { ...payload };
                         delete reduced.advanced_config;
-                        delete reduced.is_warmup;
-                        await adminDb.from('sets').insert(reduced);
+                        const { error: reducedErr } = await adminDb.from('sets').insert(reduced);
+                        if (!reducedErr) return;
+                        const reducedMsg = (reducedErr?.message || '').toLowerCase();
+                        if (!reducedMsg.includes('is_warmup')) throw reducedErr;
+                        if (payload && typeof payload === 'object' && payload.is_warmup) {
+                            throw new Error('Seu Supabase não tem a coluna "is_warmup" na tabela "sets". Rode a migration 20251222120000_sets_advanced_logic.sql e tente novamente.');
+                        }
+                        const finalPayload = { ...reduced };
+                        delete finalPayload.is_warmup;
+                        const { error: finalErr } = await adminDb.from('sets').insert(finalPayload);
+                        if (finalErr) throw finalErr;
                         return;
                     }
                     throw error;
@@ -369,8 +378,17 @@ export async function assignWorkoutToStudent(studentId, template) {
                     if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
                         const reduced = { ...payload };
                         delete reduced.advanced_config;
-                        delete reduced.is_warmup;
-                        await adminDb.from('sets').insert(reduced);
+                        const { error: reducedErr } = await adminDb.from('sets').insert(reduced);
+                        if (!reducedErr) return;
+                        const reducedMsg = (reducedErr?.message || '').toLowerCase();
+                        if (!reducedMsg.includes('is_warmup')) throw reducedErr;
+                        if (payload && typeof payload === 'object' && payload.is_warmup) {
+                            throw new Error('Seu Supabase não tem a coluna "is_warmup" na tabela "sets". Rode a migration 20251222120000_sets_advanced_logic.sql e tente novamente.');
+                        }
+                        const finalPayload = { ...reduced };
+                        delete finalPayload.is_warmup;
+                        const { error: finalErr } = await adminDb.from('sets').insert(finalPayload);
+                        if (finalErr) throw finalErr;
                         return;
                     }
                     throw e;

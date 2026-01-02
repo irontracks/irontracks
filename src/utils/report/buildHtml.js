@@ -22,7 +22,46 @@ export function buildReportHTML(session, previousSession, studentName = '') {
   const durationInMinutes = ((session && session.totalTime) || 0) / 60
   const realTotalTime = (session && session.realTotalTime)
     || (Array.isArray(session?.exerciseDurations) ? session.exerciseDurations.reduce((a,b)=>a+(b||0),0) : 0)
-  const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
+  const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? session.outdoorBike : null
+  const calories = (() => {
+    const bikeKcal = Number(outdoorBike?.caloriesKcal)
+    if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
+    return Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
+  })()
+
+  const bikeCards = (() => {
+    if (!outdoorBike) return ''
+    const dist = Number(outdoorBike?.distanceMeters)
+    const dur = Number(outdoorBike?.durationSeconds)
+    if ((!Number.isFinite(dist) || dist <= 0) && (!Number.isFinite(dur) || dur <= 0)) return ''
+    const km = Number.isFinite(dist) && dist > 0 ? (dist / 1000) : 0
+    const avg = Number(outdoorBike?.avgSpeedKmh)
+    const max = Number(outdoorBike?.maxSpeedKmh)
+    const formatKmh = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? `${Number(v).toFixed(1)} km/h` : '-')
+    return `
+      <div style="margin: 12px 0 24px">
+        <div class="muted" style="margin-bottom:8px">Bike Outdoor</div>
+        <div class="stats" style="grid-template-columns:repeat(4,1fr); margin-bottom:0">
+          <div class="card">
+            <div class="muted" style="margin-bottom:4px">Distância</div>
+            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${km > 0 ? `${km.toFixed(2)} km` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="muted" style="margin-bottom:4px">Vel. Média</div>
+            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${formatKmh(avg)}</div>
+          </div>
+          <div class="card">
+            <div class="muted" style="margin-bottom:4px">Vel. Máx</div>
+            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${formatKmh(max)}</div>
+          </div>
+          <div class="card">
+            <div class="muted" style="margin-bottom:4px">Tempo Bike</div>
+            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${formatDuration(dur || 0)}</div>
+          </div>
+        </div>
+      </div>
+    `
+  })()
 
   const prevLogsMap = {}
   if (previousSession && Array.isArray(previousSession.exercises) && previousSession.logs) {
@@ -204,6 +243,8 @@ export function buildReportHTML(session, previousSession, studentName = '') {
             <div style="font-size:16px; font-weight:800; text-transform:uppercase; font-style:italic">Concluído</div>
           </div>
         </div>
+
+        ${bikeCards}
 
         ${exercisesHtml}
 

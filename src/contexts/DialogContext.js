@@ -18,12 +18,15 @@ export const DialogProvider = ({ children }) => {
         setDialog(null);
     }, []);
 
-    const confirm = useCallback((message, title = 'Confirmação') => {
+    const confirm = useCallback((message, title = 'Confirmação', options = null) => {
         return new Promise((resolve) => {
+            const opts = options && typeof options === 'object' ? options : {};
             setDialog({
                 type: 'confirm',
                 title,
                 message,
+                confirmText: typeof opts.confirmText === 'string' ? opts.confirmText : null,
+                cancelText: typeof opts.cancelText === 'string' ? opts.cancelText : null,
                 onConfirm: () => {
                     closeDialog();
                     resolve(true);

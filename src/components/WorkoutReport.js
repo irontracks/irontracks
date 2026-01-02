@@ -54,7 +54,24 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs || {}) : 0;
     const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0;
     const durationInMinutes = session.totalTime / 60;
-    const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
+    const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? session.outdoorBike : null;
+    const calories = (() => {
+        const bikeKcal = Number(outdoorBike?.caloriesKcal);
+        if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal);
+        return Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
+    })();
+
+    const formatKm = (meters) => {
+        const m = Number(meters);
+        if (!Number.isFinite(m) || m <= 0) return '-';
+        return `${(m / 1000).toFixed(2)} km`;
+    };
+
+    const formatKmh = (kmh) => {
+        const v = Number(kmh);
+        if (!Number.isFinite(v) || v <= 0) return '-';
+        return `${v.toFixed(1)} km/h`;
+    };
 
     const prevLogsMap = {};
     if (previousSession && previousSession.logs) {
@@ -286,6 +303,30 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                         <p className="text-xl font-bold uppercase italic">CONCLUÍDO</p>
                     </div>
                 </div>
+
+                {outdoorBike && (Number(outdoorBike?.distanceMeters) > 0 || Number(outdoorBike?.durationSeconds) > 0) && (
+                    <div className="mb-8">
+                        <div className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-3">Bike Outdoor</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Distância</p>
+                                <p className="text-2xl font-mono font-bold">{formatKm(outdoorBike.distanceMeters)}</p>
+                            </div>
+                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Vel. Média</p>
+                                <p className="text-2xl font-mono font-bold">{formatKmh(outdoorBike.avgSpeedKmh)}</p>
+                            </div>
+                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Vel. Máx</p>
+                                <p className="text-2xl font-mono font-bold">{formatKmh(outdoorBike.maxSpeedKmh)}</p>
+                            </div>
+                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Bike</p>
+                                <p className="text-2xl font-mono font-bold">{formatDuration(Number(outdoorBike.durationSeconds) || 0)}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-8">
                     {(!Array.isArray(session.exercises) || session.exercises.length === 0) && (
