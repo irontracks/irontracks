@@ -31,6 +31,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     const [editExercises, setEditExercises] = useState([]);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
+    const [periodReport, setPeriodReport] = useState(null);
 
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode);
@@ -115,6 +116,84 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
         return { count, totalMinutes, avgMinutes };
     }, [filteredHistory]);
+
+    const calculateTotalVolumeFromLogs = (logs) => {
+        try {
+            const safeLogs = logs && typeof logs === 'object' ? logs : {};
+            let volume = 0;
+            Object.values(safeLogs).forEach((log) => {
+                if (!log || typeof log !== 'object') return;
+                const w = Number(String(log.weight ?? '').replace(',', '.'));
+                const r = Number(String(log.reps ?? '').replace(',', '.'));
+                if (!Number.isFinite(w) || !Number.isFinite(r)) return;
+                if (w <= 0 || r <= 0) return;
+                volume += w * r;
+            });
+            return volume;
+        } catch {
+            return 0;
+        }
+    };
+
+    const buildPeriodStats = (days) => {
+        try {
+            const historyList = Array.isArray(historyItems) ? historyItems : [];
+            const daysNumber = Number(days);
+            if (!Number.isFinite(daysNumber) || daysNumber <= 0) return null;
+            const cutoff = Date.now() - daysNumber * 24 * 60 * 60 * 1000;
+            const list = historyList.filter((s) => {
+                const t = new Date(s?.date).getTime();
+                if (!Number.isFinite(t) || Number.isNaN(t)) return false;
+                return t >= cutoff;
+            });
+            if (!list.length) return null;
+            const totalSeconds = list.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
+            const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
+            const count = list.length;
+            const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
+            let totalVolumeKg = 0;
+            list.forEach((item) => {
+                const raw = item?.rawSession && typeof item.rawSession === 'object' ? item.rawSession : null;
+                const logs = raw?.logs && typeof raw.logs === 'object' ? raw.logs : {};
+                const v = calculateTotalVolumeFromLogs(logs);
+                if (!Number.isFinite(v) || v <= 0) return;
+                totalVolumeKg += v;
+            });
+            const avgVolumeKg = count > 0 ? Math.max(0, Math.round(totalVolumeKg / count)) : 0;
+            return { days: daysNumber, count, totalMinutes, avgMinutes, totalVolumeKg, avgVolumeKg };
+        } catch {
+            return null;
+        }
+    };
+
+    const buildShareText = (report) => {
+        const data = report && typeof report === 'object' ? report : null;
+        if (!data) return '';
+        const label = data.type === 'week' ? 'semanal' : data.type === 'month' ? 'mensal' : 'período';
+        const stats = data.stats && typeof data.stats === 'object' ? data.stats : {};
+        const count = Number(stats.count) || 0;
+        const totalMinutes = Number(stats.totalMinutes) || 0;
+        const avgMinutes = Number(stats.avgMinutes) || 0;
+        const totalVolume = Number(stats.totalVolumeKg) || 0;
+        const avgVolume = Number(stats.avgVolumeKg) || 0;
+        let totalVolumeLabel = '0 kg';
+        let avgVolumeLabel = '0 kg';
+        if (Number.isFinite(totalVolume) && totalVolume > 0) {
+            totalVolumeLabel = `${totalVolume.toLocaleString('pt-BR')} kg`;
+        }
+        if (Number.isFinite(avgVolume) && avgVolume > 0) {
+            avgVolumeLabel = `${avgVolume.toLocaleString('pt-BR')} kg`;
+        }
+        const lines = [
+            'Relatório ' + label + ' IronTracks',
+            'Treinos finalizados: ' + count,
+            'Tempo total: ' + totalMinutes + ' min',
+            'Média por treino: ' + avgMinutes + ' min',
+            'Volume total: ' + totalVolumeLabel,
+            'Volume médio/treino: ' + avgVolumeLabel,
+        ];
+        return lines.join('\n');
+    };
 
     const openSession = (session) => {
         const rawSession = session?.rawSession && typeof session.rawSession === 'object' ? session.rawSession : null;
@@ -468,6 +547,47 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         }
     };
 
+    const openPeriodReport = async (type) => {
+        try {
+            const key = type === 'week' ? 7 : type === 'month' ? 30 : null;
+            if (!key) return;
+            const stats = buildPeriodStats(key);
+            if (!stats) {
+                await alert('Sem treinos suficientes nesse período para gerar um relatório.');
+                return;
+            }
+            setPeriodReport({ type, stats });
+        } catch (e) {
+            await alert('Erro ao gerar relatório: ' + (e?.message ?? String(e)));
+        }
+    };
+
+    const handleShareReport = async () => {
+        const current = periodReport && typeof periodReport === 'object' ? periodReport : null;
+        if (!current) return;
+        const text = buildShareText(current);
+        if (!text) return;
+        try {
+            const nav = typeof navigator !== 'undefined' ? navigator : null;
+            if (nav && typeof nav.share === 'function') {
+                await nav.share({ text });
+                return;
+            }
+        } catch {}
+        try {
+            const nav = typeof navigator !== 'undefined' ? navigator : null;
+            if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
+                await nav.clipboard.writeText(text);
+                await alert('Texto do relatório copiado para a área de transferência.');
+                return;
+            }
+        } catch (e) {
+            await alert('Erro ao compartilhar relatório: ' + (e?.message ?? String(e)));
+            return;
+        }
+        await alert('Não foi possível usar compartilhamento nativo. Copie o texto manualmente.');
+    };
+
     return (
         <>
         <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra pt-header-safe"}>
@@ -571,6 +691,33 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                         </div>
                     </div>
                 </div>
+
+                {!loading && historyItems.length > 0 && (
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <div>
+                                <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatórios rápidos</div>
+                                <div className="text-base font-black tracking-tight text-white">Compartilhe sua evolução</div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={() => openPeriodReport('week')}
+                                    className="min-h-[40px] px-4 rounded-xl bg-yellow-500 text-black text-xs font-black uppercase tracking-wide shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95"
+                                >
+                                    Relatório semanal
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => openPeriodReport('month')}
+                                    className="min-h-[40px] px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-black uppercase tracking-wide hover:bg-neutral-900 transition-all duration-300 active:scale-95"
+                                >
+                                    Relatório mensal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {loading && (
                     <div className="grid gap-3">
@@ -789,6 +936,69 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                         ) : (
                             <button onClick={saveManualNew} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400">Salvar</button>
                         )}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {periodReport && (
+            <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPeriodReport(null)}>
+                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    <div className="p-4 border-b border-neutral-800">
+                        <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatório de evolução</div>
+                        <div className="text-lg font-black text-white">
+                            {periodReport.type === 'week' ? 'Resumo semanal' : periodReport.type === 'month' ? 'Resumo mensal' : 'Resumo'}
+                        </div>
+                    </div>
+                    <div className="p-4 space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
+                                <div className="text-xl font-black tracking-tight text-white">{Number(periodReport.stats?.count || 0)}</div>
+                            </div>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total</div>
+                                <div className="text-xl font-black tracking-tight text-white">{Number(periodReport.stats?.totalMinutes || 0)}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                            </div>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
+                                <div className="text-xl font-black tracking-tight text-white">{Number(periodReport.stats?.avgMinutes || 0)}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                            </div>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Volume total</div>
+                                <div className="text-xl font-black tracking-tight text-white">
+                                    {(() => {
+                                        const v = Number(periodReport.stats?.totalVolumeKg || 0);
+                                        if (!Number.isFinite(v) || v <= 0) return '0kg';
+                                        return `${v.toLocaleString('pt-BR')}kg`;
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Texto para compartilhar</div>
+                            <textarea
+                                readOnly
+                                value={buildShareText(periodReport)}
+                                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-neutral-100 outline-none h-32 resize-none"
+                            />
+                        </div>
+                    </div>
+                    <div className="p-4 bg-neutral-900/50 flex gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setPeriodReport(null)}
+                            className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
+                        >
+                            Fechar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleShareReport}
+                            className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400"
+                        >
+                            Compartilhar
+                        </button>
                     </div>
                 </div>
             </div>

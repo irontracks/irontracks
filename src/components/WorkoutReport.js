@@ -329,7 +329,10 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             };
             const html = workoutPlanHtml(workout, partnerUser);
             const win = window.open('', '_blank');
-            if (!win) return;
+            if (!win) {
+                alert('Não foi possível abrir o PDF do parceiro.\nAtive pop-ups para este site e tente novamente.');
+                return;
+            }
             win.document.open();
             win.document.write(html);
             win.document.close();
@@ -463,17 +466,17 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 </div>
 
                 <div className="mb-8 p-4 rounded-xl border border-neutral-200 bg-neutral-50">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0">
                             <div className="text-xs font-black uppercase tracking-widest text-neutral-500">IA</div>
                             <div className="text-lg font-black text-neutral-900">Insights pós-treino</div>
-                            <div className="text-xs text-neutral-600">Resumo + progressão + motivação (Gemini 2.5 Flash)</div>
+                            <div className="text-xs text-neutral-600">Resumo + progressão + motivação com IA IronTracks</div>
                         </div>
                         <button
                             type="button"
                             onClick={handleGenerateAi}
                             disabled={aiState?.status === 'loading'}
-                            className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60"
+                            className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60 w-full md:w-auto"
                         >
                             {aiState?.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
                             {aiState?.ai ? 'Regerar' : 'Gerar'}
@@ -671,29 +674,35 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 )}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200 flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Total</p>
                         <p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p>
                     </div>
-                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
+                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200 flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p>
-                        <div className="flex items-baseline gap-2">
+                        <div className="flex flex-col gap-1">
                             <p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>
-                            {effectivePreviousSession && (
-                                <span className={`text-xs font-bold flex items-center ${volumeDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {volumeDelta >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                            {effectivePreviousSession && Number.isFinite(volumeDelta) && (
+                                <span
+                                    className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold w-fit ${
+                                        volumeDelta >= 0
+                                            ? 'bg-green-50 text-green-700'
+                                            : 'bg-red-50 text-red-700'
+                                    }`}
+                                >
+                                    {volumeDelta >= 0 ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
                                     {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
                                 </span>
                             )}
                         </div>
                     </div>
-                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-orange-500 mb-1 flex items-center gap-1">
                             <Flame size={12} /> Calorias
                         </p>
                         <p className="text-3xl font-mono font-bold text-orange-600">~{calories}</p>
                     </div>
-                    <div className="bg-black text-white p-4 rounded-lg">
+                    <div className="bg-black text-white p-4 rounded-lg flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p>
                         <p className="text-xl font-bold uppercase italic">CONCLUÍDO</p>
                     </div>
@@ -747,11 +756,11 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                             </div>
                             <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="text-neutral-500 border-b border-neutral-100">
-                                            <th className="py-2 text-left w-16">Série</th>
-                                            <th className="py-2 text-center w-24">Carga</th>
-                                            <th className="py-2 text-center w-24">Reps</th>
-                                            <th className="py-2 text-center w-32">Evolução</th>
+                                        <tr className="text-[10px] uppercase tracking-widest text-neutral-500 border-b border-neutral-100">
+                                            <th className="py-2 text-left w-16 font-black">Série</th>
+                                            <th className="py-2 text-center w-24 font-black">Carga</th>
+                                            <th className="py-2 text-center w-24 font-black">Reps</th>
+                                            <th className="py-2 text-center w-32 font-black">Evolução</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -781,10 +790,10 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
                                             return (
                                                 <tr key={sIdx} className="border-b border-neutral-100">
-                                                    <td className="py-3 font-mono text-neutral-500">#{sIdx + 1}</td>
-                                                    <td className="py-3 text-center font-bold text-lg">{log.weight}</td>
-                                                    <td className="py-3 text-center font-mono">{log.reps}</td>
-                                                    <td className={`py-3 text-center text-xs uppercase ${rowClass}`}>{progressionText}</td>
+                                                    <td className="py-2 font-mono text-neutral-500 text-xs">#{sIdx + 1}</td>
+                                                    <td className="py-2 text-center font-semibold text-sm">{log.weight}</td>
+                                                    <td className="py-2 text-center font-mono text-sm">{log.reps}</td>
+                                                    <td className={`py-2 text-center text-[11px] uppercase ${rowClass}`}>{progressionText}</td>
                                                 </tr>
                                             );
                                         })}
