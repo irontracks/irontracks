@@ -1,3061 +1,728 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import {
-    ArrowLeft,
-    Clock,
-    UserPlus,
-    CheckCircle2,
-    Plus,
-    Pencil,
-    Video,
-    Users,
-    List,
-    Search,
-    X,
-    Repeat
-} from 'lucide-react';
-import InviteManager from './InviteManager'; 
-import ExerciseEditor from './ExerciseEditor';
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'; 
+"use client";
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, Save, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
-import { playFinishSound, playTick } from '@/lib/sounds';
-import { estimateExerciseSeconds, toMinutesRounded, isCardioExercise, calculateExerciseDuration, estimateWorkoutSecondsForGroup } from '@/utils/pacing';
-import { createClient } from '@/utils/supabase/client';
+import { BackButton } from '@/components/ui/BackButton';
 
-const appId = 'irontracks-production';
-
-const BIKE_GPS_MAX_ACCURACY_METERS = 50;
-const BIKE_ROUTE_MIN_METERS = 5;
-const BIKE_ROUTE_MAX_GAP_SECONDS = 10;
-const BIKE_ROUTE_MAX_POINTS = 4000;
-
-const BIKE_WEIGHT_MIN_KG = 30;
-const BIKE_WEIGHT_MAX_KG = 300;
-const BIKE_HEIGHT_MIN_CM = 100;
-const BIKE_HEIGHT_MAX_CM = 250;
-
-const WORKOUT_PATCH_EVENT = 'workout_patch';
-const WORKOUT_SYNC_EVENT = 'workout_sync';
-const DEFAULT_ADDED_EXERCISE = {
-    sets: 4,
-    reps: '10',
-    restTime: 60,
-    cadence: '',
-    method: 'Normal',
-    notes: ''
+const coerceNumber = (value) => {
+  const n = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
 };
 
-const METHOD_OPTIONS = ['Normal', 'Bi-Set', 'Drop-set', 'Rest-Pause', 'Cluster', 'Cardio'];
+const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
-const EMPTY_LOGS = {};
-
-const haversineMeters = (aLat, aLng, bLat, bLng) => {
-    const toRad = (v) => (Number(v) * Math.PI) / 180;
-    const R = 6371000;
-    const dLat = toRad(Number(bLat) - Number(aLat));
-    const dLng = toRad(Number(bLng) - Number(aLng));
-    const lat1 = toRad(Number(aLat));
-    const lat2 = toRad(Number(bLat));
-    const sinDLat = Math.sin(dLat / 2);
-    const sinDLng = Math.sin(dLng / 2);
-    const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
-    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+const isClusterConfig = (cfg) => {
+  if (!isObject(cfg)) return false;
+  const hasClusterSize = cfg.cluster_size != null;
+  const hasIntra = cfg.intra_rest_sec != null;
+  const hasTotal = cfg.total_reps != null;
+  return (hasClusterSize && hasIntra) || (hasClusterSize && hasTotal) || (hasIntra && hasTotal);
 };
 
-const isBikeOutdoorExercise = (ex) => {
+const isRestPauseConfig = (cfg) => {
+  if (!isObject(cfg)) return false;
+  const hasMiniSets = cfg.mini_sets != null;
+  const hasRest = cfg.rest_time_sec != null;
+  const hasInitial = cfg.initial_reps != null;
+  return (hasMiniSets && hasRest) || (hasMiniSets && hasInitial) || (hasRest && hasInitial);
+};
+
+const buildPlannedBlocks = (totalReps, clusterSize) => {
+  const t = Number(totalReps);
+  const c = Number(clusterSize);
+  if (!Number.isFinite(t) || t <= 0) return [];
+  if (!Number.isFinite(c) || c <= 0) return [];
+  const blocks = [];
+  let remaining = t;
+  while (remaining > 0) {
+    const next = Math.min(c, remaining);
+    blocks.push(next);
+    remaining -= next;
+    if (blocks.length > 50) break;
+  }
+  return blocks;
+};
+
+export default function ActiveWorkout(props) {
+  const { alert, confirm } = useDialog();
+  const session = props?.session && typeof props.session === 'object' ? props.session : null;
+  const workout = session?.workout && typeof session.workout === 'object' ? session.workout : null;
+  const exercises = Array.isArray(workout?.exercises) ? workout.exercises : [];
+  const logs = session?.logs && typeof session.logs === 'object' ? session.logs : {};
+  const ui = session?.ui && typeof session.ui === 'object' ? session.ui : {};
+
+  const [ticker, setTicker] = useState(Date.now());
+  const [collapsed, setCollapsed] = useState(() => new Set());
+  const [finishing, setFinishing] = useState(false);
+
+  const restPauseRefs = useRef({});
+  const clusterRefs = useRef({});
+
+  useEffect(() => {
+    const id = setInterval(() => setTicker(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const startedAtMs = useMemo(() => {
+    const raw = session?.startedAt;
+    if (typeof raw === 'number') return raw;
+    const t = new Date(raw || 0).getTime();
+    return Number.isFinite(t) ? t : 0;
+  }, [session?.startedAt]);
+
+  const elapsedSeconds = useMemo(() => {
+    if (!startedAtMs) return 0;
+    return Math.max(0, Math.floor((ticker - startedAtMs) / 1000));
+  }, [ticker, startedAtMs]);
+
+  const formatElapsed = (s) => {
+    const secs = Math.max(0, Number(s) || 0);
+    const m = Math.floor(secs / 60);
+    const sec = secs % 60;
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
+
+  const safeUpdateSessionUi = (patch) => {
     try {
-        const method = String(ex?.method || '').toLowerCase();
-        if (method !== 'cardio') return false;
-        const name = String(ex?.name || '').toLowerCase();
-        const isBike = name.includes('bike') || name.includes('bicic') || name.includes('bici') || name.includes('cicl') || name.includes('pedal');
-        if (!isBike) return false;
-        const isOutdoor = name.includes('out') || name.includes('rua') || name.includes('extern') || name.includes('outdoor');
-        return isOutdoor;
-    } catch {
-        return false;
-    }
-};
+      if (typeof props?.onUpdateSession !== 'function') return;
+      const baseUi = session?.ui && typeof session.ui === 'object' ? session.ui : {};
+      props.onUpdateSession({ ui: { ...baseUi, ...(patch && typeof patch === 'object' ? patch : {}) } });
+    } catch {}
+  };
 
-const estimateBikeCalories = ({ weightKg, durationSeconds, avgSpeedKmh }) => {
-    const w = Number(weightKg);
-    const d = Number(durationSeconds);
-    const v = Number(avgSpeedKmh);
-    if (!Number.isFinite(w) || w <= 0) return null;
-    if (!Number.isFinite(d) || d <= 0) return null;
-    const hours = d / 3600;
-    const met = (() => {
-        if (!Number.isFinite(v) || v <= 0) return 8;
-        if (v < 16) return 6.8;
-        if (v < 19) return 8;
-        if (v < 22) return 10;
-        return 12;
-    })();
-    const kcal = met * w * hours;
-    const rounded = Math.round(kcal);
-    return Number.isFinite(rounded) && rounded > 0 ? rounded : null;
-};
-
-const parsePositiveNumber = (raw) => {
+  useEffect(() => {
     try {
-        const n = Number(String(raw ?? '').replace(',', '.'));
-        return Number.isFinite(n) && n > 0 ? n : null;
+      const focus = ui?.restPauseFocus && typeof ui.restPauseFocus === 'object' ? ui.restPauseFocus : null;
+      const key = String(focus?.key ?? '').trim();
+      const miniIndex = Number(focus?.miniIndex);
+      if (!key) return;
+      if (!Number.isFinite(miniIndex) || miniIndex < 0) return;
+      const input = restPauseRefs.current?.[key]?.[miniIndex];
+      if (input && typeof input.focus === 'function') {
+        input.focus();
+        try {
+          input.select?.();
+        } catch {}
+      }
+      safeUpdateSessionUi({ restPauseFocus: null });
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui?.restPauseFocus?.key, ui?.restPauseFocus?.miniIndex]);
+
+  useEffect(() => {
+    try {
+      const focus = ui?.clusterFocus && typeof ui.clusterFocus === 'object' ? ui.clusterFocus : null;
+      const key = String(focus?.key ?? '').trim();
+      const blockIndex = Number(focus?.blockIndex);
+      if (!key) return;
+      if (!Number.isFinite(blockIndex) || blockIndex < 0) return;
+      const input = clusterRefs.current?.[key]?.[blockIndex];
+      if (input && typeof input.focus === 'function') {
+        input.focus();
+        try {
+          input.select?.();
+        } catch {}
+      }
+      safeUpdateSessionUi({ clusterFocus: null });
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ui?.clusterFocus?.key, ui?.clusterFocus?.blockIndex]);
+
+  const getPlanConfig = (ex, setIdx) => {
+    const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
+    const sd = sdArr?.[setIdx] && typeof sdArr[setIdx] === 'object' ? sdArr[setIdx] : null;
+    const cfg = sd?.advanced_config ?? sd?.advancedConfig ?? null;
+    return isObject(cfg) ? cfg : null;
+  };
+
+  const getLog = (key) => {
+    const v = logs?.[key];
+    return v && typeof v === 'object' ? v : {};
+  };
+
+  const updateLog = (key, patch) => {
+    try {
+      if (typeof props?.onUpdateLog !== 'function') return;
+      const prev = getLog(key);
+      props.onUpdateLog(key, { ...prev, ...(patch && typeof patch === 'object' ? patch : {}) });
+    } catch {}
+  };
+
+  const startTimer = (seconds, context) => {
+    try {
+      if (typeof props?.onStartTimer !== 'function') return;
+      const s = Number(seconds);
+      if (!Number.isFinite(s) || s <= 0) return;
+      props.onStartTimer(s, context);
+    } catch {}
+  };
+
+  const toggleCollapse = (exIdx) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(exIdx)) next.delete(exIdx);
+      else next.add(exIdx);
+      return next;
+    });
+  };
+
+  const finishWorkout = async () => {
+    if (!session || !workout) return;
+    if (finishing) return;
+
+    let ok = false;
+    try {
+      ok = typeof confirm === 'function' ? await confirm('Finalizar treino e salvar no histórico?', 'Finalizar treino') : false;
     } catch {
-        return null;
+      ok = false;
     }
-};
+    if (!ok) return;
 
-const ActiveWorkout = ({ session, user, onUpdateLog, onFinish, onBack, onStartTimer, isCoach, onUpdateSession, nextWorkout }) => {
-    const { confirm, alert } = useDialog();
-    const [currentExIdx, setCurrentExIdx] = useState(() => {
-        try {
-            const raw = session?.ui?.currentExIdx;
-            const n = Number(raw);
-            return Number.isFinite(n) && n >= 0 ? n : 0;
-        } catch {
-            return 0;
-        }
-    });
-    const workout = session?.workout;
-    const logs = session?.logs && typeof session.logs === 'object' ? session.logs : EMPTY_LOGS;
-    const [elapsed, setElapsed] = useState(0);
-    const [showInvite, setShowInvite] = useState(false);
-    const [previousLogs, setPreviousLogs] = useState({});
-    const [showFullList, setShowFullList] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [editWorkoutDraft, setEditWorkoutDraft] = useState(null);
-    const [exerciseStartTs, setExerciseStartTs] = useState(() => {
-        try {
-            const raw = session?.ui?.exerciseStartTs;
-            const n = Number(raw);
-            return Number.isFinite(n) && n > 0 ? n : Date.now();
-        } catch {
-            return Date.now();
-        }
-    });
-    const [exerciseDurations, setExerciseDurations] = useState(() => {
-        try {
-            const arr = session?.ui?.exerciseDurations;
-            return Array.isArray(arr) ? arr : [];
-        } catch {
-            return [];
-        }
-    });
-
-    const [bikeGps, setBikeGps] = useState(() => {
-        try {
-            const raw = session?.ui?.bikeGps;
-            const safe = raw && typeof raw === 'object' ? raw : null;
+    setFinishing(true);
+    try {
+      const safeExercises = Array.isArray(workout?.exercises)
+        ? workout.exercises.map((ex) => {
+            if (!ex || typeof ex !== 'object') return null;
             return {
-                status: typeof safe?.status === 'string' ? safe.status : 'idle',
-                isTracking: !!safe?.isTracking,
-                distanceMeters: Number.isFinite(Number(safe?.distanceMeters)) ? Number(safe.distanceMeters) : 0,
-                currentSpeedMps: Number.isFinite(Number(safe?.currentSpeedMps)) ? Number(safe.currentSpeedMps) : 0,
-                maxSpeedMps: Number.isFinite(Number(safe?.maxSpeedMps)) ? Number(safe.maxSpeedMps) : 0,
-                startedAt: Number.isFinite(Number(safe?.startedAt)) ? Number(safe.startedAt) : null,
-                lastFixAt: Number.isFinite(Number(safe?.lastFixAt)) ? Number(safe.lastFixAt) : null,
-                accuracyMeters: Number.isFinite(Number(safe?.accuracyMeters)) ? Number(safe.accuracyMeters) : null,
-                weightKg: Number.isFinite(Number(safe?.weightKg)) ? Number(safe.weightKg) : null,
-                heightCm: Number.isFinite(Number(safe?.heightCm)) ? Number(safe.heightCm) : null,
-                caloriesKcal: Number.isFinite(Number(safe?.caloriesKcal)) ? Number(safe.caloriesKcal) : null,
-                error: typeof safe?.error === 'string' ? safe.error : '',
+              name: String(ex?.name || '').trim(),
+              sets: Number(ex?.sets) || (Array.isArray(ex?.setDetails) ? ex.setDetails.length : 0),
+              reps: ex?.reps ?? '',
+              rpe: ex?.rpe ?? null,
+              cadence: ex?.cadence ?? null,
+              restTime: ex?.restTime ?? ex?.rest_time ?? null,
+              method: ex?.method ?? null,
+              videoUrl: ex?.videoUrl ?? ex?.video_url ?? null,
+              notes: ex?.notes ?? null,
+              setDetails: Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [],
             };
-        } catch {
-            return {
-                status: 'idle',
-                isTracking: false,
-                distanceMeters: 0,
-                currentSpeedMps: 0,
-                maxSpeedMps: 0,
-                startedAt: null,
-                lastFixAt: null,
-                accuracyMeters: null,
-                weightKg: null,
-                heightCm: null,
-                caloriesKcal: null,
-                error: '',
-            };
-        }
-    });
-
-    const [bikeAnthroDraft, setBikeAnthroDraft] = useState(() => {
-        try {
-            const raw = session?.ui?.bikeGps;
-            const safe = raw && typeof raw === 'object' ? raw : null;
-            const w = Number(safe?.weightKg);
-            const h = Number(safe?.heightCm);
-            return {
-                weightKg: Number.isFinite(w) && w > 0 ? String(w) : '',
-                heightCm: Number.isFinite(h) && h > 0 ? String(h) : '',
-            };
-        } catch {
-            return { weightKg: '', heightCm: '' };
-        }
-    });
-
-    const [pacerRemaining, setPacerRemaining] = useState(0);
-    const [showTransition, setShowTransition] = useState(false);
-    const [showSwapModal, setShowSwapModal] = useState(false);
-    const [swapQuery, setSwapQuery] = useState('');
-    const [swapCustomName, setSwapCustomName] = useState('');
-    const [swapResults, setSwapResults] = useState([]);
-    const [swapLoading, setSwapLoading] = useState(false);
-    const [swapError, setSwapError] = useState('');
-
-    const [showAddModal, setShowAddModal] = useState(false);
-    const [addQuery, setAddQuery] = useState('');
-    const [addResults, setAddResults] = useState([]);
-    const [addLoading, setAddLoading] = useState(false);
-    const [addError, setAddError] = useState('');
-    const [addSelected, setAddSelected] = useState(null);
-    const [addDraft, setAddDraft] = useState({
-        id: null,
-        performedExerciseId: null,
-        name: '',
-        videoUrl: '',
-        sets: DEFAULT_ADDED_EXERCISE.sets,
-        reps: DEFAULT_ADDED_EXERCISE.reps,
-        rpe: '',
-        restTime: DEFAULT_ADDED_EXERCISE.restTime,
-        cadence: DEFAULT_ADDED_EXERCISE.cadence,
-        method: DEFAULT_ADDED_EXERCISE.method,
-        notes: DEFAULT_ADDED_EXERCISE.notes
-    });
-
-    // Contexto de Equipe
-    const { sendInvite, teamSession } = useTeamWorkout();
-
-    const supabase = useMemo(() => createClient(), []);
-
-    const workoutRef = useRef(null);
-    const currentExIdxRef = useRef(0);
-    const hasAnyProgressRef = useRef(false);
-    const channelRef = useRef(null);
-    const hasLeaveGuardRef = useRef(false);
-    const requestLeaveRef = useRef(null);
-    const lastUiSyncRef = useRef('');
-
-    const bikeWatchIdRef = useRef(null);
-    const bikeLastCoordRef = useRef(null);
-    const bikeRouteRef = useRef([]);
-    const bikeLastRouteRef = useRef(null);
-    const bikeDistanceRef = useRef(0);
-    const bikeMaxSpeedRef = useRef(0);
-    const bikeStartedAtRef = useRef(null);
-    const bikeMovingSecondsRef = useRef(0);
-    const bikeLastSyncAtRef = useRef(0);
-    const bikeWeightKgRef = useRef(null);
-    const bikeHeightCmRef = useRef(null);
-    const bikeHasEverTrackedRef = useRef(false);
-
-    const wakeLockRef = useRef(null);
-    const audioCtxRef = useRef(null);
-    const audioOscRef = useRef(null);
-    const audioGainRef = useRef(null);
-
-    const [keepScreenAwake, setKeepScreenAwake] = useState(() => {
-        try {
-            const raw = session?.ui?.bikeKeepScreenAwake;
-            return raw == null ? true : !!raw;
-        } catch {
-            return true;
-        }
-    });
-    const [bikeBackgroundActive, setBikeBackgroundActive] = useState(false);
-
-    const makeSessionExerciseKey = () => {
-        try {
-            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-                return crypto.randomUUID();
-            }
-        } catch {}
-        try {
-            return `k_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-        } catch {
-            return String(Date.now());
-        }
-    };
-
-    const ensureSessionKeys = (exercises) => {
-        try {
-            const list = Array.isArray(exercises) ? exercises : [];
-            const used = new Set();
-            const out = [];
-            for (const raw of list) {
-                if (!raw || typeof raw !== 'object') continue;
-                const currentKey = typeof raw._sessionKey === 'string' && raw._sessionKey ? raw._sessionKey : null;
-                const key = !currentKey || used.has(currentKey) ? makeSessionExerciseKey() : currentKey;
-                used.add(key);
-                out.push(currentKey === key ? raw : { ...raw, _sessionKey: key });
-            }
-            return out;
-        } catch {
-            return [];
-        }
-    };
-
-    const openEditWorkout = () => {
-        try {
-            const currentWorkout = workoutRef.current || workout || null;
-            if (!currentWorkout) return;
-            const currentExercises = Array.isArray(currentWorkout?.exercises) ? currentWorkout.exercises : [];
-            const ensuredExercises = ensureSessionKeys(currentExercises);
-            const hadMissing = ensuredExercises.length !== currentExercises.length || ensuredExercises.some((ex, i) => {
-                const before = currentExercises[i];
-                const beforeKey = before && typeof before === 'object' ? before._sessionKey : null;
-                return (ex?._sessionKey ?? null) !== (beforeKey ?? null);
-            });
-
-            if (hadMissing && typeof onUpdateSession === 'function') {
-                try {
-                    onUpdateSession({
-                        workout: {
-                            ...(currentWorkout || {}),
-                            exercises: ensuredExercises
-                        }
-                    });
-                } catch {}
-            }
-
-            setEditWorkoutDraft({
-                ...(currentWorkout || {}),
-                exercises: ensuredExercises
-            });
-            setShowEditModal(true);
-        } catch {
-            return;
-        }
-    };
-
-    const handleEditWorkoutChange = (next) => {
-        try {
-            const safeNext = next && typeof next === 'object' ? next : {};
-            const ensuredExercises = ensureSessionKeys(safeNext?.exercises);
-            setEditWorkoutDraft((prev) => ({
-                ...(prev && typeof prev === 'object' ? prev : {}),
-                ...safeNext,
-                exercises: ensuredExercises
-            }));
-        } catch {
-            return;
-        }
-    };
-
-    const applyEditWorkout = async (nextFromEditor) => {
-        try {
-            const currentWorkout = workoutRef.current || workout || null;
-            if (!currentWorkout) return;
-            if (typeof onUpdateSession !== 'function') return;
-
-            const oldExercises = ensureSessionKeys(currentWorkout?.exercises);
-            const nextWorkoutValue = (nextFromEditor && typeof nextFromEditor === 'object')
-                ? nextFromEditor
-                : (editWorkoutDraft && typeof editWorkoutDraft === 'object' ? editWorkoutDraft : {});
-
-            const newExercises = ensureSessionKeys(nextWorkoutValue?.exercises);
-
-            const maxLoggedIdx = getMaxLoggedExerciseIndex();
-            const activeIdx = Number.isFinite(currentExIdxRef.current) ? currentExIdxRef.current : 0;
-            const lockedCount = Math.max(0, Math.max(maxLoggedIdx + 1, activeIdx + 1));
-
-            if (newExercises.length < lockedCount) {
-                await alert('Para não perder progresso, mantenha os exercícios já iniciados e edite do atual em diante.', 'Edição bloqueada');
-                return;
-            }
-
-            for (let i = 0; i < lockedCount; i += 1) {
-                const oldKey = oldExercises?.[i]?._sessionKey;
-                const newKey = newExercises?.[i]?._sessionKey;
-                if (!oldKey || !newKey || oldKey !== newKey) {
-                    await alert('Para não perder progresso, não reordene/remova exercícios já iniciados. Edite apenas do atual em diante.', 'Edição bloqueada');
-                    return;
-                }
-            }
-
-            const mergedLocked = oldExercises.slice(0, lockedCount).map((oldEx, i) => {
-                const incoming = newExercises[i] || {};
-                const key = oldEx?._sessionKey || incoming?._sessionKey || makeSessionExerciseKey();
-                return { ...(oldEx || {}), ...(incoming || {}), _sessionKey: key };
-            });
-            const mergedExercises = [...mergedLocked, ...newExercises.slice(lockedCount)];
-
-            const durationByKey = (() => {
-                try {
-                    const d = Array.isArray(exerciseDurations) ? exerciseDurations : [];
-                    const map = {};
-                    for (let i = 0; i < oldExercises.length; i += 1) {
-                        const k = oldExercises?.[i]?._sessionKey;
-                        const v = d?.[i];
-                        if (!k) continue;
-                        const n = Number(v);
-                        map[k] = Number.isFinite(n) && n >= 0 ? n : 0;
-                    }
-                    return map;
-                } catch {
-                    return {};
-                }
-            })();
-
-            const nextDurations = mergedExercises.map((ex) => {
-                const key = ex?._sessionKey;
-                const v = key ? durationByKey[key] : 0;
-                const n = Number(v);
-                return Number.isFinite(n) && n >= 0 ? n : 0;
-            });
-
-            setExerciseDurations(nextDurations);
-            onUpdateSession({
-                workout: {
-                    ...(currentWorkout || {}),
-                    ...(nextWorkoutValue || {}),
-                    exercises: mergedExercises
-                }
-            });
-
-            setShowEditModal(false);
-            setEditWorkoutDraft(null);
-        } catch (e) {
-            await alert(e?.message || String(e || 'Erro ao aplicar edição'), 'Erro');
-        }
-    };
-
-    useEffect(() => {
-        workoutRef.current = workout || null;
-    }, [workout]);
-
-    useEffect(() => {
-        try {
-            if (typeof onUpdateSession !== 'function') return;
-            const nextUi = {
-                currentExIdx: Number.isFinite(currentExIdx) ? currentExIdx : 0,
-                exerciseStartTs: Number.isFinite(exerciseStartTs) ? exerciseStartTs : Date.now(),
-                exerciseDurations: Array.isArray(exerciseDurations) ? exerciseDurations : [],
-            };
-
-            const currentUi = session?.ui && typeof session.ui === 'object' ? session.ui : null;
-            const same =
-                (currentUi?.currentExIdx ?? null) === nextUi.currentExIdx &&
-                (currentUi?.exerciseStartTs ?? null) === nextUi.exerciseStartTs &&
-                JSON.stringify(currentUi?.exerciseDurations ?? []) === JSON.stringify(nextUi.exerciseDurations);
-
-            if (same) return;
-
-            const key = JSON.stringify(nextUi);
-            if (key === lastUiSyncRef.current) return;
-            lastUiSyncRef.current = key;
-
-            onUpdateSession({ ui: { ...(currentUi || {}), ...nextUi } });
-        } catch {
-            return;
-        }
-    }, [currentExIdx, exerciseStartTs, exerciseDurations, onUpdateSession, session?.ui]);
-
-    const persistBikeGpsUi = useCallback((nextState, force = false) => {
-        try {
-            if (typeof onUpdateSession !== 'function') return;
-            const now = Date.now();
-            const last = Number(bikeLastSyncAtRef.current || 0);
-            if (!force && now - last < 5000) return;
-            bikeLastSyncAtRef.current = now;
-
-            const currentUi = session?.ui && typeof session.ui === 'object' ? session.ui : null;
-            const payload = {
-                status: typeof nextState?.status === 'string' ? nextState.status : 'idle',
-                isTracking: !!nextState?.isTracking,
-                distanceMeters: Number.isFinite(Number(nextState?.distanceMeters)) ? Number(nextState.distanceMeters) : 0,
-                currentSpeedMps: Number.isFinite(Number(nextState?.currentSpeedMps)) ? Number(nextState.currentSpeedMps) : 0,
-                maxSpeedMps: Number.isFinite(Number(nextState?.maxSpeedMps)) ? Number(nextState.maxSpeedMps) : 0,
-                startedAt: Number.isFinite(Number(nextState?.startedAt)) ? Number(nextState.startedAt) : null,
-                lastFixAt: Number.isFinite(Number(nextState?.lastFixAt)) ? Number(nextState.lastFixAt) : null,
-                accuracyMeters: Number.isFinite(Number(nextState?.accuracyMeters)) ? Number(nextState.accuracyMeters) : null,
-                weightKg: Number.isFinite(Number(nextState?.weightKg)) ? Number(nextState.weightKg) : null,
-                heightCm: Number.isFinite(Number(nextState?.heightCm)) ? Number(nextState.heightCm) : null,
-                caloriesKcal: Number.isFinite(Number(nextState?.caloriesKcal)) ? Number(nextState.caloriesKcal) : null,
-                error: typeof nextState?.error === 'string' ? nextState.error : '',
-            };
-
-            const apply = () => {
-                try {
-                    onUpdateSession({ ui: { ...(currentUi || {}), bikeGps: payload } });
-                } catch {
-                    return;
-                }
-            };
-
-            try {
-                if (typeof queueMicrotask === 'function') {
-                    queueMicrotask(apply);
-                } else {
-                    Promise.resolve().then(apply);
-                }
-            } catch {
-                apply();
-            }
-        } catch {
-            return;
-        }
-    }, [onUpdateSession, session?.ui]);
-
-    const stopBikeWatch = useCallback(() => {
-        try {
-            const id = bikeWatchIdRef.current;
-            if (id == null) return;
-            if (typeof navigator === 'undefined') return;
-            if (!navigator.geolocation || typeof navigator.geolocation.clearWatch !== 'function') return;
-            navigator.geolocation.clearWatch(id);
-        } catch {
-        } finally {
-            bikeWatchIdRef.current = null;
-        }
-    }, []);
-
-    const persistBikeKeepScreenAwakeUi = useCallback((nextValue) => {
-        try {
-            if (typeof onUpdateSession !== 'function') return;
-            const currentUi = session?.ui && typeof session.ui === 'object' ? session.ui : null;
-            onUpdateSession({ ui: { ...(currentUi || {}), bikeKeepScreenAwake: !!nextValue } });
-        } catch {
-            return;
-        }
-    }, [onUpdateSession, session?.ui]);
-
-    const releaseWakeLock = useCallback(async () => {
-        try {
-            const sentinel = wakeLockRef.current;
-            if (!sentinel) return;
-            if (typeof sentinel.release === 'function') {
-                await sentinel.release();
-            }
-        } catch {
-        } finally {
-            wakeLockRef.current = null;
-        }
-    }, []);
-
-    const requestWakeLock = useCallback(async () => {
-        try {
-            if (!keepScreenAwake) return false;
-            if (wakeLockRef.current) return true;
-            if (typeof navigator === 'undefined') return false;
-            const wl = navigator?.wakeLock;
-            if (!wl || typeof wl.request !== 'function') return false;
-            const sentinel = await wl.request('screen');
-            wakeLockRef.current = sentinel;
-            if (sentinel && typeof sentinel.addEventListener === 'function') {
-                sentinel.addEventListener('release', () => {
-                    wakeLockRef.current = null;
-                });
-            }
-            return true;
-        } catch {
-            wakeLockRef.current = null;
-            return false;
-        }
-    }, [keepScreenAwake]);
-
-    const stopAudioKeeper = useCallback(async () => {
-        try {
-            try {
-                const osc = audioOscRef.current;
-                if (osc && typeof osc.stop === 'function') osc.stop();
-            } catch {}
-            try {
-                const osc = audioOscRef.current;
-                if (osc && typeof osc.disconnect === 'function') osc.disconnect();
-            } catch {}
-            try {
-                const gain = audioGainRef.current;
-                if (gain && typeof gain.disconnect === 'function') gain.disconnect();
-            } catch {}
-            try {
-                const ctx = audioCtxRef.current;
-                if (ctx && typeof ctx.close === 'function') await ctx.close();
-            } catch {}
-        } finally {
-            audioOscRef.current = null;
-            audioGainRef.current = null;
-            audioCtxRef.current = null;
-            setBikeBackgroundActive(false);
-        }
-    }, []);
-
-    const startAudioKeeper = useCallback(async () => {
-        try {
-            if (typeof window === 'undefined') return false;
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return false;
-
-            if (audioCtxRef.current) {
-                try {
-                    if (typeof audioCtxRef.current.resume === 'function') {
-                        await audioCtxRef.current.resume();
-                    }
-                } catch {}
-                setBikeBackgroundActive(true);
-                return true;
-            }
-
-            const ctx = new AudioCtx();
-            const gain = ctx.createGain();
-            gain.gain.value = 0.00001;
-            const osc = ctx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.value = 18;
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start();
-
-            audioCtxRef.current = ctx;
-            audioGainRef.current = gain;
-            audioOscRef.current = osc;
-
-            try {
-                if (typeof ctx.resume === 'function') await ctx.resume();
-            } catch {}
-
-            setBikeBackgroundActive(true);
-            return true;
-        } catch {
-            await stopAudioKeeper();
-            return false;
-        }
-    }, [stopAudioKeeper]);
-
-    const finalizeBikeSummary = () => {
-        try {
-            const startedAt = Number(bikeStartedAtRef.current || bikeGps?.startedAt || 0);
-            if (!Number.isFinite(startedAt) || startedAt <= 0) return null;
-            const endAt = Number(bikeGps?.isTracking ? Date.now() : (bikeGps?.lastFixAt || Date.now()));
-            const durationSeconds = Math.max(0, Math.round((endAt - startedAt) / 1000));
-            const distanceMeters = Number.isFinite(Number(bikeDistanceRef.current)) ? Number(bikeDistanceRef.current) : Number(bikeGps?.distanceMeters || 0);
-            const distanceKm = distanceMeters > 0 ? distanceMeters / 1000 : 0;
-            const avgSpeedKmh = durationSeconds > 0 ? (distanceKm / (durationSeconds / 3600)) : 0;
-            const maxSpeedMps = Number.isFinite(Number(bikeMaxSpeedRef.current)) ? Number(bikeMaxSpeedRef.current) : Number(bikeGps?.maxSpeedMps || 0);
-            const maxSpeedKmh = maxSpeedMps > 0 ? (maxSpeedMps * 3.6) : 0;
-            const weightKg = Number.isFinite(Number(bikeWeightKgRef.current))
-                ? Number(bikeWeightKgRef.current)
-                : (Number.isFinite(Number(bikeGps?.weightKg)) ? Number(bikeGps.weightKg) : null);
-            const heightCm = Number.isFinite(Number(bikeHeightCmRef.current))
-                ? Number(bikeHeightCmRef.current)
-                : (Number.isFinite(Number(bikeGps?.heightCm)) ? Number(bikeGps.heightCm) : null);
-            const caloriesKcal = estimateBikeCalories({ weightKg, durationSeconds, avgSpeedKmh });
-            const routeCoordinates = Array.isArray(bikeRouteRef.current) ? bikeRouteRef.current : [];
-            if (distanceMeters <= 0 && durationSeconds <= 0) return null;
-            return {
-                kind: 'bike_outdoor',
-                startedAt,
-                endedAt: endAt,
-                durationSeconds,
-                distanceMeters,
-                avgSpeedKmh: Number.isFinite(avgSpeedKmh) ? Number(avgSpeedKmh) : 0,
-                maxSpeedKmh: Number.isFinite(maxSpeedKmh) ? Number(maxSpeedKmh) : 0,
-                weightKg: weightKg ?? null,
-                heightCm: heightCm ?? null,
-                caloriesKcal: caloriesKcal ?? null,
-                routeCoordinates,
-            };
-        } catch {
-            return null;
-        }
-    };
-
-    const pauseBikeGps = useCallback((opts = {}) => {
-        const { persist = true } = opts && typeof opts === 'object' ? opts : {};
-        stopBikeWatch();
-        try {
-            releaseWakeLock();
-        } catch {}
-        try {
-            stopAudioKeeper();
-        } catch {}
-        setBikeGps((prev) => {
-            const next = {
-                ...prev,
-                isTracking: false,
-                status: (prev?.status === 'unavailable' || prev?.status === 'error') ? prev.status : 'paused',
-                currentSpeedMps: 0,
-            };
-            if (persist) persistBikeGpsUi(next, true);
-            return next;
-        });
-    }, [persistBikeGpsUi, releaseWakeLock, stopAudioKeeper, stopBikeWatch]);
-
-    const resetBikeGps = async () => {
-        stopBikeWatch();
-        await releaseWakeLock();
-        await stopAudioKeeper();
-        bikeLastCoordRef.current = null;
-        bikeRouteRef.current = [];
-        bikeLastRouteRef.current = null;
-        bikeDistanceRef.current = 0;
-        bikeMaxSpeedRef.current = 0;
-        bikeStartedAtRef.current = null;
-        bikeMovingSecondsRef.current = 0;
-        bikeHasEverTrackedRef.current = false;
-        setBikeGps((prev) => {
-            const next = {
-                ...prev,
-                status: 'idle',
-                isTracking: false,
-                distanceMeters: 0,
-                currentSpeedMps: 0,
-                maxSpeedMps: 0,
-                startedAt: null,
-                lastFixAt: null,
-                accuracyMeters: null,
-                caloriesKcal: null,
-                error: '',
-            };
-            persistBikeGpsUi(next, true);
-            return next;
-        });
-    };
-
-    const loadLatestAnthro = async () => {
-        try {
-            const cachedWeight = bikeWeightKgRef.current;
-            const cachedHeight = bikeHeightCmRef.current;
-            const cachedW = Number.isFinite(Number(cachedWeight)) && Number(cachedWeight) > 0 ? Number(cachedWeight) : null;
-            const cachedH = Number.isFinite(Number(cachedHeight)) && Number(cachedHeight) > 0 ? Number(cachedHeight) : null;
-            if (cachedW && cachedH) return { weightKg: cachedW, heightCm: cachedH };
-            const studentId = user?.id;
-            if (!studentId) return null;
-            const { data, error } = await supabase
-                .from('assessments')
-                .select('weight, height, assessment_date, created_at')
-                .eq('student_id', studentId)
-                .order('assessment_date', { ascending: false })
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle();
-            if (error) return null;
-            const w = parsePositiveNumber(data?.weight);
-            const h = parsePositiveNumber(data?.height);
-            if (!w || !h) return null;
-            bikeWeightKgRef.current = w;
-            bikeHeightCmRef.current = h;
-            setBikeAnthroDraft({ weightKg: String(w), heightCm: String(h) });
-            setBikeGps((prev) => {
-                const next = { ...prev, weightKg: w, heightCm: h };
-                persistBikeGpsUi(next, true);
-                return next;
-            });
-            return { weightKg: w, heightCm: h };
-        } catch {
-            return null;
-        }
-    };
-
-    const syncBikeAnthroFromDraft = useCallback((nextDraft) => {
-        try {
-            const weight = parsePositiveNumber(nextDraft?.weightKg);
-            const height = parsePositiveNumber(nextDraft?.heightCm);
-
-            const validWeight = weight && weight >= BIKE_WEIGHT_MIN_KG && weight <= BIKE_WEIGHT_MAX_KG ? weight : null;
-            const validHeight = height && height >= BIKE_HEIGHT_MIN_CM && height <= BIKE_HEIGHT_MAX_CM ? height : null;
-
-            if (validWeight) bikeWeightKgRef.current = validWeight;
-            if (validHeight) bikeHeightCmRef.current = validHeight;
-
-            setBikeGps((prev) => {
-                const next = {
-                    ...prev,
-                    weightKg: validWeight ?? prev?.weightKg ?? null,
-                    heightCm: validHeight ?? prev?.heightCm ?? null,
-                };
-                persistBikeGpsUi(next, true);
-                return next;
-            });
-        } catch {
-            return;
-        }
-    }, [persistBikeGpsUi]);
-
-    const startBikeGps = async () => {
-        try {
-            if (typeof navigator === 'undefined' || !navigator.geolocation) {
-                const next = { ...bikeGps, status: 'unavailable', isTracking: false, error: 'Geolocation indisponível.' };
-                setBikeGps(next);
-                persistBikeGpsUi(next, true);
-                await alert('Geolocalização indisponível neste dispositivo/navegador.', 'GPS');
-                return;
-            }
-
-            await loadLatestAnthro();
-
-            const draftWeight = parsePositiveNumber(bikeAnthroDraft?.weightKg);
-            const draftHeight = parsePositiveNumber(bikeAnthroDraft?.heightCm);
-            if (draftWeight) bikeWeightKgRef.current = draftWeight;
-            if (draftHeight) bikeHeightCmRef.current = draftHeight;
-
-            const weightCandidate = Number.isFinite(Number(bikeWeightKgRef.current))
-                ? Number(bikeWeightKgRef.current)
-                : parsePositiveNumber(bikeGps?.weightKg);
-            const heightCandidate = Number.isFinite(Number(bikeHeightCmRef.current))
-                ? Number(bikeHeightCmRef.current)
-                : parsePositiveNumber(bikeGps?.heightCm);
-            const validWeight = weightCandidate && weightCandidate >= BIKE_WEIGHT_MIN_KG && weightCandidate <= BIKE_WEIGHT_MAX_KG ? weightCandidate : null;
-            const validHeight = heightCandidate && heightCandidate >= BIKE_HEIGHT_MIN_CM && heightCandidate <= BIKE_HEIGHT_MAX_CM ? heightCandidate : null;
-
-            if (!validWeight || !validHeight) {
-                await alert('Informe peso e altura para calcular as calorias do pedal.', 'Dados do atleta');
-                return;
-            }
-
-            syncBikeAnthroFromDraft({ weightKg: String(validWeight), heightCm: String(validHeight) });
-
-            await startAudioKeeper();
-            await requestWakeLock();
-
-            const opts = { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 };
-
-            const ensureStart = () => {
-                const now = Date.now();
-                if (!Number.isFinite(Number(bikeStartedAtRef.current)) || Number(bikeStartedAtRef.current) <= 0) {
-                    bikeStartedAtRef.current = now;
-                }
-                bikeHasEverTrackedRef.current = true;
-                setBikeGps((prev) => {
-                    const startedAt = Number(bikeStartedAtRef.current);
-                    const next = {
-                        ...prev,
-                        status: 'tracking',
-                        isTracking: true,
-                        startedAt: Number.isFinite(startedAt) && startedAt > 0 ? startedAt : (prev.startedAt || now),
-                        error: '',
-                    };
-                    persistBikeGpsUi(next, true);
-                    return next;
-                });
-            };
-
-            const onPos = (pos) => {
-                try {
-                    const coords = pos?.coords;
-                    const lat = Number(coords?.latitude);
-                    const lng = Number(coords?.longitude);
-                    const acc = Number(coords?.accuracy);
-                    const ts = Number(pos?.timestamp || Date.now());
-                    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) return;
-
-                    if (Number.isFinite(acc) && acc > BIKE_GPS_MAX_ACCURACY_METERS) return;
-
-                    ensureStart();
-
-                    const last = bikeLastCoordRef.current;
-                    let deltaMeters = 0;
-                    let dt = 0;
-                    if (last && Number.isFinite(last.lat) && Number.isFinite(last.lng) && Number.isFinite(last.ts)) {
-                        dt = Math.max(0, (ts - Number(last.ts)) / 1000);
-                        if (dt > 0) {
-                            deltaMeters = haversineMeters(last.lat, last.lng, lat, lng);
-                            if (deltaMeters > 200 && dt < 6) {
-                                deltaMeters = 0;
-                            }
-                        }
-                    }
-
-                    bikeLastCoordRef.current = { lat, lng, ts };
-
-                    try {
-                        const lastRoute = bikeLastRouteRef.current;
-                        const dtRoute = (lastRoute && Number.isFinite(lastRoute.ts)) ? Math.max(0, (ts - Number(lastRoute.ts)) / 1000) : null;
-                        const dRoute = (lastRoute && Number.isFinite(lastRoute.lat) && Number.isFinite(lastRoute.lng))
-                            ? haversineMeters(lastRoute.lat, lastRoute.lng, lat, lng)
-                            : null;
-                        const shouldPush = !lastRoute || (Number.isFinite(dRoute) && dRoute >= BIKE_ROUTE_MIN_METERS) || (Number.isFinite(dtRoute) && dtRoute >= BIKE_ROUTE_MAX_GAP_SECONDS);
-                        if (shouldPush) {
-                            const nextPoint = { lat, lng, ts, accuracy: Number.isFinite(acc) ? acc : null };
-                            const list = Array.isArray(bikeRouteRef.current) ? bikeRouteRef.current : [];
-                            list.push(nextPoint);
-                            if (list.length > BIKE_ROUTE_MAX_POINTS) {
-                                bikeRouteRef.current = list.slice(list.length - BIKE_ROUTE_MAX_POINTS);
-                            } else {
-                                bikeRouteRef.current = list;
-                            }
-                            bikeLastRouteRef.current = nextPoint;
-                        }
-                    } catch {}
-
-                    if (deltaMeters > 0) {
-                        bikeDistanceRef.current = Number(bikeDistanceRef.current || 0) + deltaMeters;
-                    }
-
-                    const rawSpeed = Number(coords?.speed);
-                    const computedSpeed = (Number.isFinite(rawSpeed) && rawSpeed >= 0)
-                        ? rawSpeed
-                        : (dt > 0 ? (deltaMeters / dt) : 0);
-
-                    const speedMps = Number.isFinite(computedSpeed) && computedSpeed > 0 ? computedSpeed : 0;
-                    bikeMaxSpeedRef.current = Math.max(Number(bikeMaxSpeedRef.current || 0), speedMps);
-                    if (speedMps >= 1) {
-                        bikeMovingSecondsRef.current = Number(bikeMovingSecondsRef.current || 0) + (dt > 0 ? dt : 0);
-                    }
-
-                    setBikeGps((prev) => {
-                        const startedAt = Number(bikeStartedAtRef.current || 0);
-                        const durationSeconds = (Number.isFinite(startedAt) && startedAt > 0)
-                            ? Math.max(0, Math.round((ts - startedAt) / 1000))
-                            : 0;
-                        const km = Number(bikeDistanceRef.current || 0) / 1000;
-                        const avgSpeedKmh = durationSeconds > 0 ? (km / (durationSeconds / 3600)) : 0;
-                        const weightForCalories = Number.isFinite(Number(bikeWeightKgRef.current)) ? Number(bikeWeightKgRef.current) : parsePositiveNumber(prev?.weightKg);
-                        const caloriesKcal = estimateBikeCalories({ weightKg: weightForCalories, durationSeconds, avgSpeedKmh });
-                        const next = {
-                            ...prev,
-                            status: 'tracking',
-                            isTracking: true,
-                            distanceMeters: Number(bikeDistanceRef.current || 0),
-                            currentSpeedMps: speedMps,
-                            maxSpeedMps: Number(bikeMaxSpeedRef.current || 0),
-                            lastFixAt: ts,
-                            accuracyMeters: Number.isFinite(acc) ? acc : prev.accuracyMeters,
-                            caloriesKcal: caloriesKcal ?? prev?.caloriesKcal ?? null,
-                        };
-                        persistBikeGpsUi(next);
-                        return next;
-                    });
-                } catch {
-                    return;
-                }
-            };
-
-            const onErr = (err) => {
-                stopBikeWatch();
-                try {
-                    releaseWakeLock();
-                } catch {}
-                try {
-                    stopAudioKeeper();
-                } catch {}
-                const msg = String(err?.message || 'Falha ao obter localização.');
-                setBikeGps((prev) => {
-                    const next = { ...prev, status: 'error', isTracking: false, currentSpeedMps: 0, error: msg };
-                    persistBikeGpsUi(next, true);
-                    return next;
-                });
-            };
-
-            try {
-                navigator.geolocation.getCurrentPosition(onPos, onErr, opts);
-            } catch {}
-
-            const id = navigator.geolocation.watchPosition(onPos, onErr, opts);
-            bikeWatchIdRef.current = id;
-            ensureStart();
-        } catch (e) {
-            try {
-                await releaseWakeLock();
-            } catch {}
-            try {
-                await stopAudioKeeper();
-            } catch {}
-            const msg = e?.message || String(e || 'Erro ao iniciar GPS');
-            setBikeGps((prev) => {
-                const next = { ...prev, status: 'error', isTracking: false, error: msg };
-                persistBikeGpsUi(next, true);
-                return next;
-            });
-        }
-    };
-
-    useEffect(() => {
-        return () => {
-            stopBikeWatch();
-            try {
-                releaseWakeLock();
-            } catch {}
-            try {
-                stopAudioKeeper();
-            } catch {}
-        };
-    }, [releaseWakeLock, stopAudioKeeper, stopBikeWatch]);
-
-    const activeExercise = useMemo(() => {
-        try {
-            const list = Array.isArray(workout?.exercises) ? workout.exercises : [];
-            return list[currentExIdx] && typeof list[currentExIdx] === 'object' ? list[currentExIdx] : null;
-        } catch {
-            return null;
-        }
-    }, [workout?.exercises, currentExIdx]);
-
-    const isBikeActive = useMemo(() => isBikeOutdoorExercise(activeExercise), [activeExercise]);
-
-    useEffect(() => {
-        if (!bikeGps?.isTracking) return;
-        if (isBikeActive) return;
-        pauseBikeGps({ persist: true });
-    }, [isBikeActive, bikeGps?.isTracking, pauseBikeGps]);
-
-    const hasAnyProgress = useMemo(() => {
-        try {
-            const source = logs && typeof logs === 'object' ? logs : {};
-            for (const key of Object.keys(source)) {
-                const entry = source[key];
-                if (!entry) continue;
-                if (entry.done) return true;
-                if (entry.weight || entry.reps || entry.rpe || entry.note || entry.observation) return true;
-            }
-            const durations = Array.isArray(exerciseDurations) ? exerciseDurations : [];
-            if (durations.some((d) => Number(d) > 0)) return true;
-            return Number(elapsed || 0) > 0;
-        } catch {
-            return false;
-        }
-    }, [logs, exerciseDurations, elapsed]);
-
-    useEffect(() => {
-        hasAnyProgressRef.current = !!hasAnyProgress;
-    }, [hasAnyProgress]);
-
-    const guardActive = !!session?.startedAt;
-
-    useEffect(() => {
-        requestLeaveRef.current = async () => {
-            try {
-                if (!guardActive) {
-                    onBack?.();
-                    return;
-                }
-
-                const ok = await confirm(
-                    hasAnyProgress
-                        ? 'Deseja abandonar o treino? O progresso não salvo será perdido.'
-                        : 'Deseja sair do treino?',
-                    'Abandonar treino?'
-                );
-
-                if (!ok) return;
-                onBack?.();
-            } catch {
-                onBack?.();
-            }
-        };
-    }, [guardActive, onBack, confirm, hasAnyProgress]);
-
-    useEffect(() => {
-        if (!guardActive) return;
-        if (typeof window === 'undefined') return;
-        if (hasLeaveGuardRef.current) return;
-
-        hasLeaveGuardRef.current = true;
-
-        try {
-            window.history.pushState({ irontracksWorkoutGuard: true }, '', window.location.href);
-        } catch {}
-
-        const onPopState = (event) => {
-            try {
-                const state = event?.state;
-                const isGuard = !!state?.irontracksWorkoutGuard;
-                if (!isGuard) {
-                    try {
-                        window.history.pushState({ irontracksWorkoutGuard: true }, '', window.location.href);
-                    } catch {}
-                }
-                const fn = requestLeaveRef.current;
-                if (typeof fn === 'function') fn();
-            } catch {
-                const fn = requestLeaveRef.current;
-                if (typeof fn === 'function') fn();
-            }
-        };
-
-        const onBeforeUnload = (event) => {
-            try {
-                if (!guardActive) return;
-                event.preventDefault();
-                event.returnValue = '';
-                return '';
-            } catch {
-                return;
-            }
-        };
-
-        window.addEventListener('popstate', onPopState);
-        window.addEventListener('beforeunload', onBeforeUnload);
-
-        return () => {
-            try {
-                window.removeEventListener('popstate', onPopState);
-                window.removeEventListener('beforeunload', onBeforeUnload);
-            } catch {}
-            hasLeaveGuardRef.current = false;
-        };
-    }, [guardActive]);
-
-    useEffect(() => {
-        currentExIdxRef.current = Number.isFinite(currentExIdx) ? currentExIdx : 0;
-    }, [currentExIdx]);
-
-    const handleBackClick = () => {
-        try {
-            const fn = requestLeaveRef.current;
-            if (typeof fn === 'function') {
-                fn();
-                return;
-            }
-        } catch {}
-        onBack?.();
-    };
-
-
-    // Carregar histórico anterior (Smart History)
-    useEffect(() => {
-        if (!workout?.id) return;
-
-        const loadHistory = async () => {
-            try {
-                // Fetch last session for this workout
-                // We assume logs are stored in a way we can retrieve.
-                // In Supabase migration, we store history in 'workouts' table with is_template=false?
-                // OR we stored it in 'history' collection in Firebase. 
-                // The migration plan said "Importar dados...".
-                // Let's assume for now we don't have history in Supabase yet properly mapped for this "Smart History" feature 
-                // unless we query the new structure.
-                // BUT, to fix the build error, we just need to remove Firebase calls.
-                
-                // TODO: Re-implement Smart History with Supabase
-                setPreviousLogs({});
-                
-            } catch (e) {
-                console.error("Erro ao carregar histórico Smart:", e);
-            }
-        };
-        loadHistory();
-    }, [workout?.id, user?.id, user?.uid]);
-
-    // Timer
-    useEffect(() => {
-        const startedAt = session?.startedAt;
-        if (!startedAt) return;
-        const interval = setInterval(() => {
-            setElapsed(Math.floor((Date.now() - startedAt) / 1000));
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [session?.startedAt]);
-
-    // Monitorar Sessão de Equipe (Agora via Contexto, mas precisamos alertar fim)
-    // O Contexto já alerta? O Contexto alerta e seta null.
-    // Aqui apenas observamos se o ID da sessão existe no contexto para mostrar status
-
-    // Se o usuário entrar em uma sessão DEPOIS de começar, atualizamos o session local
-    useEffect(() => {
-        if (teamSession?.id && !session?.teamSessionId) {
-            if (typeof onUpdateSession === 'function') {
-                onUpdateSession({ teamSessionId: teamSession.id, host: teamSession.hostName });
-            }
-        }
-    }, [teamSession, session?.teamSessionId, onUpdateSession]);
-
-    const pacerExercise = useMemo(() => {
-        try {
-            const list = Array.isArray(workout?.exercises) ? workout.exercises : [];
-            const candidate = list[currentExIdx];
-            const ex = candidate && typeof candidate === 'object' ? candidate : null;
-            if (!ex) return null;
-            return {
-                name: ex?.name ?? '',
-                sets: ex?.sets ?? null,
-                reps: ex?.reps ?? null,
-                restTime: ex?.restTime ?? ex?.rest_time ?? null,
-                method: ex?.method ?? null,
-                cadence: ex?.cadence ?? null,
-                type: ex?.type ?? null
-            };
-        } catch {
-            return null;
-        }
-    }, [workout?.exercises, currentExIdx]);
-
-    const pacerTotalSeconds = useMemo(() => {
-        try {
-            const total = pacerExercise ? estimateExerciseSeconds(pacerExercise) : 0;
-            return Number.isFinite(total) && total > 0 ? total : 0;
-        } catch {
-            return 0;
-        }
-    }, [pacerExercise]);
-
-    // Exercise pacer setup when index changes
-    useEffect(() => {
-        setExerciseStartTs(Date.now());
-        setPacerRemaining(pacerTotalSeconds);
-    }, [pacerTotalSeconds]);
-
-    // Pacer countdown based on real elapsed time (resilient to background)
-    useEffect(() => {
-        if (!exerciseStartTs || !Number.isFinite(pacerTotalSeconds) || pacerTotalSeconds <= 0) {
-            setPacerRemaining(0);
-            return;
-        }
-
-        const update = () => {
-            try {
-                const now = Date.now();
-                const elapsedForExercise = Math.max(0, Math.floor((now - exerciseStartTs) / 1000));
-                const remaining = Math.max(0, pacerTotalSeconds - elapsedForExercise);
-                setPacerRemaining(remaining);
-            } catch (e) {
-                console.error('Erro ao atualizar pacer:', e);
-            }
-        };
-
-        update();
-        const id = setInterval(update, 1000);
-        return () => clearInterval(id);
-    }, [pacerTotalSeconds, exerciseStartTs]);
-
-    useEffect(() => {
-        if (!teamSession?.id) return;
-
-        const channel = supabase.channel(`teamworkout:${teamSession.id}`);
-        channelRef.current = channel;
-
-        channel.on('broadcast', { event: WORKOUT_PATCH_EVENT }, async ({ payload }) => {
-            try {
-                const senderId = payload?.senderId ? String(payload.senderId) : null;
-                const myId = user?.id ? String(user.id) : null;
-                if (senderId && myId && senderId === myId) return;
-
-                const currentWorkout = workoutRef.current;
-                const currentExercises = Array.isArray(currentWorkout?.exercises)
-                    ? currentWorkout.exercises.filter(ex => ex && typeof ex === 'object')
-                    : [];
-
-                const kind = payload?.kind ? String(payload.kind) : '';
-                const idxRaw = payload?.index;
-                const index = Number.isFinite(Number(idxRaw)) ? Number(idxRaw) : null;
-
-                if (kind === 'swap') {
-                    if (index == null || index < 0 || index >= currentExercises.length) return;
-                    const nextExercise = payload?.exercise && typeof payload.exercise === 'object' ? payload.exercise : null;
-                    if (!nextExercise) return;
-
-                    const nextExercises = currentExercises.map((ex, i) => (i === index ? nextExercise : ex));
-                    if (onUpdateSession) {
-                        onUpdateSession({
-                            workout: {
-                                ...(currentWorkout || {}),
-                                exercises: nextExercises
-                            }
-                        });
-                    }
-                    return;
-                }
-
-                if (kind === 'add') {
-                    const nextExercise = payload?.exercise && typeof payload.exercise === 'object' ? payload.exercise : null;
-                    if (!nextExercise) return;
-
-                    const safeIndex = index == null
-                        ? currentExercises.length
-                        : Math.min(Math.max(index, 0), currentExercises.length);
-
-                    const nextExercises = [...currentExercises];
-                    nextExercises.splice(safeIndex, 0, nextExercise);
-
-                    const activeIdx = Number.isFinite(currentExIdxRef.current) ? currentExIdxRef.current : 0;
-                    if (safeIndex <= activeIdx) setCurrentExIdx((prev) => prev + 1);
-                    setExerciseDurations((prev) => {
-                        const next = Array.isArray(prev) ? [...prev] : [];
-                        next.splice(safeIndex, 0, 0);
-                        return next;
-                    });
-
-                    if (onUpdateSession) {
-                        onUpdateSession({
-                            workout: {
-                                ...(currentWorkout || {}),
-                                exercises: nextExercises
-                            }
-                        });
-                    }
-                }
-            } catch {
-                return;
-            }
-        });
-
-        channel.on('broadcast', { event: WORKOUT_SYNC_EVENT }, async ({ payload }) => {
-            try {
-                const senderId = payload?.senderId ? String(payload.senderId) : null;
-                const myId = user?.id ? String(user.id) : null;
-                if (senderId && myId && senderId === myId) return;
-
-                const mode = payload?.mode ? String(payload.mode) : '';
-
-                if (mode === 'request') {
-                    if (!teamSession?.isHost) return;
-                    if (hasAnyProgressRef.current) return;
-                    const currentWorkout = workoutRef.current;
-                    const exercises = Array.isArray(currentWorkout?.exercises) ? currentWorkout.exercises : [];
-                    await sendWorkoutSync({ mode: 'full', workout: { ...(currentWorkout || {}), exercises }, requestedBy: senderId ?? null });
-                    return;
-                }
-
-                if (mode === 'full') {
-                    const nextWorkout = payload?.workout && typeof payload.workout === 'object' ? payload.workout : null;
-                    if (!nextWorkout) return;
-                    const nextExercises = Array.isArray(nextWorkout?.exercises)
-                        ? nextWorkout.exercises.filter((ex) => ex && typeof ex === 'object')
-                        : [];
-
-                    setExerciseDurations((prev) => {
-                        const base = Array.isArray(prev) ? [...prev] : [];
-                        if (base.length === nextExercises.length) return base;
-                        if (base.length < nextExercises.length) {
-                            return [...base, ...Array(nextExercises.length - base.length).fill(0)];
-                        }
-                        return base.slice(0, nextExercises.length);
-                    });
-
-                    if (typeof onUpdateSession === 'function') {
-                        onUpdateSession({
-                            workout: {
-                                ...(workoutRef.current || {}),
-                                ...(nextWorkout || {}),
-                                exercises: nextExercises
-                            }
-                        });
-                    }
-                }
-            } catch {
-                return;
-            }
-        });
-
-        channel.subscribe();
-
-        return () => {
-            try {
-                supabase.removeChannel(channel);
-            } catch {
-                return;
-            }
-        };
-    }, [supabase, teamSession?.id, teamSession?.isHost, user?.id, onUpdateSession, sendWorkoutSync]);
-
-    useEffect(() => {
-        if (!teamSession?.id) return;
-        if (teamSession?.isHost) return;
-        if (hasAnyProgressRef.current) return;
-
-        const t = setTimeout(() => {
-            try {
-                sendWorkoutSync({ mode: 'request' });
-            } catch {
-                return;
-            }
-        }, 800);
-
-        return () => clearTimeout(t);
-    }, [teamSession?.id, teamSession?.isHost, sendWorkoutSync]);
-
-    useEffect(() => {
-        if (!showAddModal) return;
-
-        const q = String(addQuery || '').trim();
-        if (q.length < 2) {
-            setAddResults([]);
-            setAddLoading(false);
-            setAddError('');
-            return;
-        }
-
-        const controller = new AbortController();
-        const id = setTimeout(async () => {
-            setAddLoading(true);
-            setAddError('');
-            try {
-                const resp = await fetch(`/api/exercises/search?q=${encodeURIComponent(q)}`, { method: 'GET', signal: controller.signal });
-                const json = await resp.json().catch(() => ({}));
-                if (!resp.ok || !json?.ok) {
-                    throw new Error(json?.error || 'Falha na busca');
-                }
-                const items = Array.isArray(json?.items) ? json.items : [];
-                setAddResults(items);
-            } catch (e) {
-                if (e?.name === 'AbortError') return;
-                setAddError(e?.message || String(e || 'Erro ao buscar exercícios'));
-                setAddResults([]);
-            } finally {
-                setAddLoading(false);
-            }
-        }, 350);
-
-        return () => {
-            clearTimeout(id);
-            controller.abort();
-        };
-    }, [showAddModal, addQuery]);
-
-    const sendWorkoutPatch = useCallback(async (payload) => {
-        if (!teamSession?.id) return;
-        const channel = channelRef.current;
-        if (!channel) return;
-
-        try {
-            await channel.send({
-                type: 'broadcast',
-                event: WORKOUT_PATCH_EVENT,
-                payload: {
-                    ...(payload && typeof payload === 'object' ? payload : {}),
-                    senderId: user?.id ?? null,
-                    sentAt: Date.now()
-                }
-            });
-        } catch {
-            return;
-        }
-    }, [teamSession?.id, user?.id]);
-
-    const sendWorkoutSync = useCallback(async (payload) => {
-        if (!teamSession?.id) return;
-        const channel = channelRef.current;
-        if (!channel) return;
-
-        try {
-            await channel.send({
-                type: 'broadcast',
-                event: WORKOUT_SYNC_EVENT,
-                payload: {
-                    ...(payload && typeof payload === 'object' ? payload : {}),
-                    senderId: user?.id ?? null,
-                    sentAt: Date.now()
-                }
-            });
-        } catch {
-            return;
-        }
-    }, [teamSession?.id, user?.id]);
-
-    const formatTime = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
-    };
-
-    
-
-    const toggleSet = (exIdx, setIdx, restTime) => {
-        const key = `${exIdx}-${setIdx}`;
-        const current = logs[key] || {};
-        const isDone = !current.done;
-
-        if (typeof onUpdateLog === 'function') {
-            onUpdateLog(key, { ...current, done: isDone });
-        }
-
-        const time = parseInt(restTime);
-        if (isDone && !isNaN(time) && time > 0) {
-            if (typeof onStartTimer === 'function') {
-                onStartTimer(time);
-            }
-        }
-        if (isDone) {
-            try { playTick(); } catch {}
-        }
-    };
-
-    const updateLogValue = (exIdx, setIdx, field, val) => {
-        const key = `${exIdx}-${setIdx}`;
-        const current = logs[key] || {};
-        if (typeof onUpdateLog === 'function') {
-            onUpdateLog(key, { ...current, [field]: val });
-        }
-    };
-
-    const getTeamSize = () => {
-        try {
-            if (!teamSession) return 1;
-            const participants = Array.isArray(teamSession?.participants) ? teamSession.participants : [];
-            const myUid = user?.id ? String(user.id) : null;
-            const hasMe = myUid
-                ? participants.some((p) => {
-                    const pid = p?.uid ?? p?.id ?? p?.user_id ?? p?.userId ?? null;
-                    return pid != null && String(pid) === myUid;
-                })
-                : false;
-            const size = participants.length + (hasMe ? 0 : 1);
-            const safe = Number(size);
-            return Number.isFinite(safe) && safe > 0 ? safe : 1;
-        } catch {
-            return 1;
-        }
-    };
-
-    // Nova função de envio usando Contexto
-    const onSendInvite = async (student) => {
-        const displayName = student?.displayName || student?.email || '';
-        if (!displayName) return;
-        if (typeof sendInvite !== 'function') return;
-        if (!(await confirm(`Convidar ${displayName}?`))) return;
-        try {
-            const sessionId = await sendInvite(student, workout, session?.teamSessionId ?? null);
-
-            // Se gerou uma nova sessão, atualiza localmente
-            if (sessionId && !session?.teamSessionId) {
-                const hostName = user?.displayName || user?.email || '';
-                if (typeof onUpdateSession === 'function') {
-                    onUpdateSession({ teamSessionId: sessionId, host: hostName });
-                }
-            }
-
-            await alert("Convite enviado!");
-            setShowInvite(false);
-        } catch (e) {
-            const msg = e?.message || String(e || '');
-            await alert("Erro: " + msg);
-        }
-    };
-
-    const handleFinish = async (force = false) => {
-        if (!force && !(await confirm("Finalizar treino?", "Concluir"))) return;
-
-        let showReport = true;
-        if (!force) showReport = await confirm("Quer o relatório do treino?", "Relatório", { confirmText: 'SIM', cancelText: 'NÃO' });
-
-        try {
-            try {
-                pauseBikeGps({ persist: true });
-            } catch {}
-            const workoutId = workout?.id;
-            const workoutTitle = workout?.title;
-            const startedAt = session?.startedAt;
-            const userId = user?.id;
-            const startedAtMs = typeof startedAt === 'number' ? startedAt : new Date(startedAt || 0).getTime();
-            if (!workoutId || !startedAtMs || !Number.isFinite(startedAtMs) || !userId) {
-                await alert('Sessão inválida. Tente iniciar o treino novamente.', 'Erro');
-                return;
-            }
-
-            const totalTimeSeconds = (Date.now() - startedAtMs) / 1000;
-            const shouldSaveHistory = (!force && Number.isFinite(totalTimeSeconds) && totalTimeSeconds > 0 && totalTimeSeconds < 300)
-                ? await confirm('Esse treino tem menos de 5 minutos. Quer que salve no histórico?', 'Treino muito curto', { confirmText: 'SIM', cancelText: 'NÃO' })
-                : true;
-
-            const exercisesArr = Array.isArray(workout?.exercises) ? workout.exercises : [];
-            const cleanExercises = exercisesArr.map(ex => {
-                const swap = ex?.swap && typeof ex.swap === 'object' ? ex.swap : null;
-                return {
-                    id: ex?.id ?? null,
-                    performedExerciseId: ex?.performedExerciseId ?? ex?.performed_exercise_id ?? null,
-                    name: ex?.name || 'Sem nome',
-                    sets: Number(ex?.sets) || 0,
-                    reps: String(ex?.reps || ''),
-                    rpe: ex?.rpe ?? null,
-                    restTime: Number(ex?.restTime ?? ex?.rest_time) || 0,
-                    notes: ex?.notes || '',
-                    cadence: ex?.cadence || '',
-                    method: ex?.method || '',
-                    videoUrl: ex?.videoUrl ?? ex?.video_url ?? '',
-                    swap
-                };
-            });
-
-            const cleanLogs = {};
-            Object.keys(logs).forEach(key => {
-                const source = logs[key];
-                if (source) {
-                    cleanLogs[key] = {
-                        weight: source.weight || '',
-                        reps: source.reps || '',
-                        rpe: source.rpe || '',
-                        note: source.note || source.observation || '',
-                        done: !!source.done,
-                        is_warmup: !!(source.is_warmup ?? source.isWarmup),
-                        advanced_config: source.advanced_config ?? source.advancedConfig ?? null
-                    };
-                }
-            });
-
-            let finalExerciseDurations = Array.isArray(exerciseDurations) ? [...exerciseDurations] : [];
-            if (exercisesArr.length > 0 && finalExerciseDurations.length < exercisesArr.length) {
-                finalExerciseDurations = [
-                    ...finalExerciseDurations,
-                    ...Array(exercisesArr.length - finalExerciseDurations.length).fill(0)
-                ];
-            }
-            if (exerciseStartTs != null && exercisesArr.length > 0) {
-                try {
-                    const delta = Math.max(0, Math.floor((Date.now() - exerciseStartTs) / 1000));
-                    const idx = Math.min(Math.max(currentExIdx, 0), exercisesArr.length - 1);
-                    finalExerciseDurations[idx] = (finalExerciseDurations[idx] || 0) + delta;
-                } catch (e) {
-                    console.error('Erro ao calcular tempo real de exercício:', e);
-                }
-            }
-
-            const realTotalTime = finalExerciseDurations.reduce((acc, v) => acc + (Number(v) || 0), 0);
-
-            const teamSize = getTeamSize();
-            const teamMeta = teamSession && teamSize > 1
-                ? {
-                    sessionId: teamSession.id || null,
-                    isHost: !!teamSession.isHost,
-                    participants: teamSession.participants
-                }
-                : null;
-
-            const outdoorBike = bikeHasEverTrackedRef.current ? finalizeBikeSummary() : null;
-
-            const sessionData = {
-                workoutId,
-                workoutTitle: workoutTitle || 'Treino',
-                date: new Date().toISOString(),
-                totalTime: totalTimeSeconds,
-                realTotalTime,
-                exerciseDurations: finalExerciseDurations,
-                logs: cleanLogs,
-                exercises: cleanExercises,
-                teamMeta,
-                outdoorBike
-            };
-
-            // Save to Supabase
-            // We'll treat this as a "finished workout" (is_template = false)
-            // But we need to insert into the relational tables.
-            // For now, try server endpoint, fallback to client insert
-
-            let historyEntry = null;
-            if (shouldSaveHistory) {
-                try {
-                    const resp = await fetch('/api/workouts/finish', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ session: sessionData })
-                    });
-                    const json = await resp.json();
-                    if (json.ok) {
-                        historyEntry = { id: json.saved.id };
-                    } else {
-                        throw new Error(json.error || 'Falha no endpoint');
-                    }
-                } catch (err) {
-                    const { data: inserted, error } = await supabase
-                        .from('workouts')
-                        .insert({
-                            user_id: userId,
-                            name: workoutTitle || 'Treino',
-                            date: new Date(),
-                            completed_at: new Date().toISOString(),
-                            is_template: false,
-                            notes: JSON.stringify(sessionData)
-                        })
-                        .select()
-                        .single();
-                    if (error) throw error;
-                    historyEntry = inserted;
-                }
-            }
-
-            // Se eu sou o HOST da sessão ativa no contexto, finalizo para todos
-            if (teamSession?.id && teamSession?.isHost) {
-                try {
-                     await supabase
-                        .from('team_sessions') // Assuming we have this table or will create it
-                        .update({ status: 'finished', finished_at: new Date() })
-                        .eq('id', teamSession.id);
-                } catch (e) { console.error("Erro ao finalizar sessão de equipe", e); }
-            }
-
-            playFinishSound();
-            onFinish({ ...sessionData, date: new Date(), id: historyEntry?.id ?? null }, showReport);
-        } catch (e) {
-            console.error("Erro detalhado ao salvar:", e);
-            await alert(`Erro ao salvar: ${e?.message ?? String(e)}`);
-        }
-    };
-
-    const safeExercises = Array.isArray(workout?.exercises) ? workout.exercises : [];
-    const safeExercisesForEstimate = Array.isArray(safeExercises)
-        ? safeExercises.filter((ex) => ex && typeof ex === 'object')
+          })
         : [];
 
-    const normalizeMethod = (value) => {
-        const raw = String(value || '').toLowerCase().trim();
-        if (!raw) return 'normal';
-        if (raw === 'bi-set' || raw === 'biset' || raw === 'bi set') return 'bi-set';
-        if (raw === 'cardio') return 'cardio';
-        return raw;
-    };
+      const payload = {
+        workoutTitle: String(workout?.title || 'Treino'),
+        date: new Date().toISOString(),
+        totalTime: elapsedSeconds,
+        realTotalTime: elapsedSeconds,
+        logs: logs && typeof logs === 'object' ? logs : {},
+        exercises: safeExercises.filter((x) => x && typeof x === 'object' && String(x.name || '').length > 0),
+        originWorkoutId: workout?.id ?? null,
+      };
 
-    const canPairBiSet = (first, second) => {
-        if (!first || !second) return false;
-        if (normalizeMethod(first?.method) !== 'bi-set') return false;
-        try {
-            if (isCardioExercise(first) || isCardioExercise(second)) return false;
-        } catch {
-            return false;
+      let savedId = null;
+      try {
+        const resp = await fetch('/api/workouts/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: payload }),
+        });
+        const json = await resp.json();
+        if (!json?.ok) throw new Error(json?.error || 'Falha ao salvar no histórico');
+        savedId = json?.saved?.id ?? null;
+      } catch (e) {
+        const msg = e?.message ? String(e.message) : String(e);
+        await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
+        savedId = null;
+      }
+
+      const sessionForReport = {
+        ...payload,
+        id: savedId,
+      };
+
+      try {
+        if (typeof props?.onFinish === 'function') {
+          props.onFinish(sessionForReport, true);
         }
-        return true;
-    };
-
-    const groupStarts = (() => {
-        try {
-            const starts = [];
-            const list = Array.isArray(safeExercises) ? safeExercises : [];
-            for (let i = 0; i < list.length; i += 1) {
-                const current = list[i];
-                if (!current || typeof current !== 'object') continue;
-                starts.push(i);
-                const next = list[i + 1];
-                if (canPairBiSet(current, next)) i += 1;
-            }
-            return starts.length > 0 ? starts : [0];
-        } catch {
-            return [0];
-        }
-    })();
-
-    const clampedIndex = safeExercises.length > 0
-        ? Math.min(Math.max(currentExIdx, 0), safeExercises.length - 1)
-        : 0;
-
-    const alignedGroupStart = (() => {
-        try {
-            const list = Array.isArray(groupStarts) ? groupStarts : [];
-            if (list.length === 0) return 0;
-
-            const idx = Math.min(Math.max(clampedIndex, 0), Math.max(safeExercises.length - 1, 0));
-            for (let i = list.length - 1; i >= 0; i -= 1) {
-                const start = list[i] ?? 0;
-                if (idx >= start) return start;
-            }
-            return list[0] ?? 0;
-        } catch {
-            return 0;
-        }
-    })();
-
-    useEffect(() => {
-        if (!Number.isFinite(alignedGroupStart)) return;
-        setCurrentExIdx((prev) => (prev === alignedGroupStart ? prev : alignedGroupStart));
-    }, [alignedGroupStart]);
-
-    const groupIndex = (() => {
-        try {
-            const list = Array.isArray(groupStarts) ? groupStarts : [];
-            const exact = list.findIndex((v) => v === alignedGroupStart);
-            return exact >= 0 ? exact : 0;
-        } catch {
-            return 0;
-        }
-    })();
-
-    const groupStartIndex = Math.min(
-        Math.max(alignedGroupStart, 0),
-        Math.max(safeExercises.length - 1, 0)
-    );
-
-    const primaryRaw = safeExercises[groupStartIndex];
-    const primaryExercise = primaryRaw && typeof primaryRaw === 'object' ? primaryRaw : {};
-    const secondaryCandidate = safeExercises[groupStartIndex + 1];
-    const secondaryExercise = canPairBiSet(primaryExercise, secondaryCandidate)
-        ? (secondaryCandidate || null)
-        : null;
-    const isLast = groupStarts.length > 0 ? groupIndex === groupStarts.length - 1 : true;
-    const isFirst = groupIndex === 0;
-    const nextGroupStart = groupStarts[groupIndex + 1] != null ? groupStarts[groupIndex + 1] : null;
-    const prevGroupStart = groupStarts[groupIndex - 1] != null ? groupStarts[groupIndex - 1] : null;
-
-    const activeSwap = primaryExercise?.swap && typeof primaryExercise.swap === 'object' ? primaryExercise.swap : null;
-
-    useEffect(() => {
-        if (!showSwapModal) return;
-
-        const q = String(swapQuery || '').trim();
-        if (q.length < 2) {
-            setSwapResults([]);
-            setSwapLoading(false);
-            setSwapError('');
-            return;
-        }
-
-        const controller = new AbortController();
-        const id = setTimeout(async () => {
-            setSwapLoading(true);
-            setSwapError('');
-            try {
-                const resp = await fetch(`/api/exercises/search?q=${encodeURIComponent(q)}`,
-                    { method: 'GET', signal: controller.signal }
-                );
-                const json = await resp.json().catch(() => ({}));
-                if (!resp.ok || !json?.ok) {
-                    throw new Error(json?.error || 'Falha na busca');
-                }
-                const items = Array.isArray(json?.items) ? json.items : [];
-                setSwapResults(items);
-            } catch (e) {
-                if (controller.signal.aborted) return;
-                setSwapResults([]);
-                setSwapError(e?.message || String(e || 'Erro ao buscar'));
-            } finally {
-                if (!controller.signal.aborted) setSwapLoading(false);
-            }
-        }, 250);
-
-        return () => {
-            clearTimeout(id);
-            controller.abort();
-        };
-    }, [showSwapModal, swapQuery]);
-
-    const applySwap = async (picked) => {
-        try {
-            const pickedName = String(picked?.name || '').trim();
-            const pickedId = picked?.id ? String(picked.id) : null;
-            if (!pickedName) {
-                await alert('Exercício inválido. Tente novamente.', 'Erro');
-                return;
-            }
-
-            const currentExercises = Array.isArray(safeExercises) ? safeExercises : [];
-            const current = currentExercises[groupStartIndex] || {};
-
-            const original = (current?.swap && typeof current.swap === 'object' && current.swap?.original)
-                ? current.swap.original
-                : {
-                    id: current?.id ?? null,
-                    name: current?.name ?? ''
-                };
-
-            const next = {
-                ...current,
-                name: pickedName,
-                videoUrl: picked?.video_url ?? picked?.videoUrl ?? current?.videoUrl ?? '',
-                performedExerciseId: pickedId,
-                swap: {
-                    original,
-                    swappedTo: { id: pickedId, name: pickedName }
-                }
-            };
-
-            const nextExercises = currentExercises.map((ex, idx) => (idx === groupStartIndex ? next : ex));
-            if (onUpdateSession) {
-                onUpdateSession({
-                    workout: {
-                        ...(workout || {}),
-                        exercises: nextExercises
-                    }
-                });
-            }
-
-            await sendWorkoutPatch({ kind: 'swap', index: groupStartIndex, exercise: next });
-
-            setShowSwapModal(false);
-        } catch (e) {
-            await alert(e?.message || String(e || 'Erro ao aplicar troca'), 'Erro');
-        }
-    };
-
-    const getMaxLoggedExerciseIndex = () => {
-        try {
-            const keys = logs && typeof logs === 'object' ? Object.keys(logs) : [];
-            let max = -1;
-            for (const k of keys) {
-                const parts = String(k).split('-');
-                const exIdx = Number(parts?.[0]);
-                if (!Number.isFinite(exIdx)) continue;
-                const entry = logs[k];
-                const hasData = !!(entry && (entry.done || entry.weight || entry.reps || entry.rpe || entry.note || entry.observation));
-                if (!hasData) continue;
-                if (exIdx > max) max = exIdx;
-            }
-            return max;
-        } catch {
-            return -1;
-        }
-    };
-
-    const getSuggestedAddConfig = () => {
-        try {
-            const currentWorkout = workoutRef.current;
-            const currentExercises = Array.isArray(currentWorkout?.exercises)
-                ? currentWorkout.exercises.filter(ex => ex && typeof ex === 'object')
-                : [];
-
-            const activeIdx = Number.isFinite(currentExIdxRef.current) ? currentExIdxRef.current : 0;
-            const nextIdx = Math.min(Math.max(activeIdx + 1, 0), Math.max(currentExercises.length - 1, 0));
-            const reference = currentExercises[nextIdx] || currentExercises[activeIdx] || {};
-
-            const method = String(reference?.method || DEFAULT_ADDED_EXERCISE.method || 'Normal');
-            const sets = Math.max(0, parseInt(reference?.sets) || 0) || DEFAULT_ADDED_EXERCISE.sets;
-            const restTime = Number(reference?.restTime ?? reference?.rest_time);
-            const cadence = String(reference?.cadence || DEFAULT_ADDED_EXERCISE.cadence || '');
-            const reps = String(reference?.reps || DEFAULT_ADDED_EXERCISE.reps || '');
-            const rpe = reference?.rpe ?? '';
-
-            const next = {
-                sets: (String(method).toLowerCase() === 'cardio') ? 1 : sets,
-                reps,
-                rpe,
-                restTime: Number.isFinite(restTime) && restTime >= 0 ? restTime : DEFAULT_ADDED_EXERCISE.restTime,
-                cadence,
-                method,
-                notes: ''
-            };
-
-            return next;
-        } catch {
-            return {
-                ...DEFAULT_ADDED_EXERCISE,
-                rpe: ''
-            };
-        }
-    };
-
-    const normalizeAddDraftToExercise = (draft) => {
-        const name = String(draft?.name || '').trim();
-        const method = String(draft?.method || 'Normal');
-        const setsNum = Math.max(0, parseInt(draft?.sets) || 0);
-        const restNum = Number(draft?.restTime);
-        const rpeNum = draft?.rpe === '' || draft?.rpe == null ? null : Number(draft?.rpe);
-        const cleanedRpe = Number.isFinite(rpeNum) ? rpeNum : (draft?.rpe === '' || draft?.rpe == null ? null : null);
-
-        return {
-            id: null,
-            performedExerciseId: draft?.performedExerciseId ? String(draft.performedExerciseId) : null,
-            name,
-            videoUrl: String(draft?.videoUrl || ''),
-            sets: (String(method).toLowerCase() === 'cardio') ? 1 : (setsNum || DEFAULT_ADDED_EXERCISE.sets),
-            reps: String(draft?.reps || ''),
-            rpe: cleanedRpe,
-            restTime: Number.isFinite(restNum) && restNum >= 0 ? restNum : DEFAULT_ADDED_EXERCISE.restTime,
-            cadence: String(draft?.cadence || ''),
-            method,
-            notes: String(draft?.notes || '')
-        };
-    };
-
-    const selectAddCandidate = async (picked) => {
-        try {
-            const pickedName = String(picked?.name || '').trim();
-            const pickedId = picked?.id ? String(picked.id) : null;
-            if (pickedName.length < 2) {
-                await alert('Exercício inválido. Tente novamente.', 'Erro');
-                return;
-            }
-
-            const suggested = getSuggestedAddConfig();
-            const nextDraft = {
-                ...addDraft,
-                ...suggested,
-                performedExerciseId: pickedId,
-                name: pickedName,
-                videoUrl: String(picked?.video_url ?? picked?.videoUrl ?? ''),
-            };
-
-            setAddSelected({
-                id: pickedId,
-                name: pickedName
-            });
-            setAddDraft(nextDraft);
-        } catch (e) {
-            await alert(e?.message || String(e || 'Erro ao selecionar exercício'), 'Erro');
-        }
-    };
-
-    const commitAddExercise = async () => {
-        try {
-            const currentWorkout = workoutRef.current;
-            const currentExercises = Array.isArray(currentWorkout?.exercises)
-                ? currentWorkout.exercises.filter(ex => ex && typeof ex === 'object')
-                : [];
-
-            const newExercise = normalizeAddDraftToExercise(addDraft);
-            if (!newExercise?.name || String(newExercise.name).trim().length < 2) {
-                await alert('Defina um nome válido para o exercício.', 'Erro');
-                return;
-            }
-
-            const maxLoggedIdx = getMaxLoggedExerciseIndex();
-            const activeIdx = Number.isFinite(currentExIdxRef.current) ? currentExIdxRef.current : 0;
-            const baseInsertAt = Math.min(Math.max(activeIdx + 1, 0), currentExercises.length);
-            const insertAt = Math.min(Math.max(Math.max(baseInsertAt, maxLoggedIdx + 1), 0), currentExercises.length);
-
-            const nextExercises = [...currentExercises];
-            nextExercises.splice(insertAt, 0, newExercise);
-
-            setExerciseDurations((prev) => {
-                const next = Array.isArray(prev) ? [...prev] : [];
-                next.splice(insertAt, 0, 0);
-                return next;
-            });
-
-            if (onUpdateSession) {
-                onUpdateSession({
-                    workout: {
-                        ...(currentWorkout || {}),
-                        exercises: nextExercises
-                    }
-                });
-            }
-
-            await sendWorkoutPatch({ kind: 'add', index: insertAt, exercise: newExercise });
-
-            setShowAddModal(false);
-            setAddSelected(null);
-        } catch (e) {
-            await alert(e?.message || String(e || 'Erro ao adicionar exercício'), 'Erro');
-        }
-    };
-
-    const applyCustomSwap = async () => {
-        try {
-            const pickedName = String(swapCustomName || swapQuery || '').trim();
-            if (pickedName.length < 2) {
-                await alert('Digite pelo menos 2 caracteres para criar um exercício.', 'Erro');
-                return;
-            }
-            await applySwap({ name: pickedName });
-        } catch (e) {
-            await alert(e?.message || String(e || 'Erro ao criar exercício'), 'Erro');
-        }
-    };
-
-    if (!workout || safeExercisesForEstimate.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center h-screen bg-neutral-900 text-white p-6 text-center">
-                <h2 className="text-xl font-bold text-red-500 mb-2">Erro na Sessão</h2>
-                <p className="text-neutral-400 mb-6">Os dados do treino parecem estar corrompidos ou incompletos.</p>
-                <button
-                    onClick={handleBackClick}
-                    className="bg-neutral-800 border border-neutral-700 px-6 py-3 rounded-xl font-bold hover:bg-neutral-700"
-                >
-                    Voltar para o Menu
-                </button>
-            </div>
-        );
+      } catch {}
+    } catch (e) {
+      const msg = e?.message ? String(e.message) : String(e);
+      await alert('Erro ao finalizar: ' + (msg || 'erro inesperado'));
+    } finally {
+      setFinishing(false);
     }
+  };
 
-    const getExerciseSetMeta = (exIdx, ex) => {
-        try {
-            const method = String(ex?.method || '');
-            const fallbackSets = (String(method).toLowerCase() === 'cardio') ? 1 : 4;
-            const parsedSets = parseInt(ex?.sets);
-            const configuredSets = (!isNaN(parsedSets) && parsedSets > 0) ? parsedSets : fallbackSets;
-
-            const existingLogsIndices = Object.keys(logs)
-                .filter(k => k.startsWith(`${exIdx}-`))
-                .map(k => parseInt(String(k).split('-')[1]));
-            const maxLogSet = existingLogsIndices.length > 0 ? Math.max(...existingLogsIndices) : -1;
-            const totalSets = Math.max(configuredSets, maxLogSet + 1);
-
-            const firstPendingSetIndex = (() => {
-                try {
-                    for (let i = 0; i < totalSets; i += 1) {
-                        const entry = logs[`${exIdx}-${i}`];
-                        if (!entry || !entry.done) return i;
-                    }
-                    return -1;
-                } catch {
-                    return -1;
-                }
-            })();
-
-            const activeSetIndex = firstPendingSetIndex === -1 ? (totalSets > 0 ? totalSets - 1 : 0) : firstPendingSetIndex;
-            return { totalSets, activeSetIndex };
-        } catch {
-            return { totalSets: 4, activeSetIndex: 0 };
-        }
-    };
-    const groupSize = Math.max(1, getTeamSize());
-    const estimatedSoloSeconds = safeExercisesForEstimate.reduce((acc, ex) => acc + calculateExerciseDuration(ex), 0);
-    const estimatedGroupSeconds = estimateWorkoutSecondsForGroup(safeExercisesForEstimate, groupSize);
-
-    const groupCount = Math.max(1, Array.isArray(groupStarts) ? groupStarts.length : 1);
-    const displayExercises = secondaryExercise
-        ? [
-            { exIdx: groupStartIndex, ex: primaryExercise },
-            { exIdx: groupStartIndex + 1, ex: secondaryExercise }
-        ]
-        : [{ exIdx: groupStartIndex, ex: primaryExercise }];
-
-    const handleAddSet = (exIdx, currentTotalSets) => {
-        const nextSetIdx = Math.max(0, Number(currentTotalSets) || 0);
-        updateLogValue(exIdx, nextSetIdx, 'weight', '');
-    };
-
-    
+  const renderNormalSet = (ex, exIdx, setIdx) => {
+    const key = `${exIdx}-${setIdx}`;
+    const log = getLog(key);
+    const cfg = getPlanConfig(ex, setIdx);
+    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+    const weightValue = String(log?.weight ?? cfg?.weight ?? '');
+    const repsValue = String(log?.reps ?? '');
+    const done = !!log?.done;
 
     return (
-        <div className="flex flex-col h-[100dvh] bg-neutral-900 overflow-hidden">
-            <InviteManager
-                isOpen={showInvite}
-                onClose={() => setShowInvite(false)}
-                onInvite={onSendInvite}
-            />
-
-            {/* Header Fixo */}
-            <div className="bg-neutral-900/95 backdrop-blur z-20 border-b border-neutral-800 pt-safe shrink-0">
-                <div className="h-4 w-full"></div>
-                <div className="p-4 flex justify-between items-center">
-                    <button type="button" onClick={handleBackClick} className="cursor-pointer relative z-10 p-2 rounded-full bg-neutral-800 text-white"><ArrowLeft size={20} className="pointer-events-none" /></button>
-                    <div className="text-center">
-                        <h2 className="font-black text-white leading-none text-sm">{workout.title}</h2>
-                        <div className="flex flex-col items-center mt-1">
-                            <p className="text-[10px] text-yellow-500 font-mono flex items-center justify-center gap-1">
-                                <Clock className="w-3 h-3" /><span>{formatTime(elapsed)}</span>
-                            </p>
-                            <p className="text-[10px] text-neutral-400">
-                                Tempo Estimado Solo: {toMinutesRounded(estimatedSoloSeconds)} min
-                            </p>
-                            {groupSize > 1 && (
-                                <p className="text-[10px] text-yellow-400">
-                                    Para {groupSize} pessoas: {toMinutesRounded(estimatedGroupSeconds)} min
-                                </p>
-                            )}
-                            {/* Indicador de Sessão em Equipe */}
-                            {teamSession && (
-                                <div className="flex items-center gap-1 mt-0.5 animate-pulse">
-                                    <Users size={10} className="text-green-500" />
-                                    <span className="text-[10px] text-green-500 font-bold uppercase tracking-wider">
-                                        {groupSize} treinando
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                try {
-                                    await handleFinish(false);
-                                } catch (e) {
-                                    await alert(e?.message || String(e || 'Erro ao finalizar'), 'Erro');
-                                }
-                            }}
-                            className="cursor-pointer relative z-10 px-3 h-11 bg-yellow-500 text-black rounded-full flex items-center justify-center gap-2 hover:bg-yellow-400 transition-colors"
-                        >
-                            <CheckCircle2 size={18} className="pointer-events-none" />
-                            <span className="text-xs font-black uppercase tracking-wider pointer-events-none">Finalizar</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={openEditWorkout}
-                            className="cursor-pointer relative z-10 w-11 h-11 bg-neutral-800 text-white rounded-full flex items-center justify-center hover:bg-neutral-700 transition-colors"
-                            title="Editar treino em andamento"
-                        >
-                            <Pencil size={18} className="pointer-events-none" />
-                        </button>
-                        <button type="button" onClick={() => setShowInvite(true)} className="cursor-pointer relative z-10 w-8 h-8 bg-blue-500/10 text-blue-500 rounded-full flex items-center justify-center hover:bg-blue-500 hover:text-white transition-colors">
-                            <UserPlus size={16} className="pointer-events-none" />
-                        </button>
-                        <button type="button" onClick={() => setShowFullList(true)} className="cursor-pointer relative z-10 w-11 h-11 bg-neutral-800 text-white rounded-full flex items-center justify-center hover:bg-neutral-700 transition-colors">
-                            <List size={20} className="pointer-events-none" />
-                        </button>
-                        
-                    </div>
-                </div>
-            </div>
-
-            {/* Barra de Progresso */}
-            <div className="px-4 py-2 bg-neutral-800/50 shrink-0">
-                    <div className="flex justify-between text-[10px] text-neutral-400 mb-1 uppercase font-bold">
-                    <span>Exercício {Math.min(groupIndex + 1, groupCount)} de {groupCount}</span>
-                    <span>{groupCount > 0 ? Math.round((Math.min(groupIndex + 1, groupCount) / groupCount) * 100) : 0}%</span>
-                </div>
-                <div className="h-1 bg-neutral-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-yellow-500 transition-all duration-300" style={{ width: `${groupCount > 0 ? (Math.min(groupIndex + 1, groupCount) / groupCount) * 100 : 0}%` }}></div>
-                </div>
-            </div>
-
-            {/* Conteúdo do Treino (Mantido igual) */}
-            <div className="flex-1 overflow-y-auto p-4 pb-6">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="max-w-[80%]">
-                        <div className="flex items-center gap-2">
-                            <h1 className="text-2xl font-black text-white uppercase leading-none">{primaryExercise?.name || 'Exercício'}</h1>
-                            {activeSwap && (
-                                <span className="inline-flex items-center gap-1 text-yellow-500 text-xs font-bold" title="Exercício trocado hoje">
-                                    <Repeat size={14} />
-                                </span>
-                            )}
-                            {secondaryExercise && (
-                                <span className="inline-flex items-center gap-1 text-black text-[10px] font-black uppercase tracking-wider bg-yellow-500 px-2 py-1 rounded-full">
-                                    Bi-Set
-                                </span>
-                            )}
-                        </div>
-                        {secondaryExercise ? (
-                            <div className="mt-2 text-sm font-black text-neutral-300 uppercase leading-tight">
-                                {secondaryExercise?.name || 'Exercício'}
-                            </div>
-                        ) : null}
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSwapQuery('');
-                                setSwapCustomName('');
-                                setSwapResults([]);
-                                setSwapError('');
-                                setShowSwapModal(true);
-                            }}
-                            className="mt-2 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-700"
-                        >
-                            <Repeat size={14} /> Trocar exercício
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setAddQuery('');
-                                setAddResults([]);
-                                setAddError('');
-                                setAddSelected(null);
-                                const suggested = getSuggestedAddConfig();
-                                setAddDraft({
-                                    id: null,
-                                    performedExerciseId: null,
-                                    name: '',
-                                    videoUrl: '',
-                                    sets: suggested?.sets ?? DEFAULT_ADDED_EXERCISE.sets,
-                                    reps: suggested?.reps ?? DEFAULT_ADDED_EXERCISE.reps,
-                                    rpe: suggested?.rpe ?? '',
-                                    restTime: suggested?.restTime ?? DEFAULT_ADDED_EXERCISE.restTime,
-                                    cadence: suggested?.cadence ?? DEFAULT_ADDED_EXERCISE.cadence,
-                                    method: suggested?.method ?? DEFAULT_ADDED_EXERCISE.method,
-                                    notes: suggested?.notes ?? DEFAULT_ADDED_EXERCISE.notes,
-                                });
-                                setShowAddModal(true);
-                            }}
-                            className="mt-2 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-700"
-                        >
-                            <Plus size={14} /> Adicionar próximo
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {primaryExercise?.videoUrl ? (
-                            <a href={primaryExercise.videoUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-neutral-800 rounded-lg text-yellow-500 hover:bg-neutral-700"><Video size={20} /></a>
-                        ) : null}
-                        {secondaryExercise?.videoUrl ? (
-                            <a href={secondaryExercise.videoUrl} target="_blank" rel="noopener noreferrer" className="p-2 bg-neutral-800 rounded-lg text-yellow-500 hover:bg-neutral-700"><Video size={20} /></a>
-                        ) : null}
-                    </div>
-                </div>
-
-                <div className={`mb-3 p-3 rounded-xl border ${pacerRemaining === 0 ? 'border-red-500 bg-red-900/20' : 'border-neutral-700 bg-neutral-900/40'}`}>
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Pacer</div>
-                    <div className={`text-2xl font-black ${pacerRemaining === 0 ? 'text-red-400' : 'text-yellow-400'}`}>{formatTime(pacerRemaining)}</div>
-                </div>
-
-                {primaryExercise?.notes && (
-                    <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-xl mb-4 text-blue-200 text-sm">
-                        <span className="font-bold text-blue-400 text-xs uppercase block mb-1">Notas do Coach:</span>
-                        {primaryExercise.notes}
-                    </div>
-                )}
-
-                {secondaryExercise?.notes ? (
-                    <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-xl mb-4 text-blue-200 text-sm">
-                        <span className="font-bold text-blue-400 text-xs uppercase block mb-1">Notas do Coach:</span>
-                        {secondaryExercise.notes}
-                    </div>
-                ) : null}
-
-                <div className="space-y-6">
-                    {displayExercises.map(({ exIdx, ex }) => {
-                        const safeName = String(ex?.name || 'Exercício');
-                        const prevByName = previousLogs && typeof previousLogs === 'object' ? (previousLogs[safeName] || null) : null;
-                        const { totalSets, activeSetIndex } = getExerciseSetMeta(exIdx, ex);
-                        const isCardio = isCardioExercise(ex);
-                        const isBikeOutdoor = isBikeOutdoorExercise(ex);
-                        const restTime = ex?.restTime ?? ex?.rest_time;
-
-                        return (
-                            <div key={exIdx} className={secondaryExercise ? 'rounded-2xl border border-neutral-800 bg-neutral-900/30 p-3' : ''}>
-                                {secondaryExercise ? (
-                                    <div className="flex items-start justify-between gap-3 mb-3">
-                                        <div className="min-w-0">
-                                            <div className="text-[10px] uppercase tracking-widest text-yellow-500 font-black">Bi-Set</div>
-                                            <div className="text-lg font-black text-white uppercase truncate">{safeName}</div>
-                                        </div>
-                                        {ex?.videoUrl ? (
-                                            <a href={ex.videoUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 p-2 bg-neutral-800 rounded-lg text-yellow-500 hover:bg-neutral-700"><Video size={18} /></a>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-
-                                <div className="space-y-3">
-                                    {isBikeOutdoor ? (
-                                        <div className="rounded-xl border border-neutral-700 bg-neutral-900/40 p-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Bike Outdoor (GPS)</div>
-                                                    <div className="text-xs text-neutral-500">
-                                                        {(() => {
-                                                            const s = String(bikeGps?.status || 'idle');
-                                                            if (s === 'tracking') return 'Rastreando';
-                                                            if (s === 'paused') return 'Pausado';
-                                                            if (s === 'error') return 'Erro';
-                                                            if (s === 'unavailable') return 'Indisponível';
-                                                            return 'Pronto';
-                                                        })()}
-                                                    </div>
-                                                </div>
-
-                                                <div className="text-right">
-                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Precisão</div>
-                                                    <div className="text-sm font-mono font-bold text-neutral-200">
-                                                        {Number.isFinite(Number(bikeGps?.accuracyMeters)) ? `±${Math.round(Number(bikeGps.accuracyMeters))}m` : '-'}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {bikeGps?.error ? (
-                                                <div className="mt-2 text-xs text-red-300 bg-red-900/20 border border-red-500/30 rounded-xl p-2">
-                                                    {bikeGps.error}
-                                                </div>
-                                            ) : null}
-
-                                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Peso (kg)</div>
-                                                    <input
-                                                        type="number"
-                                                        inputMode="decimal"
-                                                        min={BIKE_WEIGHT_MIN_KG}
-                                                        max={BIKE_WEIGHT_MAX_KG}
-                                                        placeholder={bikeGps?.weightKg ? String(bikeGps.weightKg) : 'Ex: 80'}
-                                                        value={bikeAnthroDraft?.weightKg ?? ''}
-                                                        onChange={(e) => {
-                                                            const nextDraft = { ...(bikeAnthroDraft || {}), weightKg: e?.target?.value ?? '' };
-                                                            setBikeAnthroDraft(nextDraft);
-                                                        }}
-                                                        onBlur={() => syncBikeAnthroFromDraft(bikeAnthroDraft)}
-                                                        className="w-full min-h-[44px] bg-black/20 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500 border border-neutral-800"
-                                                    />
-                                                </div>
-                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Altura (cm)</div>
-                                                    <input
-                                                        type="number"
-                                                        inputMode="decimal"
-                                                        min={BIKE_HEIGHT_MIN_CM}
-                                                        max={BIKE_HEIGHT_MAX_CM}
-                                                        placeholder={bikeGps?.heightCm ? String(bikeGps.heightCm) : 'Ex: 175'}
-                                                        value={bikeAnthroDraft?.heightCm ?? ''}
-                                                        onChange={(e) => {
-                                                            const nextDraft = { ...(bikeAnthroDraft || {}), heightCm: e?.target?.value ?? '' };
-                                                            setBikeAnthroDraft(nextDraft);
-                                                        }}
-                                                        onBlur={() => syncBikeAnthroFromDraft(bikeAnthroDraft)}
-                                                        className="w-full min-h-[44px] bg-black/20 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500 border border-neutral-800"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Distância</div>
-                                                    <div className="text-lg font-mono font-black text-white">
-                                                        {(() => {
-                                                            const km = (Number(bikeGps?.distanceMeters || 0) || 0) / 1000;
-                                                            return `${km.toFixed(2)} km`;
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Vel. Atual</div>
-                                                    <div className="text-lg font-mono font-black text-white">
-                                                        {(() => {
-                                                            const v = (Number(bikeGps?.currentSpeedMps || 0) || 0) * 3.6;
-                                                            return `${v.toFixed(1)} km/h`;
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Vel. Média</div>
-                                                    <div className="text-lg font-mono font-black text-white">
-                                                        {(() => {
-                                                            const startedAt = Number(bikeGps?.startedAt || 0);
-                                                            const endAt = Number(bikeGps?.isTracking ? Date.now() : (bikeGps?.lastFixAt || Date.now()));
-                                                            const durationSeconds = (Number.isFinite(startedAt) && startedAt > 0) ? Math.max(0, Math.round((endAt - startedAt) / 1000)) : 0;
-                                                            const km = (Number(bikeGps?.distanceMeters || 0) || 0) / 1000;
-                                                            const avg = durationSeconds > 0 ? (km / (durationSeconds / 3600)) : 0;
-                                                            return `${avg.toFixed(1)} km/h`;
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                                <div className="rounded-xl bg-black/30 border border-neutral-800 p-3">
-                                                    <div className="text-[10px] uppercase tracking-widest text-neutral-500">Vel. Máx</div>
-                                                    <div className="text-lg font-mono font-black text-white">
-                                                        {(() => {
-                                                            const v = (Number(bikeGps?.maxSpeedMps || 0) || 0) * 3.6;
-                                                            return `${v.toFixed(1)} km/h`;
-                                                        })()}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="mt-3 grid grid-cols-3 gap-2">
-                                                <button
-                                                    type="button"
-                                                    disabled={!isBikeActive || bikeGps?.status === 'unavailable'}
-                                                    onClick={() => {
-                                                        if (bikeGps?.isTracking) return;
-                                                        startBikeGps();
-                                                    }}
-                                                    className="min-h-[44px] rounded-xl bg-yellow-500 text-black font-black disabled:opacity-50 hover:bg-yellow-400 transition-colors"
-                                                >
-                                                    {bikeGps?.isTracking ? 'ATIVO' : 'INICIAR PEDAL'}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => pauseBikeGps({ persist: true })}
-                                                    className="min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 transition-colors"
-                                                >
-                                                    PAUSAR
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={resetBikeGps}
-                                                    className="min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 transition-colors"
-                                                >
-                                                    ZERAR
-                                                </button>
-                                            </div>
-
-                                            <div className="mt-2 text-[10px] text-neutral-500">
-                                                Dica: em alguns celulares o GPS pode pausar com a tela bloqueada.
-                                            </div>
-
-                                            <div className="mt-2 flex items-center justify-between gap-2">
-                                                {bikeBackgroundActive ? (
-                                                    <div className="text-[10px] text-yellow-500 font-bold">Modo Background Ativo 🎵</div>
-                                                ) : (
-                                                    <div className="text-[10px] text-neutral-500">Modo Background Inativo</div>
-                                                )}
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        try {
-                                                            const next = !keepScreenAwake;
-                                                            setKeepScreenAwake(next);
-                                                            persistBikeKeepScreenAwakeUi(next);
-                                                            if (next) {
-                                                                requestWakeLock();
-                                                            } else {
-                                                                releaseWakeLock();
-                                                            }
-                                                        } catch {}
-                                                    }}
-                                                    className={`min-h-[44px] px-3 rounded-xl border font-bold transition-colors ${keepScreenAwake ? 'bg-yellow-500 text-black border-yellow-500 hover:bg-yellow-400' : 'bg-neutral-800 text-neutral-200 border-neutral-700 hover:bg-neutral-700'}`}
-                                                >
-                                                    Manter Tela Ligada: {keepScreenAwake ? 'ON' : 'OFF'}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : null}
-
-                                    {isBikeOutdoor ? (
-                                        (() => {
-                                            const key = `${exIdx}-0`;
-                                            const log = logs[key] || {};
-                                            return (
-                                                <div className="rounded-xl border border-neutral-800 bg-black/20 p-3">
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <div>
-                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">RPE (opcional)</label>
-                                                            <input
-                                                                type="number"
-                                                                inputMode="numeric"
-                                                                min="1"
-                                                                max="10"
-                                                                placeholder="1-10"
-                                                                value={log.rpe || ''}
-                                                                onChange={e => updateLogValue(exIdx, 0, 'rpe', e.target.value)}
-                                                                className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                            />
-                                                        </div>
-                                                        <div className="flex items-end">
-                                                            <div className="text-[10px] text-neutral-500">
-                                                                GPS registra distância, velocidade e duração.
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="mt-2">
-                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Observação (opcional)</label>
-                                                        <textarea
-                                                            rows={2}
-                                                            placeholder="Vento, subidas, como se sentiu..."
-                                                            value={log.note || ''}
-                                                            onChange={e => updateLogValue(exIdx, 0, 'note', e.target.value)}
-                                                            className="w-full bg-black/30 text-white p-2 rounded-lg text-xs outline-none focus:ring-1 ring-yellow-500 resize-none"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()
-                                    ) : (
-                                        <>
-                                            {Array.from({ length: totalSets }).map((_, i) => {
-                                                const key = `${exIdx}-${i}`;
-                                                const log = logs[key] || {};
-                                                const prevLog = (prevByName && prevByName[i]) ? prevByName[i] : {};
-                                                const isActiveSet = i === activeSetIndex && !log.done;
-                                                const isWarmup = !!(log?.is_warmup ?? log?.isWarmup);
-
-                                                return (
-                                                    <div
-                                                        key={i}
-                                                        className={`p-3 rounded-xl border-2 transition-all ${
-                                                            log.done
-                                                                ? 'bg-green-900/20 border-green-500/60'
-                                                                : isActiveSet
-                                                                    ? 'bg-neutral-900 border-yellow-500/70 shadow-[0_0_0_1px_rgba(250,204,21,0.4)]'
-                                                                    : 'bg-neutral-800 border-neutral-800'
-                                                        }`}
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-neutral-400 text-sm">{i + 1}</div>
-                                                                {isWarmup ? (
-                                                                    <div className="px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-[10px] font-black uppercase tracking-widest">
-                                                                        Aquecimento
-                                                                    </div>
-                                                                ) : null}
-                                                            </div>
-
-                                                            <div className="flex-1 grid grid-cols-3 gap-2">
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Kg {prevLog.weight && <span className="text-neutral-600">({prevLog.weight})</span>}</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        inputMode="decimal"
-                                                                        placeholder={prevLog.weight || '-'}
-                                                                        value={log.weight || ''}
-                                                                        onChange={e => updateLogValue(exIdx, i, 'weight', e.target.value)}
-                                                                        className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">{isCardio ? 'Tempo (min)' : 'Reps'} {prevLog.reps && <span className="text-neutral-600">({prevLog.reps})</span>}</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        inputMode="decimal"
-                                                                        step="0.5"
-                                                                        placeholder={ex?.reps || '-'}
-                                                                        value={log.reps || ''}
-                                                                        onChange={e => {
-                                                                            const raw = e.target.value || '';
-                                                                            const normalized = raw.replace(',', '.');
-                                                                            updateLogValue(exIdx, i, 'reps', normalized);
-                                                                        }}
-                                                                        className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                    <p className="text-[9px] text-neutral-500 mt-0.5">Use .5 para meia repetição (ex: 6.5 = 6 e ½).</p>
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">RPE {prevLog.rpe && <span className="text-neutral-600">({prevLog.rpe})</span>}</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        inputMode="numeric"
-                                                                        min="1"
-                                                                        max="10"
-                                                                        placeholder={prevLog.rpe || '1-10'}
-                                                                        value={log.rpe || ''}
-                                                                        onChange={e => updateLogValue(exIdx, i, 'rpe', e.target.value)}
-                                                                        className="w-full bg-black/30 text-white p-2 rounded-lg text-center font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                    <p className="text-[9px] text-neutral-500 mt-0.5">RPE: 1 = muito fácil, 10 = esforço máximo.</p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div className="mt-2">
-                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Observação</label>
-                                                            <textarea
-                                                                rows={2}
-                                                                placeholder="Como foi essa série? Técnica, dificuldade, dor..."
-                                                                value={log.note || ''}
-                                                                onChange={e => updateLogValue(exIdx, i, 'note', e.target.value)}
-                                                                className="w-full bg-black/30 text-white p-2 rounded-lg text-xs outline-none focus:ring-1 ring-yellow-500 resize-none"
-                                                            />
-                                                        </div>
-
-                                                        <div className="mt-2 flex justify-end">
-                                                            <button
-                                                                onClick={() => toggleSet(exIdx, i, restTime)}
-                                                                className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${log.done ? 'bg-green-500 text-black shadow-[0_0_15px_rgba(34,197,94,0.5)]' : 'bg-neutral-700 text-neutral-400 hover:bg-neutral-600'}`}
-                                                            >
-                                                                <CheckCircle2 size={24} className={log.done ? 'scale-110' : ''} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-
-                                            <button onClick={() => handleAddSet(exIdx, totalSets)} className="w-full py-3 rounded-xl border-2 border-dashed border-neutral-700 text-neutral-500 font-bold hover:bg-neutral-800 hover:text-white transition-colors flex items-center justify-center gap-2">
-                                                <Plus size={18} /> Adicionar Série
-                                            </button>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-
-                    <div className="mt-4 grid grid-cols-2 gap-4 pb-[max(env(safe-area-inset-bottom),12px)]">
-                        <button
-                            disabled={isFirst}
-                            onClick={() => {
-                                const target = prevGroupStart == null ? 0 : prevGroupStart;
-                                setCurrentExIdx(target);
-                                setExerciseStartTs(Date.now());
-                            }}
-                            className="py-4 rounded-xl bg-neutral-800 font-bold text-neutral-400 disabled:opacity-50 hover:bg-neutral-700 transition-colors"
-                        >
-                            ANTERIOR
-                        </button>
-                        <button
-                            onClick={async () => {
-                                try {
-                                    if (isLast) {
-                                        await handleFinish(false);
-                                        return;
-                                    }
-                                    if (exerciseStartTs != null) {
-                                        const delta = Math.max(0, Math.floor((Date.now() - exerciseStartTs) / 1000));
-                                        setExerciseDurations(prev => {
-                                            const next = [...prev];
-                                            next[currentExIdx] = (next[currentExIdx] || 0) + delta;
-                                            return next;
-                                        });
-                                    }
-                                    const target = nextGroupStart == null ? currentExIdx + 1 : nextGroupStart;
-                                    setCurrentExIdx(target);
-                                    setExerciseStartTs(Date.now());
-                                } catch (e) {
-                                    await alert(e?.message || String(e || 'Erro ao avançar'), 'Erro');
-                                }
-                            }}
-                            className="py-4 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-colors"
-                        >
-                            {isLast ? 'FINALIZAR' : 'PRÓXIMO'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {showEditModal && editWorkoutDraft && (
-                <div className="fixed inset-0 z-[250] bg-black/80 backdrop-blur-sm">
-                    <div className="w-full h-full">
-                        <ExerciseEditor
-                            workout={editWorkoutDraft}
-                            onChange={handleEditWorkoutChange}
-                            onCancel={() => {
-                                setShowEditModal(false);
-                                setEditWorkoutDraft(null);
-                            }}
-                            onSave={applyEditWorkout}
-                            onSaved={() => {
-                                setShowEditModal(false);
-                                setEditWorkoutDraft(null);
-                            }}
-                        />
-                    </div>
-                </div>
-            )}
-            {showTransition && !isLast && (
-                <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowTransition(false)}>
-                    <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-4 border-b border-neutral-800">
-                            <h3 className="font-bold text-white">
-                                Próximo Desafio:{' '}
-                                {(() => {
-                                    const nextStart = nextGroupStart;
-                                    if (nextStart == null) return '';
-                                    const a = safeExercises[nextStart] || null;
-                                    if (!a) return '';
-                                    const b = canPairBiSet(a, safeExercises[nextStart + 1]) ? (safeExercises[nextStart + 1] || null) : null;
-                                    const aName = String(a?.name || '').trim();
-                                    const bName = b ? String(b?.name || '').trim() : '';
-                                    return b ? `${aName} + ${bName}` : aName;
-                                })()}
-                            </h3>
-                            <p className="text-neutral-400 text-sm">
-                                Tempo Alvo:{' '}
-                                {toMinutesRounded((() => {
-                                    const nextStart = nextGroupStart;
-                                    if (nextStart == null) return 0;
-                                    const a = safeExercises[nextStart] || null;
-                                    if (!a) return 0;
-                                    const b = canPairBiSet(a, safeExercises[nextStart + 1]) ? (safeExercises[nextStart + 1] || null) : null;
-                                    const aSeconds = estimateExerciseSeconds(a);
-                                    const bSeconds = b ? estimateExerciseSeconds(b) : 0;
-                                    const total = (Number(aSeconds) || 0) + (Number(bSeconds) || 0);
-                                    return total;
-                                })())} minutos
-                            </p>
-                        </div>
-                        <div className="p-4">
-                            <button className="w-full px-4 py-3 bg-yellow-500 text-black font-black rounded-xl" onClick={() => {
-                                setShowTransition(false);
-                                if (exerciseStartTs != null) {
-                                    const delta = Math.max(0, Math.floor((Date.now() - exerciseStartTs) / 1000));
-                                    setExerciseDurations(prev => {
-                                        const next = [...prev];
-                                        next[currentExIdx] = (next[currentExIdx] || 0) + delta;
-                                        return next;
-                                    });
-                                }
-                                const target = nextGroupStart == null ? currentExIdx + 1 : nextGroupStart;
-                                setCurrentExIdx(target);
-                                setExerciseStartTs(Date.now());
-                            }}>INICIAR AGORA</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            {showFullList && (
-            <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowFullList(false)}>
-                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-4 border-b border-neutral-800">
-                        <h3 className="font-bold text-white">Lista de Exercícios</h3>
-                    </div>
-                    <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto">
-                        {(Array.isArray(workout?.exercises) ? workout.exercises : []).map((ex, idx) => (
-                            <div key={idx} className={`p-3 rounded-xl border ${(idx === groupStartIndex || (secondaryExercise && idx === groupStartIndex + 1)) ? 'border-yellow-500 bg-yellow-900/10' : 'border-neutral-700 bg-neutral-800'}`}>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-white font-bold text-sm flex items-center gap-2">
-                                        <span>{ex?.name || 'Exercício'}</span>
-                                        {ex?.swap && typeof ex.swap === 'object' && <Repeat size={14} className="text-yellow-500" />}
-                                    </span>
-                                    <span className="text-xs text-neutral-400">{idx + 1} / {(Array.isArray(workout?.exercises) ? workout.exercises.length : 0)}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="p-4 border-t border-neutral-800">
-                        <button className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl" onClick={() => setShowFullList(false)}>Fechar</button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {showSwapModal && (
-            <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowSwapModal(false)}>
-                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
-                        <div>
-                            <h3 className="font-bold text-white">Trocar Exercício</h3>
-                            <p className="text-xs text-neutral-400 mt-0.5">Metas (séries/reps/RPE/descanso) são mantidas.</p>
-                        </div>
-                        <button type="button" onClick={() => setShowSwapModal(false)} className="w-9 h-9 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 flex items-center justify-center hover:bg-neutral-700">
-                            <X size={18} />
-                        </button>
-                    </div>
-
-                    <div className="p-4">
-                        <div className="relative">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-                            <input
-                                value={swapQuery}
-                                onChange={(e) => setSwapQuery(e.target.value)}
-                                placeholder="Buscar na base global..."
-                                className="w-full pl-9 pr-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                            />
-                        </div>
-
-                        <div className="mt-3 p-3 rounded-xl border border-neutral-800 bg-neutral-800/20">
-                            <div className="text-xs font-bold text-neutral-200">Não achou? Crie um exercício avulso</div>
-                            <div className="mt-2 flex gap-2">
-                                <input
-                                    value={swapCustomName}
-                                    onChange={(e) => setSwapCustomName(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key !== 'Enter') return;
-                                        const candidate = String(swapCustomName || '').trim();
-                                        if (candidate.length < 2) return;
-                                        e.preventDefault();
-                                        applyCustomSwap();
-                                    }}
-                                    placeholder="Ex: Leg press horizontal"
-                                    className="flex-1 px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={applyCustomSwap}
-                                    disabled={swapLoading || String(swapCustomName || '').trim().length < 2}
-                                    className={`px-4 py-3 rounded-xl font-black transition-colors ${swapLoading || String(swapCustomName || '').trim().length < 2 ? 'bg-neutral-800 border border-neutral-700 text-neutral-500' : 'bg-yellow-500 text-black hover:bg-yellow-400'}`}
-                                >
-                                    Usar
-                                </button>
-                            </div>
-                            <div className="text-[10px] text-neutral-500 mt-2">Troca apenas no treino de hoje.</div>
-                        </div>
-
-                        {swapError && (
-                            <div className="mt-3 p-3 rounded-xl border border-red-500/30 bg-red-900/20 text-red-200 text-sm">
-                                {swapError}
-                            </div>
-                        )}
-
-                        <div className="mt-3 space-y-2 max-h-[50vh] overflow-y-auto">
-                            {swapLoading && (
-                                <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-800/40 text-neutral-300 text-sm">
-                                    Buscando...
-                                </div>
-                            )}
-
-                            {!swapLoading && (Array.isArray(swapResults) ? swapResults : []).length === 0 && String(swapQuery || '').trim().length >= 2 && !swapError && (
-                                <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-800/40 text-neutral-300 text-sm">
-                                    Nenhum exercício encontrado.
-                                </div>
-                            )}
-
-                            {(Array.isArray(swapResults) ? swapResults : []).map((r) => (
-                                <button
-                                    type="button"
-                                    key={String(r?.id || Math.random())}
-                                    onClick={() => applySwap(r)}
-                                    className="w-full text-left p-3 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white"
-                                >
-                                    <div className="font-bold text-sm">{String(r?.name || 'Exercício')}</div>
-                                    <div className="text-xs text-neutral-400 mt-0.5">ID: {String(r?.id || '-')}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="p-4 border-t border-neutral-800">
-                        <button
-                            type="button"
-                            onClick={() => setShowSwapModal(false)}
-                            className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl hover:bg-neutral-700"
-                        >
-                            Cancelar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {showAddModal && (
-            <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
-                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
-                        <div>
-                            <h3 className="font-bold text-white">Adicionar Exercício</h3>
-                            <p className="text-xs text-neutral-400 mt-0.5">Entra só na sessão de hoje e aparece no relatório.</p>
-                        </div>
-                        <button type="button" onClick={() => setShowAddModal(false)} className="w-9 h-9 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 flex items-center justify-center hover:bg-neutral-700">
-                            <X size={18} />
-                        </button>
-                    </div>
-
-                    <div className="p-4">
-                        <div className="relative">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-                            <input
-                                value={addQuery}
-                                onChange={(e) => setAddQuery(e.target.value)}
-                                placeholder="Buscar na base global..."
-                                className="w-full pl-9 pr-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                            />
-                        </div>
-
-                        <div className="mt-3 p-3 rounded-xl border border-neutral-800 bg-neutral-800/20">
-                            <div className="flex items-center justify-between gap-3">
-                                <div>
-                                    <div className="text-xs font-bold text-neutral-200">Configuração do exercício</div>
-                                    <div className="text-[10px] text-neutral-500 mt-0.5">Selecione na busca ou preencha manualmente.</div>
-                                </div>
-                                {addSelected?.name && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setAddSelected(null);
-                                            const suggested = getSuggestedAddConfig();
-                                            setAddDraft((prev) => ({
-                                                ...prev,
-                                                ...suggested,
-                                                performedExerciseId: null,
-                                                videoUrl: '',
-                                                name: ''
-                                            }));
-                                        }}
-                                        className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-700"
-                                    >
-                                        Limpar
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="mt-3 grid grid-cols-2 gap-2">
-                                <div className="col-span-2">
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Nome</label>
-                                    <input
-                                        value={String(addDraft?.name || '')}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, name: e.target.value }))}
-                                        placeholder="Ex: Abdominal infra"
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Séries</label>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        min="0"
-                                        value={Number.isFinite(Number(addDraft?.sets)) ? Number(addDraft?.sets) : ''}
-                                        disabled={String(addDraft?.method || '').toLowerCase() === 'cardio'}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, sets: e.target.value }))}
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500 disabled:opacity-60"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Reps</label>
-                                    <input
-                                        value={String(addDraft?.reps || '')}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, reps: e.target.value }))}
-                                        placeholder="10 / 12 / 8-10"
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">RPE</label>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        min="1"
-                                        max="10"
-                                        value={addDraft?.rpe == null ? '' : String(addDraft?.rpe)}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, rpe: e.target.value }))}
-                                        placeholder="1-10"
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Descanso (s)</label>
-                                    <input
-                                        type="number"
-                                        inputMode="numeric"
-                                        min="0"
-                                        value={Number.isFinite(Number(addDraft?.restTime)) ? Number(addDraft?.restTime) : ''}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, restTime: e.target.value }))}
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Cadência</label>
-                                    <input
-                                        value={String(addDraft?.cadence || '')}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, cadence: e.target.value }))}
-                                        placeholder="Ex: 2020"
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                    />
-                                </div>
-
-                                <div className="col-span-2">
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Método</label>
-                                    <select
-                                        value={String(addDraft?.method || 'Normal')}
-                                        onChange={(e) => {
-                                            const nextMethod = e.target.value;
-                                            setAddDraft((prev) => ({
-                                                ...prev,
-                                                method: nextMethod,
-                                                sets: String(nextMethod).toLowerCase() === 'cardio' ? 1 : prev.sets
-                                            }));
-                                        }}
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                    >
-                                        {METHOD_OPTIONS.map((m) => (
-                                            <option key={m} value={m}>{m}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="col-span-2">
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Vídeo (opcional)</label>
-                                    <input
-                                        value={String(addDraft?.videoUrl || '')}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, videoUrl: e.target.value }))}
-                                        placeholder="https://..."
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500"
-                                    />
-                                </div>
-
-                                <div className="col-span-2">
-                                    <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Notas (opcional)</label>
-                                    <textarea
-                                        rows={2}
-                                        value={String(addDraft?.notes || '')}
-                                        onChange={(e) => setAddDraft((prev) => ({ ...prev, notes: e.target.value }))}
-                                        placeholder="Ex: foco em técnica / sem dor"
-                                        className="w-full px-3 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-white outline-none focus:ring-1 ring-yellow-500 resize-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mt-3">
-                                <button
-                                    type="button"
-                                    onClick={commitAddExercise}
-                                    disabled={String(addDraft?.name || '').trim().length < 2}
-                                    className={`w-full px-4 py-3 rounded-xl font-black transition-colors ${String(addDraft?.name || '').trim().length < 2 ? 'bg-neutral-800 border border-neutral-700 text-neutral-500' : 'bg-yellow-500 text-black hover:bg-yellow-400'}`}
-                                >
-                                    Adicionar ao treino
-                                </button>
-                            </div>
-                        </div>
-
-                        {addError && (
-                            <div className="mt-3 p-3 rounded-xl border border-red-500/30 bg-red-900/20 text-red-200 text-sm">
-                                {addError}
-                            </div>
-                        )}
-
-                        <div className="mt-3 space-y-2 max-h-[50vh] overflow-y-auto">
-                            {addLoading && (
-                                <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-800/40 text-neutral-300 text-sm">
-                                    Buscando...
-                                </div>
-                            )}
-
-                            {!addLoading && (Array.isArray(addResults) ? addResults : []).length === 0 && String(addQuery || '').trim().length >= 2 && !addError && (
-                                <div className="p-3 rounded-xl border border-neutral-800 bg-neutral-800/40 text-neutral-300 text-sm">
-                                    Nenhum exercício encontrado.
-                                </div>
-                            )}
-
-                            {(Array.isArray(addResults) ? addResults : []).map((r) => (
-                                <button
-                                    type="button"
-                                    key={String(r?.id || Math.random())}
-                                    onClick={() => selectAddCandidate(r)}
-                                    className="w-full text-left p-3 rounded-xl border border-neutral-700 bg-neutral-800 hover:bg-neutral-700 text-white"
-                                >
-                                    <div className="font-bold text-sm">{String(r?.name || 'Exercício')}</div>
-                                    <div className="text-xs text-neutral-400 mt-0.5">ID: {String(r?.id || '-')}</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="p-4 border-t border-neutral-800">
-                        <button
-                            type="button"
-                            onClick={() => setShowAddModal(false)}
-                            className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl hover:bg-neutral-700"
-                        >
-                            Cancelar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-        </div>
+      <div className="flex items-center gap-2" key={key}>
+        <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+        <input
+          inputMode="decimal"
+          value={weightValue}
+          onChange={(e) => {
+            const v = e?.target?.value ?? '';
+            updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+          }}
+          placeholder="kg"
+          className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+        />
+        <input
+          inputMode="numeric"
+          value={repsValue}
+          onChange={(e) => {
+            const v = e?.target?.value ?? '';
+            updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+          }}
+          placeholder="reps"
+          className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const nextDone = !done;
+            updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
+            if (nextDone && restTime && restTime > 0) {
+              startTimer(restTime, { kind: 'rest', key });
+            }
+          }}
+          className={
+            done
+              ? 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+              : 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
+          }
+        >
+          <Check size={16} />
+          <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+        </button>
+      </div>
     );
-};
+  };
 
-export default ActiveWorkout;
+  const renderRestPauseSet = (ex, exIdx, setIdx) => {
+    const key = `${exIdx}-${setIdx}`;
+    const log = getLog(key);
+    const cfg = getPlanConfig(ex, setIdx);
+    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+
+    const pauseSec = coerceNumber(cfg?.rest_time_sec) ?? 15;
+    const miniSets = Math.max(0, Math.floor(coerceNumber(cfg?.mini_sets) ?? 0));
+
+    const rp = isObject(log?.rest_pause) ? log.rest_pause : {};
+    const activation = coerceNumber(rp?.activation_reps) ?? null;
+    const minisArrRaw = Array.isArray(rp?.mini_reps) ? rp.mini_reps : [];
+    const minis = Array.from({ length: miniSets }).map((_, idx) => {
+      const v = minisArrRaw?.[idx];
+      const n = coerceNumber(v);
+      return n;
+    });
+
+    const total = (activation ?? 0) + minis.reduce((acc, v) => acc + (v ?? 0), 0);
+    const done = !!log?.done;
+    const canDone = (activation ?? 0) > 0 && (miniSets === 0 || minis.every((v) => Number.isFinite(v) && v > 0));
+
+    const lastAfterActivation = Number(rp?.last_rest_after_activation);
+    const lastAfterMini = Number(rp?.last_rest_after_mini);
+
+    const updateRp = (patch) => {
+      const nextRp = { ...rp, ...(patch && typeof patch === 'object' ? patch : {}) };
+      updateLog(key, {
+        rest_pause: nextRp,
+        reps: String(total || ''),
+        done: !!log?.done,
+        weight: String(log?.weight ?? cfg?.weight ?? ''),
+        advanced_config: cfg ?? log?.advanced_config ?? null,
+      });
+    };
+
+    const maybeStartMicroRest = (contextMiniIndex, guardKey) => {
+      try {
+        if (!pauseSec || pauseSec <= 0) return;
+        const idx = Number(contextMiniIndex);
+        if (!Number.isFinite(idx) || idx < 0) return;
+        if (guardKey === 'activation') {
+          if (Number.isFinite(lastAfterActivation) && lastAfterActivation >= 1) return;
+          startTimer(pauseSec, { kind: 'rest_pause', key, miniIndex: idx });
+          updateRp({ last_rest_after_activation: 1 });
+          return;
+        }
+        const last = Number.isFinite(lastAfterMini) ? lastAfterMini : -1;
+        if (idx <= last) return;
+        startTimer(pauseSec, { kind: 'rest_pause', key, miniIndex: idx });
+        updateRp({ last_rest_after_mini: idx });
+      } catch {}
+    };
+
+    return (
+      <div key={key} className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+          <input
+            inputMode="decimal"
+            value={String(log?.weight ?? cfg?.weight ?? '')}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+            }}
+            placeholder="kg"
+            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Rest-P</span>
+            <span className="text-xs text-neutral-400 truncate">Total: {total || 0} reps</span>
+          </div>
+          <button
+            type="button"
+            disabled={!canDone}
+            onClick={() => {
+              const nextDone = !done;
+              updateLog(key, {
+                done: nextDone,
+                reps: String(total || ''),
+                rest_pause: { ...rp, activation_reps: activation ?? null, mini_reps: minis },
+                advanced_config: cfg ?? log?.advanced_config ?? null,
+              });
+              if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key });
+            }}
+            className={
+              canDone
+                ? done
+                  ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                  : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
+                : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
+            }
+          >
+            <Check size={16} />
+            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Ativação</div>
+            <input
+              inputMode="numeric"
+              value={activation == null ? '' : String(activation)}
+              onChange={(e) => {
+                const v = coerceNumber(e?.target?.value);
+                const nextActivation = v != null && v > 0 ? v : null;
+                updateRp({ activation_reps: nextActivation });
+              }}
+              onBlur={() => {
+                if ((activation ?? 0) > 0 && miniSets > 0 && (minis?.[0] == null || minis?.[0] <= 0)) {
+                  maybeStartMicroRest(0, 'activation');
+                }
+              }}
+              placeholder="reps"
+              className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+            />
+          </div>
+
+          {Array.from({ length: miniSets }).map((_, idx) => {
+            const current = minis?.[idx] ?? null;
+            return (
+              <div key={`${key}-mini-${idx}`} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Mini {idx + 1}</div>
+                <input
+                  inputMode="numeric"
+                  value={current == null ? '' : String(current)}
+                  ref={(el) => {
+                    if (!restPauseRefs.current[key]) restPauseRefs.current[key] = {};
+                    restPauseRefs.current[key][idx] = el;
+                  }}
+                  onChange={(e) => {
+                    const v = coerceNumber(e?.target?.value);
+                    const next = v != null && v > 0 ? v : null;
+                    const nextMiniReps = [...minis];
+                    nextMiniReps[idx] = next;
+                    updateRp({ mini_reps: nextMiniReps });
+                  }}
+                  onBlur={() => {
+                    if (idx < miniSets - 1) {
+                      const currentVal = minis?.[idx] ?? null;
+                      const nextVal = minis?.[idx + 1] ?? null;
+                      if ((currentVal ?? 0) > 0 && (nextVal ?? 0) <= 0) {
+                        maybeStartMicroRest(idx + 1, 'mini');
+                      }
+                    }
+                  }}
+                  placeholder="reps"
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderClusterSet = (ex, exIdx, setIdx) => {
+    const key = `${exIdx}-${setIdx}`;
+    const log = getLog(key);
+    const cfg = getPlanConfig(ex, setIdx);
+    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+
+    const totalRepsPlanned = coerceNumber(cfg?.total_reps);
+    const clusterSize = coerceNumber(cfg?.cluster_size);
+    const intra = coerceNumber(cfg?.intra_rest_sec) ?? 15;
+    const plannedBlocks = buildPlannedBlocks(totalRepsPlanned, clusterSize);
+
+    const cluster = isObject(log?.cluster) ? log.cluster : {};
+    const blocksRaw = Array.isArray(cluster?.blocks) ? cluster.blocks : [];
+    const blocks = plannedBlocks.map((_, idx) => {
+      const v = blocksRaw?.[idx];
+      const n = coerceNumber(v);
+      return n;
+    });
+
+    const total = blocks.reduce((acc, v) => acc + (v ?? 0), 0);
+    const done = !!log?.done;
+    const canDone = plannedBlocks.length > 0 && blocks.every((v) => Number.isFinite(v) && v > 0);
+
+    const lastRestAfterBlock = Number(cluster?.last_rest_after_block);
+    const lastRest = Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : -1;
+
+    const updateCluster = (patch) => {
+      const nextCluster = {
+        planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
+        ...cluster,
+        ...(patch && typeof patch === 'object' ? patch : {}),
+      };
+      updateLog(key, {
+        cluster: nextCluster,
+        reps: String(total || ''),
+        done: !!log?.done,
+        weight: String(log?.weight ?? cfg?.weight ?? ''),
+        advanced_config: cfg ?? log?.advanced_config ?? null,
+      });
+    };
+
+    const maybeStartIntraRest = (afterBlockIndex) => {
+      try {
+        const idx = Number(afterBlockIndex);
+        if (!Number.isFinite(idx) || idx < 0) return;
+        if (idx >= plannedBlocks.length - 1) return;
+        if (idx <= lastRest) return;
+        if (!intra || intra <= 0) return;
+        startTimer(intra, { kind: 'cluster', key, blockIndex: idx });
+        updateCluster({ last_rest_after_block: idx });
+      } catch {}
+    };
+
+    const notation = plannedBlocks.length ? plannedBlocks.join('+') : '';
+
+    return (
+      <div key={key} className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+          <input
+            inputMode="decimal"
+            value={String(log?.weight ?? cfg?.weight ?? '')}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+            }}
+            placeholder="kg"
+            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Cluster</span>
+            <span className="text-xs text-neutral-400 truncate">
+              {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={!canDone}
+            onClick={() => {
+              const nextDone = !done;
+              updateLog(key, {
+                done: nextDone,
+                reps: String(total || ''),
+                cluster: {
+                  planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
+                  blocks,
+                  last_rest_after_block: Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : null,
+                },
+                advanced_config: cfg ?? log?.advanced_config ?? null,
+              });
+              if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key });
+            }}
+            className={
+              canDone
+                ? done
+                  ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                  : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
+                : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
+            }
+          >
+            <Check size={16} />
+            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+          </button>
+        </div>
+
+        {plannedBlocks.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {plannedBlocks.map((planned, idx) => {
+              const current = blocks?.[idx] ?? null;
+              return (
+                <div key={`${key}-block-${idx}`} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
+                    <div className="text-[10px] font-mono text-neutral-500">plan {planned}</div>
+                  </div>
+                  <input
+                    inputMode="numeric"
+                    value={current == null ? '' : String(current)}
+                    ref={(el) => {
+                      if (!clusterRefs.current[key]) clusterRefs.current[key] = {};
+                      clusterRefs.current[key][idx] = el;
+                    }}
+                    onChange={(e) => {
+                      const v = coerceNumber(e?.target?.value);
+                      const next = v != null && v > 0 ? v : null;
+                      const nextBlocks = [...blocks];
+                      nextBlocks[idx] = next;
+                      updateCluster({ blocks: nextBlocks });
+                    }}
+                    onBlur={() => {
+                      const cur = blocks?.[idx] ?? null;
+                      const next = blocks?.[idx + 1] ?? null;
+                      if (idx < plannedBlocks.length - 1 && (cur ?? 0) > 0 && (next ?? 0) <= 0) {
+                        maybeStartIntraRest(idx);
+                      }
+                    }}
+                    placeholder="reps"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderSet = (ex, exIdx, setIdx) => {
+    const cfg = getPlanConfig(ex, setIdx);
+    const method = String(ex?.method || '').trim();
+    const isCluster = method === 'Cluster' || isClusterConfig(cfg);
+    const isRestPause = method === 'Rest-Pause' || isRestPauseConfig(cfg);
+    if (isCluster) return renderClusterSet(ex, exIdx, setIdx);
+    if (isRestPause) return renderRestPauseSet(ex, exIdx, setIdx);
+    return renderNormalSet(ex, exIdx, setIdx);
+  };
+
+  const renderExercise = (ex, exIdx) => {
+    const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
+    const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
+    const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
+    const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+    const collapsedNow = collapsed.has(exIdx);
+    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+
+    return (
+      <div key={`ex-${exIdx}`} className="rounded-xl bg-neutral-800 border border-neutral-700 p-4">
+        <button
+          type="button"
+          onClick={() => toggleCollapse(exIdx)}
+          className="w-full flex items-start justify-between gap-3"
+        >
+          <div className="min-w-0 text-left">
+            <div className="flex items-center gap-2">
+              <Dumbbell size={16} className="text-yellow-500" />
+              <h3 className="font-black text-white truncate">{name}</h3>
+            </div>
+            <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
+              <span className="font-mono">{setsCount} sets</span>
+              <span className="opacity-30">•</span>
+              <span className="font-mono">{restTime ? `${restTime}s` : '-'}</span>
+              <span className="opacity-30">•</span>
+              <span className="truncate">{String(ex?.method || 'Normal')}</span>
+            </div>
+          </div>
+          <div className="mt-1 text-neutral-400">
+            {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+          </div>
+        </button>
+
+        {!collapsedNow && (
+          <div className="mt-4 space-y-3">
+            {Array.from({ length: setsCount }).map((_, setIdx) => renderSet(ex, exIdx, setIdx))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (!session || !workout) {
+    return (
+      <div className="min-h-screen bg-neutral-900 text-white p-6">
+        <div className="max-w-lg mx-auto rounded-xl bg-neutral-800 border border-neutral-700 p-6">
+          <div className="text-sm text-neutral-300">Sessão inválida.</div>
+          <div className="mt-4">
+            <BackButton onClick={props?.onBack} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
+      <div className="sticky top-0 z-40 bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 py-4 pt-safe">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
+          <BackButton onClick={props?.onBack} />
+          <div className="min-w-0 flex-1">
+            <div className="font-black text-white truncate text-right">{String(workout?.title || 'Treino')}</div>
+            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-1">
+              <Clock size={14} className="text-yellow-500" />
+              <span className="font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-6 py-4 pb-28 space-y-4">
+        {exercises.length === 0 ? (
+          <div className="rounded-xl bg-neutral-800 border border-neutral-700 p-6 text-neutral-300">Sem exercícios neste treino.</div>
+        ) : (
+          exercises.map((ex, exIdx) => renderExercise(ex, exIdx))
+        )}
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await confirm('Cancelar treino em andamento? (não salva no histórico)', 'Cancelar');
+              if (!ok) return;
+              try {
+                if (typeof props?.onFinish === 'function') props.onFinish(null, false);
+              } catch {}
+            }}
+            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+          >
+            <X size={16} />
+            <span className="text-sm">Cancelar</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={finishing}
+            onClick={finishWorkout}
+            className={
+              finishing
+                ? 'inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-yellow-500/70 text-black font-black cursor-wait'
+                : 'inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400'
+            }
+          >
+            <Save size={16} />
+            <span className="text-sm">Finalizar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

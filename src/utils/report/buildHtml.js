@@ -10,11 +10,21 @@ export function buildReportHTML(session, previousSession, studentName = '') {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`
   }
   const calculateTotalVolume = (logs) => {
-    let volume = 0
-    Object.values(logs || {}).forEach(log => {
-      if (log && log.weight && log.reps) volume += (parseFloat(log.weight) * parseFloat(log.reps))
-    })
-    return volume
+    try {
+      let volume = 0
+      const safeLogs = logs && typeof logs === 'object' ? logs : {}
+      Object.values(safeLogs).forEach((log) => {
+        if (!log || typeof log !== 'object') return
+        const w = Number(String(log.weight ?? '').replace(',', '.'))
+        const r = Number(String(log.reps ?? '').replace(',', '.'))
+        if (!Number.isFinite(w) || !Number.isFinite(r)) return
+        if (w <= 0 || r <= 0) return
+        volume += w * r
+      })
+      return volume
+    } catch {
+      return 0
+    }
   }
   const currentVolume = calculateTotalVolume(session?.logs || {})
   const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs || {}) : 0
@@ -64,15 +74,19 @@ export function buildReportHTML(session, previousSession, studentName = '') {
   })()
 
   const prevLogsMap = {}
-  if (previousSession && Array.isArray(previousSession.exercises) && previousSession.logs) {
+  const safePrevLogs = previousSession?.logs && typeof previousSession.logs === 'object' ? previousSession.logs : {}
+  if (previousSession && Array.isArray(previousSession?.exercises)) {
     previousSession.exercises.forEach((ex, exIdx) => {
+      if (!ex || typeof ex !== 'object') return
+      const exName = String(ex?.name || '').trim()
+      if (!exName) return
       const exLogs = []
-      Object.keys(previousSession.logs || {}).forEach(key => {
+      Object.keys(safePrevLogs).forEach(key => {
         const parts = String(key || '').split('-')
         const eIdx = parseInt(parts[0] || '0', 10)
-        if (eIdx === exIdx) exLogs.push(previousSession.logs[key])
+        if (eIdx === exIdx) exLogs.push(safePrevLogs[key])
       })
-      if (ex && ex.name) prevLogsMap[ex.name] = exLogs
+      prevLogsMap[exName] = exLogs
     })
   }
 
@@ -108,9 +122,11 @@ export function buildReportHTML(session, previousSession, studentName = '') {
     let rows = ''
     for (let sIdx = 0; sIdx < sets; sIdx++) {
       const key = `${exIdx}-${sIdx}`
-      const log = session && session.logs ? session.logs[key] : null
+      const safeSessionLogs = session?.logs && typeof session.logs === 'object' ? session.logs : {}
+      const log = safeSessionLogs[key]
       const prevLog = prevLogs[sIdx]
-      if (!log || (!log.weight && !log.reps)) continue
+      if (!log || typeof log !== 'object') continue
+      if (!log.weight && !log.reps) continue
       let progressionText = '-'
       let progressionClass = ''
       if (prevLog && prevLog.weight) {

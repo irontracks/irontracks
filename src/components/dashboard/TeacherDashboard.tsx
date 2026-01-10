@@ -24,6 +24,7 @@ type Props = {
   exportingAll?: boolean
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
+  onOpenIronScanner: () => void
 }
 
 export default function TeacherDashboard(props: Props) {

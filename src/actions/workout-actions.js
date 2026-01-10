@@ -2,8 +2,546 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const SETS_INSERT_CHUNK_SIZE = 200;
+
+const POST_WORKOUT_AI_MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash';
+
+const extractJsonFromText = (raw) => {
+    const text = String(raw || '').trim();
+    if (!text) return null;
+
+    let candidate = text;
+    if (candidate.startsWith('```')) {
+        const firstBreak = candidate.indexOf('\n');
+        const lastFence = candidate.lastIndexOf('```');
+        if (firstBreak !== -1 && lastFence !== -1) {
+            candidate = candidate.substring(firstBreak + 1, lastFence).trim();
+        }
+    }
+
+    try {
+        return JSON.parse(candidate);
+    } catch {
+        const start = candidate.indexOf('{');
+        const end = candidate.lastIndexOf('}');
+        if (start === -1 || end === -1 || end <= start) return null;
+        const slice = candidate.substring(start, end + 1);
+        try {
+            return JSON.parse(slice);
+        } catch {
+            return null;
+        }
+    }
+};
+
+const normalizeSessionForAi = (session, user) => {
+    const s = session && typeof session === 'object' ? session : null;
+    if (!s) return null;
+
+    const exercisesArr = Array.isArray(s.exercises) ? s.exercises : [];
+    const logsObj = s.logs && typeof s.logs === 'object' ? s.logs : {};
+
+    const maxExercises = 40;
+    const maxSetsTotal = 260;
+    const maxSetsPerExercise = 20;
+
+    let remainingSets = maxSetsTotal;
+    const exercises = exercisesArr.slice(0, maxExercises).map((ex, exIdx) => {
+        const exSafe = ex && typeof ex === 'object' ? ex : {};
+        const name = String(exSafe.name || '').trim();
+        const targetReps = String(exSafe.reps ?? '').trim();
+        const method = String(exSafe.method ?? '').trim();
+        const notes = String(exSafe.notes ?? '').trim();
+
+        const requestedSets = Number(exSafe.sets) || 0;
+        const cap = Math.max(0, Math.min(maxSetsPerExercise, requestedSets, remainingSets));
+        remainingSets -= cap;
+
+        const sets = Array.from({ length: cap }).map((_, setIndex) => {
+            const key = `${exIdx}-${setIndex}`;
+            const log = logsObj?.[key] && typeof logsObj[key] === 'object' ? logsObj[key] : {};
+
+            const restPauseActivation = (() => {
+                try {
+                    const rp = log?.rest_pause && typeof log.rest_pause === 'object' ? log.rest_pause : null;
+                    const v = Number(String(rp?.activation_reps ?? '').replace(',', '.'));
+                    return Number.isFinite(v) && v > 0 ? v : null;
+                } catch {
+                    return null;
+                }
+            })();
+
+            return {
+                set: setIndex + 1,
+                weight: String(log?.weight ?? '').trim(),
+                reps: String(log?.reps ?? '').trim(),
+                done: !!log?.done,
+                rpe: log?.rpe ?? null,
+                advanced_config: log?.advanced_config ?? log?.advancedConfig ?? null,
+                rest_pause_activation_reps: restPauseActivation
+            };
+        });
+
+        return {
+            name,
+            targetReps,
+            method,
+            notes,
+            sets
+        };
+    }).filter((x) => !!x && typeof x === 'object' && String(x.name || '').length > 0);
+
+    const teamMeta = s.teamMeta && typeof s.teamMeta === 'object' ? s.teamMeta : null;
+    const participants = Array.isArray(teamMeta?.participants) ? teamMeta.participants : [];
+    const myId = user?.id ? String(user.id) : null;
+    const hasMe = myId ? participants.some((p) => {
+        const pid = p?.uid ?? p?.id ?? p?.user_id ?? p?.userId ?? null;
+        return pid != null && String(pid) === myId;
+    }) : false;
+    const teamSize = Math.max(1, participants.length + (hasMe ? 0 : 1));
+
+    const workoutTitle = String(s.workoutTitle || s.title || '').trim() || 'Treino';
+    const durationSeconds = Number(s.realTotalTime ?? s.totalTime ?? 0) || 0;
+    const dateIso = (() => {
+        const d = s.date;
+        if (!d) return null;
+        if (typeof d === 'string') return d;
+        try {
+            const dt = d?.toDate ? d.toDate() : new Date(d);
+            const t = dt?.getTime?.();
+            if (!Number.isFinite(t)) return null;
+            return new Date(t).toISOString();
+        } catch {
+            return null;
+        }
+    })();
+
+    return {
+        workoutTitle,
+        dateIso,
+        durationSeconds,
+        teamSize,
+        exercises
+    };
+};
+
+const computeSessionMetrics = (normalized) => {
+    const base = normalized && typeof normalized === 'object' ? normalized : null;
+    if (!base) return null;
+
+    const exercises = Array.isArray(base.exercises) ? base.exercises : [];
+    let totalVolumeKg = 0;
+    let totalSetsDone = 0;
+
+    const perExercise = exercises.map((ex) => {
+        const name = String(ex?.name || '').trim();
+        if (!name) return null;
+        const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+        let volumeKg = 0;
+        let setsDone = 0;
+        let topWeight = 0;
+        let topReps = 0;
+
+        const isClusterSet = (cfg) => {
+            try {
+                const c = cfg && typeof cfg === 'object' ? cfg : null;
+                if (!c) return false;
+                const hasCluster = c.cluster_size != null;
+                const hasIntra = c.intra_rest_sec != null;
+                const hasTotal = c.total_reps != null;
+                return (hasCluster && hasIntra) || (hasCluster && hasTotal) || (hasIntra && hasTotal);
+            } catch {
+                return false;
+            }
+        };
+
+        sets.forEach((s) => {
+            const repsTotal = Number(String(s?.reps ?? '').replace(',', '.')) || 0;
+            const rpAct = Number(String(s?.rest_pause_activation_reps ?? '').replace(',', '.'));
+            const repsStrength = Number.isFinite(rpAct) && rpAct > 0 ? rpAct : repsTotal;
+            const weight = Number(String(s?.weight ?? '').replace(',', '.')) || 0;
+            const done = !!s?.done;
+            const adv = s?.advanced_config ?? s?.advancedConfig ?? null;
+            const isCluster = isClusterSet(adv);
+            if (done) {
+                setsDone += 1;
+                const setVolume = weight * repsTotal;
+                if (Number.isFinite(setVolume) && setVolume > 0) {
+                    volumeKg += setVolume;
+                }
+                if (!isCluster) {
+                    if (Number.isFinite(weight) && weight > topWeight) topWeight = weight;
+                    if (Number.isFinite(repsStrength) && repsStrength > topReps) topReps = repsStrength;
+                }
+            }
+        });
+
+        totalVolumeKg += volumeKg;
+        totalSetsDone += setsDone;
+
+        return {
+            name,
+            volumeKg,
+            setsDone,
+            topWeight,
+            topReps
+        };
+    }).filter((ex) => ex && typeof ex === 'object');
+
+    const topExercises = [...perExercise]
+        .filter((ex) => Number.isFinite(ex.volumeKg) && ex.volumeKg > 0)
+        .sort((a, b) => b.volumeKg - a.volumeKg)
+        .slice(0, 5);
+
+    return {
+        totalVolumeKg,
+        totalSetsDone,
+        totalExercises: perExercise.length,
+        topExercises
+    };
+};
+
+const computeDeterministicPrs = async (supabase, user, workoutId, normalized) => {
+    try {
+        const base = normalized && typeof normalized === 'object' ? normalized : null;
+        if (!base) return [];
+
+        const exercises = Array.isArray(base.exercises) ? base.exercises : [];
+        const currentByName = new Map();
+
+        exercises.forEach((ex) => {
+            const name = String(ex?.name || '').trim();
+            if (!name) return;
+            const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+            let bestWeight = 0;
+            let bestReps = 0;
+            let bestVolume = 0;
+
+            const isClusterSet = (cfg) => {
+                try {
+                    const c = cfg && typeof cfg === 'object' ? cfg : null;
+                    if (!c) return false;
+                    const hasCluster = c.cluster_size != null;
+                    const hasIntra = c.intra_rest_sec != null;
+                    const hasTotal = c.total_reps != null;
+                    return (hasCluster && hasIntra) || (hasCluster && hasTotal) || (hasIntra && hasTotal);
+                } catch {
+                    return false;
+                }
+            };
+
+            sets.forEach((s) => {
+                const repsTotal = Number(String(s?.reps ?? '').replace(',', '.')) || 0;
+                const rpAct = Number(String(s?.rest_pause_activation_reps ?? '').replace(',', '.'));
+                const repsStrength = Number.isFinite(rpAct) && rpAct > 0 ? rpAct : repsTotal;
+                const weight = Number(String(s?.weight ?? '').replace(',', '.')) || 0;
+                const done = !!s?.done;
+                if (!done) return;
+                const adv = s?.advanced_config ?? s?.advancedConfig ?? null;
+                const isCluster = isClusterSet(adv);
+                if (!isCluster) {
+                    if (Number.isFinite(weight) && weight > bestWeight) bestWeight = weight;
+                    if (Number.isFinite(repsStrength) && repsStrength > bestReps) bestReps = repsStrength;
+                }
+                const vol = weight * repsTotal;
+                if (Number.isFinite(vol) && vol > bestVolume) bestVolume = vol;
+            });
+
+            const prev = currentByName.get(name) || { weight: 0, reps: 0, volume: 0 };
+            currentByName.set(name, {
+                weight: Math.max(prev.weight, bestWeight),
+                reps: Math.max(prev.reps, bestReps),
+                volume: Math.max(prev.volume, bestVolume)
+            });
+        });
+
+        if (!currentByName.size) return [];
+
+        const userId = user?.id ? String(user.id) : '';
+        if (!userId) return [];
+
+        const query = supabase
+            .from('workouts')
+            .select('id, notes')
+            .eq('user_id', userId)
+            .eq('is_template', false);
+
+        if (workoutId) {
+            query.neq('id', workoutId);
+        }
+
+        const { data, error } = await query;
+        if (error || !Array.isArray(data)) return [];
+
+        const bestHistoryByName = new Map();
+
+        for (const row of data) {
+            if (!row) continue;
+            let session = null;
+            try {
+                if (typeof row.notes === 'string') session = JSON.parse(row.notes);
+                else if (row.notes && typeof row.notes === 'object') session = row.notes;
+            } catch {
+                session = null;
+            }
+            if (!session || typeof session !== 'object') continue;
+
+            const normalizedSession = normalizeSessionForAi(session, user);
+            const exArr = normalizedSession && Array.isArray(normalizedSession.exercises) ? normalizedSession.exercises : [];
+
+            exArr.forEach((ex) => {
+                const name = String(ex?.name || '').trim();
+                if (!name) return;
+                const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+                let bestWeight = 0;
+                let bestReps = 0;
+                let bestVolume = 0;
+
+                sets.forEach((s) => {
+                    const reps = Number(String(s?.reps ?? '').replace(',', '.')) || 0;
+                    const weight = Number(String(s?.weight ?? '').replace(',', '.')) || 0;
+                    const done = !!s?.done;
+                    if (!done) return;
+                    if (Number.isFinite(weight) && weight > bestWeight) bestWeight = weight;
+                    if (Number.isFinite(reps) && reps > bestReps) bestReps = reps;
+                    const vol = weight * reps;
+                    if (Number.isFinite(vol) && vol > bestVolume) bestVolume = vol;
+                });
+
+                const prev = bestHistoryByName.get(name) || { weight: 0, reps: 0, volume: 0 };
+                bestHistoryByName.set(name, {
+                    weight: Math.max(prev.weight, bestWeight),
+                    reps: Math.max(prev.reps, bestReps),
+                    volume: Math.max(prev.volume, bestVolume)
+                });
+            });
+        }
+
+        const prs = [];
+
+        currentByName.forEach((current, name) => {
+            const history = bestHistoryByName.get(name) || { weight: 0, reps: 0, volume: 0 };
+            const weightPr = Number.isFinite(current.weight) && current.weight > 0 && current.weight > (history.weight || 0);
+            const repsPr = Number.isFinite(current.reps) && current.reps > 0 && current.reps > (history.reps || 0);
+            const volumePr = Number.isFinite(current.volume) && current.volume > 0 && current.volume > (history.volume || 0);
+
+            if (!weightPr && !repsPr && !volumePr) return;
+
+            if (volumePr) {
+                prs.push({
+                    exercise: name,
+                    label: 'Volume',
+                    value: `${current.volume.toLocaleString('pt-BR')}kg`
+                });
+                return;
+            }
+
+            if (weightPr) {
+                prs.push({
+                    exercise: name,
+                    label: 'Carga',
+                    value: `${current.weight.toLocaleString('pt-BR')}kg`
+                });
+                return;
+            }
+
+            if (repsPr) {
+                prs.push({
+                    exercise: name,
+                    label: 'Reps',
+                    value: `${current.reps} reps`
+                });
+            }
+        });
+
+        prs.sort((a, b) => {
+            const av = Number(String(a.value).replace(/[^0-9.,]/g, '').replace('.', '').replace(',', '.')) || 0;
+            const bv = Number(String(b.value).replace(/[^0-9.,]/g, '').replace('.', '').replace(',', '.')) || 0;
+            return bv - av;
+        });
+
+        return prs.slice(0, 10);
+    } catch {
+        return [];
+    }
+};
+
+const buildPostWorkoutAiObject = (source, metrics, deterministicPrs) => {
+    const base = source && typeof source === 'object' ? source : {};
+    const safePrs = Array.isArray(deterministicPrs) ? deterministicPrs : [];
+
+    return {
+        summary: Array.isArray(base.summary)
+            ? base.summary
+                  .map((x) => String(x || '').trim())
+                  .filter((x) => x)
+                  .slice(0, 6)
+            : [],
+        highlights: Array.isArray(base.highlights)
+            ? base.highlights
+                  .map((x) => String(x || '').trim())
+                  .filter((x) => x)
+                  .slice(0, 5)
+            : [],
+        progression: Array.isArray(base.progression)
+            ? base.progression
+                  .map((x) => {
+                      if (!x || typeof x !== 'object') return null;
+                      return {
+                          exercise: String(x.exercise || '').trim(),
+                          recommendation: String(x.recommendation || '').trim(),
+                          reason: String(x.reason || '').trim()
+                      };
+                  })
+                  .filter((x) => x && x.exercise && x.recommendation)
+                  .slice(0, 10)
+            : [],
+        motivation: String(base.motivation || '').trim(),
+        prs: safePrs,
+        warnings: Array.isArray(base.warnings)
+            ? base.warnings
+                  .map((x) => String(x || '').trim())
+                  .filter((x) => x)
+                  .slice(0, 5)
+            : [],
+        metrics,
+        meta: {
+            model: base.meta && typeof base.meta === 'object' && base.meta.model ? String(base.meta.model).trim() : POST_WORKOUT_AI_MODEL_ID,
+            generatedAt:
+                base.meta && typeof base.meta === 'object' && base.meta.generatedAt
+                    ? String(base.meta.generatedAt).trim()
+                    : new Date().toISOString()
+        }
+    };
+};
+
+export async function generatePostWorkoutInsights(payload) {
+    try {
+        const supabase = await createClient();
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        const user = authData?.user ?? null;
+        if (!user) return { ok: false, error: 'Unauthorized' };
+
+        const workoutId = typeof payload?.workoutId === 'string' ? payload.workoutId : null;
+
+        const normalized = normalizeSessionForAi(payload?.session, user);
+        if (!normalized) return { ok: false, error: 'Sessão inválida' };
+        const metrics = computeSessionMetrics(normalized);
+        const deterministicPrs = await computeDeterministicPrs(supabase, user, workoutId, normalized);
+
+        let existingAi = null;
+        if (workoutId) {
+            try {
+                const { data: row, error: rowErr } = await supabase
+                    .from('workouts')
+                    .select('id, notes')
+                    .eq('id', workoutId)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+                if (!rowErr && row) {
+                    let current = null;
+                    try {
+                        if (typeof row.notes === 'string') current = JSON.parse(row.notes);
+                        else if (row.notes && typeof row.notes === 'object') current = row.notes;
+                    } catch {
+                        current = null;
+                    }
+                    if (current && typeof current === 'object' && current.ai && typeof current.ai === 'object') {
+                        existingAi = current.ai;
+                    }
+                }
+            } catch {
+                existingAi = null;
+            }
+        }
+
+        if (existingAi) {
+            const aiFromExisting = buildPostWorkoutAiObject(existingAi, metrics, deterministicPrs);
+            return { ok: true, ai: aiFromExisting, saved: true };
+        }
+
+        const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        if (!apiKey) {
+            const aiNoApi = buildPostWorkoutAiObject(null, metrics, deterministicPrs);
+            return { ok: true, ai: aiNoApi, saved: false };
+        }
+
+        const prompt =
+            'Você é um treinador especialista em musculação. Analise o treino abaixo e gere INSIGHTS objetivos e acionáveis.' +
+            ' Retorne APENAS um JSON válido (sem markdown) seguindo estritamente esta estrutura:' +
+            ' {' +
+            '"summary": string[],' +
+            '"highlights": string[],' +
+            '"progression": {"exercise": string, "recommendation": string, "reason": string}[],' +
+            '"motivation": string,' +
+            '"prs": {"exercise": string, "label": string, "value": string}[],' +
+            '"warnings": string[]' +
+            ' }.' +
+            ' Regras: summary max 6 itens, highlights max 5, progression max 10, warnings max 5.' +
+            ' Seja específico. Não invente dados. Se faltar dado, diga "insuficiente" e recomende o que registrar.' +
+            '\n\nTREINO (JSON):\n' +
+            JSON.stringify(normalized);
+
+        let ai = null;
+        let saved = false;
+
+        try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: POST_WORKOUT_AI_MODEL_ID });
+            const result = await model.generateContent([{ text: prompt }]);
+            const response = result?.response;
+            const text = (await response?.text()) || '';
+            const parsed = extractJsonFromText(text);
+            if (!parsed || typeof parsed !== 'object') {
+                throw new Error('Falha ao interpretar resposta da IA');
+            }
+
+            const obj = parsed;
+            ai = buildPostWorkoutAiObject(obj, metrics, deterministicPrs);
+
+            if (workoutId) {
+                const { data: row, error: rowErr } = await supabase
+                    .from('workouts')
+                    .select('id, notes')
+                    .eq('id', workoutId)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+                if (!rowErr && row) {
+                    let current = null;
+                    try {
+                        if (typeof row.notes === 'string') current = JSON.parse(row.notes);
+                        else if (row.notes && typeof row.notes === 'object') current = row.notes;
+                    } catch {
+                        current = null;
+                    }
+
+                    const nextSession = current && typeof current === 'object' ? { ...current, ai } : { ai };
+                    const { error: upErr } = await supabase
+                        .from('workouts')
+                        .update({ notes: JSON.stringify(nextSession) })
+                        .eq('id', workoutId)
+                        .eq('user_id', user.id);
+                    if (!upErr) saved = true;
+                }
+            }
+        } catch {
+            ai = buildPostWorkoutAiObject(null, metrics, deterministicPrs);
+            saved = false;
+        }
+
+        try {
+            revalidatePath('/');
+        } catch {}
+
+        return { ok: true, ai, saved };
+    } catch (e) {
+        const msg = e?.message ? String(e.message) : String(e);
+        return { ok: false, error: msg || 'Erro inesperado ao gerar insights' };
+    }
+}
 
 const chunkArray = (arr, size) => {
     const safe = Array.isArray(arr) ? arr : [];
@@ -54,6 +592,154 @@ const insertSetsBulkSafe = async (supabase, rows) => {
         if (finalErr) throw finalErr;
     }
 };
+
+export async function applyProgressionToNextTemplate(payload) {
+    try {
+        const supabase = await createClient();
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        const user = authData?.user ?? null;
+        if (!user) return { ok: false, error: 'Unauthorized' };
+
+        const session = payload && typeof payload.session === 'object' ? payload.session : null;
+        if (!session) return { ok: false, error: 'Sessão inválida' };
+
+        const rawProgression = Array.isArray(payload?.progression) ? payload.progression : [];
+        const progression = rawProgression
+            .map((item) => {
+                if (!item || typeof item !== 'object') return null;
+                const exercise = String(item.exercise || '').trim();
+                const recommendation = String(item.recommendation || '').trim();
+                const reason = String(item.reason || '').trim();
+                if (!exercise || !recommendation) return null;
+                return { exercise, recommendation, reason };
+            })
+            .filter((x) => x)
+            .slice(0, 20);
+
+        if (!progression.length) return { ok: false, error: 'Sem progressão para aplicar' };
+
+        const historyIdRaw = payload?.historyId;
+        const historyId =
+            typeof historyIdRaw === 'string' || typeof historyIdRaw === 'number' ? historyIdRaw : null;
+
+        let historySession = null;
+
+        if (historyId != null) {
+            try {
+                const { data: row } = await supabase
+                    .from('workouts')
+                    .select('id, user_id, notes, name, is_template')
+                    .eq('id', historyId)
+                    .eq('user_id', user.id)
+                    .maybeSingle();
+
+                if (row && row.user_id === user.id) {
+                    let parsed = null;
+                    try {
+                        if (typeof row.notes === 'string') parsed = JSON.parse(row.notes);
+                        else if (row.notes && typeof row.notes === 'object') parsed = row.notes;
+                    } catch {
+                        parsed = null;
+                    }
+                    if (parsed && typeof parsed === 'object') historySession = parsed;
+                }
+            } catch {
+                historySession = null;
+            }
+        }
+
+        const baseSession = historySession && typeof historySession === 'object' ? historySession : session;
+
+        const baseTitle = (() => {
+            const raw = baseSession?.workoutTitle || historySession?.name || session?.workoutTitle;
+            const title = String(raw || '').trim();
+            if (title) return title;
+            return 'Treino';
+        })();
+
+        const baseTemplateId = (() => {
+            const originId = baseSession?.originWorkoutId;
+            const workoutId = baseSession?.workoutId;
+            if (originId) return originId;
+            if (workoutId) return workoutId;
+            return null;
+        })();
+
+        const logs = baseSession?.logs && typeof baseSession.logs === 'object' ? baseSession.logs : {};
+        const sourceExercises = Array.isArray(baseSession?.exercises) ? baseSession.exercises : [];
+
+        const exercises = sourceExercises
+            .filter((ex) => ex && typeof ex === 'object')
+            .map((ex, exIdx) => {
+                const name = String(ex.name || '').trim();
+                const sets = Number.parseInt(ex.sets, 10) || 0;
+                const reps = ex.reps || '';
+                const restTime = ex.restTime != null ? Number(ex.restTime) || 0 : null;
+                const cadence = ex.cadence || null;
+                const method = ex.method || null;
+                const notes = ex.notes || '';
+                const muscleGroup = ex.muscleGroup ?? null;
+                const videoUrl = ex.videoUrl ?? null;
+
+                const setDetails = [];
+                if (sets > 0) {
+                    for (let i = 0; i < sets; i += 1) {
+                        const key = `${exIdx}-${i}`;
+                        const log = logs[key] && typeof logs[key] === 'object' ? logs[key] : null;
+                        const weight = log && log.weight != null ? log.weight : null;
+                        const setReps = log && log.reps != null ? log.reps : reps;
+                        const rpe = log && log.rpe != null ? log.rpe : null;
+                        const isWarmup = !!(log && (log.is_warmup || log.isWarmup));
+                        setDetails.push({
+                            reps: setReps ?? null,
+                            rpe: rpe ?? null,
+                            set_number: i + 1,
+                            weight: weight ?? null,
+                            is_warmup: isWarmup,
+                            advanced_config: null
+                        });
+                    }
+                }
+
+                return {
+                    name,
+                    sets,
+                    reps,
+                    restTime,
+                    cadence,
+                    method,
+                    notes,
+                    muscleGroup,
+                    videoUrl,
+                    setDetails
+                };
+            });
+
+        if (!exercises.length) return { ok: false, error: 'Sem exercícios para aplicar progressão' };
+
+        const notesPayload = {
+            type: 'ai_progression_template',
+            baseTemplateId: baseTemplateId || null,
+            fromHistoryId: historyId ?? null,
+            originalWorkoutTitle: baseTitle,
+            createdFrom: 'post_workout',
+            createdAt: new Date().toISOString(),
+            progression
+        };
+
+        const workout = await createWorkout({
+            title: baseTitle,
+            notes: JSON.stringify(notesPayload),
+            exercises
+        });
+
+        return { ok: true, templateId: workout?.id || null };
+    } catch (e) {
+        const msg = e?.message ? String(e.message) : String(e);
+        return { ok: false, error: msg || 'Erro inesperado ao aplicar progressão' };
+    }
+}
 
 // WORKOUTS
 export async function createWorkout(data) {

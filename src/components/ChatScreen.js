@@ -28,6 +28,9 @@ const ChatScreen = ({ user, onClose }) => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const { confirm, alert, prompt } = useDialog();
+    const alertRef = useRef(alert);
+    const confirmRef = useRef(confirm);
+    const promptRef = useRef(prompt);
 
     const [globalChannel, setGlobalChannel] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -40,6 +43,12 @@ const ChatScreen = ({ user, onClose }) => {
 
     const dummy = useRef();
     const supabase = useMemo(() => createClient(), []);
+
+    useEffect(() => {
+        alertRef.current = alert;
+        confirmRef.current = confirm;
+        promptRef.current = prompt;
+    }, [alert, confirm, prompt]);
 
     const [privateChannels, setPrivateChannels] = useState([]);
     const [sendingInviteTo, setSendingInviteTo] = useState(null);
@@ -134,9 +143,11 @@ const ChatScreen = ({ user, onClose }) => {
             }
         } catch (e) {
             const msg = (e?.message ?? String(e ?? '')).trim();
-            alert(`Erro ao conectar no chat global: ${msg || 'Erro desconhecido'}`);
+            try {
+                await alertRef.current(`Erro ao conectar no chat global: ${msg || 'Erro desconhecido'}`);
+            } catch {}
         }
-    }, [alert, fetchGlobalId, globalChannel, supabase])
+    }, [fetchGlobalId, globalChannel, supabase])
 
     useEffect(() => {
         if (globalChannel && view === 'list') {
@@ -246,7 +257,7 @@ const ChatScreen = ({ user, onClose }) => {
                     const payload = { type: 'image', media_url: pub.publicUrl, thumb_url: pubThumb.publicUrl }
                     await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
                 } else if (isVideo) {
-                    if (file.size > 50 * 1024 * 1024) { await alert('Vídeo acima de 50MB. Comprima antes.'); continue }
+                    if (file.size > 50 * 1024 * 1024) { await alertRef.current('Vídeo acima de 50MB. Comprima antes.'); continue }
                     const signVid = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}` }) }).then(r => r.json())
                     if (!signVid.ok) throw new Error(signVid.error || 'Falha ao assinar upload')
                     await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file)
@@ -255,14 +266,14 @@ const ChatScreen = ({ user, onClose }) => {
                     await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
                 }
             }
-        } catch (err) { console.error(err); await alert('Falha ao enviar mídia: '+(err?.message || String(err))) }
+        } catch (err) { console.error(err); await alertRef.current('Falha ao enviar mídia: '+(err?.message || String(err))) }
         finally { setUploading(false); e.target.value = '' }
     }
 
     const insertEmoji = (emoji) => { setNewMessage(prev => prev + emoji); setShowEmoji(false) }
 
     const handleAddGif = async () => {
-        const url = await prompt('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
+        const url = await promptRef.current('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
         if (!url || !activeChannel) return
         const payload = { type: 'gif', media_url: url }
         await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
@@ -276,7 +287,7 @@ const ChatScreen = ({ user, onClose }) => {
             return;
         }
 
-        if (await confirm(`Quer conversar com ${targetUser.display_name}?`, "Iniciar Conversa")) {
+        if (await confirmRef.current(`Quer conversar com ${targetUser.display_name}?`, "Iniciar Conversa")) {
             setSendingInviteTo(targetUser.id);
             try {
                 const { data: pending } = await supabase
@@ -288,7 +299,7 @@ const ChatScreen = ({ user, onClose }) => {
                     .single();
                 
                 if (pending) {
-                    const resend = await confirm("Já existe um convite pendente para este usuário. Cancelar e reenviar?", "Convite Pendente");
+                    const resend = await confirmRef.current("Já existe um convite pendente para este usuário. Cancelar e reenviar?", "Convite Pendente");
                     if (resend) {
                         const { error: delErr } = await supabase.from('chat_invites').delete().eq('id', pending.id);
                         if (delErr) throw delErr;
@@ -297,10 +308,10 @@ const ChatScreen = ({ user, onClose }) => {
                             receiver_id: targetUser.id
                         });
                         if (reErr) throw reErr;
-                        await alert(`Convite reenviado para ${targetUser.display_name}!`, "Convite Reenviado");
+                        await alertRef.current(`Convite reenviado para ${targetUser.display_name}!`, "Convite Reenviado");
                         setView('list');
                     } else {
-                        await alert("Você já enviou um convite para este usuário.");
+                        await alertRef.current("Você já enviou um convite para este usuário.");
                     }
                 } else {
                     const { error } = await supabase.from('chat_invites').insert({
@@ -308,11 +319,11 @@ const ChatScreen = ({ user, onClose }) => {
                         receiver_id: targetUser.id
                     });
                     if (error) throw error;
-                    await alert(`Convite enviado para ${targetUser.display_name}! Aguarde a aceitação.`, "Convite Enviado");
+                    await alertRef.current(`Convite enviado para ${targetUser.display_name}! Aguarde a aceitação.`, "Convite Enviado");
                     setView('list');
                 }
             } catch (e) {
-                await alert("Erro ao enviar convite: " + (e?.message ?? String(e)));
+                await alertRef.current("Erro ao enviar convite: " + (e?.message ?? String(e)));
             } finally {
                 setSendingInviteTo(null);
             }

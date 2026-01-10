@@ -705,6 +705,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     .order('name');
                 wData = data || [];
             }
+
+            wData = (Array.isArray(wData) ? wData : []).filter((w) => w && typeof w === 'object' && w.is_template === true);
             
             const studentDeduped = (wData || []).sort((a,b) => (a.name||'').localeCompare(b.name||''));
             const synced = (studentDeduped || []).filter(w => (w?.created_by && w.created_by === user.id));
@@ -930,6 +932,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     .order('name');
                 refreshed = data || [];
             }
+            refreshed = (Array.isArray(refreshed) ? refreshed : []).filter((w) => w && typeof w === 'object' && w.is_template === true);
             setStudentWorkouts(refreshed || []);
             await alert('Treino enviado com sucesso!', 'Sucesso');
         } catch (e) {

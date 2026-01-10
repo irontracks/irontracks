@@ -117,7 +117,10 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     }, [filteredHistory]);
 
     const openSession = (session) => {
-        const payload = session?.rawSession || session;
+        const rawSession = session?.rawSession && typeof session.rawSession === 'object' ? session.rawSession : null;
+        const payload = rawSession
+            ? { ...rawSession, id: rawSession.id ?? session?.id ?? null }
+            : session;
         if (typeof onViewReport === 'function') {
             try {
                 onViewReport(payload);

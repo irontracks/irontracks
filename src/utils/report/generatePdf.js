@@ -57,9 +57,21 @@ export async function generateWorkoutPdf(session, previousSession) {
   }
 
   const calcVolume = (logs) => {
-    let v = 0
-    Object.values(logs || {}).forEach(l => { if (l?.weight && l?.reps) v += Number(l.weight) * Number(l.reps) })
-    return v
+    try {
+      let v = 0
+      const safeLogs = logs && typeof logs === 'object' ? logs : {}
+      Object.values(safeLogs).forEach((l) => {
+        if (!l || typeof l !== 'object') return
+        const w = Number(String(l.weight ?? '').replace(',', '.'))
+        const r = Number(String(l.reps ?? '').replace(',', '.'))
+        if (!Number.isFinite(w) || !Number.isFinite(r)) return
+        if (w <= 0 || r <= 0) return
+        v += w * r
+      })
+      return v
+    } catch {
+      return 0
+    }
   }
 
   const currentVolume = calcVolume(session?.logs)
@@ -89,34 +101,41 @@ export async function generateWorkoutPdf(session, previousSession) {
   y -= lineH
 
   const prevMap = {}
-  if (previousSession?.exercises && previousSession?.logs) {
+  const safePrevLogs = previousSession?.logs && typeof previousSession.logs === 'object' ? previousSession.logs : {}
+  if (previousSession && Array.isArray(previousSession?.exercises)) {
     previousSession.exercises.forEach((ex, exIdx) => {
+      if (!ex || typeof ex !== 'object') return
+      const exName = String(ex?.name || '').trim()
+      if (!exName) return
       const exLogs = []
-      Object.keys(previousSession.logs).forEach(key => {
+      Object.keys(safePrevLogs).forEach(key => {
         const [eIdx] = key.split('-')
-        if (Number(eIdx) === exIdx) exLogs.push(previousSession.logs[key])
+        if (Number(eIdx) === exIdx) exLogs.push(safePrevLogs[key])
       })
-      prevMap[ex.name] = exLogs
+      prevMap[exName] = exLogs
     })
   }
 
-  (session?.exercises || []).forEach((ex, exIdx) => {
+  const safeExercises = Array.isArray(session?.exercises) ? session.exercises : []
+  safeExercises.forEach((ex, exIdx) => {
+    if (!ex || typeof ex !== 'object') return
     ensureSpace(3)
-    page.drawText(`${exIdx + 1}. ${ex.name || ''}`, { x: margin, y, size: boldSize, font: bold })
+    page.drawText(`${exIdx + 1}. ${String(ex?.name || '')}`, { x: margin, y, size: boldSize, font: bold })
     y -= lineH
-    page.drawText(`Método: ${ex.method || 'Normal'}  RPE: ${ex.rpe || '-'}  Cad: ${ex.cadence || '-'}`, { x: margin, y, size: textSize, font })
+    page.drawText(`Método: ${String(ex?.method || 'Normal')}  RPE: ${String(ex?.rpe || '-')}  Cad: ${String(ex?.cadence || '-')}`, { x: margin, y, size: textSize, font })
     y -= lineH
     ensureSpace(2)
     page.drawText('Série   Carga   Reps   Evolução', { x: margin, y, size: monoSize, font })
     y -= lineH
-    const sets = Number(ex.sets || 0)
-    const prevLogs = prevMap[ex.name] || []
+    const sets = Number(ex?.sets || 0)
+    const prevLogs = prevMap[String(ex?.name || '').trim()] || []
     for (let sIdx = 0; sIdx < sets; sIdx++) {
       ensureSpace(1)
       const key = `${exIdx}-${sIdx}`
       const log = session?.logs?.[key]
       const prev = prevLogs[sIdx]
-      if (!log || (!log.weight && !log.reps)) continue
+      if (!log || typeof log !== 'object') continue
+      if (!log.weight && !log.reps) continue
       let evol = '-'
       if (prev?.weight) {
         const d = Number(log.weight) - Number(prev.weight)

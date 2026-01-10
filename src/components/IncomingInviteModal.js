@@ -7,7 +7,7 @@ const IncomingInviteModal = ({ onStartSession }) => {
     const { alert } = useDialog();
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
 
-    const [nowMs, setNowMs] = useState(0);
+    const [nowMs, setNowMs] = useState(() => Date.now());
 
     useEffect(() => {
         const tick = () => setNowMs(Date.now());
@@ -20,16 +20,23 @@ const IncomingInviteModal = ({ onStartSession }) => {
     }, []);
 
     const latestInvite = Array.isArray(incomingInvites) ? incomingInvites[0] : null;
-    const latestInviteCreatedAtMs = typeof latestInvite?.createdAt?.seconds === 'number' ? latestInvite.createdAt.seconds * 1000 : 0;
-    const shouldShow = Boolean(latestInvite && nowMs && latestInviteCreatedAtMs && (nowMs - latestInviteCreatedAtMs) < 300000);
+    const latestInviteCreatedAtMs = (() => {
+        const raw = latestInvite?.created_at ?? latestInvite?.createdAt ?? null;
+        if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0;
+        if (typeof raw === 'string') {
+            const ms = Date.parse(raw);
+            return Number.isFinite(ms) ? ms : 0;
+        }
+        return 0;
+    })();
+    const shouldShow = Boolean(latestInvite && nowMs && (latestInviteCreatedAtMs ? (nowMs - latestInviteCreatedAtMs) < 7 * 24 * 60 * 60 * 1000 : true));
 
     const handleAccept = async () => {
         if (!latestInvite) return;
         try {
+            if (typeof acceptInvite !== 'function') return;
             const workout = await acceptInvite(latestInvite);
-            if (workout && onStartSession) {
-                onStartSession(workout);
-            }
+            if (workout && typeof onStartSession === 'function') onStartSession(workout);
         } catch (e) {
             await alert("Erro: " + (e?.message ?? String(e)));
         }
@@ -37,7 +44,12 @@ const IncomingInviteModal = ({ onStartSession }) => {
 
     const handleReject = async () => {
         if (!latestInvite) return;
-        await rejectInvite(latestInvite.id);
+        try {
+            if (typeof rejectInvite !== 'function') return;
+            await rejectInvite(latestInvite.id);
+        } catch (e) {
+            await alert("Erro: " + (e?.message ?? String(e)));
+        }
     };
 
     if (!shouldShow) return null;
@@ -48,9 +60,9 @@ const IncomingInviteModal = ({ onStartSession }) => {
                 <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
                     <Users size={32} className="text-black" />
                 </div>
-                <h3 className="text-2xl font-black text-white mb-2">Convite de Treino!</h3>
+                <h3 className="text-2xl font-black text-white mb-2">Bora treinar junto?</h3>
                 <p className="text-neutral-300 mb-6">
-                    <span className="text-yellow-500 font-bold">{latestInvite?.fromName}</span> convidou você para treinar agora.
+                    <span className="text-yellow-500 font-bold">{latestInvite?.from?.displayName || 'Alguém'}</span> te chamou para encarar esse treino lado a lado.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                     <button

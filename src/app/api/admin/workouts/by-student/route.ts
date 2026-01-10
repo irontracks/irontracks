@@ -78,6 +78,7 @@ export async function GET(req: Request) {
       .from('workouts')
       .select('*, exercises(*, sets(*))')
       .or(`user_id.eq.${targetUserId},student_id.eq.${targetUserId}`)
+      .eq('is_template', true)
       .order('name')
 
     return NextResponse.json({ ok: true, rows: rows || [] })

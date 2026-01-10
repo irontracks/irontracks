@@ -923,21 +923,17 @@ function IronTracksApp() {
         if (user?.id) {
              const syncProfile = async () => {
                  try {
-                    await supabase.from('profiles').upsert({
-                        id: user.id,
-                        email: user.email,
-                        display_name: user.displayName,
-                        photo_url: user.photoURL,
-                        last_seen: new Date(),
-                        role: user.role || 'user'
-                    }, { onConflict: 'id' });
+                    await supabase
+                        .from('profiles')
+                        .update({ last_seen: new Date().toISOString() })
+                        .eq('id', user.id);
                  } catch (e) {
                     console.error('Erro ao sincronizar perfil:', e);
                  }
              };
              syncProfile();
         }
-    }, [supabase, user?.id, user?.role, user?.email, user?.displayName, user?.photoURL]);
+    }, [supabase, user?.id]);
 
     useEffect(() => {
         let cancelled = false;
@@ -1008,7 +1004,20 @@ function IronTracksApp() {
 
             let data = []
             let studentData = []
+            let studentsList = []
+
             if (role === 'admin' || role === 'teacher') {
+                // 1. Fetch Students
+                try {
+                    const { data: st } = await supabase
+                        .from('students')
+                        .select('id, name, email, user_id')
+                        .or(`teacher_id.eq.${currentUser.id},created_by.eq.${currentUser.id}`)
+                        .order('name');
+                    studentsList = st || [];
+                } catch (e) { console.error('Erro fetching students', e); }
+
+                // 2. Fetch My Workouts
                 const { data: myD, error: myErr } = await supabase
                     .from('workouts')
                     .select(`
@@ -1024,13 +1033,8 @@ function IronTracksApp() {
                 if (myErr) throw myErr
                 data = myD || []
 
-                // Fetch students of this teacher
-                const { data: students } = await supabase
-                    .from('students')
-                    .select('id, name, email, user_id')
-                    .or(`teacher_id.eq.${currentUser.id},created_by.eq.${currentUser.id}`)
-                    .order('name')
-                const ids = (students || []).map(s => s.user_id || s.id).filter(Boolean)
+                // 3. Fetch Student Workouts
+                const ids = studentsList.map(s => s.user_id || s.id).filter(Boolean)
                 if (ids.length > 0) {
                     const seen = new Set()
                     const combined = []
@@ -1041,6 +1045,7 @@ function IronTracksApp() {
                             .eq('is_template', true)
                             .in('user_id', ids)
                             .order('name')
+                            .limit(500)
                         for (const w of (swByUser || [])) { if (!seen.has(w.id)) { seen.add(w.id); combined.push(w) } }
                     } catch {}
                     try {
@@ -1050,6 +1055,7 @@ function IronTracksApp() {
                             .eq('is_template', true)
                             .in('student_id', ids)
                             .order('name')
+                            .limit(500)
                         for (const w of (swByStudent || [])) { if (!seen.has(w.id)) { seen.add(w.id); combined.push(w) } }
                     } catch {}
                     studentData = combined
@@ -1080,7 +1086,7 @@ function IronTracksApp() {
                 if (role === 'admin' || role === 'teacher') {
                     setWorkouts(mapped)
                     try {
-                        const studentMapped = (studentData || []).map(mapWorkout)
+                        const studentMapped = (studentData || []).map(mapWorkoutRow)
                         const byStudent = new Map()
                         for (const w of studentMapped) {
                             const sid = w.user_id
@@ -1090,7 +1096,7 @@ function IronTracksApp() {
                             byStudent.set(sid, list)
                         }
                         const nameById = new Map()
-                        for (const s of (students || [])) {
+                        for (const s of (studentsList || [])) {
                             const sid = s.user_id || s.id
                             if (!sid) continue
                             nameById.set(sid, { name: s.name || String(sid).slice(0,8), email: s.email || '' })
@@ -1100,7 +1106,8 @@ function IronTracksApp() {
                             return { id: sid, name: info.name, email: info.email, workouts: list }
                         }).filter(f => (f.workouts || []).length > 0)
                         setStudentFolders(folders)
-                    } catch {
+                    } catch (err) {
+                        console.error("Erro ao processar alunos:", err);
                         setStudentFolders([])
                     }
                 } else {
@@ -1117,10 +1124,10 @@ function IronTracksApp() {
                         const coachIds = Array.from(byCoach.keys())
                         let profiles = []
                         if (coachIds.length) {
-                            const { data: profs } = await supabase.from('profiles').select('id, display_name, email').in('id', coachIds)
+                            const { data: profs } = await supabase.from('profiles').select('id, display_name').in('id', coachIds)
                             profiles = profs || []
                         }
-                        const nameByCoach = new Map(profiles.map(p => [p.id, p.display_name || p.email || String(p.id).slice(0,8)]))
+                        const nameByCoach = new Map(profiles.map(p => [p.id, p.display_name || String(p.id).slice(0,8)]))
                         const folders = Array.from(byCoach.entries()).map(([cid, list]) => ({
                             id: cid,
                             name: `Treinos compartilhados de ${nameByCoach.get(cid) || String(cid).slice(0,8)}`,
@@ -1155,7 +1162,6 @@ function IronTracksApp() {
 
     useEffect(() => {
         if (user) {
-            console.log("EFFECT: User state updated, fetching workouts...", user.id, user.role);
             fetchWorkouts(user);
         }
     }, [user, fetchWorkouts]);
@@ -1199,20 +1205,21 @@ function IronTracksApp() {
 
         setSavingProfile(true);
         try {
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('profiles')
-                .upsert(
-                    {
-                        id: user.id,
-                        email: user.email,
-                        display_name: nextName,
-                        photo_url: user.photoURL,
-                        last_seen: new Date(),
-                        role: user.role || 'user',
-                    },
-                    { onConflict: 'id' }
-                );
+                .update({
+                    display_name: nextName,
+                    photo_url: user.photoURL ?? null,
+                    last_seen: new Date().toISOString(),
+                })
+                .eq('id', user.id)
+                .select('id')
+                .maybeSingle();
             if (error) throw error;
+            if (!data?.id) {
+                await alert('Não foi possível salvar seu perfil (registro não encontrado).', 'Perfil');
+                return;
+            }
             setProfileIncomplete(false);
             setShowCompleteProfile(false);
         } catch (e) {
@@ -1835,7 +1842,7 @@ function IronTracksApp() {
                     <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQuickViewWorkout(null)}>
                         <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 flex justify-between items-center border-b border-neutral-800">
-                                <h3 className="font-bold text-white">{quickViewWorkout.title}</h3>
+                                <h3 className="font-bold text-white">{String(quickViewWorkout?.title || '')}</h3>
                                 <button
                                     type="button"
                                     onClick={() => setQuickViewWorkout(null)}
@@ -1847,19 +1854,19 @@ function IronTracksApp() {
                                 </button>
                             </div>
                             <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
-                                {quickViewWorkout.exercises?.map((ex, idx) => (
+                                {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex, idx) => (
                                     <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
                                         <div className="flex justify-between items-center">
-                                            <h4 className="font-bold text-white text-sm">{ex.name}</h4>
-                                            <span className="text-xs text-neutral-400">{(parseInt(ex.sets) || 0)} x {ex.reps || '-'}</span>
+                                            <h4 className="font-bold text-white text-sm">{String(ex?.name || '—')}</h4>
+                                            <span className="text-xs text-neutral-400">{(parseInt(ex?.sets) || 0)} x {String(ex?.reps || '-')}</span>
                                         </div>
                                         <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
-                                            <Clock size={14} className="text-yellow-500" /><span>Descanso: {ex.restTime ? `${parseInt(ex.restTime)}s` : '-'}</span>
+                                            <Clock size={14} className="text-yellow-500" /><span>Descanso: {ex?.restTime ? `${parseInt(ex.restTime)}s` : '-'}</span>
                                         </div>
-                                        {ex.notes && <p className="text-sm text-neutral-300 mt-2">{ex.notes}</p>}
+                                        {ex?.notes && <p className="text-sm text-neutral-300 mt-2">{String(ex.notes || '')}</p>}
                                     </div>
                                 ))}
-                                {(!quickViewWorkout.exercises || quickViewWorkout.exercises.length === 0) && (
+                                {(!Array.isArray(quickViewWorkout?.exercises) || quickViewWorkout.exercises.length === 0) && (
                                     <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
                                 )}
                             </div>

@@ -33,6 +33,7 @@ type Props = {
   exportingAll?: boolean
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
+  onOpenIronScanner: () => void
 }
 
 export default function StudentDashboard(props: Props) {
@@ -181,6 +182,17 @@ export default function StudentDashboard(props: Props) {
                     <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
                     <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden text-neutral-300">
                       <div className="p-2 space-y-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setToolsOpen(false)
+                            props.onOpenIronScanner()
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Scanner de Treino (Imagem)</span>
+                          <span className="text-yellow-500">📷</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => {

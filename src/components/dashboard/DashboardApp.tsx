@@ -60,8 +60,11 @@ type DirectChat = {
 }
 
 type NotificationPayload = {
-  text: string
-  senderName?: string | null
+	text: string
+	senderName?: string | null
+	displayName?: string | null
+	photoURL?: string | null
+	type?: string | null
 }
 
 type Props = {
@@ -142,6 +145,74 @@ function DashboardInner(props: Props) {
 
   const supabase = useMemo(() => createClient(), [])
 
+  const LAST_SEEN_HEARTBEAT_MS = 120_000
+  const LAST_SEEN_MIN_WRITE_GAP_MS = 30_000
+
+  const lastSeenWriteAtRef = useRef<number>(0)
+
+  const touchLastSeen = useCallback(
+    async (force: boolean) => {
+      const userId = props.user?.id ? String(props.user.id) : ''
+      if (!userId) return
+      const now = Date.now()
+      const last = Number(lastSeenWriteAtRef.current || 0)
+      if (!force && now - last < LAST_SEEN_MIN_WRITE_GAP_MS) return
+      lastSeenWriteAtRef.current = now
+      try {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ last_seen: new Date().toISOString() })
+          .eq('id', userId)
+        if (error) throw error
+      } catch {
+        return
+      }
+    },
+    [props.user?.id, supabase]
+  )
+
+  useEffect(() => {
+    const userId = props.user?.id ? String(props.user.id) : ''
+    if (!userId) return
+
+    void touchLastSeen(true)
+
+    const intervalId = window.setInterval(() => {
+      void touchLastSeen(false)
+    }, LAST_SEEN_HEARTBEAT_MS)
+
+    const onFocus = () => {
+      void touchLastSeen(true)
+    }
+
+    const onVisibility = () => {
+      try {
+        if (document.visibilityState === 'visible') {
+          void touchLastSeen(true)
+        }
+      } catch {
+        return
+      }
+    }
+
+    try {
+      window.addEventListener('focus', onFocus)
+      document.addEventListener('visibilitychange', onVisibility)
+    } catch {
+      return
+    }
+
+    return () => {
+      try {
+        window.clearInterval(intervalId)
+      } catch {}
+      try {
+        window.removeEventListener('focus', onFocus)
+        document.removeEventListener('visibilitychange', onVisibility)
+      } catch {}
+    }
+  }, [LAST_SEEN_HEARTBEAT_MS, props.user?.id, touchLastSeen])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
     const handler = () => {
@@ -179,7 +250,16 @@ function DashboardInner(props: Props) {
   const scrollPositionsRef = useRef<Record<string, number>>({})
   const pendingScrollRestoreRef = useRef<DashboardView | null>(null)
 
-  type ActiveModal = null | 'completeProfile' | 'export' | 'quickView' | 'notifications' | 'wallet' | 'jsonImport' | 'admin'
+  type ActiveModal =
+    | null
+    | 'completeProfile'
+    | 'export'
+    | 'quickView'
+    | 'notifications'
+    | 'wallet'
+    | 'jsonImport'
+    | 'admin'
+    | 'ironScanner'
   const [activeModal, setActiveModal] = useState<ActiveModal>(null)
 
   const [profileIncomplete, setProfileIncomplete] = useState<boolean>(!!props.initialProfileIncomplete)
@@ -220,6 +300,20 @@ function DashboardInner(props: Props) {
 
   const [exportingAll, setExportingAll] = useState(false)
   const [directChat, setDirectChat] = useState<DirectChat | null>(null)
+
+  type IronScannerExercise = {
+    name: string
+    sets: number
+    reps: string
+    notes: string
+  }
+
+  const [ironScannerLoading, setIronScannerLoading] = useState(false)
+  const [ironScannerExercises, setIronScannerExercises] = useState<IronScannerExercise[]>([])
+  const [ironScannerError, setIronScannerError] = useState<string | null>(null)
+  const [ironScannerFileName, setIronScannerFileName] = useState<string | null>(null)
+  const [ironScannerTitle, setIronScannerTitle] = useState('')
+  const [creatingWorkoutFromScanner, setCreatingWorkoutFromScanner] = useState(false)
 
   useEffect(() => {
     try {
@@ -312,13 +406,22 @@ function DashboardInner(props: Props) {
     if (!activeModal) return true
     if (activeModal === 'completeProfile') return !savingProfile
     if (activeModal === 'wallet') return !savingWallet
+    if (activeModal === 'ironScanner') return !ironScannerLoading && !creatingWorkoutFromScanner
     return true
-  }, [activeModal, savingProfile, savingWallet])
+  }, [activeModal, savingProfile, savingWallet, ironScannerLoading, creatingWorkoutFromScanner])
 
   const closeActiveModal = useCallback(() => {
     if (!canCloseActiveModal) return
     if (activeModal === 'quickView') setQuickViewWorkout(null)
     if (activeModal === 'export') setExportWorkout(null)
+    if (activeModal === 'ironScanner') {
+      setIronScannerExercises([])
+      setIronScannerError(null)
+      setIronScannerFileName(null)
+      setIronScannerTitle('')
+      setIronScannerLoading(false)
+      setCreatingWorkoutFromScanner(false)
+    }
     setActiveModal(null)
   }, [activeModal, canCloseActiveModal])
 
@@ -827,17 +930,12 @@ function DashboardInner(props: Props) {
     try {
       const { error } = await supabase
         .from('profiles')
-        .upsert(
-          {
-            id: props.user.id,
-            email: props.user.email,
-            display_name: nextName,
-            photo_url: props.user.photoURL ?? null,
-            last_seen: new Date(),
-            role: props.user.role || 'user',
-          },
-          { onConflict: 'id' }
-        )
+        .update({
+          display_name: nextName,
+          photo_url: props.user.photoURL ?? null,
+          last_seen: new Date().toISOString(),
+        })
+        .eq('id', props.user.id)
       if (error) throw error
       setProfileIncomplete(false)
       setActiveModal(null)
@@ -899,6 +997,7 @@ function DashboardInner(props: Props) {
       logs: seededLogs,
       startedAt: Date.now(),
       timerTargetTime: null,
+      timerContext: null,
     })
     navigateToView('active', { scroll: 'top' })
     return true
@@ -911,10 +1010,13 @@ function DashboardInner(props: Props) {
     })
   }
 
-  const handleStartTimer = (duration: number) => {
+  const handleStartTimer = (duration: number, context?: any) => {
+    const seconds = Number(duration)
+    if (!Number.isFinite(seconds) || seconds <= 0) return
     setActiveSession((prev: any) => ({
       ...(prev || {}),
-      timerTargetTime: Date.now() + duration * 1000,
+      timerTargetTime: Date.now() + seconds * 1000,
+      timerContext: context ?? null,
     }))
   }
 
@@ -922,7 +1024,55 @@ function DashboardInner(props: Props) {
     setActiveSession((prev: any) => ({
       ...(prev || {}),
       timerTargetTime: null,
+      timerContext: null,
     }))
+  }
+
+  const handleTimerFinish = (context?: any) => {
+    try {
+      const kind = String(context?.kind ?? '')
+      if (kind === 'rest_pause') {
+        const key = String(context?.key ?? '')
+        const miniIndexRaw = Number(context?.miniIndex)
+        const miniIndex = Number.isFinite(miniIndexRaw) && miniIndexRaw >= 0 ? miniIndexRaw : 0
+
+        setActiveSession((prev: any) => {
+          const prevUi = prev?.ui && typeof prev.ui === 'object' ? prev.ui : {}
+          return {
+            ...(prev || {}),
+            timerTargetTime: null,
+            timerContext: null,
+            ui: {
+              ...prevUi,
+              restPauseFocus: key ? { key, miniIndex } : null,
+            },
+          }
+        })
+        return
+      }
+
+      if (kind === 'cluster') {
+        const key = String(context?.key ?? '')
+        const blockIndexRaw = Number(context?.blockIndex)
+        const nextBlockIndex = Number.isFinite(blockIndexRaw) && blockIndexRaw >= 0 ? blockIndexRaw + 1 : 0
+
+        setActiveSession((prev: any) => {
+          const prevUi = prev?.ui && typeof prev.ui === 'object' ? prev.ui : {}
+          return {
+            ...(prev || {}),
+            timerTargetTime: null,
+            timerContext: null,
+            ui: {
+              ...prevUi,
+              clusterFocus: key ? { key, blockIndex: nextBlockIndex } : null,
+            },
+          }
+        })
+        return
+      }
+    } catch {}
+
+    handleCloseTimer()
   }
 
   const handleFinishSession = async (sessionData: any, showReport: boolean) => {
@@ -1108,6 +1258,102 @@ function DashboardInner(props: Props) {
     }
   }
 
+  const handleIronScannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e?.target?.files?.[0]
+    if (!file) return
+
+    setIronScannerError(null)
+    setIronScannerExercises([])
+    setIronScannerFileName(file.name)
+    setIronScannerLoading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/iron-scanner', {
+        method: 'POST',
+        body: formData,
+      })
+
+      const json = await response.json().catch(() => null)
+      if (!response.ok || !json || json.ok === false) {
+        const message = json?.error || 'Falha ao ler treino pela imagem.'
+        setIronScannerError(message)
+        return
+      }
+
+      const exercises = Array.isArray(json.exercises) ? json.exercises : []
+      const mapped: IronScannerExercise[] = exercises
+        .filter((ex: any) => ex && typeof ex === 'object')
+        .map((ex: any) => ({
+          name: String(ex?.name ?? ''),
+          sets: Number.isFinite(Number(ex?.sets)) && Number(ex?.sets) > 0 ? Number(ex?.sets) : 4,
+          reps: String(ex?.reps ?? '10'),
+          notes: String(ex?.notes ?? ''),
+        }))
+
+      if (!mapped.length) {
+        setIronScannerError('Nenhum exercício válido encontrado na imagem.')
+        return
+      }
+
+      setIronScannerExercises(mapped)
+      if (!ironScannerTitle) setIronScannerTitle('Treino do Iron Scanner')
+    } catch (err: any) {
+      const message = err?.message ? String(err.message) : String(err || 'Erro inesperado')
+      setIronScannerError(message)
+    } finally {
+      setIronScannerLoading(false)
+    }
+  }
+
+  const handleUpdateIronScannerExercise = (index: number, patch: Partial<IronScannerExercise>) => {
+    setIronScannerExercises((prev) =>
+      prev.map((ex, idx) => (idx === index ? { ...ex, ...patch } : ex))
+    )
+  }
+
+  const handleRemoveIronScannerExercise = (index: number) => {
+    setIronScannerExercises((prev) => prev.filter((_, idx) => idx !== index))
+  }
+
+  const handleCreateWorkoutFromScanner = async () => {
+    if (!ironScannerExercises.length) {
+      setIronScannerError('Nenhum exercício para criar o treino.')
+      return
+    }
+
+    const title = ironScannerTitle && ironScannerTitle.trim().length > 0 ? ironScannerTitle.trim() : 'Treino do Iron Scanner'
+
+    try {
+      setCreatingWorkoutFromScanner(true)
+      const payload = {
+        title,
+        notes: '',
+        exercises: ironScannerExercises.map((ex) => ({
+          name: ex.name,
+          sets: ex.sets,
+          reps: ex.reps,
+          notes: ex.notes,
+        })),
+      }
+
+      await createWorkout(payload)
+      await refreshWorkouts()
+      setActiveModal(null)
+      setIronScannerExercises([])
+      setIronScannerError(null)
+      setIronScannerFileName(null)
+      setIronScannerTitle('')
+    } catch (err: any) {
+      const message = err?.message ? String(err.message) : String(err || 'Erro ao criar treino')
+      setIronScannerError(message)
+    } finally {
+      setCreatingWorkoutFromScanner(false)
+    }
+  }
+
   const handleJsonUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e?.target?.files?.[0]
     if (!file) return
@@ -1211,13 +1457,20 @@ function DashboardInner(props: Props) {
     goBackView('dashboard')
   }
 
-  const handleRealtimeNotification = (payload: NotificationPayload | null) => {
-    setNotification(payload)
-    if (payload) {
-      setHasUnreadNotification(true)
-      setHasUnreadChat(true)
-    }
-  }
+	const handleRealtimeNotification = (payload: NotificationPayload | null) => {
+		setNotification(payload)
+		if (payload) {
+			setHasUnreadNotification(true)
+			try {
+				const rawType = String(payload.type ?? '').toLowerCase()
+				const isChatRelated = rawType === 'message' || rawType === 'chat' || rawType === 'direct_message'
+				if (isChatRelated) {
+					setHasUnreadChat(true)
+				}
+			} catch {
+			}
+		}
+	}
 
   const quickViewExercises = Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []
 
@@ -1345,6 +1598,7 @@ function DashboardInner(props: Props) {
                 exportingAll={exportingAll}
                 onExportAll={handleExportAllWorkouts}
                 onOpenJsonImport={() => setActiveModal('jsonImport')}
+                onOpenIronScanner={() => setActiveModal('ironScanner')}
                 assessmentsContent={<AssessmentHistory studentId={props.user.id} />}
               />
             ) : (
@@ -1368,6 +1622,7 @@ function DashboardInner(props: Props) {
                 exportingAll={exportingAll}
                 onExportAll={handleExportAllWorkouts}
                 onOpenJsonImport={() => setActiveModal('jsonImport')}
+                onOpenIronScanner={() => setActiveModal('ironScanner')}
                 assessmentsContent={<AssessmentHistory studentId={props.user.id} />}
               />
             )
@@ -1539,6 +1794,138 @@ function DashboardInner(props: Props) {
           </div>
         )}
 
+        {activeModal === 'ironScanner' && (
+          <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeActiveModal}>
+            <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center">
+                    <Upload size={20} className="text-yellow-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-white text-sm uppercase tracking-widest">Iron Scanner</h3>
+                    <p className="text-xs text-neutral-400">Envie a foto do treino, revise e salve como template.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeActiveModal}
+                  disabled={!canCloseActiveModal}
+                  className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors disabled:opacity-60"
+                  aria-label="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500">Foto do treino</label>
+                  <label className="block w-full cursor-pointer bg-yellow-500 hover:bg-yellow-400 text-black font-black py-4 rounded-xl text-center text-sm transition-colors">
+                    {ironScannerLoading ? 'Lendo treino...' : 'Selecionar imagem'}
+                    <input type="file" accept="image/*" onChange={handleIronScannerFileChange} className="hidden" disabled={ironScannerLoading} />
+                  </label>
+                  {ironScannerFileName && (
+                    <p className="text-xs text-neutral-400 truncate">Arquivo: {ironScannerFileName}</p>
+                  )}
+                  {ironScannerLoading && (
+                    <div className="flex items-center gap-2 text-xs text-neutral-300 mt-2">
+                      <Loader2 size={14} className="animate-spin text-yellow-500" />
+                      <span>Analisando a imagem e extraindo exercícios...</span>
+                    </div>
+                  )}
+                  {ironScannerError && (
+                    <p className="text-xs text-red-400 mt-2">{ironScannerError}</p>
+                  )}
+                </div>
+
+                {ironScannerExercises.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500">Título do treino</label>
+                      <input
+                        value={ironScannerTitle}
+                        onChange={(e) => setIronScannerTitle(e.target.value)}
+                        placeholder="Ex: Treino A - Peito e Tríceps"
+                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500"
+                      />
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto space-y-2 border border-neutral-800 rounded-xl p-2 bg-neutral-900/60">
+                      {ironScannerExercises.map((ex, idx) => (
+                        <div key={idx} className="bg-neutral-800 rounded-xl p-3 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <input
+                              value={ex.name}
+                              onChange={(e) => handleUpdateIronScannerExercise(idx, { name: e.target.value })}
+                              className="flex-1 bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500"
+                              placeholder="Nome do exercício"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveIronScannerExercise(idx)}
+                              className="ml-2 px-2 py-2 rounded-lg bg-neutral-900 text-neutral-400 hover:bg-red-900/40 hover:text-red-300 text-xs font-bold uppercase tracking-widest"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-20">
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Séries</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={20}
+                                value={ex.sets}
+                                onChange={(e) => handleUpdateIronScannerExercise(idx, { sets: Number(e.target.value) || 1 })}
+                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-yellow-500"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Reps</label>
+                              <input
+                                value={ex.reps}
+                                onChange={(e) => handleUpdateIronScannerExercise(idx, { reps: e.target.value })}
+                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-yellow-500"
+                                placeholder="Ex: 8-10"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-widest text-neutral-500 mb-1">Notas</label>
+                            <textarea
+                              value={ex.notes}
+                              onChange={(e) => handleUpdateIronScannerExercise(idx, { notes: e.target.value })}
+                              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-yellow-500 resize-none"
+                              rows={2}
+                              placeholder="Observações, métodos avançados, etc."
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCreateWorkoutFromScanner}
+                      disabled={creatingWorkoutFromScanner || !ironScannerExercises.length}
+                      className="w-full mt-2 py-3 rounded-xl bg-yellow-500 text-black font-black text-sm uppercase tracking-widest disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {creatingWorkoutFromScanner ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> Criando treino...
+                        </>
+                      ) : (
+                        <>Salvar como treino</>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeModal === 'export' && exportWorkout && (
           <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeActiveModal}>
             <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -1681,7 +2068,14 @@ function DashboardInner(props: Props) {
           </div>
         )}
 
-        {activeSession?.timerTargetTime ? <RestTimerOverlay targetTime={activeSession.timerTargetTime} onClose={handleCloseTimer} onFinish={handleCloseTimer} /> : null}
+        {activeSession?.timerTargetTime ? (
+          <RestTimerOverlay
+            targetTime={activeSession.timerTargetTime}
+            context={activeSession?.timerContext}
+            onClose={handleCloseTimer}
+            onFinish={handleTimerFinish}
+          />
+        ) : null}
 
         {notification ? (
           <NotificationToast
@@ -1690,7 +2084,9 @@ function DashboardInner(props: Props) {
               try {
                 const senderName = String((notification as any)?.senderName ?? '')
                 const isSystem = senderName === 'Aviso do Sistema' || senderName === 'Sistema'
-                if (!isSystem) {
+                const rawType = String((notification as any)?.type ?? '').toLowerCase()
+                const isChatRelated = rawType === 'message' || rawType === 'chat' || rawType === 'direct_message'
+                if (!isSystem && isChatRelated) {
                   setHasUnreadChat(false)
                   navigateToView('chat', { scroll: 'top' })
                 }

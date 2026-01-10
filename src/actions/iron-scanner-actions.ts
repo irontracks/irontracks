@@ -16,7 +16,7 @@ type IronScannerResponse = {
 };
 
 const IRON_SCANNER_MODEL =
-  process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || "gemini-2.5-flash-lite";
+  process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || "gemini-2.5-flash";
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 export async function processWorkoutImage(formData: FormData): Promise<IronScannerResponse> {

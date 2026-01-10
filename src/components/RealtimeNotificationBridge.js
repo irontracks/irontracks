@@ -26,14 +26,18 @@ const RealtimeNotificationBridge = ({ setNotification }) => {
               if (!mounted) return
               const n = payload?.new && typeof payload.new === 'object' ? payload.new : null
               if (!n) return
+
+              const rawType = String(n?.type ?? '').toLowerCase()
               const title = String(n?.title ?? '').trim()
               const message = String(n?.message ?? '').trim()
               if (!title || !message) return
+
               setNotification({
                 text: message,
                 displayName: title,
                 photoURL: null,
-                senderName: title
+                senderName: title,
+                type: rawType || 'broadcast',
               })
             } catch {
               return
