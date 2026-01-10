@@ -954,23 +954,29 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
                                 <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
-                                <div className="text-xl font-black tracking-tight text-white">{Number(periodReport.stats?.count || 0)}</div>
+                                <div className="text-xl font-black tracking-tight text-white font-mono">
+                                    {Number(periodReport.stats?.count || 0)}
+                                </div>
                             </div>
                             <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total</div>
-                                <div className="text-xl font-black tracking-tight text-white">{Number(periodReport.stats?.totalMinutes || 0)}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total (min)</div>
+                                <div className="text-xl font-black tracking-tight text-white font-mono">
+                                    {Number(periodReport.stats?.totalMinutes || 0)}
+                                </div>
                             </div>
                             <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
-                                <div className="text-xl font-black tracking-tight text-white">{Number(periodReport.stats?.avgMinutes || 0)}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média (min)</div>
+                                <div className="text-xl font-black tracking-tight text-white font-mono">
+                                    {Number(periodReport.stats?.avgMinutes || 0)}
+                                </div>
                             </div>
                             <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Volume total</div>
-                                <div className="text-xl font-black tracking-tight text-white">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Volume total (kg)</div>
+                                <div className="text-xl font-black tracking-tight text-white font-mono">
                                     {(() => {
                                         const v = Number(periodReport.stats?.totalVolumeKg || 0);
-                                        if (!Number.isFinite(v) || v <= 0) return '0kg';
-                                        return `${v.toLocaleString('pt-BR')}kg`;
+                                        if (!Number.isFinite(v) || v <= 0) return '0';
+                                        return v.toLocaleString('pt-BR');
                                     })()}
                                 </div>
                             </div>

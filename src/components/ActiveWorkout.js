@@ -171,6 +171,10 @@ export default function ActiveWorkout(props) {
     if (!session || !workout) return;
     if (finishing) return;
 
+    const minSecondsForFullSession = 30 * 60;
+    const elapsedSafe = Number(elapsedSeconds) || 0;
+    let showReport = true;
+
     let ok = false;
     try {
       ok = typeof confirm === 'function' ? await confirm('Finalizar treino e salvar no histórico?', 'Finalizar treino') : false;
@@ -178,6 +182,28 @@ export default function ActiveWorkout(props) {
       ok = false;
     }
     if (!ok) return;
+
+    if (elapsedSafe > 0 && Number.isFinite(elapsedSafe) && elapsedSafe < minSecondsForFullSession) {
+      let allowSaveShort = false;
+      try {
+        allowSaveShort =
+          typeof confirm === 'function'
+            ? await confirm('Este treino durou menos de 30 minutos. Deseja salvar no histórico mesmo assim?', 'Treino curto (< 30 min)')
+            : false;
+      } catch {
+        allowSaveShort = false;
+      }
+      if (!allowSaveShort) return;
+
+      try {
+        showReport =
+          typeof confirm === 'function'
+            ? await confirm('Deseja gerar o relatório deste treino curto agora?', 'Gerar relatório?')
+            : true;
+      } catch {
+        showReport = true;
+      }
+    }
 
     setFinishing(true);
     try {
@@ -232,7 +258,7 @@ export default function ActiveWorkout(props) {
 
       try {
         if (typeof props?.onFinish === 'function') {
-          props.onFinish(sessionForReport, true);
+          props.onFinish(sessionForReport, showReport);
         }
       } catch {}
     } catch (e) {
@@ -250,49 +276,65 @@ export default function ActiveWorkout(props) {
     const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
     const weightValue = String(log?.weight ?? cfg?.weight ?? '');
     const repsValue = String(log?.reps ?? '');
+    const notesValue = String(log?.notes ?? '');
     const done = !!log?.done;
 
     return (
-      <div className="flex items-center gap-2" key={key}>
-        <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-        <input
-          inputMode="decimal"
-          value={weightValue}
-          onChange={(e) => {
-            const v = e?.target?.value ?? '';
-            updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-          }}
-          placeholder="kg"
-          className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
-        <input
-          inputMode="numeric"
-          value={repsValue}
-          onChange={(e) => {
-            const v = e?.target?.value ?? '';
-            updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-          }}
-          placeholder="reps"
-          className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            const nextDone = !done;
-            updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
-            if (nextDone && restTime && restTime > 0) {
-              startTimer(restTime, { kind: 'rest', key });
+      <div className="space-y-2" key={key}>
+        <div className="flex items-center gap-2">
+          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+          <input
+            inputMode="decimal"
+            value={weightValue}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+            }}
+            placeholder="kg"
+            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+          <div className="w-24 flex flex-col gap-1">
+            <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Repetição / reps</div>
+            <input
+              inputMode="numeric"
+              value={repsValue}
+              onChange={(e) => {
+                const v = e?.target?.value ?? '';
+                updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+              }}
+              placeholder="reps"
+              className="bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const nextDone = !done;
+              updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
+              if (nextDone && restTime && restTime > 0) {
+                startTimer(restTime, { kind: 'rest', key });
+              }
+            }}
+            className={
+              done
+                ? 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                : 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
             }
+          >
+            <Check size={16} />
+            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+          </button>
+        </div>
+        <textarea
+          value={notesValue}
+          onChange={(e) => {
+            const v = e?.target?.value ?? '';
+            updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
           }}
-          className={
-            done
-              ? 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-              : 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
-          }
-        >
-          <Check size={16} />
-          <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
-        </button>
+          placeholder="Observações da série"
+          rows={2}
+          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+        />
       </div>
     );
   };
@@ -350,6 +392,8 @@ export default function ActiveWorkout(props) {
         updateRp({ last_rest_after_mini: idx });
       } catch {}
     };
+
+    const notesValue = String(log?.notes ?? '');
 
     return (
       <div key={key} className="space-y-2">
@@ -451,6 +495,16 @@ export default function ActiveWorkout(props) {
             );
           })}
         </div>
+        <textarea
+          value={notesValue}
+          onChange={(e) => {
+            const v = e?.target?.value ?? '';
+            updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+          }}
+          placeholder="Observações da série"
+          rows={2}
+          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+        />
       </div>
     );
   };
@@ -509,6 +563,7 @@ export default function ActiveWorkout(props) {
     };
 
     const notation = plannedBlocks.length ? plannedBlocks.join('+') : '';
+    const notesValue = String(log?.notes ?? '');
 
     return (
       <div key={key} className="space-y-2">
@@ -599,6 +654,16 @@ export default function ActiveWorkout(props) {
             })}
           </div>
         )}
+        <textarea
+          value={notesValue}
+          onChange={(e) => {
+            const v = e?.target?.value ?? '';
+            updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+          }}
+          placeholder="Observações da série"
+          rows={2}
+          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+        />
       </div>
     );
   };
