@@ -901,11 +901,11 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                                                         <input type="number" value={ex.restTime || 0} onChange={(e)=>updateManualExercise(idx,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                     </div>
                                                 </div>
-                                                <div>
+                                                        <div>
                                                     <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
                                                     <div className="grid grid-cols-4 gap-2">
                                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                            <input key={sIdx} value={ex.weights?.[sIdx] ?? ''} onChange={(e)=>updateManualExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
+                                                            <input key={sIdx} value={ex.weights?.[sIdx] ?? ''} onChange={(e)=>updateManualExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
                                                         ))}
                                                     </div>
                                                 </div>
@@ -913,7 +913,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                                                     <label className="text-[10px] text-neutral-500">Reps por série</label>
                                                     <div className="grid grid-cols-4 gap-2">
                                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                            <input key={sIdx} value={ex.repsPerSet?.[sIdx] ?? ''} onChange={(e)=>updateManualExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
+                                                            <input key={sIdx} value={ex.repsPerSet?.[sIdx] ?? ''} onChange={(e)=>updateManualExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
                                                         ))}
                                                     </div>
                                                 </div>

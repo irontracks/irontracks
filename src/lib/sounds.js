@@ -1,20 +1,26 @@
 let __ctx;
+let __unlocked = false;
 
 const UNLOCK_SILENT_GAIN = 0.000001;
 const UNLOCK_SILENT_DURATION_S = 0.03;
 
-const ensureCtx = () => {
+const ensureCtx = (opts) => {
     if (typeof window === 'undefined') return null;
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
-    if (!__ctx || __ctx.state === 'closed') __ctx = new AC();
+    const allowCreate = !!(opts && typeof opts === 'object' && opts.create);
+    if (!__ctx || __ctx.state === 'closed') {
+        if (!__unlocked && !allowCreate) return null;
+        __ctx = new AC();
+    }
     if (__ctx.state === 'suspended') { try { __ctx.resume(); } catch {} }
     return __ctx;
 };
 
 export const unlockAudio = () => {
     try {
-        const ctx = ensureCtx();
+        __unlocked = true;
+        const ctx = ensureCtx({ create: true });
         if (!ctx) return;
         if (ctx.state === 'suspended') {
             try {

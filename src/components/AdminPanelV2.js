@@ -2,10 +2,19 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
-    Crown, X, UserCog, AlertCircle, Trash2, Megaphone, Plus, Copy, ArrowLeft,
-    MessageSquare, Send, RefreshCw, Dumbbell, Share2, UserPlus, AlertTriangle, Edit3, ShieldAlert,
-    ChevronDown, FileText, Download, History, Search
+	Crown, X, UserCog, AlertCircle, Trash2, Megaphone, Plus, Copy, ArrowLeft,
+	MessageSquare, Send, RefreshCw, Dumbbell, Share2, UserPlus, AlertTriangle, Edit3, ShieldAlert,
+	ChevronDown, FileText, Download, History, Search
 } from 'lucide-react';
+import { Bar } from 'react-chartjs-2';
+import {
+	Chart as ChartJS,
+	CategoryScale,
+	LinearScale,
+	BarElement,
+	Tooltip,
+	Legend
+} from 'chart.js';
 import { createClient } from '@/utils/supabase/client';
 import AdminWorkoutEditor from './AdminWorkoutEditor';
 import { workoutPlanHtml } from '@/utils/report/templates';
@@ -16,6 +25,9 @@ import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
 
 const ADMIN_EMAIL = 'djmkapple@gmail.com';
+const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const AdminPanelV2 = ({ user, onClose }) => {
     const { alert, confirm } = useDialog();
@@ -129,17 +141,98 @@ const AdminPanelV2 = ({ user, onClose }) => {
             .filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
     }, [studentStatusFilter, studentMatchesQuery, statusMatches, usersList]);
 
-    const teachersFiltered = useMemo(() => {
-        const list = Array.isArray(teachersList) ? teachersList : [];
-        return list
-            .filter(teacherMatchesQuery)
-            .filter((t) => statusMatches(t?.status || 'pendente', teacherStatusFilter));
-    }, [statusMatches, teacherMatchesQuery, teacherStatusFilter, teachersList]);
+	const teachersFiltered = useMemo(() => {
+		const list = Array.isArray(teachersList) ? teachersList : [];
+		return list
+			.filter(teacherMatchesQuery)
+			.filter((t) => statusMatches(t?.status || 'pendente', teacherStatusFilter));
+	}, [statusMatches, teacherMatchesQuery, teacherStatusFilter, teachersList]);
 
-    const templatesFiltered = useMemo(() => {
-        const list = Array.isArray(templates) ? templates : [];
-        return list.filter(templateMatchesQuery);
-    }, [templateMatchesQuery, templates]);
+	const templatesFiltered = useMemo(() => {
+		const list = Array.isArray(templates) ? templates : [];
+		return list.filter(templateMatchesQuery);
+	}, [templateMatchesQuery, templates]);
+
+	const coachInboxItems = useMemo(() => {
+		if (!isTeacher) return [];
+		const list = Array.isArray(usersList) ? usersList : [];
+        const today = new Date();
+        const todayMs = today.getTime();
+        if (!Number.isFinite(todayMs)) return [];
+
+        const safeDays = (value) => {
+            const n = Number(value);
+            if (!Number.isFinite(n) || n < 0) return 0;
+            return n;
+        };
+
+        const items = list
+            .filter((s) => s && typeof s === 'object' && s.teacher_id === user?.id)
+            .map((s) => {
+                const workouts = Array.isArray(s.workouts) ? s.workouts : [];
+                const nonTemplate = workouts.filter((w) => w && typeof w === 'object' && w.is_template !== true);
+
+                if (!nonTemplate.length) {
+                    return {
+                        id: s.id,
+                        name: s.name || s.email || '',
+                        email: s.email || '',
+                        status: s.status || 'pendente',
+                        hasWorkouts: false,
+                        daysSinceLastWorkout: null,
+                    };
+                }
+
+                let lastWorkoutMs = 0;
+                nonTemplate.forEach((w) => {
+                    try {
+                        const raw = w.date || w.completed_at || w.created_at;
+                        if (!raw) return;
+                        const d = raw?.toDate ? raw.toDate() : new Date(raw);
+                        const t = d?.getTime ? d.getTime() : NaN;
+                        if (!Number.isFinite(t)) return;
+                        if (t > lastWorkoutMs) lastWorkoutMs = t;
+                    } catch {}
+                });
+
+                if (!lastWorkoutMs) {
+                    return {
+                        id: s.id,
+                        name: s.name || s.email || '',
+                        email: s.email || '',
+                        status: s.status || 'pendente',
+                        hasWorkouts: false,
+                        daysSinceLastWorkout: null,
+                    };
+                }
+
+                const diffMs = todayMs - lastWorkoutMs;
+                const days = diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) : 0;
+
+                return {
+                    id: s.id,
+                    name: s.name || s.email || '',
+                    email: s.email || '',
+                    status: s.status || 'pendente',
+                    hasWorkouts: true,
+                    daysSinceLastWorkout: days,
+                };
+            })
+            .filter((item) => item && typeof item === 'object')
+            .filter((item) => {
+                if (!item.hasWorkouts) return true;
+                const days = safeDays(item.daysSinceLastWorkout);
+                return days >= COACH_INBOX_INACTIVE_THRESHOLD_DAYS;
+            });
+
+        items.sort((a, b) => {
+            const aDays = a.hasWorkouts ? safeDays(a.daysSinceLastWorkout) : Number.MAX_SAFE_INTEGER;
+            const bDays = b.hasWorkouts ? safeDays(b.daysSinceLastWorkout) : Number.MAX_SAFE_INTEGER;
+            return bDays - aDays;
+        });
+
+        return items.slice(0, 5);
+	}, [isTeacher, usersList, user?.id]);
 
     useEffect(() => {
         if (!selectedStudent) setHistoryOpen(false);
@@ -370,7 +463,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 .from('students')
                                 .select('*, workouts(*)')
                                 .order('name');
-                            query = query.or(`teacher_id.eq.${currentUser.id},created_by.eq.${currentUser.id}`);
+                            const uid = currentUser?.id ? String(currentUser.id) : '';
+                            if (uid) query = query.or(`teacher_id.eq.${uid},user_id.eq.${uid}`);
                             const { data: studentsData } = await query;
                             list = (studentsData || []).filter(s => (s.email || '').toLowerCase() !== (currentUser.email || '').toLowerCase());
                         }
@@ -429,7 +523,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         .from('students')
                         .select('*, workouts(*)')
                         .order('name');
-                    query = query.or(`teacher_id.eq.${currentUser.id},created_by.eq.${currentUser.id}`);
+                    const uid = currentUser?.id ? String(currentUser.id) : '';
+                    if (uid) query = query.or(`teacher_id.eq.${uid},user_id.eq.${uid}`);
                     const { data: studentsData } = await query;
                     list = (studentsData || []).filter(s => (s.email || '').toLowerCase() !== (currentUser.email || '').toLowerCase());
                     // Overlay cached teacher assignment by email to ensure UI reflects recent changes
@@ -1035,32 +1130,195 @@ const AdminPanelV2 = ({ user, onClose }) => {
         }
     };
 
-    const runDangerAction = async (actionKey, actionName, actionFn, resetInput) => {
-        setDangerActionLoading(actionKey);
-        try {
-            const ok = await handleDangerAction(actionName, actionFn);
-            if (ok) resetInput();
-        } finally {
-            setDangerActionLoading(null);
-        }
-    };
+	const runDangerAction = async (actionKey, actionName, actionFn, resetInput) => {
+		setDangerActionLoading(actionKey);
+		try {
+			const ok = await handleDangerAction(actionName, actionFn);
+			if (ok) resetInput();
+		} finally {
+			setDangerActionLoading(null);
+		}
+	};
 
-    if (!isAdmin && !isTeacher) return null;
+	let TAB_LABELS = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
+	if (isAdmin) {
+		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', system: 'SISTEMA' };
+	}
 
-    let TAB_LABELS = { dashboard: 'VISÃO', students: 'ALUNOS', templates: 'TREINOS' };
-    if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', system: 'SISTEMA' };
-    }
+	const tabKeys = Object.keys(TAB_LABELS);
+	const currentTabLabel = TAB_LABELS[tab] || 'VISÃO GERAL';
 
-    const tabKeys = Object.keys(TAB_LABELS);
-    const currentTabLabel = TAB_LABELS[tab] || 'VISÃO';
+	const totalStudents = Array.isArray(usersList) ? usersList.length : 0;
+	const studentsWithTeacher = Array.isArray(usersList) ? usersList.filter(s => !!s.teacher_id).length : 0;
+	const studentsWithoutTeacher = Array.isArray(usersList) ? usersList.filter(s => !s.teacher_id).length : 0;
+	const totalTeachers = Array.isArray(teachersList) ? teachersList.length : 0;
 
-    const totalStudents = Array.isArray(usersList) ? usersList.length : 0;
-    const studentsWithTeacher = Array.isArray(usersList) ? usersList.filter(s => !!s.teacher_id).length : 0;
-    const studentsWithoutTeacher = Array.isArray(usersList) ? usersList.filter(s => !s.teacher_id).length : 0;
-    const totalTeachers = Array.isArray(teachersList) ? teachersList.length : 0;
+	const studentStatusStats = useMemo(() => {
+		const list = Array.isArray(usersList) ? usersList : [];
+		const stats = { pago: 0, pendente: 0, atrasado: 0, cancelar: 0, outros: 0 };
+		for (const s of list) {
+			try {
+				const rawStatus = s && typeof s === 'object' ? s.status : null;
+				const key = String(rawStatus || 'pendente').toLowerCase().trim();
+				if (Object.prototype.hasOwnProperty.call(stats, key)) {
+					stats[key] += 1;
+				} else {
+					stats.outros += 1;
+				}
+			} catch {}
+		}
+		return stats;
+	}, [usersList]);
 
-    const selectedStatus = normalizeText(selectedStudent?.status || '');
+	const dashboardCharts = useMemo(() => {
+		const baseTotalStudents = typeof totalStudents === 'number' && Number.isFinite(totalStudents) && totalStudents > 0 ? totalStudents : 0;
+		const baseWith = typeof studentsWithTeacher === 'number' && Number.isFinite(studentsWithTeacher) && studentsWithTeacher > 0 ? studentsWithTeacher : 0;
+		const baseWithout = typeof studentsWithoutTeacher === 'number' && Number.isFinite(studentsWithoutTeacher) && studentsWithoutTeacher > 0 ? studentsWithoutTeacher : 0;
+
+		const teacherData = {
+			labels: ['Com professor', 'Sem professor'],
+			datasets: [
+				{
+					label: 'Alunos',
+					data: [baseWith, baseWithout],
+					backgroundColor: ['rgba(250, 204, 21, 0.9)', 'rgba(82, 82, 82, 0.9)'],
+					borderRadius: 999,
+					maxBarThickness: 40
+				}
+			]
+		};
+
+		const totalStatus =
+			studentStatusStats.pago +
+			studentStatusStats.pendente +
+			studentStatusStats.atrasado +
+			studentStatusStats.cancelar +
+			studentStatusStats.outros;
+
+		const statusValues =
+			totalStatus > 0
+				? [
+					studentStatusStats.pago,
+					studentStatusStats.pendente,
+					studentStatusStats.atrasado,
+					studentStatusStats.cancelar,
+					studentStatusStats.outros
+				]
+				: [0, 0, 0, 0, 0];
+
+		const statusData = {
+			labels: ['Pago', 'Pendente', 'Atrasado', 'Cancelar', 'Outros'],
+			datasets: [
+				{
+					label: 'Alunos',
+					data: statusValues,
+					backgroundColor: [
+						'rgba(34, 197, 94, 0.9)',
+						'rgba(234, 179, 8, 0.9)',
+						'rgba(248, 113, 113, 0.9)',
+						'rgba(148, 163, 184, 0.9)',
+						'rgba(82, 82, 82, 0.9)'
+					],
+					borderRadius: 12,
+					maxBarThickness: 32
+				}
+			]
+		};
+
+		const baseOptions = {
+			responsive: true,
+			maintainAspectRatio: false,
+			plugins: {
+				legend: {
+					display: false,
+					labels: {
+						color: '#a3a3a3',
+						font: { size: 10, weight: '600' }
+					}
+				},
+				tooltip: {
+					enabled: true,
+					backgroundColor: 'rgba(10,10,10,0.9)',
+					borderColor: '#404040',
+					borderWidth: 1,
+					titleColor: '#fafafa',
+					bodyColor: '#e5e5e5',
+					padding: 8,
+					displayColors: false
+				}
+			},
+			scales: {
+				x: {
+					grid: {
+						display: false,
+						drawBorder: false
+					},
+					ticks: {
+						color: '#a3a3a3',
+						font: { size: 10, weight: '600' }
+					}
+				},
+				y: {
+					beginAtZero: true,
+					grid: {
+						color: 'rgba(64,64,64,0.6)',
+						drawBorder: false
+					},
+					ticks: {
+						color: '#737373',
+						font: { size: 9, weight: '500' },
+						precision: 0,
+						stepSize: 1
+					}
+				}
+			}
+		};
+
+		const teacherOptions = {
+			...baseOptions,
+			onClick: () => {
+				try {
+					setTab('students');
+					setSelectedStudent(null);
+				} catch {}
+			}
+		};
+
+		const statusOptions = {
+			...baseOptions,
+			onClick: (evt, elements) => {
+				try {
+					if (!elements || elements.length === 0) return;
+					const first = elements[0];
+					const index = typeof first?.index === 'number' ? first.index : null;
+					if (index == null || !Number.isFinite(index)) return;
+					const mapping = ['pago', 'pendente', 'atrasado', 'cancelar', 'outros'];
+					const key = mapping[index];
+					if (!key) return;
+					setStudentStatusFilter(key);
+					setTab('students');
+					setSelectedStudent(null);
+				} catch {}
+			}
+		};
+
+		return {
+			teacherDistribution: {
+				data: teacherData,
+				options: teacherOptions
+			},
+			statusDistribution: {
+				data: statusData,
+				options: statusOptions
+			},
+			statusTotal: totalStatus,
+			totalStudents: baseTotalStudents
+		};
+	}, [totalStudents, studentsWithTeacher, studentsWithoutTeacher, studentStatusStats, setStudentStatusFilter, setTab, setSelectedStudent]);
+
+	if (!isAdmin && !isTeacher) return null;
+
+	const selectedStatus = normalizeText(selectedStudent?.status || '');
     const selectedStatusLabel = String(selectedStudent?.status || 'pendente');
     const selectedStatusTone = selectedStatus === 'pago'
         ? 'bg-green-500/10 text-green-400 border-green-500/30'
@@ -1078,10 +1336,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         DIAGNOSTIC MODE: {debugError}
                     </div>
                 )}
-                <div className="px-4 md:px-8 py-3">
-                    <div className="w-full max-w-6xl mx-auto space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
+				<div className="px-4 md:px-8 py-2">
+					<div className="w-full flex flex-col md:flex-row md:items-center md:justify-between gap-1 md:gap-4">
+						<div className="flex items-center justify-between gap-3">
+							<div className="flex items-center gap-3">
                                 <button
                                     type="button"
                                     onClick={() => { setSelectedStudent(null); setTab('dashboard'); }}
@@ -1097,15 +1355,15 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </button>
                                 <div className="hidden md:block text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Operações do seu negócio</div>
                             </div>
-                            <button
-                                onClick={() => onClose && onClose()}
-                                className="flex-shrink-0 w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
-                            >
-                                <X size={18} className="font-bold" />
-                            </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 min-w-0">
+							<button
+								onClick={() => onClose && onClose()}
+								className="md:hidden flex-shrink-0 w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
+							>
+								<X size={18} className="font-bold" />
+							</button>
+						</div>
+						
+						<div className="flex items-center gap-2 min-w-0 mt-1 md:mt-0">
                             <div className="flex-1 min-w-0">
                                 <div className="hidden md:flex items-center gap-2 justify-end flex-wrap">
                                     {Object.entries(TAB_LABELS).map(([key, label]) => (
@@ -1121,6 +1379,12 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             {label}
                                         </button>
                                     ))}
+                                    <button
+                                        onClick={() => onClose && onClose()}
+                                        className="hidden md:inline-flex items-center justify-center w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white transition-all border border-neutral-800 active:scale-95 ml-1"
+                                    >
+                                        <X size={18} className="font-bold" />
+                                    </button>
                                 </div>
 
                                 <div className="md:hidden flex items-center gap-2">
@@ -1231,48 +1495,147 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 </div>
             )}
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-20 pb-safe">
-                {tab === 'dashboard' && !selectedStudent && (
-                    <div className="w-full max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div
-                            className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
-                            onClick={() => { setTab('students'); setSelectedStudent(null); }}
-                        >
-                            <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Total Alunos</h3>
-                            <p className="text-3xl font-black text-white mt-1">{totalStudents}</p>
-                        </div>
-                        <div className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 transition-colors">
-                            <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Com Professor</h3>
-                            <p className="text-3xl font-black text-green-400 mt-1">{studentsWithTeacher}</p>
-                        </div>
-                        <div
-                            className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
-                            onClick={() => { setTab('students'); setSelectedStudent(null); }}
-                        >
-                            <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Sem Professor</h3>
-                            <p className="text-3xl font-black text-yellow-500 mt-1">{studentsWithoutTeacher}</p>
-                        </div>
-                        <div
-                            className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
-                            onClick={() => { setTab('templates'); setSelectedStudent(null); }}
-                        >
-                            <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Treinos Criados</h3>
-                            <p className="text-3xl font-black text-white mt-1">{myWorkoutsCount ?? '-'}</p>
-                        </div>
-                        {isAdmin && (
-                            <div
-                                className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
-                                onClick={() => { setTab('teachers'); setSelectedStudent(null); }}
-                            >
-                                <h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Professores Ativos</h3>
-                                <p className="text-3xl font-black text-white mt-1">{totalTeachers}</p>
+			<div className="flex-1 min-h-0 overflow-y-auto p-4 pb-20 pb-safe">
+				{tab === 'dashboard' && !selectedStudent && (
+					<div className="w-full">
+						<div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+							<div
+								className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+								onClick={() => { setTab('students'); setSelectedStudent(null); }}
+							>
+								<h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Total Alunos</h3>
+								<p className="text-3xl font-black text-white mt-1">{totalStudents}</p>
+								<p className="mt-2 text-[11px] text-neutral-500">Clique para ir direto à aba Alunos.</p>
+							</div>
+							<div className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800">
+								<h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Com Professor</h3>
+								<p className="text-3xl font-black text-green-400 mt-1">{studentsWithTeacher}</p>
+								<p className="mt-2 text-[11px] text-neutral-500">Alunos vinculados a pelo menos um professor.</p>
+							</div>
+							<div
+								className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+								onClick={() => { setTab('students'); setSelectedStudent(null); }}
+							>
+								<h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Sem Professor</h3>
+								<p className="text-3xl font-black text-yellow-500 mt-1">{studentsWithoutTeacher}</p>
+								<p className="mt-2 text-[11px] text-neutral-500">Alunos aguardando vínculo ou triagem.</p>
+							</div>
+							<div
+								className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+								onClick={() => { setTab('templates'); setSelectedStudent(null); }}
+							>
+								<h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Treinos Criados</h3>
+								<p className="text-3xl font-black text-white mt-1">{myWorkoutsCount ?? '-'}</p>
+								<p className="mt-2 text-[11px] text-neutral-500">Modelos de treino disponíveis para uso imediato.</p>
+							</div>
+							{isAdmin && (
+								<div
+									className="bg-neutral-900 p-4 rounded-2xl border border-neutral-800 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+									onClick={() => { setTab('teachers'); setSelectedStudent(null); }}
+								>
+									<h3 className="text-neutral-400 text-[11px] font-bold uppercase tracking-widest">Professores Ativos</h3>
+									<p className="text-3xl font-black text-white mt-1">{totalTeachers}</p>
+									<p className="mt-2 text-[11px] text-neutral-500">Gestão completa na aba Professores.</p>
+								</div>
+							)}
+						</div>
+
+						<div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+							<div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)] h-64">
+								<div className="flex items-center justify-between gap-3 mb-3">
+									<div>
+										<h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-400">Distribuição Alunos</h3>
+										<p className="text-[11px] text-neutral-500 mt-1">Com professor vs sem professor.</p>
+									</div>
+									<div className="text-[11px] text-neutral-500 font-semibold">
+										{dashboardCharts.totalStudents} total
+									</div>
+								</div>
+								<div className="h-[180px]">
+									{dashboardCharts?.teacherDistribution && (
+										<Bar data={dashboardCharts.teacherDistribution.data} options={dashboardCharts.teacherDistribution.options} />
+									)}
+								</div>
+							</div>
+							<div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)] h-64">
+								<div className="flex items-center justify-between gap-3 mb-3">
+									<div>
+										<h3 className="text-[11px] font-black uppercase tracking-widest text-neutral-400">Status de Pagamento</h3>
+										<p className="text-[11px] text-neutral-500 mt-1">Distribuição rápida por status financeiro.</p>
+									</div>
+									<div className="text-[11px] text-neutral-500 font-semibold">
+										{dashboardCharts.statusTotal} registros
+									</div>
+								</div>
+								<div className="h-[180px]">
+									{dashboardCharts?.statusDistribution && (
+										<Bar data={dashboardCharts.statusDistribution.data} options={dashboardCharts.statusDistribution.options} />
+									)}
+								</div>
+							</div>
+						</div>
+						
+						{isTeacher && coachInboxItems.length > 0 && (
+							<div className="mt-6 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3 mb-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Coach Inbox</div>
+                                        <div className="text-xs text-neutral-400 mt-1">
+                                            Alunos que mais precisam de atenção com base na atividade recente.
+                                        </div>
+                                    </div>
+                                    <div className="text-[11px] font-bold text-neutral-400">
+                                        {coachInboxItems.length} prioridade{coachInboxItems.length > 1 ? 's' : ''}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {coachInboxItems.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => {
+                                                const list = Array.isArray(usersList) ? usersList : [];
+                                                const target = list.find((s) => s && s.id === item.id);
+                                                if (target) setSelectedStudent(target);
+                                            }}
+                                            className="w-full text-left bg-neutral-900 border border-neutral-800 hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 rounded-2xl px-3 py-3 flex items-center justify-between gap-3 transition-all duration-300 active:scale-[0.99]"
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 rounded-full bg-neutral-950 border border-neutral-700 flex items-center justify-center text-xs font-black text-neutral-200 flex-shrink-0">
+                                                    {(item.name || item.email || '?').slice(0, 2).toUpperCase()}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-semibold text-white truncate">{item.name || item.email}</div>
+                                                    <div className="text-[11px] text-neutral-500 truncate">{item.email}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                <div
+                                                    className={
+                                                        item.hasWorkouts
+                                                            ? 'px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-yellow-500/10 text-yellow-400 border border-yellow-500/40'
+                                                            : 'px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/40'
+                                                    }
+                                                >
+                                                    {item.hasWorkouts
+                                                        ? `${item.daysSinceLastWorkout ?? 0}d sem treino`
+                                                        : 'Nenhum treino registrado'}
+                                                </div>
+                                                <div className="text-[10px] text-neutral-500 font-semibold capitalize truncate">
+                                                    Status: {String(item.status || 'pendente')}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
                 )}
 
-                {tab === 'students' && !selectedStudent && (
-                    <div className="w-full max-w-6xl mx-auto space-y-4">
+				{tab === 'students' && !selectedStudent && (
+					<div className="w-full space-y-4">
                         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                 <div className="min-w-0">
@@ -1416,8 +1779,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
-                {tab === 'templates' && !selectedStudent && (
-                    <div className="w-full max-w-6xl mx-auto space-y-4">
+				{tab === 'templates' && !selectedStudent && (
+					<div className="w-full space-y-4">
                         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -1662,8 +2025,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
-                {tab === 'teachers' && isAdmin && !selectedStudent && (
-                    <div className="w-full max-w-6xl mx-auto space-y-4">
+				{tab === 'teachers' && isAdmin && !selectedStudent && (
+					<div className="w-full space-y-4">
                         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                                 <div className="min-w-0">

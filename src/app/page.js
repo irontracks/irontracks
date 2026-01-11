@@ -51,8 +51,11 @@ import { playStartSound, unlockAudio } from '@/lib/sounds';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { estimateExerciseSeconds, toMinutesRounded, calculateExerciseDuration } from '@/utils/pacing';
 import { BackButton } from '@/components/ui/BackButton';
+import StudentDashboard from '@/components/dashboard/StudentDashboard'
+import SettingsModal from '@/components/SettingsModal'
+import { useUserSettings } from '@/hooks/useUserSettings'
 
-const AssessmentHistory = dynamic(() => import('@/pages/AssessmentHistory'), { ssr: false });
+const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 
 const ADMIN_EMAIL = 'djmkapple@gmail.com';
 const appId = 'irontracks-production';
@@ -151,6 +154,7 @@ function IronTracksApp() {
     const [showJsonImportModal, setShowJsonImportModal] = useState(false);
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const [notification, setNotification] = useState(null);
+    const [settingsOpen, setSettingsOpen] = useState(false)
     const [isCoach, setIsCoach] = useState(false);
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
     const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
@@ -172,6 +176,7 @@ function IronTracksApp() {
 	const suppressForeignFinishToastUntilRef = useRef(0);
     const [sessionTicker, setSessionTicker] = useState(0);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
+    const userSettingsApi = useUserSettings(user?.id)
 
     const supabaseRef = useRef(null);
     if (!supabaseRef.current) supabaseRef.current = createClient();
@@ -978,17 +983,9 @@ function IronTracksApp() {
         };
     }, [supabase, user?.id, user?.displayName]);
 
-    useEffect(() => {
-        if (!authLoading && user?.id) {
-            try {
-                router.replace('/dashboard');
-            } catch {}
-        }
-    }, [authLoading, user?.id, router]);
-
-    // Fetch Workouts
-    const fetchWorkouts = useCallback(async (specificUser = user) => {
-        const supabase = createClient();
+	// Fetch Workouts
+	const fetchWorkouts = useCallback(async (specificUser = user) => {
+		const supabase = createClient();
         if (isFetching.current) return;
         isFetching.current = true;
         
@@ -1012,7 +1009,7 @@ function IronTracksApp() {
                     const { data: st } = await supabase
                         .from('students')
                         .select('id, name, email, user_id')
-                        .or(`teacher_id.eq.${currentUser.id},created_by.eq.${currentUser.id}`)
+                        .or(`teacher_id.eq.${currentUser.id},user_id.eq.${currentUser.id}`)
                         .order('name');
                     studentsList = st || [];
                 } catch (e) { console.error('Erro fetching students', e); }
@@ -1514,6 +1511,7 @@ function IronTracksApp() {
                                     setHasUnreadNotification(false);
                                 }}
                                 onOpenSchedule={() => router.push('/dashboard/schedule')}
+                                onOpenSettings={() => setSettingsOpen(true)}
                                 onLogout={handleLogout}
                             />
                         </div>
@@ -1529,91 +1527,40 @@ function IronTracksApp() {
                 {user && <RealtimeNotificationBridge setNotification={setNotification} />}
 
                 {/* Main Content */}
-                <div className={`flex-1 overflow-y-auto custom-scrollbar relative ${isHeaderVisible ? 'pt-32 md:pt-24' : ''}`}>
-                    {view === 'dashboard' && (
-                        <div className="p-4 space-y-4 pb-24">
-
-                            {profileIncomplete && (
-                                <div className="bg-neutral-800 border border-yellow-500/30 rounded-xl p-4 flex items-start justify-between gap-3">
-                                    <div>
-                                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Perfil incompleto</div>
-                                        <div className="text-sm text-neutral-300 mt-1">
-                                            Complete seu nome de exibição para personalizar sua conta.
-                                        </div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowCompleteProfile(true)}
-                                        className="shrink-0 bg-yellow-500 text-black font-black px-4 py-2 rounded-xl active:scale-95 transition-transform"
-                                    >
-                                        Terminar cadastro
-                                    </button>
-                                </div>
-                            )}
-                            
-                            {/* Removido botão de restaurar dados JSON conforme solicitação */}
-
-                            <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-1 flex gap-1">
-                                <button
-                                    onClick={() => setView('dashboard')}
-                                    className={`flex-1 min-h-[44px] p-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${view === 'dashboard' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-transparent text-neutral-300 hover:bg-neutral-700/50'}`}
-                                >
-                                    TREINOS
-                                </button>
-                                <button
-                                    onClick={() => setView('assessments')}
-                                    className={`flex-1 min-h-[44px] p-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${view === 'assessments' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-transparent text-neutral-300 hover:bg-neutral-700/50'}`}
-                                >
-                                    AVALIAÇÕES
-                                </button>
-                            </div>
-
-                            <button onClick={handleCreateWorkout} className="w-full bg-yellow-500 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 hover:bg-yellow-400 transition-transform active:scale-95">
-                                <Plus size={24} /> Novo Treino
-                            </button>
-
-                            <div className="space-y-3">
-                                <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Meus Treinos</h3>
-                                <div className="flex gap-2 mb-2">
-                                    <button onClick={handleExportAllWorkouts} disabled={exportingAll} className="flex-1 min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700 disabled:opacity-50">Salvar JSON</button>
-                                    <button onClick={() => setShowJsonImportModal(true)} className="flex-1 min-h-[44px] px-3 py-2 bg-yellow-500 text-black rounded-xl font-black text-xs uppercase hover:bg-yellow-400">Importar JSON</button>
-                                </div>
-                                {workouts.length === 0 && (
-                                    <div className="text-center py-10 text-neutral-600">
-                                        <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 opacity-50"><Dumbbell size={32} /></div>
-                                        <p>Nenhum treino criado.</p>
-                                    </div>
-                                )}
-                                {workouts.map(w => (
-                                    <div
-                                        key={w.id}
-                                        className="bg-neutral-800 rounded-xl p-4 border-l-4 border-neutral-600 md:hover:border-yellow-500 transition-all group relative overflow-hidden cursor-pointer"
-                                        onClick={() => setQuickViewWorkout(w)}
-                                    >
-                                        <div className="relative z-10">
-                                            <h3 className="font-bold text-white text-lg uppercase mb-1 pr-32 leading-tight">{w.title}</h3>
-                                            <p className="text-xs text-neutral-400 font-mono mb-4">{w.exercises?.length || 0} EXERCÍCIOS</p>
-
-                                            <div className="flex gap-2 mt-2">
-                                                <button onClick={(e) => { e.stopPropagation(); handleStartSession(w); }} className="relative z-30 flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg flex items-center justify-center gap-2 text-white font-bold text-sm transition-colors border border-white/10 active:scale-95 touch-manipulation">
-                                                    <Play size={16} className="fill-white" /> INICIAR TREINO
-                                                </button>
-                                            </div>
-                                        </div>
-
-						<div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5">
-							<button onClick={(e) => { e.stopPropagation(); handleShareWorkout(w); }} className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white"><Share2 size={14} /></button>
-							<button onClick={(e) => { e.stopPropagation(); handleDuplicateWorkout(w); }} className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white"><Copy size={14} /></button>
-							<button onClick={(e) => { e.stopPropagation(); handleEditWorkout(w); }} className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white"><MoreVertical size={14} /></button>
-                                            {w.user_id === user?.id && (
-                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteWorkout(w.id, w.title); }} className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white"><Trash2 size={14} /></button>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                        </div>
+                <div
+                    className="flex-1 overflow-y-auto custom-scrollbar relative"
+                    style={{
+                        '--dashboard-sticky-top': isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : '0px',
+                        paddingTop: isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : undefined,
+                    }}
+                >
+                    {(view === 'dashboard' || view === 'assessments') && (
+                        <StudentDashboard
+                            workouts={Array.isArray(workouts) ? workouts : []}
+                            profileIncomplete={Boolean(profileIncomplete)}
+                            onOpenCompleteProfile={() => setShowCompleteProfile(true)}
+                            view={view === 'assessments' ? 'assessments' : 'dashboard'}
+                            onChangeView={(next) => setView(next)}
+                            assessmentsContent={user?.id ? <AssessmentHistory studentId={user.id} /> : null}
+                            settings={userSettingsApi?.settings ?? null}
+                            onCreateWorkout={handleCreateWorkout}
+                            onQuickView={(w) => setQuickViewWorkout(w)}
+                            onStartSession={(w) => handleStartSession(w)}
+                            onShareWorkout={(w) => handleShareWorkout(w)}
+                            onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
+                            onEditWorkout={(w) => handleEditWorkout(w)}
+                            onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
+                            currentUserId={user?.id}
+                            exportingAll={Boolean(exportingAll)}
+                            onExportAll={handleExportAllWorkouts}
+                            onOpenJsonImport={() => setShowJsonImportModal(true)}
+                            onOpenIronScanner={async () => {
+                                try {
+                                    await handleCreateWorkout()
+                                    await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
+                                } catch {}
+                            }}
+                        />
                     )}
 
 					{view === 'edit' && (
@@ -1654,12 +1601,6 @@ function IronTracksApp() {
                     )}
 
                     {/* Evolução removida conforme solicitação */}
-
-                    {view === 'assessments' && (
-                        <div className="p-4 pb-24">
-                            <AssessmentHistory studentId={user.id} />
-                        </div>
-                    )}
 
                     {view === 'report' && reportData.current && (
                         <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe">
@@ -1957,6 +1898,29 @@ function IronTracksApp() {
                 {/* Admin Panel Modal controlled by State */}
                 {showAdminPanel && (
                     <AdminPanelV2 user={user} onClose={() => setShowAdminPanel(false)} />
+                )}
+
+                {settingsOpen && (
+                    <SettingsModal
+                        isOpen={settingsOpen}
+                        onClose={() => setSettingsOpen(false)}
+                        settings={userSettingsApi?.settings ?? null}
+                        saving={Boolean(userSettingsApi?.saving)}
+                        onSave={async (next) => {
+                            try {
+                                const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})
+                                const res = await userSettingsApi?.save?.(safeNext)
+                                if (!res?.ok) {
+                                    await alert('Falha ao salvar: ' + (res?.error || ''))
+                                    return false
+                                }
+                                return true
+                            } catch (e) {
+                                await alert('Falha ao salvar: ' + (e?.message ?? String(e)))
+                                return false
+                            }
+                        }}
+                    />
                 )}
             </div>
         </TeamWorkoutProvider>

@@ -1,58 +1,19 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { createClient } from '@/utils/supabase/server'
+import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
-
-const isAllowed = async (admin: ReturnType<typeof createAdminClient>, user: { id: string; email?: string | null }) => {
-  const email = (user.email || '').toLowerCase()
-  if (email && email === ADMIN_EMAIL.toLowerCase()) return true
-
-  let teacher: any | null = null
-  const { data: byUserId } = await admin
-    .from('teachers')
-    .select('id')
-    .eq('user_id', user.id)
-    .limit(1)
-    .maybeSingle()
-  teacher = byUserId || null
-
-  if (!teacher?.id && email) {
-    const { data: byEmail } = await admin
-      .from('teachers')
-      .select('id')
-      .ilike('email', email)
-      .limit(1)
-      .maybeSingle()
-    teacher = byEmail || null
-  }
-
-  if (teacher?.id) return true
-
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  return profile?.role === 'admin' || profile?.role === 'teacher'
-}
-
 export async function GET(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     const url = new URL(req.url)
     const id = url.searchParams.get('id') || undefined
     const email = url.searchParams.get('email') || undefined
 
     const admin = createAdminClient()
-    const allowed = await isAllowed(admin, user)
-    if (!allowed) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
     // Resolve to profiles.id (auth uid)
     let targetUserId = ''

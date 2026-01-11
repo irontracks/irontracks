@@ -21,15 +21,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
     }
 
-    if (receiverId === user.id) {
-      return NextResponse.json({ ok: true, skipped: true })
+    if (receiverId !== user.id) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
+    const safeSenderName = senderName.slice(0, 80)
+    const safePreview = preview.slice(0, 240)
+    if (!safeSenderName || !safePreview) {
+      return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
     }
 
     const admin = createAdminClient()
     const { error } = await admin.from('notifications').insert({
-      user_id: receiverId,
-      title: senderName,
-      message: preview,
+      user_id: user.id,
+      title: safeSenderName,
+      message: safePreview,
       type: 'message',
     })
 
@@ -40,4 +46,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

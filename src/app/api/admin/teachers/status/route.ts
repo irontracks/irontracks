@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
+import { requireRole } from '@/utils/auth/route'
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== ADMIN_EMAIL) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin'])
+    if (!auth.ok) return auth.response
     const body = await req.json()
     const { id, status } = body || {}
     if (!id || !status) return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })

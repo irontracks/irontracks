@@ -22,6 +22,9 @@ type Props = {
   view: 'dashboard' | 'assessments'
   onChangeView: (next: 'dashboard' | 'assessments') => void
   assessmentsContent?: React.ReactNode
+  settings?: {
+    dashboardDensity?: 'compact' | 'comfortable'
+  } | null
   onCreateWorkout: () => MaybePromise<void>
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
@@ -34,10 +37,19 @@ type Props = {
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
   onOpenIronScanner: () => void
+  streakStats?: {
+    currentStreak: number
+    bestStreak: number
+    totalWorkouts: number
+    totalVolumeKg: number
+    badges: { id: string; label: string; kind: string }[]
+  } | null
+  streakLoading?: boolean
 }
 
 export default function StudentDashboard(props: Props) {
   const workouts = Array.isArray(props.workouts) ? props.workouts : []
+  const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
   const [toolsOpen, setToolsOpen] = useState(false)
   const [creatingWorkout, setCreatingWorkout] = useState(false)
   const [pendingAction, setPendingAction] = useState<
@@ -96,7 +108,7 @@ export default function StudentDashboard(props: Props) {
   }, [toolsOpen])
 
   return (
-    <div className="p-4 space-y-4 pb-24">
+    <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
       {props.profileIncomplete && (
         <div className="bg-neutral-800 border border-yellow-500/30 rounded-xl p-4 flex items-start justify-between gap-3">
           <div>
@@ -165,7 +177,7 @@ export default function StudentDashboard(props: Props) {
             {creatingWorkout ? 'Abrindo editor...' : 'Novo Treino'}
           </button>
 
-          <div className="space-y-3">
+          <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Meus Treinos</h3>
               <div className="relative">
@@ -235,7 +247,11 @@ export default function StudentDashboard(props: Props) {
             {workouts.map((w, idx) => (
               <div
                 key={String(w?.id ?? idx)}
-                className="bg-neutral-800 rounded-xl p-4 border-l-4 border-neutral-600 md:hover:border-yellow-500 transition-all group relative overflow-hidden cursor-pointer"
+                className={
+                  density === 'compact'
+                    ? 'bg-neutral-800 rounded-xl p-3 border-l-4 border-neutral-600 md:hover:border-yellow-500 transition-all group relative overflow-hidden cursor-pointer'
+                    : 'bg-neutral-800 rounded-xl p-4 border-l-4 border-neutral-600 md:hover:border-yellow-500 transition-all group relative overflow-hidden cursor-pointer'
+                }
                 onClick={() => {
                   const key = getWorkoutKey(w, idx)
                   if (isWorkoutBusy(key)) return

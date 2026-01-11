@@ -20,6 +20,7 @@ import { DialogProvider } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { useAssessment } from '@/hooks/useAssessment';
 import AssessmentPDFGenerator from '@/components/assessment/AssessmentPDFGenerator';
+import { generateAssessmentPlanAi } from '@/actions/workout-actions';
 
 ChartJS.register(
   CategoryScale,
@@ -206,6 +207,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   const [showHistory, setShowHistory] = useState(false);
   const [studentName, setStudentName] = useState<string>('Aluno');
   const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
+  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, { loading: boolean; error: string | null; plan: any | null; usedAi: boolean }>>({});
 
   const measurementFields = [
     { key: 'arm', label: 'Braço' },
@@ -231,8 +233,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     (async () => {
       try {
         if (!studentId) {
-          if (mounted) setError('ID do aluno não fornecido.')
-          return
+          if (mounted) setError('ID do aluno não fornecido.');
+          return;
         }
         if (mounted) {
           setError(null);
@@ -279,8 +281,69 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [studentId, getStudentAssessments, supabase]);
+
+  const handleGenerateAssessmentPlan = async (assessment: any) => {
+    try {
+      const id = String(assessment?.id || '');
+      if (!id) return;
+
+      setAiPlanByAssessmentId((prev) => ({
+        ...prev,
+        [id]: {
+          loading: true,
+          error: null,
+          plan: prev[id]?.plan ?? null,
+          usedAi: prev[id]?.usedAi ?? false,
+        },
+      }));
+
+      const res = await generateAssessmentPlanAi({
+        assessment,
+        studentName,
+        trainerName: assessment?.trainer_name || '',
+        goal: assessment?.goal || assessment?.observations || '',
+      });
+
+      if (!res || !res.ok) {
+        setAiPlanByAssessmentId((prev) => ({
+          ...prev,
+          [id]: {
+            loading: false,
+            error: res?.error ? String(res.error) : 'Falha ao gerar plano tático',
+            plan: prev[id]?.plan ?? null,
+            usedAi: false,
+          },
+        }));
+        return;
+      }
+
+      setAiPlanByAssessmentId((prev) => ({
+        ...prev,
+        [id]: {
+          loading: false,
+          error: null,
+          plan: res.plan ?? null,
+          usedAi: !!res.usedAi,
+        },
+      }));
+    } catch (e: any) {
+      const id = String(assessment?.id || '');
+      if (!id) return;
+      setAiPlanByAssessmentId((prev) => ({
+        ...prev,
+        [id]: {
+          loading: false,
+          error: e?.message ? String(e.message) : 'Erro inesperado ao gerar plano tático',
+          plan: prev[id]?.plan ?? null,
+          usedAi: false,
+        },
+      }));
+    }
+  };
 
   const sortedAssessments = useMemo(() => {
     const safeTime = (raw: any) => {
@@ -1005,6 +1068,13 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                     trainerName={assessment.trainer_name}
                     assessmentDate={new Date(assessment.assessment_date || Date.now())}
                   />
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateAssessmentPlan(assessment)}
+                    className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95"
+                  >
+                    {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando plano…' : 'Plano Tático (AI)'}
+                  </button>
                 </div>
               </div>
               {selectedAssessment === assessment.id && (
@@ -1039,6 +1109,76 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                       </div>
                     </div>
                   </div>
+                  {(() => {
+                    const s = aiPlanByAssessmentId[String(assessment.id)];
+                    if (!s) return null;
+                    const plan = s.plan && typeof s.plan === 'object' ? s.plan : null;
+                    if (!plan && !s.loading && !s.error) return null;
+                    return (
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
+                          <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2">Resumo Tático</div>
+                          {s.loading ? (
+                            <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
+                          ) : s.error ? (
+                            <div className="text-sm text-red-400">{s.error}</div>
+                          ) : plan ? (
+                            <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                              {Array.isArray(plan.summary) && plan.summary.length > 0
+                                ? plan.summary.map((item: any, idx: number) => (
+                                    <li key={idx}>{String(item || '')}</li>
+                                  ))
+                                : null}
+                            </ul>
+                          ) : null}
+                        </div>
+                        {plan ? (
+                          <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
+                            {Array.isArray(plan.training) && plan.training.length > 0 && (
+                              <div>
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
+                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                  {plan.training.map((item: any, idx: number) => (
+                                    <li key={idx}>{String(item || '')}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {Array.isArray(plan.nutrition) && plan.nutrition.length > 0 && (
+                              <div>
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
+                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                  {plan.nutrition.map((item: any, idx: number) => (
+                                    <li key={idx}>{String(item || '')}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {Array.isArray(plan.habits) && plan.habits.length > 0 && (
+                              <div>
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
+                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                  {plan.habits.map((item: any, idx: number) => (
+                                    <li key={idx}>{String(item || '')}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {Array.isArray(plan.warnings) && plan.warnings.length > 0 && (
+                              <div>
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
+                                <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
+                                  {plan.warnings.map((item: any, idx: number) => (
+                                    <li key={idx}>{String(item || '')}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -1168,3 +1308,4 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     </DialogProvider>
   );
 }
+

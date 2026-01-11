@@ -1,14 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     const body = await req.json()
     const student_id = body?.student_id as string | undefined
@@ -37,8 +36,6 @@ export async function POST(req: Request) {
         }
       }
     }
-
-    // Allow any authenticated user to assign; validation above ensures teacher profile exists
 
     // Resolve student row by id or email/user_id
     let targetId = student_id || ''

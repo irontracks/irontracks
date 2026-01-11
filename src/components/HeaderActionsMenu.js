@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { LayoutGrid, Bell, MessageSquare, Users, History, LogOut, Command, Calendar, CreditCard } from 'lucide-react'
+import { Bell, Cog, MessageSquare, Users, History, LogOut, Command, Calendar, CreditCard } from 'lucide-react'
 
-const HeaderActionsMenu = ({ user, isCoach, hasUnreadChat, hasUnreadNotification, onOpenAdmin, onOpenChatList, onOpenGlobalChat, onOpenHistory, onOpenNotifications, onLogout, onOpenSchedule, onOpenWallet }) => {
+const HeaderActionsMenu = ({ user, isCoach, hasUnreadChat, hasUnreadNotification, onOpenAdmin, onOpenChatList, onOpenGlobalChat, onOpenHistory, onOpenNotifications, onLogout, onOpenSchedule, onOpenWallet, onOpenSettings }) => {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
@@ -95,6 +95,11 @@ const HeaderActionsMenu = ({ user, isCoach, hasUnreadChat, hasUnreadNotification
               <button onClick={() => { onOpenHistory?.(); setOpen(false); }} className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm transition-all duration-150">
                 <div className="w-5 h-5 flex items-center justify-center transition-transform duration-150 group-hover:scale-110"><History size={16} className="text-neutral-300" /></div>
                 <span className="flex-1 text-neutral-300 group-hover:text-white">Histórico</span>
+              </button>
+
+              <button onClick={() => { onOpenSettings?.(); setOpen(false); }} className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm transition-all duration-150">
+                <div className="w-5 h-5 flex items-center justify-center transition-transform duration-150 group-hover:scale-110"><Cog size={16} className="text-neutral-300" /></div>
+                <span className="flex-1 text-neutral-300 group-hover:text-white">Configurações</span>
               </button>
               
               <button onClick={() => { onLogout?.(); setOpen(false); }} className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm transition-all duration-150">

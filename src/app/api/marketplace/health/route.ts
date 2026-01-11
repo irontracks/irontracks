@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,12 @@ const parsePlatformFeePercent = () => {
   return { value: DEFAULT_PLATFORM_FEE_PERCENT, source: 'default' as const }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (!hasValidInternalSecret(req)) {
+    const auth = await requireRole(['admin'])
+    if (!auth.ok) return auth.response
+  }
+
   const fee = parsePlatformFeePercent()
   const asaasBaseUrl = ((process.env.ASAAS_BASE_URL || 'https://api.asaas.com/v3') as string).trim()
   const asaasUserAgent = ((process.env.ASAAS_USER_AGENT || '') as string).trim()

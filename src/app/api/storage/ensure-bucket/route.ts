@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { requireUser } from '@/utils/auth/route'
 
 export async function POST(request: Request) {
   try {
+    const auth = await requireUser()
+    if (!auth.ok) return auth.response
+
     const admin = createAdminClient()
     const body = await request.json().catch(() => ({}))
     const name = body?.name || 'chat-media'
+    if (name !== 'chat-media') return NextResponse.json({ ok: false, error: 'invalid bucket' }, { status: 400 })
 
     const existing = await admin.storage.getBucket(name)
     if (!existing?.data) {
@@ -21,4 +26,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    if (!hasValidInternalSecret(req)) {
+      const auth = await requireRole(['admin'])
+      if (!auth.ok) return auth.response
+    }
+
     const admin = createAdminClient()
     const { data: globals } = await admin
       .from('chat_channels')
@@ -35,4 +41,3 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

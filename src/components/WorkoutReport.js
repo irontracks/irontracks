@@ -185,8 +185,8 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             let volume = 0;
             Object.values(safeLogs).forEach((log) => {
                 if (!log || typeof log !== 'object') return;
-                const w = Number(log.weight);
-                const r = Number(log.reps);
+                const w = Number(String(log.weight ?? '').replace(',', '.'));
+                const r = Number(String(log.reps ?? '').replace(',', '.'));
                 if (!Number.isFinite(w) || !Number.isFinite(r)) return;
                 if (w <= 0 || r <= 0) return;
                 volume += w * r;

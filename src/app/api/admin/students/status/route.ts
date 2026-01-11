@@ -1,14 +1,11 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
+import { requireRole } from '@/utils/auth/route'
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     const body = await req.json()
     const { id, status } = body || {}
@@ -16,9 +13,9 @@ export async function POST(req: Request) {
 
     // Only admin or responsible teacher
     const admin = createAdminClient()
-    if (user.email !== ADMIN_EMAIL) {
+    if (auth.role !== 'admin') {
       const { data: s } = await admin.from('students').select('teacher_id').eq('id', id).maybeSingle()
-      if (!s || s.teacher_id !== user.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+      if (!s || s.teacher_id !== auth.user.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
     const { error } = await admin.from('students').update({ status }).eq('id', id)

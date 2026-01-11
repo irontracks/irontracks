@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     const admin = createAdminClient()
     const body = await req.json().catch(() => ({}))
@@ -36,13 +33,28 @@ export async function POST(req: Request) {
     }
     if (!targetUserId) return NextResponse.json({ ok: false, error: 'missing target' }, { status: 400 })
 
+    if (auth.role !== 'admin') {
+      try {
+        const { data: srow } = await admin
+          .from('students')
+          .select('id, teacher_id, user_id, email')
+          .or(`id.eq.${targetUserId},user_id.eq.${targetUserId}${email ? `,email.ilike.${email}` : ''}`)
+          .maybeSingle()
+        if (!srow?.id || srow.teacher_id !== auth.user.id) {
+          return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+        }
+      } catch {
+        return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+      }
+    }
+
     let isAuthUser = false
     try {
       const { data: maybeProfile } = await admin.from('profiles').select('id').eq('id', targetUserId).maybeSingle()
       isAuthUser = !!maybeProfile?.id
     } catch {}
 
-    let sourceUserId = user.id
+    let sourceUserId = auth.user.id
     try {
       if (id || email) {
         let srow: any = null
@@ -204,7 +216,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: existingErr.message, debug: { targetUserId } }, { status: 400 })
     }
 
-    const syncedExisting = (existing || []).filter((w: any) => (w?.created_by || '') === user.id)
+    const syncedExisting = (existing || []).filter((w: any) => (w?.created_by || '') === auth.user.id)
     const syncedExistingMatched = (syncedExisting || []).filter((w: any) => matchesGroup(w?.name || ''))
 
     const byName = new Map<string, any[]>()
@@ -216,6 +228,7 @@ export async function POST(req: Request) {
       byName.set(k, list)
     }
 
+    const allowDeleteDedup = Boolean(hasValidInternalSecret(req) && auth.role === 'admin' && (body as any)?.allow_delete_dedup === true)
     let dedup_deleted = 0
     const keptSynced = new Map<string, { id: string; name: string }>()
     for (const entry of Array.from(byName.entries())) {
@@ -228,6 +241,7 @@ export async function POST(req: Request) {
       const keep = sorted[0]
       if (keep?.id) keptSynced.set(k, { id: keep.id, name: keep.name })
       const toDelete = sorted.slice(1)
+      if (!allowDeleteDedup) continue
       for (const d of toDelete) {
         const wid = d?.id
         if (!wid) continue
@@ -326,7 +340,7 @@ export async function POST(req: Request) {
               student_id: isAuthUser ? null : (targetUserId || null),
               name: t.name,
               notes: t.notes,
-              created_by: user.id,
+              created_by: auth.user.id,
               is_template: true,
             })
             .select()

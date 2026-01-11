@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
-
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || user.email !== ADMIN_EMAIL) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin'])
+    if (!auth.ok) return auth.response
 
     const body = await req.json()
     const email = (body?.email || '').toLowerCase().trim()

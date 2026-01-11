@@ -1,284 +1,174 @@
-export async function generateWorkoutPdf(session, previousSession) {
-  let PDFDocument;
-  let StandardFonts;
-  let rgb;
-  try {
-    const pdfLib = await import('pdf-lib')
-    PDFDocument = pdfLib.PDFDocument
-    StandardFonts = pdfLib.StandardFonts
-    rgb = pdfLib.rgb
-  } catch (e) {
-    throw new Error('Falha ao carregar o gerador de PDF')
-  }
-
-  const pdfDoc = await PDFDocument.create()
-  const page = pdfDoc.addPage([595, 842])
-  const { width, height } = page.getSize()
-  const margin = 36
-  const lineH = 18
-  const titleSize = 24
-  const textSize = 12
-  const monoSize = 12
-  const boldSize = 14
-
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-
-  let y = height - margin
-
-  const drawText = (text, x, size = textSize, f = font, color = rgb(0, 0, 0)) => {
-    page.drawText(String(text ?? ''), { x, y, size, font: f, color })
-    y -= lineH
-  }
-
-  const drawKV = (k, v) => {
-    page.drawText(String(k), { x: margin, y, size: textSize, font: bold, color: rgb(0.4, 0.4, 0.4) })
-    page.drawText(String(v), { x: margin + 120, y, size: textSize, font, color: rgb(0, 0, 0) })
-    y -= lineH
-  }
-
-  const ensureSpace = (rows = 1) => {
-    if (y - rows * lineH < margin) {
-      const p = pdfDoc.addPage([595, 842])
-      y = 842 - margin
-    }
-  }
-
-  const formatDate = (ts) => {
-    if (!ts) return ''
-    const d = ts.toDate ? ts.toDate() : new Date(ts)
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-  }
-
-  const formatDuration = (s) => {
-    const mins = Math.floor((s || 0) / 60)
-    const secs = Math.floor((s || 0) % 60)
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`
-  }
-
-  const calcVolume = (logs) => {
-    try {
-      let v = 0
-      const safeLogs = logs && typeof logs === 'object' ? logs : {}
-      Object.values(safeLogs).forEach((l) => {
-        if (!l || typeof l !== 'object') return
-        const w = Number(String(l.weight ?? '').replace(',', '.'))
-        const r = Number(String(l.reps ?? '').replace(',', '.'))
-        if (!Number.isFinite(w) || !Number.isFinite(r)) return
-        if (w <= 0 || r <= 0) return
-        v += w * r
-      })
-      return v
-    } catch {
-      return 0
-    }
-  }
-
-  const currentVolume = calcVolume(session?.logs)
-  const prevVolume = calcVolume(previousSession?.logs)
-  const delta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0
-  const durationM = (session?.totalTime || 0) / 60
-  const calories = Math.round((currentVolume * 0.02) + (durationM * 4))
-
-  page.drawText('IRONTRACKS', { x: margin, y, size: titleSize, font: bold })
-  y -= lineH
-  page.drawText('Relatório de Performance', { x: margin, y, size: textSize, font })
-  y -= lineH
-  drawKV('Treino', session?.workoutTitle || 'Treino')
-  drawKV('Data', formatDate(session?.date))
-  y -= 6
-
-  page.drawRectangle({ x: margin - 4, y: y - 4, width: width - margin * 2 + 8, height: 4, color: rgb(0, 0, 0) })
-  y -= lineH
-
-  drawKV('Tempo', formatDuration(session?.totalTime))
-  if (session?.realTotalTime) {
-    drawKV('Tempo Real', formatDuration(session.realTotalTime))
-  }
-  drawKV('Volume', `${currentVolume.toLocaleString()} kg`)
-  drawKV('Evolução', `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`)
-  drawKV('Calorias', `~${calories}`)
-  y -= lineH
-
-  const prevMap = {}
-  const safePrevLogs = previousSession?.logs && typeof previousSession.logs === 'object' ? previousSession.logs : {}
-  if (previousSession && Array.isArray(previousSession?.exercises)) {
-    previousSession.exercises.forEach((ex, exIdx) => {
-      if (!ex || typeof ex !== 'object') return
-      const exName = String(ex?.name || '').trim()
-      if (!exName) return
-      const exLogs = []
-      Object.keys(safePrevLogs).forEach(key => {
-        const [eIdx] = key.split('-')
-        if (Number(eIdx) === exIdx) exLogs.push(safePrevLogs[key])
-      })
-      prevMap[exName] = exLogs
-    })
-  }
-
-  const safeExercises = Array.isArray(session?.exercises) ? session.exercises : []
-  safeExercises.forEach((ex, exIdx) => {
-    if (!ex || typeof ex !== 'object') return
-    ensureSpace(3)
-    page.drawText(`${exIdx + 1}. ${String(ex?.name || '')}`, { x: margin, y, size: boldSize, font: bold })
-    y -= lineH
-    page.drawText(`Método: ${String(ex?.method || 'Normal')}  RPE: ${String(ex?.rpe || '-')}  Cad: ${String(ex?.cadence || '-')}`, { x: margin, y, size: textSize, font })
-    y -= lineH
-    ensureSpace(2)
-    page.drawText('Série   Carga   Reps   Evolução', { x: margin, y, size: monoSize, font })
-    y -= lineH
-    const sets = Number(ex?.sets || 0)
-    const prevLogs = prevMap[String(ex?.name || '').trim()] || []
-    for (let sIdx = 0; sIdx < sets; sIdx++) {
-      ensureSpace(1)
-      const key = `${exIdx}-${sIdx}`
-      const log = session?.logs?.[key]
-      const prev = prevLogs[sIdx]
-      if (!log || typeof log !== 'object') continue
-      if (!log.weight && !log.reps) continue
-      let evol = '-'
-      if (prev?.weight) {
-        const d = Number(log.weight) - Number(prev.weight)
-        evol = d === 0 ? '=' : `${d > 0 ? '+' : ''}${d}kg`
-      }
-      page.drawText(`#${sIdx + 1}`.padEnd(7) + String(log.weight || '-').padEnd(7) + String(log.reps || '-').padEnd(7) + evol, { x: margin, y, size: monoSize, font })
-      y -= lineH
-
-      const note = log.note || log.observation
-      if (note) {
-        ensureSpace(1)
-        const text = String(note)
-        page.drawText(`Obs: ${text}`, { x: margin + 8, y, size: textSize - 1, font })
-        y -= lineH
-      }
-    }
-    y -= 6
-  })
-
-  const bytes = await pdfDoc.save()
-  return new Blob([bytes], { type: 'application/pdf' })
-}
-
 export async function generateAssessmentPdf(formData, results, studentName) {
-  let PDFDocument;
-  let StandardFonts;
-  let rgb;
   try {
-    const pdfLib = await import('pdf-lib')
-    PDFDocument = pdfLib.PDFDocument
-    StandardFonts = pdfLib.StandardFonts
-    rgb = pdfLib.rgb
-  } catch (e) {
-    throw new Error('Falha ao carregar o gerador de PDF')
+    const data = formData && typeof formData === 'object' ? formData : {};
+    const metrics = results && typeof results === 'object' ? results : {};
+
+    const name = String(studentName || 'Aluno').trim() || 'Aluno';
+    const dateRaw = data?.assessment_date ?? new Date().toISOString().split('T')[0];
+    const date = typeof dateRaw === 'string' && dateRaw ? dateRaw : new Date().toISOString().split('T')[0];
+
+    const weight = Number.parseFloat(String(data?.weight ?? '0').replace(',', '.')) || 0;
+    const height = Number.parseFloat(String(data?.height ?? '0').replace(',', '.')) || 0;
+    const age = Number.parseInt(String(data?.age ?? '0'), 10) || 0;
+    const gender = String(data?.gender || '').toUpperCase();
+
+    const bodyComposition = metrics?.bodyComposition && typeof metrics.bodyComposition === 'object'
+      ? metrics.bodyComposition
+      : {};
+
+    const bodyFatPercentage = Number(bodyComposition?.bodyFatPercentage ?? 0) || 0;
+    const sumOfSkinfolds = Number(bodyComposition?.sumOfSkinfolds ?? 0) || 0;
+
+    const bmr = Number(metrics?.bmr ?? 0) || 0;
+    const bmi = Number(metrics?.bmi ?? 0) || 0;
+    const bmiClassification = String(metrics?.bmiClassification || '');
+    const bodyFatClassification = String(metrics?.bodyFatClassification || '');
+    const leanMass = Number(metrics?.leanMass ?? 0) || 0;
+    const fatMass = Number(metrics?.fatMass ?? 0) || 0;
+
+    const observations = String(data?.observations || '');
+
+    const html = `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Avaliação Física • ${name}</title>
+    <style>
+      *{box-sizing:border-box} body{margin:0;background:#fff;color:#000;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+      .container{max-width:840px;margin:0 auto;padding:32px}
+      .header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid #000;padding-bottom:16px;margin-bottom:24px}
+      .brand{font-weight:900;font-size:32px;letter-spacing:-1px}
+      .brand .muted{color:#555;font-style:italic}
+      .subtitle{font-size:12px;text-transform:uppercase;color:#666;font-weight:700;letter-spacing:2px}
+      .title{font-size:20px;font-weight:800}
+      .date{font-size:12px;color:#666}
+      .section{margin-bottom:24px}
+      .section h2{font-size:16px;margin:0 0 8px;font-weight:800;text-transform:uppercase;letter-spacing:1px}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+      .card{background:#f7f7f7;border:1px solid #ddd;border-radius:12px;padding:12px;font-size:13px}
+      .label{font-size:11px;text-transform:uppercase;color:#555;font-weight:700;letter-spacing:1px;margin-bottom:4px}
+      .value{font-size:14px;font-weight:700}
+      .footer{margin-top:32px;padding-top:12px;border-top:1px solid #ddd;text-align:center;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:2px}
+      table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+      th,td{border-bottom:1px solid #eee;padding:6px 4px;text-align:left}
+      th{color:#666;text-transform:uppercase;font-weight:700;font-size:11px}
+      .muted{color:#666;font-size:12px}
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <div>
+          <div class="brand">IRON<span class="muted">TRACKS</span></div>
+          <div class="subtitle">Avaliação Física</div>
+        </div>
+        <div style="text-align:right">
+          <div class="title">${name}</div>
+          <div class="date">${date}</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Dados básicos</h2>
+        <div class="grid">
+          <div class="card">
+            <div class="label">Peso</div>
+            <div class="value">${weight ? `${weight.toFixed(1)} kg` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Altura</div>
+            <div class="value">${height ? `${height.toFixed(2)} m` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Idade</div>
+            <div class="value">${age || '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Gênero</div>
+            <div class="value">${gender || '-'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Composição corporal</h2>
+        <div class="grid">
+          <div class="card">
+            <div class="label">% Gordura</div>
+            <div class="value">${bodyFatPercentage ? `${bodyFatPercentage.toFixed(1)}%` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Soma das dobras</div>
+            <div class="value">${sumOfSkinfolds ? `${sumOfSkinfolds.toFixed(1)} mm` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Massa magra</div>
+            <div class="value">${leanMass ? `${leanMass.toFixed(1)} kg` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Massa gorda</div>
+            <div class="value">${fatMass ? `${fatMass.toFixed(1)} kg` : '-'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Metabolismo e índices</h2>
+        <div class="grid">
+          <div class="card">
+            <div class="label">BMR</div>
+            <div class="value">${bmr ? `${bmr.toFixed(0)} kcal/dia` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">BMI</div>
+            <div class="value">${bmi ? `${bmi.toFixed(1)} kg/m²` : '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Classificação BMI</div>
+            <div class="value">${bmiClassification || '-'}</div>
+          </div>
+          <div class="card">
+            <div class="label">Classificação Gordura</div>
+            <div class="value">${bodyFatClassification || '-'}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Dobras cutâneas</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Região</th>
+              <th>Valor (mm)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Tríceps</td><td>${data?.triceps_skinfold ?? '-'}</td></tr>
+            <tr><td>Bíceps</td><td>${data?.biceps_skinfold ?? '-'}</td></tr>
+            <tr><td>Subescapular</td><td>${data?.subscapular_skinfold ?? '-'}</td></tr>
+            <tr><td>Supra-ilíaca</td><td>${data?.suprailiac_skinfold ?? '-'}</td></tr>
+            <tr><td>Abdominal</td><td>${data?.abdominal_skinfold ?? '-'}</td></tr>
+            <tr><td>Coxa</td><td>${data?.thigh_skinfold ?? '-'}</td></tr>
+            <tr><td>Panturrilha</td><td>${data?.calf_skinfold ?? '-'}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      ${observations ? `<div class="section"><h2>Observações</h2><p class="muted">${observations}</p></div>` : ''}
+
+      <div class="footer">IronTracks System • ${date}</div>
+    </div>
+  </body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
+    return blob;
+  } catch (error) {
+    console.error('Erro ao montar HTML da avaliação', error);
+    const fallback = '<!doctype html><html><body><p>Não foi possível gerar o PDF da avaliação.</p></body></html>';
+    return new Blob([fallback], { type: 'text/html' });
   }
-
-  const pdfDoc = await PDFDocument.create()
-  let page = pdfDoc.addPage([595, 842])
-  const { width, height } = page.getSize()
-  const margin = 36
-  const lineH = 18
-  const titleSize = 24
-  const textSize = 12
-  const boldSize = 14
-
-  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
-  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-
-  let y = height - margin
-
-  const drawText = (text, x, size = textSize, f = font, color = rgb(0, 0, 0)) => {
-    page.drawText(String(text ?? ''), { x, y, size, font: f, color })
-    y -= lineH
-  }
-
-  const drawKV = (k, v) => {
-    page.drawText(String(k), { x: margin, y, size: textSize, font: bold, color: rgb(0.4, 0.4, 0.4) })
-    page.drawText(String(v), { x: margin + 160, y, size: textSize, font, color: rgb(0, 0, 0) })
-    y -= lineH
-  }
-
-  const ensureSpace = (rows = 1) => {
-    if (y - rows * lineH < margin) {
-      page = pdfDoc.addPage([595, 842])
-      y = 842 - margin
-    }
-  }
-
-  const formatNumber = (n, d = 1) => {
-    const v = Number(n || 0)
-    return isNaN(v) ? '-' : v.toFixed(d)
-  }
-
-  drawText('IRONTRACKS', margin, titleSize, bold)
-  drawText('Avaliação Física', margin)
-  drawKV('Aluno', studentName || '-')
-  drawKV('Data', formData.assessment_date || '-')
-  y -= 6
-  page.drawRectangle({ x: margin - 4, y: y - 4, width: width - margin * 2 + 8, height: 4, color: rgb(0, 0, 0) })
-  y -= lineH
-
-  // Dados básicos
-  drawText('Dados Básicos', margin, boldSize, bold)
-  drawKV('Peso', `${formData.weight || '-'} kg`)
-  drawKV('Altura', `${formData.height || '-'} cm`)
-  drawKV('Idade', `${formData.age || '-'} anos`)
-  drawKV('Gênero', formData.gender === 'M' ? 'Masculino' : 'Feminino')
-  y -= 6
-
-  // Composição corporal
-  drawText('Composição Corporal', margin, boldSize, bold)
-  drawKV('% Gordura', `${formatNumber(results?.bodyComposition?.bodyFatPercentage, 1)}%`)
-  drawKV('Massa Magra', `${formatNumber(results?.leanMass, 1)} kg`)
-  drawKV('Massa Gorda', `${formatNumber(results?.fatMass, 1)} kg`)
-  drawKV('IMC', formatNumber(results?.bmi, 1))
-  if (results?.bmiClassification) {
-    drawKV('Classificação IMC', results.bmiClassification)
-  }
-  if (results?.bodyFatClassification) {
-    drawKV('Classificação Gordura', results.bodyFatClassification)
-  }
-  drawKV('BMR', `${formatNumber(results?.bmr, 0)} kcal/dia`)
-  y -= 6
-
-  // Circunferências
-  drawText('Circunferências (cm)', margin, boldSize, bold)
-  const circ = [
-    ['Braço', formData.arm_circ],
-    ['Tórax', formData.chest_circ],
-    ['Cintura', formData.waist_circ],
-    ['Quadril', formData.hip_circ],
-    ['Coxa', formData.thigh_circ],
-    ['Panturrilha', formData.calf_circ]
-  ]
-  circ.forEach(([k, v]) => { if (v) drawKV(k, `${v} cm`) })
-  y -= 6
-
-  // Dobras cutâneas
-  drawText('Dobras Cutâneas (mm)', margin, boldSize, bold)
-  const skin = [
-    ['Tricipital', formData.triceps_skinfold],
-    ['Bicipital', formData.biceps_skinfold],
-    ['Subescapular', formData.subscapular_skinfold],
-    ['Suprailíaca', formData.suprailiac_skinfold],
-    ['Abdominal', formData.abdominal_skinfold],
-    ['Coxa', formData.thigh_skinfold],
-    ['Panturrilha', formData.calf_skinfold]
-  ]
-  skin.forEach(([k, v]) => { if (v) drawKV(k, `${v} mm`) })
-
-  if (results?.bodyComposition?.sumOfSkinfolds || results?.bodyComposition?.sum_skinfolds) {
-    const sum = results?.bodyComposition?.sumOfSkinfolds || results?.bodyComposition?.sum_skinfolds
-    drawKV('Soma das dobras', `${formatNumber(sum, 1)} mm`)
-  }
-
-  // Observações
-  if (formData.observations) {
-    y -= 6
-    drawText('Observações', margin, boldSize, bold)
-    const text = String(formData.observations)
-    page.drawText(text, { x: margin, y, size: textSize, font })
-  }
-
-  const bytes = await pdfDoc.save()
-  return new Blob([bytes], { type: 'application/pdf' })
 }
+

@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { parseTrainingNumber, parseTrainingNumberOrZero } from '@/utils/trainingNumber';
 
 const SETS_INSERT_CHUNK_SIZE = 200;
 
@@ -36,6 +37,371 @@ const extractJsonFromText = (raw) => {
     }
 };
 
+export async function generateAssessmentPlanAi(payload) {
+    try {
+        const safePayload = payload && typeof payload === 'object' ? payload : {};
+        const assessment = safePayload.assessment && typeof safePayload.assessment === 'object' ? safePayload.assessment : null;
+        const studentName = String(safePayload.studentName || '').trim() || 'Aluno';
+        const trainerName = String(safePayload.trainerName || '').trim() || 'Coach';
+        const goal = String(safePayload.goal || safePayload.goals || '').trim();
+
+        if (!assessment || typeof assessment !== 'object') {
+            return {
+                ok: false,
+                error: 'Avaliação inválida para gerar plano tático',
+            };
+        }
+
+        const weight = Number(assessment.weight ?? assessment.weight_kg ?? 0) || 0;
+        const height = Number(assessment.height ?? assessment.height_cm ?? 0) || 0;
+        const age = Number(assessment.age ?? 0) || 0;
+        const gender = String(assessment.gender || '').toUpperCase();
+        const bodyFat = Number(assessment.body_fat_percentage ?? assessment.bf ?? 0) || 0;
+        const leanMass = Number(assessment.lean_mass ?? 0) || null;
+        const fatMass = Number(assessment.fat_mass ?? 0) || null;
+        const bmi = Number(assessment.bmi ?? 0) || 0;
+        const bmr = Number(assessment.bmr ?? 0) || 0;
+        const tdee = Number(assessment.tdee ?? 0) || 0;
+
+        const safeMetrics = {
+            weight,
+            height,
+            age,
+            gender,
+            bodyFat,
+            leanMass,
+            fatMass,
+            bmi,
+            bmr,
+            tdee,
+        };
+
+        const hasCoreData = weight > 0 && height > 0 && age > 0 && bodyFat > 0;
+        if (!hasCoreData) {
+            return {
+                ok: true,
+                plan: {
+                    summary: [
+                        'Preencha peso, altura, idade e dobras para liberar o plano tático automático.',
+                    ],
+                    training: [],
+                    nutrition: [],
+                    habits: [],
+                    warnings: [
+                        'Sem dados completos, qualquer sugestão seria chute. Priorize uma avaliação bem preenchida.',
+                    ],
+                },
+                usedAi: false,
+            };
+        }
+
+        const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+        if (!apiKey) {
+            const basePlan = buildFallbackAssessmentPlan(studentName, trainerName, safeMetrics, goal);
+            return { ok: true, plan: basePlan, usedAi: false };
+        }
+
+        const prompt =
+            'Você é um treinador especialista em avaliação física e periodização de treino.' +
+            ' Gere um PLANO TÁTICO de 12 semanas, objetivo e acionável, para o aluno descrito abaixo.' +
+            ' Retorne APENAS um JSON válido (sem markdown) no formato:' +
+            ' {' +
+            '  "summary": string[],' +
+            '  "training": string[],' +
+            '  "nutrition": string[],' +
+            '  "habits": string[],' +
+            '  "warnings": string[]' +
+            ' }.' +
+            ' Regras: summary máx 5 itens, training máx 10, nutrition máx 8, habits máx 8, warnings máx 5.' +
+            ' Fale em português brasileiro, direto para o aluno, mas com tom profissional.' +
+            ' Não invente dados: se algo não estiver claro, deixe explícito nas warnings.' +
+            `\n\nALUNO: ${studentName}\nCOACH: ${trainerName}` +
+            '\n\nMÉTRICAS (JSON):\n' +
+            JSON.stringify({
+                metrics: safeMetrics,
+                goal: goal || null,
+            });
+
+        let plan = null;
+
+        try {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: POST_WORKOUT_AI_MODEL_ID });
+            const result = await model.generateContent([{ text: prompt }]);
+            const response = result?.response;
+            const text = (await response?.text()) || '';
+            const parsed = extractJsonFromText(text);
+            if (!parsed || typeof parsed !== 'object') {
+                throw new Error('Falha ao interpretar resposta da IA');
+            }
+
+            plan = buildAssessmentPlanObject(parsed, safeMetrics);
+        } catch {
+            plan = buildFallbackAssessmentPlan(studentName, trainerName, safeMetrics, goal);
+            return { ok: true, plan, usedAi: false };
+        }
+
+        return { ok: true, plan, usedAi: true };
+    } catch (e) {
+        const msg = e?.message ? String(e.message) : String(e);
+        return { ok: false, error: msg || 'Erro ao gerar plano tático' };
+    }
+}
+
+const buildAssessmentPlanObject = (raw, metrics) => {
+    const base = raw && typeof raw === 'object' ? raw : {};
+
+    const coerceStringArray = (value, max) => {
+        const list = Array.isArray(value) ? value : [];
+        return list
+            .map((item) => String(item || '').trim())
+            .filter((item) => !!item)
+            .slice(0, max);
+    };
+
+    const summary = coerceStringArray(base.summary, 5);
+    const training = coerceStringArray(base.training, 10);
+    const nutrition = coerceStringArray(base.nutrition, 8);
+    const habits = coerceStringArray(base.habits, 8);
+    const warnings = coerceStringArray(base.warnings, 5);
+
+    return {
+        summary,
+        training,
+        nutrition,
+        habits,
+        warnings,
+        metrics,
+    };
+};
+
+const buildFallbackAssessmentPlan = (studentName, trainerName, metrics, goal) => {
+    const safeGoal = String(goal || '').toLowerCase();
+    const goalLabel = safeGoal.includes('perder') || safeGoal.includes('cut') ? 'redução de gordura' : safeGoal.includes('ganho') || safeGoal.includes('bulk') ? 'ganho de massa magra' : 'recomposição corporal';
+
+    const summary = [
+        `Plano de 12 semanas focado em ${goalLabel} com ajustes semanais baseados em peso e percepção de esforço.`,
+        'Monitorar peso, circunferências e percepção de fadiga pelo menos 1x por semana.',
+    ];
+
+    const training = [
+        'Treino de força 3-5x/semana, priorizando multiarticulares (agachamento, supino, remada, levantamento terra).',
+        'Dividir em membros superiores/inferiores ou ABC simples, conforme nível do aluno.',
+        'Trabalhar faixas de 6-12 repetições para grandes grupamentos e 10-15 para menores.',
+        'Progredir carga ou repetições semanalmente, mantendo 1-3 repetições em reserva na maior parte das séries.',
+        'Incluir 1-2 sessões leves extras de mobilidade e core por semana para saúde articular.',
+    ];
+
+    const nutrition = [
+        'Garantir pelo menos 1,6-2,2g de proteína por kg de peso corporal por dia.',
+        'Organizar 3-5 refeições ao dia, com fonte de proteína em todas elas.',
+        'Ajustar carboidratos em torno dos treinos (mais próximos do treino, menos longe dele).',
+        'Manter ingestão adequada de água (2-3L/dia, ajustando por clima e suor).',
+    ];
+
+    const habits = [
+        'Dormir 7-9 horas por noite, com horário de sono o mais regular possível.',
+        'Registrar treino e alimentação em aplicativo ou planilha para aumentar a aderência.',
+        'Fazer caminhadas leves nos dias sem treino para melhorar recuperação e gasto calórico.',
+        'Agendar reavaliação física a cada 8-12 semanas para ajustar o plano.',
+    ];
+
+    const warnings = [
+        'Qualquer dor articular persistente deve ser avaliada e pode exigir ajuste de volume/carga.',
+        'Evite aumentar carga e volume ao mesmo tempo; priorize progressão controlada.',
+    ];
+
+    return {
+        summary,
+        training,
+        nutrition,
+        habits,
+        warnings,
+        metrics,
+        meta: {
+            studentName,
+            trainerName,
+            goal: goalLabel,
+        },
+    };
+};
+
+export async function computeWorkoutStreakAndStats() {
+    try {
+        const supabase = await createClient();
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) throw authError;
+        const user = authData?.user ?? null;
+        const userId = user?.id ? String(user.id) : '';
+        if (!userId) return { ok: false, error: 'Unauthorized' };
+
+        const { data, error } = await supabase
+            .from('workouts')
+            .select('id, date, created_at, notes, is_template')
+            .eq('user_id', userId)
+            .eq('is_template', false)
+            .order('date', { ascending: false })
+            .limit(365);
+
+        if (error) throw error;
+
+        const rows = Array.isArray(data) ? data : [];
+        if (!rows.length) {
+            return {
+                ok: true,
+                data: {
+                    currentStreak: 0,
+                    bestStreak: 0,
+                    totalWorkouts: 0,
+                    totalVolumeKg: 0,
+                    badges: []
+                }
+            };
+        }
+
+        const dayKey = (v) => {
+            try {
+                if (!v) return null;
+                const d = v?.toDate ? v.toDate() : new Date(v);
+                const iso = d.toISOString();
+                return iso.slice(0, 10);
+            } catch {
+                return null;
+            }
+        };
+
+        const daysSet = new Set();
+        const byDay = new Map();
+
+        rows.forEach((r) => {
+            if (!r || typeof r !== 'object') return;
+            const dk = dayKey(r.date) ?? dayKey(r.created_at);
+            if (!dk) return;
+            daysSet.add(dk);
+            const list = byDay.get(dk) || [];
+            list.push(r);
+            byDay.set(dk, list);
+        });
+
+        const sortedDays = Array.from(daysSet)
+            .filter((d) => typeof d === 'string' && d.length === 10)
+            .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+
+        let currentStreak = 0;
+        let bestStreak = 0;
+
+        if (sortedDays.length) {
+            const today = new Date();
+            const todayKey = today.toISOString().slice(0, 10);
+            const dayToIndex = new Map(sortedDays.map((d, idx) => [d, idx]));
+
+            const hasDay = (key) => dayToIndex.has(key);
+
+            let cursor = todayKey;
+            let streak = 0;
+
+            while (true) {
+                if (!hasDay(cursor)) {
+                    const prev = new Date(cursor + 'T00:00:00Z');
+                    prev.setUTCDate(prev.getUTCDate() - 1);
+                    const prevKey = prev.toISOString().slice(0, 10);
+                    const earliest = sortedDays[0];
+                    if (prevKey < earliest) break;
+                    if (!hasDay(prevKey)) break;
+                    cursor = prevKey;
+                    continue;
+                }
+
+                streak += 1;
+                const prev = new Date(cursor + 'T00:00:00Z');
+                prev.setUTCDate(prev.getUTCDate() - 1);
+                const prevKey = prev.toISOString().slice(0, 10);
+                if (!hasDay(prevKey)) break;
+                cursor = prevKey;
+            }
+
+            currentStreak = streak;
+
+            let best = 0;
+            let run = 1;
+            for (let i = 1; i < sortedDays.length; i += 1) {
+                const prev = new Date(sortedDays[i - 1] + 'T00:00:00Z');
+                const cur = new Date(sortedDays[i] + 'T00:00:00Z');
+                const diffDays = Math.round((cur.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
+                if (diffDays === 1) {
+                    run += 1;
+                } else {
+                    if (run > best) best = run;
+                    run = 1;
+                }
+            }
+            if (run > best) best = run;
+            bestStreak = best;
+        }
+
+        let totalVolumeKg = 0;
+        let totalWorkouts = rows.length;
+
+        rows.forEach((r) => {
+            try {
+                let notes = null;
+                if (typeof r.notes === 'string') {
+                    const t = r.notes.trim();
+                    if (t) notes = JSON.parse(t);
+                } else if (r.notes && typeof r.notes === 'object') {
+                    notes = r.notes;
+                }
+                const logs = notes?.logs && typeof notes.logs === 'object' ? notes.logs : {};
+                Object.values(logs).forEach((log) => {
+                    if (!log || typeof log !== 'object') return;
+                    const w = parseTrainingNumber(log?.weight);
+                    const reps = parseTrainingNumber(log?.reps);
+                    if (!Number.isFinite(w) || !Number.isFinite(reps)) return;
+                    if (w <= 0 || reps <= 0) return;
+                    totalVolumeKg += w * reps;
+                });
+            } catch {
+                return;
+            }
+        });
+
+        const badges = [];
+
+        if (totalWorkouts >= 1) {
+            badges.push({ id: 'first_workout', label: 'Primeiro Treino', kind: 'milestone' });
+        }
+        if (currentStreak >= 3) {
+            badges.push({ id: 'streak_3', label: '3 Dias Seguidos', kind: 'streak' });
+        }
+        if (currentStreak >= 7) {
+            badges.push({ id: 'streak_7', label: '7 Dias Seguidos', kind: 'streak' });
+        }
+        if (bestStreak >= 30) {
+            badges.push({ id: 'streak_30', label: '30 Dias de Foco', kind: 'streak' });
+        }
+        if (totalVolumeKg >= 50000) {
+            badges.push({ id: 'volume_50k', label: '50.000kg Levantados', kind: 'volume' });
+        }
+        if (totalVolumeKg >= 100000) {
+            badges.push({ id: 'volume_100k', label: '100.000kg Levantados', kind: 'volume' });
+        }
+
+        return {
+            ok: true,
+            data: {
+                currentStreak,
+                bestStreak,
+                totalWorkouts,
+                totalVolumeKg,
+                badges
+            }
+        };
+    } catch (e) {
+        const msg = e?.message ? String(e.message) : String(e);
+        return { ok: false, error: msg || 'Erro ao calcular conquistas' };
+    }
+}
+
 const normalizeSessionForAi = (session, user) => {
     const s = session && typeof session === 'object' ? session : null;
     if (!s) return null;
@@ -66,7 +432,7 @@ const normalizeSessionForAi = (session, user) => {
             const restPauseActivation = (() => {
                 try {
                     const rp = log?.rest_pause && typeof log.rest_pause === 'object' ? log.rest_pause : null;
-                    const v = Number(String(rp?.activation_reps ?? '').replace(',', '.'));
+                    const v = parseTrainingNumber(rp?.activation_reps);
                     return Number.isFinite(v) && v > 0 ? v : null;
                 } catch {
                     return null;
@@ -158,10 +524,10 @@ const computeSessionMetrics = (normalized) => {
         };
 
         sets.forEach((s) => {
-            const repsTotal = Number(String(s?.reps ?? '').replace(',', '.')) || 0;
-            const rpAct = Number(String(s?.rest_pause_activation_reps ?? '').replace(',', '.'));
+            const repsTotal = parseTrainingNumberOrZero(s?.reps);
+            const rpAct = parseTrainingNumber(s?.rest_pause_activation_reps);
             const repsStrength = Number.isFinite(rpAct) && rpAct > 0 ? rpAct : repsTotal;
-            const weight = Number(String(s?.weight ?? '').replace(',', '.')) || 0;
+            const weight = parseTrainingNumberOrZero(s?.weight);
             const done = !!s?.done;
             const adv = s?.advanced_config ?? s?.advancedConfig ?? null;
             const isCluster = isClusterSet(adv);
@@ -233,10 +599,10 @@ const computeDeterministicPrs = async (supabase, user, workoutId, normalized) =>
             };
 
             sets.forEach((s) => {
-                const repsTotal = Number(String(s?.reps ?? '').replace(',', '.')) || 0;
-                const rpAct = Number(String(s?.rest_pause_activation_reps ?? '').replace(',', '.'));
+                const repsTotal = parseTrainingNumberOrZero(s?.reps);
+                const rpAct = parseTrainingNumber(s?.rest_pause_activation_reps);
                 const repsStrength = Number.isFinite(rpAct) && rpAct > 0 ? rpAct : repsTotal;
-                const weight = Number(String(s?.weight ?? '').replace(',', '.')) || 0;
+                const weight = parseTrainingNumberOrZero(s?.weight);
                 const done = !!s?.done;
                 if (!done) return;
                 const adv = s?.advanced_config ?? s?.advancedConfig ?? null;
@@ -300,8 +666,8 @@ const computeDeterministicPrs = async (supabase, user, workoutId, normalized) =>
                 let bestVolume = 0;
 
                 sets.forEach((s) => {
-                    const reps = Number(String(s?.reps ?? '').replace(',', '.')) || 0;
-                    const weight = Number(String(s?.weight ?? '').replace(',', '.')) || 0;
+                    const reps = parseTrainingNumberOrZero(s?.reps);
+                    const weight = parseTrainingNumberOrZero(s?.weight);
                     const done = !!s?.done;
                     if (!done) return;
                     if (Number.isFinite(weight) && weight > bestWeight) bestWeight = weight;

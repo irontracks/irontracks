@@ -14,7 +14,10 @@ const mapSubscriptionStatusFromPayment = (status: string) => {
 export async function POST(req: Request) {
   const secret = (process.env.ASAAS_WEBHOOK_SECRET || '').trim()
   const provided = (req.headers.get('x-webhook-secret') || '').trim()
-  if (secret && provided !== secret) {
+  if (!secret) {
+    return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 500 })
+  }
+  if (provided !== secret) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 

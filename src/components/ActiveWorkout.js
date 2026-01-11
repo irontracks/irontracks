@@ -1,14 +1,12 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, Save, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Plus, Save, UserPlus, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { BackButton } from '@/components/ui/BackButton';
-
-const coerceNumber = (value) => {
-  const n = Number(String(value ?? '').replace(',', '.'));
-  return Number.isFinite(n) ? n : null;
-};
+import { parseTrainingNumber } from '@/utils/trainingNumber';
+import InviteManager from '@/components/InviteManager';
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
@@ -46,6 +44,7 @@ const buildPlannedBlocks = (totalReps, clusterSize) => {
 
 export default function ActiveWorkout(props) {
   const { alert, confirm } = useDialog();
+  const { sendInvite } = useTeamWorkout();
   const session = props?.session && typeof props.session === 'object' ? props.session : null;
   const workout = session?.workout && typeof session.workout === 'object' ? session.workout : null;
   const exercises = Array.isArray(workout?.exercises) ? workout.exercises : [];
@@ -55,9 +54,20 @@ export default function ActiveWorkout(props) {
   const [ticker, setTicker] = useState(Date.now());
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [finishing, setFinishing] = useState(false);
+  const [openNotesKeys, setOpenNotesKeys] = useState(() => new Set());
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [addExerciseOpen, setAddExerciseOpen] = useState(false);
+  const [addExerciseDraft, setAddExerciseDraft] = useState(() => ({
+    name: '',
+    sets: '3',
+    restTime: '60',
+  }));
 
   const restPauseRefs = useRef({});
   const clusterRefs = useRef({});
+  const MAX_EXTRA_SETS_PER_EXERCISE = 50;
+  const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
+  const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;
 
   useEffect(() => {
     const id = setInterval(() => setTicker(Date.now()), 1000);
@@ -167,6 +177,82 @@ export default function ActiveWorkout(props) {
     });
   };
 
+  const addExtraSetToExercise = async (exIdx) => {
+    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    const idx = Number(exIdx);
+    if (!Number.isFinite(idx) || idx < 0) return;
+    if (idx >= exercises.length) return;
+    try {
+      const nextExercises = [...exercises];
+      const exRaw = nextExercises[idx] && typeof nextExercises[idx] === 'object' ? nextExercises[idx] : {};
+      const setsHeader = Math.max(0, Number.parseInt(String(exRaw?.sets ?? '0'), 10) || 0);
+      const sdArrRaw = Array.isArray(exRaw?.setDetails) ? exRaw.setDetails : Array.isArray(exRaw?.set_details) ? exRaw.set_details : [];
+      const sdArr = Array.isArray(sdArrRaw) ? [...sdArrRaw] : [];
+      const setsCount = Math.max(setsHeader, sdArr.length);
+      if (setsCount >= MAX_EXTRA_SETS_PER_EXERCISE) return;
+
+      const last = sdArr.length > 0 ? sdArr[sdArr.length - 1] : null;
+      const base = last && typeof last === 'object' ? last : {};
+      const nextDetail = {
+        ...base,
+        set_number: setsCount + 1,
+        weight: null,
+        reps: '',
+        rpe: null,
+        notes: null,
+        is_warmup: false,
+      };
+
+      sdArr.push(nextDetail);
+      nextExercises[idx] = {
+        ...exRaw,
+        sets: setsCount + 1,
+        setDetails: sdArr,
+      };
+      props.onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
+      setCollapsed((prev) => {
+        const next = new Set(prev);
+        if (next.has(idx)) next.delete(idx);
+        return next;
+      });
+    } catch (e) {
+      try {
+        await alert('Não foi possível adicionar série extra: ' + (e?.message || String(e || '')));
+      } catch {}
+    }
+  };
+
+  const addExtraExerciseToWorkout = async () => {
+    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    if (exercises.length >= MAX_EXTRA_EXERCISES_PER_WORKOUT) return;
+    const name = String(addExerciseDraft?.name || '').trim();
+    if (!name) {
+      try {
+        await alert('Informe o nome do exercício.', 'Exercício extra');
+      } catch {}
+      return;
+    }
+    const sets = Math.max(1, Number.parseInt(String(addExerciseDraft?.sets || '3'), 10) || 1);
+    const rest = parseTrainingNumber(addExerciseDraft?.restTime);
+    const restTime = Number.isFinite(rest) && rest > 0 ? rest : null;
+    const nextExercise = {
+      name,
+      sets,
+      restTime,
+      method: 'Normal',
+      setDetails: [],
+    };
+    try {
+      props.onUpdateSession({ workout: { ...workout, exercises: [...exercises, nextExercise] } });
+      setAddExerciseOpen(false);
+      setAddExerciseDraft({ name: '', sets: String(sets), restTime: String(restTime ?? DEFAULT_EXTRA_EXERCISE_REST_TIME_S) });
+    } catch (e) {
+      try {
+        await alert('Não foi possível adicionar exercício extra: ' + (e?.message || String(e || '')));
+      } catch {}
+    }
+  };
+
   const finishWorkout = async () => {
     if (!session || !workout) return;
     if (finishing) return;
@@ -177,32 +263,51 @@ export default function ActiveWorkout(props) {
 
     let ok = false;
     try {
-      ok = typeof confirm === 'function' ? await confirm('Finalizar treino e salvar no histórico?', 'Finalizar treino') : false;
+      ok =
+        typeof confirm === 'function'
+          ? await confirm('Deseja finalizar o treino?', 'Finalizar treino', {
+              confirmText: 'Sim',
+              cancelText: 'Não',
+            })
+          : false;
     } catch {
       ok = false;
     }
     if (!ok) return;
 
-    if (elapsedSafe > 0 && Number.isFinite(elapsedSafe) && elapsedSafe < minSecondsForFullSession) {
+    const isShort = elapsedSafe > 0 && Number.isFinite(elapsedSafe) && elapsedSafe < minSecondsForFullSession;
+    let shouldSaveHistory = true;
+
+    if (isShort) {
       let allowSaveShort = false;
       try {
         allowSaveShort =
           typeof confirm === 'function'
-            ? await confirm('Este treino durou menos de 30 minutos. Deseja salvar no histórico mesmo assim?', 'Treino curto (< 30 min)')
+            ? await confirm(
+                'Esse treino durou menos de 30 minutos. Deseja adicioná-lo no histórico?',
+                'Treino curto (< 30 min)',
+                {
+                  confirmText: 'Sim',
+                  cancelText: 'Não',
+                }
+              )
             : false;
       } catch {
         allowSaveShort = false;
       }
-      if (!allowSaveShort) return;
+      shouldSaveHistory = !!allowSaveShort;
+    }
 
-      try {
-        showReport =
-          typeof confirm === 'function'
-            ? await confirm('Deseja gerar o relatório deste treino curto agora?', 'Gerar relatório?')
-            : true;
-      } catch {
-        showReport = true;
-      }
+    try {
+      showReport =
+        typeof confirm === 'function'
+          ? await confirm('Deseja o relatório desse treino?', 'Gerar relatório?', {
+              confirmText: 'Sim',
+              cancelText: 'Não',
+            })
+          : true;
+    } catch {
+      showReport = true;
     }
 
     setFinishing(true);
@@ -236,19 +341,21 @@ export default function ActiveWorkout(props) {
       };
 
       let savedId = null;
-      try {
-        const resp = await fetch('/api/workouts/finish', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session: payload }),
-        });
-        const json = await resp.json();
-        if (!json?.ok) throw new Error(json?.error || 'Falha ao salvar no histórico');
-        savedId = json?.saved?.id ?? null;
-      } catch (e) {
-        const msg = e?.message ? String(e.message) : String(e);
-        await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
-        savedId = null;
+      if (shouldSaveHistory) {
+        try {
+          const resp = await fetch('/api/workouts/finish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session: payload }),
+          });
+          const json = await resp.json();
+          if (!json?.ok) throw new Error(json?.error || 'Falha ao salvar no histórico');
+          savedId = json?.saved?.id ?? null;
+        } catch (e) {
+          const msg = e?.message ? String(e.message) : String(e);
+          await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
+          savedId = null;
+        }
       }
 
       const sessionForReport = {
@@ -273,68 +380,122 @@ export default function ActiveWorkout(props) {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
-    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
     const weightValue = String(log?.weight ?? cfg?.weight ?? '');
     const repsValue = String(log?.reps ?? '');
+    const rpeValue = String(log?.rpe ?? '');
     const notesValue = String(log?.notes ?? '');
     const done = !!log?.done;
 
+    const isHeaderRow = setIdx === 0;
+    const notesId = `notes-${key}`;
+    const hasNotes = notesValue.trim().length > 0;
+    const isNotesOpen = openNotesKeys.has(key);
+
+    const toggleNotes = () => {
+      setOpenNotesKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    };
+
     return (
-      <div className="space-y-2" key={key}>
-        <div className="flex items-center gap-2">
-          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          <input
-            inputMode="decimal"
-            value={weightValue}
-            onChange={(e) => {
-              const v = e?.target?.value ?? '';
-              updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-            }}
-            placeholder="kg"
-            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-          />
-          <div className="w-24 flex flex-col gap-1">
-            <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Repetição / reps</div>
+      <div className="space-y-1" key={key}>
+        {isHeaderRow && (
+          <div className="hidden sm:flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 font-bold px-1">
+            <div className="w-10">Série</div>
+            <div className="w-24">Peso (kg)</div>
+            <div className="w-24">Reps</div>
+            <div className="w-24">RPE</div>
+            <div className="ml-auto flex items-center gap-2">Ações</div>
+          </div>
+        )}
+        <div className="rounded-lg bg-neutral-900/40 border border-neutral-800 px-2 py-2 space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+            <div className="flex items-center gap-1 ml-auto sm:ml-0">
+              <button
+                type="button"
+                onClick={toggleNotes}
+                className={
+                  isNotesOpen || hasNotes
+                    ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                    : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+                }
+              >
+                <MessageSquare size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextDone = !done;
+                  updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
+                  if (nextDone && restTime && restTime > 0) {
+                    startTimer(restTime, { kind: 'rest', key });
+                  }
+                }}
+                className={
+                  done
+                    ? 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black font-black shadow-yellow-500/20 shadow-sm active:scale-95 transition duration-150'
+                    : 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150'
+                }
+              >
+                <Check size={16} />
+                <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:max-w-sm">
             <input
-              inputMode="numeric"
+              inputMode="decimal"
+              value={weightValue}
+              onChange={(e) => {
+                const v = e?.target?.value ?? '';
+                updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+              }}
+              placeholder="Peso (kg)"
+              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+            />
+            <input
+              inputMode="decimal"
               value={repsValue}
               onChange={(e) => {
                 const v = e?.target?.value ?? '';
                 updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
               }}
-              placeholder="reps"
-              className="bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+              placeholder="Reps"
+              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+            />
+            <input
+              inputMode="decimal"
+              value={rpeValue}
+              onChange={(e) => {
+                const v = e?.target?.value ?? '';
+                updateLog(key, { rpe: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+              }}
+              placeholder="RPE"
+              className="w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-1.5 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
             />
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const nextDone = !done;
-              updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
-              if (nextDone && restTime && restTime > 0) {
-                startTimer(restTime, { kind: 'rest', key });
-              }
-            }}
-            className={
-              done
-                ? 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                : 'ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
-            }
-          >
-            <Check size={16} />
-            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
-          </button>
         </div>
-        <textarea
-          value={notesValue}
-          onChange={(e) => {
-            const v = e?.target?.value ?? '';
-            updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-          }}
-          placeholder="Observações da série"
-          rows={2}
-          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
+        {isNotesOpen && (
+          <div className="px-1">
+            <textarea
+              id={notesId}
+              value={notesValue}
+              onChange={(e) => {
+                const v = e?.target?.value ?? '';
+                updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+              }}
+              placeholder="Observações da série (opcional)"
+              rows={2}
+              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 shadow-sm shadow-yellow-500/10 transition duration-200"
+            />
+          </div>
+        )}
       </div>
     );
   };
@@ -343,17 +504,17 @@ export default function ActiveWorkout(props) {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
-    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
-    const pauseSec = coerceNumber(cfg?.rest_time_sec) ?? 15;
-    const miniSets = Math.max(0, Math.floor(coerceNumber(cfg?.mini_sets) ?? 0));
+    const pauseSec = parseTrainingNumber(cfg?.rest_time_sec) ?? 15;
+    const miniSets = Math.max(0, Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0));
 
     const rp = isObject(log?.rest_pause) ? log.rest_pause : {};
-    const activation = coerceNumber(rp?.activation_reps) ?? null;
+    const activation = parseTrainingNumber(rp?.activation_reps) ?? null;
     const minisArrRaw = Array.isArray(rp?.mini_reps) ? rp.mini_reps : [];
     const minis = Array.from({ length: miniSets }).map((_, idx) => {
       const v = minisArrRaw?.[idx];
-      const n = coerceNumber(v);
+      const n = parseTrainingNumber(v);
       return n;
     });
 
@@ -443,10 +604,10 @@ export default function ActiveWorkout(props) {
           <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
             <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Ativação</div>
             <input
-              inputMode="numeric"
+              inputMode="decimal"
               value={activation == null ? '' : String(activation)}
               onChange={(e) => {
-                const v = coerceNumber(e?.target?.value);
+                const v = parseTrainingNumber(e?.target?.value);
                 const nextActivation = v != null && v > 0 ? v : null;
                 updateRp({ activation_reps: nextActivation });
               }}
@@ -466,14 +627,14 @@ export default function ActiveWorkout(props) {
               <div key={`${key}-mini-${idx}`} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
                 <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Mini {idx + 1}</div>
                 <input
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={current == null ? '' : String(current)}
                   ref={(el) => {
                     if (!restPauseRefs.current[key]) restPauseRefs.current[key] = {};
                     restPauseRefs.current[key][idx] = el;
                   }}
                   onChange={(e) => {
-                    const v = coerceNumber(e?.target?.value);
+                    const v = parseTrainingNumber(e?.target?.value);
                     const next = v != null && v > 0 ? v : null;
                     const nextMiniReps = [...minis];
                     nextMiniReps[idx] = next;
@@ -513,18 +674,18 @@ export default function ActiveWorkout(props) {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
-    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
-    const totalRepsPlanned = coerceNumber(cfg?.total_reps);
-    const clusterSize = coerceNumber(cfg?.cluster_size);
-    const intra = coerceNumber(cfg?.intra_rest_sec) ?? 15;
+    const totalRepsPlanned = parseTrainingNumber(cfg?.total_reps);
+    const clusterSize = parseTrainingNumber(cfg?.cluster_size);
+    const intra = parseTrainingNumber(cfg?.intra_rest_sec) ?? 15;
     const plannedBlocks = buildPlannedBlocks(totalRepsPlanned, clusterSize);
 
     const cluster = isObject(log?.cluster) ? log.cluster : {};
     const blocksRaw = Array.isArray(cluster?.blocks) ? cluster.blocks : [];
     const blocks = plannedBlocks.map((_, idx) => {
       const v = blocksRaw?.[idx];
-      const n = coerceNumber(v);
+      const n = parseTrainingNumber(v);
       return n;
     });
 
@@ -626,14 +787,14 @@ export default function ActiveWorkout(props) {
                     <div className="text-[10px] font-mono text-neutral-500">plan {planned}</div>
                   </div>
                   <input
-                    inputMode="numeric"
+                    inputMode="decimal"
                     value={current == null ? '' : String(current)}
                     ref={(el) => {
                       if (!clusterRefs.current[key]) clusterRefs.current[key] = {};
                       clusterRefs.current[key][idx] = el;
                     }}
                     onChange={(e) => {
-                      const v = coerceNumber(e?.target?.value);
+                      const v = parseTrainingNumber(e?.target?.value);
                       const next = v != null && v > 0 ? v : null;
                       const nextBlocks = [...blocks];
                       nextBlocks[idx] = next;
@@ -684,7 +845,7 @@ export default function ActiveWorkout(props) {
     const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
     const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
     const collapsedNow = collapsed.has(exIdx);
-    const restTime = coerceNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
     return (
       <div key={`ex-${exIdx}`} className="rounded-xl bg-neutral-800 border border-neutral-700 p-4">
@@ -712,8 +873,16 @@ export default function ActiveWorkout(props) {
         </button>
 
         {!collapsedNow && (
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-2">
             {Array.from({ length: setsCount }).map((_, setIdx) => renderSet(ex, exIdx, setIdx))}
+            <button
+              type="button"
+              onClick={() => addExtraSetToExercise(exIdx)}
+              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 font-black hover:bg-neutral-800 active:scale-95 transition-transform"
+            >
+              <Plus size={16} />
+              <span className="text-sm">Série extra</span>
+            </button>
           </div>
         )}
       </div>
@@ -737,7 +906,27 @@ export default function ActiveWorkout(props) {
     <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
       <div className="sticky top-0 z-40 bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 py-4 pt-safe">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-          <BackButton onClick={props?.onBack} />
+          <div className="flex items-center gap-2">
+            <BackButton onClick={props?.onBack} />
+            <button
+              type="button"
+              onClick={() => setAddExerciseOpen(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95"
+              title="Adicionar exercício extra"
+            >
+              <Plus size={16} />
+              <span className="text-sm font-black hidden sm:inline">Exercício</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setInviteOpen(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95"
+              title="Convidar para treinar junto"
+            >
+              <UserPlus size={16} />
+              <span className="text-sm font-black hidden sm:inline">Convidar</span>
+            </button>
+          </div>
           <div className="min-w-0 flex-1">
             <div className="font-black text-white truncate text-right">{String(workout?.title || 'Treino')}</div>
             <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-1">
@@ -747,6 +936,91 @@ export default function ActiveWorkout(props) {
           </div>
         </div>
       </div>
+
+      <InviteManager
+        isOpen={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onInvite={async (targetUser) => {
+          try {
+            const payloadWorkout = workout && typeof workout === 'object'
+              ? { ...workout, exercises: Array.isArray(workout?.exercises) ? workout.exercises : [] }
+              : { title: 'Treino', exercises: [] };
+            await sendInvite(targetUser, payloadWorkout);
+          } catch (e) {
+            const msg = e?.message || String(e || '');
+            await alert('Falha ao enviar convite: ' + msg);
+          }
+        }}
+      />
+
+      {addExerciseOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setAddExerciseOpen(false)}>
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-lg font-black text-white truncate">Adicionar exercício extra</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddExerciseOpen(false)}
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <input
+                  value={String(addExerciseDraft?.name ?? '')}
+                  onChange={(e) => setAddExerciseDraft((prev) => ({ ...(prev || {}), name: e?.target?.value ?? '' }))}
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                  placeholder="Ex: Supino reto"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(addExerciseDraft?.sets ?? '')}
+                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...(prev || {}), sets: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="3"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(addExerciseDraft?.restTime ?? '')}
+                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...(prev || {}), restTime: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="60"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-800 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAddExerciseOpen(false)}
+                className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={addExtraExerciseToWorkout}
+                className="flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-6 py-4 pb-28 space-y-4">
         {exercises.length === 0 ? (

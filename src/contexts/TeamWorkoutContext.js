@@ -26,17 +26,33 @@ export const TeamWorkoutProvider = ({ children, user }) => {
     const [loading, setLoading] = useState(false);
     const supabase = useMemo(() => createClient(), []);
 
-    // 1. Listen for Incoming Invites
-    useEffect(() => {
-        if (!user?.id) return;
+    const canReceiveInvites = useMemo(() => {
+        const uid = user?.id ? String(user.id) : '';
+        if (!uid) return true;
+        try {
+            if (typeof window === 'undefined') return true;
+            const raw = window.localStorage.getItem(`irontracks.userSettings.v1.${uid}`) || '';
+            const parsed = raw ? JSON.parse(raw) : null;
+            const allow = parsed && typeof parsed === 'object' ? parsed.allowTeamInvites : undefined;
+            return allow !== false;
+        } catch {
+            return true;
+        }
+    }, [user?.id]);
 
-        // Fetch initial pending invites
-        const fetchInvites = async () => {
+    const refetchInvites = useMemo(() => {
+        return async () => {
             try {
+                const safeUserId = user?.id ? String(user.id) : '';
+                if (!safeUserId) return;
+                if (!canReceiveInvites) {
+                    setIncomingInvites([]);
+                    return;
+                }
                 const { data } = await supabase
                     .from('invites')
                     .select('*, profiles:from_uid(display_name, photo_url)')
-                    .eq('to_uid', user.id)
+                    .eq('to_uid', safeUserId)
                     .eq('status', 'pending')
                     .order('created_at', { ascending: false });
                 const list = Array.isArray(data) ? data : [];
@@ -54,10 +70,20 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                     }));
                 setIncomingInvites(mapped);
             } catch {
-                setIncomingInvites([]);
+                return;
             }
         };
-        fetchInvites();
+    }, [supabase, user?.id, canReceiveInvites]);
+
+    // 1. Listen for Incoming Invites
+    useEffect(() => {
+        if (!user?.id) return;
+
+        if (!canReceiveInvites) {
+            setIncomingInvites([]);
+            return;
+        }
+        refetchInvites();
 
         // Subscribe to new invites
         const channel = supabase
@@ -137,7 +163,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, user?.id]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
 
     // Fallback: if invites realtime isn't enabled, notifications will still fire
     useEffect(() => {
@@ -189,8 +215,8 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                         const n = payload?.new && typeof payload.new === 'object' ? payload.new : null;
                         if (!n) return;
                         const type = String(n?.type ?? '');
-                        if (type !== 'invite') return;
-                        refetch();
+                    if (type !== 'invite') return;
+                        refetchInvites();
                         try { playStartSound(); } catch {}
                     } catch {
                         return;
@@ -199,6 +225,29 @@ export const TeamWorkoutProvider = ({ children, user }) => {
             )
             .subscribe();
 
+        const POLL_MS = 20_000;
+        const pollId = setInterval(() => {
+            try { refetchInvites(); } catch {}
+        }, POLL_MS);
+
+        const handleVisibility = () => {
+            try {
+                if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                    refetchInvites();
+                }
+            } catch {}
+        };
+        const handleFocus = () => {
+            try { refetchInvites(); } catch {}
+        };
+
+        try {
+            if (typeof document !== 'undefined') document.addEventListener('visibilitychange', handleVisibility);
+        } catch {}
+        try {
+            if (typeof window !== 'undefined') window.addEventListener('focus', handleFocus);
+        } catch {}
+
         return () => {
             mounted = false;
             try {
@@ -206,8 +255,15 @@ export const TeamWorkoutProvider = ({ children, user }) => {
             } catch {
                 return;
             }
+            try { clearInterval(pollId); } catch {}
+            try {
+                if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibility);
+            } catch {}
+            try {
+                if (typeof window !== 'undefined') window.removeEventListener('focus', handleFocus);
+            } catch {}
         };
-    }, [supabase, user?.id]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
 
     // 2. Listen to Active Team Session
     useEffect(() => {
