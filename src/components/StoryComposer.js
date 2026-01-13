@@ -5,6 +5,9 @@ import { Download, Share2, X } from 'lucide-react'
 
 const CANVAS_W = 1080
 const CANVAS_H = 1920
+const SAFE_TOP = 250
+const SAFE_BOTTOM = 420
+const SAFE_SIDE = 90
 
 const safeString = (v) => {
   try {
@@ -78,8 +81,131 @@ const drawRoundedRect = (ctx, x, y, w, h, r) => {
   ctx.closePath()
 }
 
+const fitCover = ({ canvasW, canvasH, imageW, imageH }) => {
+  const iw = Number(imageW) || 0
+  const ih = Number(imageH) || 0
+  if (iw <= 0 || ih <= 0) return { scale: 1, dw: 0, dh: 0 }
+  const coverScale = Math.max(canvasW / iw, canvasH / ih)
+  const dw = iw * coverScale
+  const dh = ih * coverScale
+  return { scale: coverScale, dw, dh }
+}
+
+const drawStory = ({
+  ctx,
+  canvasW,
+  canvasH,
+  backgroundImage,
+  zoom,
+  offset,
+  metrics,
+}) => {
+  ctx.clearRect(0, 0, canvasW, canvasH)
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(0, 0, canvasW, canvasH)
+
+  if (backgroundImage) {
+    const iw = Number(backgroundImage.naturalWidth) || 0
+    const ih = Number(backgroundImage.naturalHeight) || 0
+    const { scale: coverScale } = fitCover({ canvasW, canvasH, imageW: iw, imageH: ih })
+    const finalScale = coverScale * (Number(zoom) || 1)
+    const dw = iw * finalScale
+    const dh = ih * finalScale
+    const cx = (canvasW - dw) / 2 + (Number(offset?.x) || 0)
+    const cy = (canvasH - dh) / 2 + (Number(offset?.y) || 0)
+    ctx.drawImage(backgroundImage, cx, cy, dw, dh)
+  } else {
+    const g = ctx.createLinearGradient(0, 0, canvasW, canvasH)
+    g.addColorStop(0, '#0a0a0a')
+    g.addColorStop(1, '#111827')
+    ctx.fillStyle = g
+    ctx.fillRect(0, 0, canvasW, canvasH)
+  }
+
+  const overlay = ctx.createLinearGradient(0, canvasH * 0.35, 0, canvasH)
+  overlay.addColorStop(0, 'rgba(0,0,0,0)')
+  overlay.addColorStop(1, 'rgba(0,0,0,0.78)')
+  ctx.fillStyle = overlay
+  ctx.fillRect(0, 0, canvasW, canvasH)
+
+  const left = SAFE_SIDE
+  const right = canvasW - SAFE_SIDE
+  const safeBottomY = canvasH - SAFE_BOTTOM
+
+  ctx.textBaseline = 'top'
+
+  const brandY = SAFE_TOP + 24
+  ctx.fillStyle = '#facc15'
+  ctx.font = '900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+  ctx.fillText('IRONTRACKS', left, brandY)
+
+  const title = safeString(metrics?.title).toUpperCase()
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '900 74px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+
+  const lines = []
+  const words = title.split(/\s+/).filter(Boolean)
+  let line = ''
+  for (const w of words) {
+    const candidate = line ? `${line} ${w}` : w
+    if (ctx.measureText(candidate).width <= right - left) line = candidate
+    else {
+      if (line) lines.push(line)
+      line = w
+    }
+    if (lines.length >= 2) break
+  }
+  if (line && lines.length < 2) lines.push(line)
+
+  const cardH = 130
+  const cardY = safeBottomY - 24 - cardH
+  const subtitleY = cardY - 56
+
+  let titleY = subtitleY - 24 - lines.length * 86
+  titleY = Math.max(titleY, brandY + 92)
+
+  lines.forEach((l, idx) => {
+    ctx.fillText(l, left, titleY + idx * 86)
+  })
+
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'
+  ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+  const dateText = metrics?.date ? `• ${metrics.date}` : ''
+  ctx.fillText(`RELATÓRIO DO TREINO ${dateText}`.trim(), left, subtitleY)
+
+  const cards = [
+    { label: 'VOLUME', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` },
+    { label: 'TEMPO', value: formatDuration(metrics?.totalTime) },
+    { label: 'KCAL', value: String(metrics?.kcal || 0) },
+  ]
+
+  const gap = 18
+  const cardW = Math.floor((right - left - gap * 2) / 3)
+
+  cards.forEach((c, idx) => {
+    const x = left + idx * (cardW + gap)
+    ctx.save()
+    drawRoundedRect(ctx, x, cardY, cardW, cardH, 26)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
+    ctx.fill()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)'
+    ctx.stroke()
+    ctx.restore()
+
+    ctx.fillStyle = 'rgba(255,255,255,0.65)'
+    ctx.font = '900 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+    ctx.fillText(c.label, x + 22, cardY + 18)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '900 42px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+    ctx.fillText(c.value, x + 22, cardY + 54)
+  })
+}
+
 export default function StoryComposer({ open, session, onClose }) {
   const previewRef = useRef(null)
+  const previewCanvasRef = useRef(null)
   const inputRef = useRef(null)
 
   const [backgroundUrl, setBackgroundUrl] = useState('')
@@ -90,6 +216,7 @@ export default function StoryComposer({ open, session, onClose }) {
   const [zoom, setZoom] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [showSafeGuide, setShowSafeGuide] = useState(true)
 
   const metrics = useMemo(() => {
     const title = safeString(session?.workoutTitle || session?.name || 'Treino')
@@ -112,6 +239,7 @@ export default function StoryComposer({ open, session, onClose }) {
     setError('')
     setBusy(false)
     setDragging(false)
+    setShowSafeGuide(true)
   }, [open])
 
   useEffect(() => {
@@ -172,7 +300,7 @@ export default function StoryComposer({ open, session, onClose }) {
       const scaleX = CANVAS_W / rect.width
       const scaleY = CANVAS_H / rect.height
 
-      setOffset((prev) => ({ x: prev.x + dx * scaleX, y: prev.y + dy * scaleY }))
+      setOffset((prev) => ({ x: (prev?.x || 0) + dx * scaleX, y: (prev?.y || 0) + dy * scaleY }))
       setDragStart({ x: e.clientX, y: e.clientY })
     } catch {
     }
@@ -193,105 +321,23 @@ export default function StoryComposer({ open, session, onClose }) {
     canvas.height = CANVAS_H
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('no_ctx')
-
-    ctx.fillStyle = '#000000'
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-
-    if (backgroundImage) {
-      const iw = Number(backgroundImage.naturalWidth) || 0
-      const ih = Number(backgroundImage.naturalHeight) || 0
-
-      if (iw > 0 && ih > 0) {
-        const coverScale = Math.max(CANVAS_W / iw, CANVAS_H / ih)
-        const scale = coverScale * (Number(zoom) || 1)
-        const dw = iw * scale
-        const dh = ih * scale
-
-        const cx = (CANVAS_W - dw) / 2 + (Number(offset.x) || 0)
-        const cy = (CANVAS_H - dh) / 2 + (Number(offset.y) || 0)
-
-        ctx.drawImage(backgroundImage, cx, cy, dw, dh)
-      }
-    } else {
-      const g = ctx.createLinearGradient(0, 0, CANVAS_W, CANVAS_H)
-      g.addColorStop(0, '#0a0a0a')
-      g.addColorStop(1, '#111827')
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-    }
-
-    const overlay = ctx.createLinearGradient(0, CANVAS_H * 0.35, 0, CANVAS_H)
-    overlay.addColorStop(0, 'rgba(0,0,0,0)')
-    overlay.addColorStop(1, 'rgba(0,0,0,0.75)')
-    ctx.fillStyle = overlay
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
-
-    ctx.fillStyle = '#facc15'
-    ctx.font = '900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
-    ctx.textBaseline = 'top'
-    ctx.fillText('IRONTRACKS', 72, 64)
-
-    const title = safeString(metrics.title).toUpperCase()
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '900 74px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
-    const lines = []
-    const words = title.split(/\s+/).filter(Boolean)
-    let line = ''
-    for (const w of words) {
-      const candidate = line ? `${line} ${w}` : w
-      if (ctx.measureText(candidate).width <= CANVAS_W - 144) line = candidate
-      else {
-        if (line) lines.push(line)
-        line = w
-      }
-      if (lines.length >= 2) break
-    }
-    if (line && lines.length < 2) lines.push(line)
-
-    let y = CANVAS_H - 520
-    lines.forEach((l) => {
-      ctx.fillText(l, 72, y)
-      y += 86
-    })
-
-    ctx.fillStyle = 'rgba(255,255,255,0.85)'
-    ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
-    const dateText = metrics.date ? `• ${metrics.date}` : ''
-    ctx.fillText(`RELATÓRIO DO TREINO ${dateText}`.trim(), 72, CANVAS_H - 320)
-
-    const cards = [
-      { label: 'VOLUME', value: `${Math.round(metrics.volume).toLocaleString('pt-BR')} kg` },
-      { label: 'TEMPO', value: formatDuration(metrics.totalTime) },
-      { label: 'KCAL', value: String(metrics.kcal || 0) },
-    ]
-
-    const cardY = CANVAS_H - 240
-    const gap = 18
-    const cardW = Math.floor((CANVAS_W - 144 - gap * 2) / 3)
-    const cardH = 130
-
-    cards.forEach((c, idx) => {
-      const x = 72 + idx * (cardW + gap)
-      ctx.save()
-      drawRoundedRect(ctx, x, cardY, cardW, cardH, 26)
-      ctx.fillStyle = 'rgba(0,0,0,0.55)'
-      ctx.fill()
-      ctx.lineWidth = 2
-      ctx.strokeStyle = 'rgba(255,255,255,0.12)'
-      ctx.stroke()
-      ctx.restore()
-
-      ctx.fillStyle = 'rgba(255,255,255,0.65)'
-      ctx.font = '900 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
-      ctx.fillText(c.label, x + 22, cardY + 18)
-
-      ctx.fillStyle = '#ffffff'
-      ctx.font = '900 42px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
-      ctx.fillText(c.value, x + 22, cardY + 54)
-    })
-
+    drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics })
     return canvas
   }
+
+  useEffect(() => {
+    if (!open) return
+    const canvas = previewCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    let raf = 0
+    const draw = () => {
+      drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics })
+    }
+    raf = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(raf)
+  }, [open, backgroundImage, zoom, offset.x, offset.y, metrics])
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob)
@@ -380,52 +426,28 @@ export default function StoryComposer({ open, session, onClose }) {
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
             >
-              {backgroundUrl ? (
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    backgroundImage: `url(${backgroundUrl})`,
-                    backgroundSize: `${zoom * 110}%`,
-                    backgroundPosition: `calc(50% + ${(offset.x / 10).toFixed(2)}px) calc(50% + ${(offset.y / 10).toFixed(2)}px)`,
-                    backgroundRepeat: 'no-repeat',
-                    filter: 'contrast(1.05) saturate(1.1)',
-                  }}
-                />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-neutral-950 to-neutral-800" />
-              )}
+              <canvas
+                ref={previewCanvasRef}
+                width={CANVAS_W}
+                height={CANVAS_H}
+                className="absolute inset-0 w-full h-full"
+              />
 
-              <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/0 to-black/70" />
-
-              <div className="absolute top-4 left-4">
-                <div className="text-yellow-500 font-black italic tracking-tighter text-lg leading-none">
-                  IRON<span className="text-white">TRACKS</span>
-                </div>
-              </div>
-
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="text-white font-black text-2xl leading-tight drop-shadow">
-                  {safeString(metrics.title).toUpperCase()}
-                </div>
-                <div className="mt-2 text-white/80 text-xs font-black uppercase tracking-widest">
-                  RELATÓRIO DO TREINO{metrics.date ? ` • ${metrics.date}` : ''}
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <div className="rounded-2xl border border-white/10 bg-black/50 px-3 py-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-white/60">Volume</div>
-                    <div className="text-white font-black text-sm">{Math.round(metrics.volume).toLocaleString('pt-BR')} kg</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/50 px-3 py-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-white/60">Tempo</div>
-                    <div className="text-white font-black text-sm">{formatDuration(metrics.totalTime)}</div>
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-black/50 px-3 py-2">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-white/60">Kcal</div>
-                    <div className="text-white font-black text-sm">{metrics.kcal || 0}</div>
-                  </div>
-                </div>
-              </div>
+              {showSafeGuide ? (
+                <>
+                  <div className="absolute inset-x-0 top-0 bg-black/45" style={{ height: `${(SAFE_TOP / CANVAS_H) * 100}%` }} />
+                  <div className="absolute inset-x-0 bottom-0 bg-black/45" style={{ height: `${(SAFE_BOTTOM / CANVAS_H) * 100}%` }} />
+                  <div
+                    className="absolute border border-yellow-500/60 rounded-2xl pointer-events-none"
+                    style={{
+                      left: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
+                      right: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
+                      top: `${(SAFE_TOP / CANVAS_H) * 100}%`,
+                      bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
+                    }}
+                  />
+                </>
+              ) : null}
             </div>
 
             <div className="w-full max-w-[360px] flex items-center justify-between gap-2">
@@ -470,6 +492,15 @@ export default function StoryComposer({ open, session, onClose }) {
                 </div>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowSafeGuide((v) => !v)}
+              className="h-11 rounded-2xl bg-neutral-950 border border-neutral-800 text-white font-black uppercase tracking-widest text-xs hover:bg-neutral-800"
+              disabled={busy}
+            >
+              {showSafeGuide ? 'Ocultar Safe Area' : 'Mostrar Safe Area'}
+            </button>
 
             {error ? (
               <div className="rounded-2xl border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-200">
