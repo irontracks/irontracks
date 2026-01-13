@@ -132,6 +132,8 @@ export async function POST(req: Request) {
         name, 
         notes, 
         is_template,
+        created_by,
+        user_id,
         exercises (
           id, 
           name, 
