@@ -16,9 +16,11 @@ export async function POST(req: Request) {
     const email = body?.email as string | undefined
 
     let targetUserId = ''
+    let resolvedEmail = String(email || '').trim()
     if (id) {
-      const { data: sById } = await admin.from('students').select('id, user_id').eq('id', id).maybeSingle()
+      const { data: sById } = await admin.from('students').select('id, user_id, email').eq('id', id).maybeSingle()
       if (sById?.user_id) targetUserId = sById.user_id
+      if (!resolvedEmail && sById?.email) resolvedEmail = String(sById.email || '').trim()
       if (!targetUserId) {
         const { data: pById } = await admin.from('profiles').select('id').eq('id', id).maybeSingle()
         if (pById?.id) {
@@ -26,9 +28,9 @@ export async function POST(req: Request) {
         }
       }
     }
-    if (!targetUserId && email) {
-      const { data: profile } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
-      const { data: student } = await admin.from('students').select('id, user_id').ilike('email', email).maybeSingle()
+    if (!targetUserId && resolvedEmail) {
+      const { data: profile } = await admin.from('profiles').select('id').ilike('email', resolvedEmail).maybeSingle()
+      const { data: student } = await admin.from('students').select('id, user_id, email').ilike('email', resolvedEmail).maybeSingle()
       targetUserId = profile?.id || student?.user_id || ''
     }
     if (!targetUserId) return NextResponse.json({ ok: false, error: 'missing target' }, { status: 400 })
@@ -38,7 +40,7 @@ export async function POST(req: Request) {
         const { data: srow } = await admin
           .from('students')
           .select('id, teacher_id, user_id, email')
-          .or(`id.eq.${targetUserId},user_id.eq.${targetUserId}${email ? `,email.ilike.${email}` : ''}`)
+          .or(`id.eq.${targetUserId},user_id.eq.${targetUserId}${resolvedEmail ? `,email.ilike.${resolvedEmail}` : ''}`)
           .maybeSingle()
         if (!srow?.id || srow.teacher_id !== auth.user.id) {
           return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })

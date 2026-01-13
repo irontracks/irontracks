@@ -17,19 +17,21 @@ export async function GET(req: Request) {
 
     // Resolve to profiles.id (auth uid)
     let targetUserId = ''
+    let resolvedEmail = String(email || '').trim()
     if (id) {
-      const { data: sById } = await admin.from('students').select('user_id').eq('id', id).maybeSingle()
+      const { data: sById } = await admin.from('students').select('user_id, email').eq('id', id).maybeSingle()
       targetUserId = sById?.user_id || ''
+      if (!resolvedEmail && sById?.email) resolvedEmail = String(sById.email || '').trim()
       if (!targetUserId) {
         const { data: pById } = await admin.from('profiles').select('id').eq('id', id).maybeSingle()
         targetUserId = pById?.id || ''
       }
     }
-    if (!targetUserId && email) {
-      const { data: pByEmail } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
+    if (!targetUserId && resolvedEmail) {
+      const { data: pByEmail } = await admin.from('profiles').select('id').ilike('email', resolvedEmail).maybeSingle()
       targetUserId = pByEmail?.id || ''
       if (!targetUserId) {
-        const { data: sByEmail } = await admin.from('students').select('user_id').ilike('email', email).maybeSingle()
+        const { data: sByEmail } = await admin.from('students').select('user_id').ilike('email', resolvedEmail).maybeSingle()
         targetUserId = sByEmail?.user_id || ''
       }
     }
