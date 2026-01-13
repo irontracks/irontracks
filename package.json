@@ -11,7 +11,6 @@
     "postversion": "git config user.email \"djmkapple@gmail.com\" && npx vercel --prod"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.87.3",
     "chart.js": "^4.5.1",

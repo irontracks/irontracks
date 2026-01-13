@@ -7,7 +7,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import AdminWorkoutEditor from './AdminWorkoutEditor';
 import { useDialog } from '@/contexts/DialogContext';
-import { sendBroadcastMessage } from '@/actions/admin-actions';
+import { sendBroadcastMessage, registerStudent } from '@/actions/admin-actions';
 import AssessmentButton from '@/components/assessment/AssessmentButton';
 
 const appId = 'irontracks-production';
@@ -15,7 +15,6 @@ const ADMIN_EMAIL = 'djmkapple@gmail.com';
 
 const AdminPanelV2 = ({ user, onClose }) => {
     const { alert, confirm, prompt } = useDialog();
-    const isAdmin = user?.email === ADMIN_EMAIL;
     const [tab, setTab] = useState('dashboard');
     const [usersList, setUsersList] = useState([]);
     const [templates, setTemplates] = useState([]);
@@ -29,7 +28,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     // Register Student State
     const [showRegisterModal, setShowRegisterModal] = useState(false);
-    const [newStudent, setNewStudent] = useState({ name: '', email: '' });
+    const [newStudent, setNewStudent] = useState({ name: '', email: '', password: '' });
     const [registering, setRegistering] = useState(false);
 
     // Student Details State
@@ -42,17 +41,18 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const isSuperAdmin = user.email === ADMIN_EMAIL;
     const supabase = createClient();
 
-    // 1. Fetch Students (students table with RLS)
+    // 1. Fetch Students (Profiles)
     useEffect(() => {
         const fetchStudents = async () => {
-            let query = supabase.from('students').select('id, name, email, teacher_id').order('name');
-            if (!isAdmin) query = query.eq('teacher_id', user.id);
-            const { data, error } = await query;
-            if (error) console.error('Students query error:', error.message);
-            setUsersList(data || []);
+            const { data } = await supabase
+                .from('profiles')
+                .select('*')
+                .neq('email', ADMIN_EMAIL) // Don't list admin
+                .order('display_name');
+            if (data) setUsersList(data);
         };
         fetchStudents();
-    }, [registering, isAdmin, user.id]);
+    }, [registering]); // Refresh list after registering
 
     // 2. Fetch Templates (Admin Workouts)
     useEffect(() => {
@@ -101,14 +101,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
     
     const handleAddTemplateToStudent = async (template) => {
         if (!selectedStudent) return;
-        if (!(await confirm(`Adicionar treino "${template.name}" para ${selectedStudent.name || selectedStudent.display_name}?`))) return;
+        if (!(await confirm(`Adicionar treino "${template.name}" para ${selectedStudent.display_name}?`))) return;
 
         try {
             // Clone Workout
             const { data: newWorkout, error: wError } = await supabase
                 .from('workouts')
                 .insert({
-                    user_id: selectedStudent.user_id || selectedStudent.id,
+                    user_id: selectedStudent.id,
                     name: template.name,
                     notes: template.notes,
                     is_template: true
@@ -187,10 +187,11 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
         try {
             const { error } = await supabase
-                .from('students')
+                .from('profiles')
                 .update({
-                    name: editedStudent.name,
-                    email: editedStudent.email
+                    display_name: editedStudent.display_name,
+                    email: editedStudent.email,
+                    updated_at: new Date()
                 })
                 .eq('id', selectedStudent.id);
 
@@ -199,14 +200,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
             // Atualizar o aluno selecionado
             setSelectedStudent(prev => ({
                 ...prev,
-                name: editedStudent.name,
+                display_name: editedStudent.display_name,
                 email: editedStudent.email
             }));
 
             // Atualizar a lista de alunos
             setUsersList(prev => prev.map(student => 
                 student.id === selectedStudent.id 
-                    ? { ...student, name: editedStudent.name, email: editedStudent.email }
+                    ? { ...student, display_name: editedStudent.display_name, email: editedStudent.email }
                     : student
             ));
 
@@ -237,20 +238,18 @@ const AdminPanelV2 = ({ user, onClose }) => {
     };
 
     const handleRegisterStudent = async () => {
-        if (!newStudent?.name || !newStudent?.email) return await alert('Preencha nome e email.');
+        if (!newStudent.name || !newStudent.email || !newStudent.password) return await alert("Preencha todos os campos.");
+        
         setRegistering(true);
         try {
-            const { data, error } = await supabase
-                .from('students')
-                .insert({ name: newStudent.name, email: newStudent.email, teacher_id: user.id })
-                .select();
-            if (error) throw error;
-            await alert(`Aluno ${newStudent.name} cadastrado com sucesso!`, 'Sucesso');
-            setNewStudent({ name: '', email: '' });
+            const result = await registerStudent(newStudent.email, newStudent.password, newStudent.name);
+            if (result.error) throw new Error(result.error);
+
+            await alert(`Aluno ${newStudent.name} cadastrado com sucesso!`, "Sucesso");
+            setNewStudent({ name: '', email: '', password: '' });
             setShowRegisterModal(false);
-            setUsersList(prev => (data?.[0] ? [data[0], ...prev] : prev));
         } catch (e) {
-            await alert('Erro ao cadastrar: ' + e.message);
+            await alert("Erro ao cadastrar: " + e.message);
         } finally {
             setRegistering(false);
         }
@@ -311,9 +310,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
                         {usersList.map(s => (
                             <div key={s.id} onClick={() => setSelectedStudent(s)} className="bg-neutral-800 p-4 rounded-xl flex items-center gap-4 border border-neutral-700 hover:border-yellow-500 cursor-pointer">
-                                <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-lg text-neutral-300">{(s.name || s.email || '?')[0]}</div>
+                                {s.photo_url ? (
+                                    <Image src={s.photo_url} width={48} height={48} className="rounded-full bg-neutral-700" alt={s.display_name} />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-lg">{s.display_name?.[0]}</div>
+                                )}
                                 <div>
-                                    <h3 className="font-bold text-white">{s.name || s.email}</h3>
+                                    <h3 className="font-bold text-white">{s.display_name}</h3>
                                     <p className="text-xs text-neutral-400">{s.email}</p>
                                 </div>
                             </div>
@@ -390,8 +393,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         <label className="block text-sm font-medium text-neutral-300 mb-2">Nome</label>
                                         <input
                                             type="text"
-                                            value={editedStudent.name || ''}
-                                            onChange={(e) => setEditedStudent(prev => ({ ...prev, name: e.target.value }))}
+                                            value={editedStudent.display_name || ''}
+                                            onChange={(e) => setEditedStudent(prev => ({ ...prev, display_name: e.target.value }))}
                                             className="w-full bg-neutral-900 border border-neutral-600 rounded-lg px-3 py-2 text-white focus:border-yellow-500 focus:outline-none"
                                         />
                                     </div>
@@ -422,9 +425,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </div>
                         ) : (
                             <div className="flex items-center gap-4 mb-6">
-                                <div className="w-16 h-16 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-2xl">{(selectedStudent.name || selectedStudent.display_name || '?')[0]}</div>
+                                {selectedStudent.photo_url ? (
+                                    <Image src={selectedStudent.photo_url} width={64} height={64} className="rounded-full bg-neutral-700" alt={selectedStudent.display_name} />
+                                ) : (
+                                    <div className="w-16 h-16 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-2xl">{selectedStudent.display_name?.[0]}</div>
+                                )}
                                 <div className="flex-1">
-                                    <h2 className="text-2xl font-black text-white">{selectedStudent.name || selectedStudent.display_name}</h2>
+                                    <h2 className="text-2xl font-black text-white">{selectedStudent.display_name}</h2>
                                     <p className="text-neutral-400 text-sm">{selectedStudent.email}</p>
                                 </div>
                                 <button
@@ -525,7 +532,15 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
                                 />
                             </div>
-                            
+                            <div>
+                                <label className="text-xs text-neutral-500 uppercase font-bold">Senha Inicial</label>
+                                <input 
+                                    value={newStudent.password}
+                                    onChange={e => setNewStudent({...newStudent, password: e.target.value})}
+                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    type="text" // Visible for admin convenience
+                                />
+                            </div>
                         </div>
 
                         <div className="flex gap-2 mt-6">
