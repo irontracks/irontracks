@@ -35,10 +35,19 @@ export async function GET(req: Request) {
     }
     if (!targetUserId) return NextResponse.json({ ok: false, error: 'missing target' }, { status: 400 })
 
+    try {
+      const { data: maybeProfile } = await admin.from('profiles').select('id').eq('id', targetUserId).maybeSingle()
+      if (!maybeProfile?.id) {
+        return NextResponse.json({ ok: false, error: 'Aluno sem conta (user_id).' }, { status: 400 })
+      }
+    } catch {
+      return NextResponse.json({ ok: false, error: 'Falha ao validar aluno' }, { status: 400 })
+    }
+
     const { data: rows } = await admin
       .from('workouts')
       .select('*, exercises(*, sets(*))')
-      .or(`user_id.eq.${targetUserId},student_id.eq.${targetUserId}`)
+      .eq('user_id', targetUserId)
       .eq('is_template', true)
       .order('name')
 

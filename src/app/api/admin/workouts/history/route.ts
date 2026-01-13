@@ -26,7 +26,6 @@ export async function GET(req: Request) {
         const { data: pById } = await admin.from('profiles').select('id').eq('id', id).maybeSingle()
         targetUserId = pById?.id || ''
       }
-      if (!targetUserId) targetUserId = id
     }
 
     if (!targetUserId && email) {
@@ -45,7 +44,7 @@ export async function GET(req: Request) {
       .from('workouts')
       .select('*')
       .eq('is_template', false)
-      .or(`user_id.eq.${targetUserId},student_id.eq.${targetUserId}`)
+      .eq('user_id', targetUserId)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(200)

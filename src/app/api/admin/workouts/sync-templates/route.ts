@@ -19,7 +19,6 @@ export async function POST(req: Request) {
     if (id) {
       const { data: sById } = await admin.from('students').select('id, user_id').eq('id', id).maybeSingle()
       if (sById?.user_id) targetUserId = sById.user_id
-      if (!targetUserId && sById?.id) targetUserId = sById.id
       if (!targetUserId) {
         const { data: pById } = await admin.from('profiles').select('id').eq('id', id).maybeSingle()
         if (pById?.id) {
@@ -49,11 +48,17 @@ export async function POST(req: Request) {
       }
     }
 
-    let isAuthUser = false
     try {
       const { data: maybeProfile } = await admin.from('profiles').select('id').eq('id', targetUserId).maybeSingle()
-      isAuthUser = !!maybeProfile?.id
-    } catch {}
+      if (!maybeProfile?.id) {
+        return NextResponse.json(
+          { ok: false, error: 'Aluno sem conta (user_id). Não é possível sincronizar.' },
+          { status: 400 },
+        )
+      }
+    } catch {
+      return NextResponse.json({ ok: false, error: 'Falha ao validar aluno' }, { status: 400 })
+    }
 
     const sourceUserId = auth.user.id
 
@@ -222,7 +227,7 @@ export async function POST(req: Request) {
     const { data: existing, error: existingErr } = await admin
       .from('workouts')
       .select('id, name, created_by, created_at')
-      .or(`user_id.eq.${targetUserId},student_id.eq.${targetUserId}`)
+      .eq('user_id', targetUserId)
       .eq('is_template', true)
     if (existingErr) {
       return NextResponse.json({ ok: false, error: existingErr.message, debug: { targetUserId } }, { status: 400 })
@@ -417,7 +422,7 @@ export async function POST(req: Request) {
     const { data: rows } = await admin
       .from('workouts')
       .select('*, exercises(*, sets(*))')
-      .or(`user_id.eq.${targetUserId},student_id.eq.${targetUserId}`)
+      .eq('user_id', targetUserId)
       .eq('is_template', true)
       .order('name')
 

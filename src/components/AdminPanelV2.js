@@ -743,22 +743,22 @@ const AdminPanelV2 = ({ user, onClose }) => {
         if (!selectedStudent) return;
         const fetchDetails = async () => {
             setLoading(true);
-            let targetId = selectedStudent.user_id || selectedStudent.id;
-            if (!targetId && selectedStudent.email) {
+            let targetUserId = selectedStudent.user_id || '';
+            if (!targetUserId && selectedStudent.email) {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('id')
                     .eq('email', selectedStudent.email)
                     .maybeSingle();
-                targetId = profile?.id || targetId;
+                targetUserId = profile?.id || targetUserId;
             }
             try {
-                const key = selectedStudent?.id || selectedStudent?.email || targetId;
+                const key = selectedStudent?.id || selectedStudent?.email || targetUserId;
                 if (key && !loadedStudentInfo.current.has(key)) {
                     const resp = await fetch('/api/admin/students/list');
                     const js = await resp.json();
                     if (js.ok) {
-                        const row = (js.students || []).find(s => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetId)) || ((s.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase()));
+                        const row = (js.students || []).find(s => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || ((s.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase()));
                         if (row) {
                             const nextTeacher = row.teacher_id || null;
                             const nextUserId = row.user_id || selectedStudent.user_id || null;
@@ -780,31 +780,18 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 }
             } catch {}
             let wData = [];
-            if (isAdmin || isTeacher) {
-                try {
-                    const res = await fetch(`/api/admin/workouts/by-student?${targetId ? `id=${encodeURIComponent(targetId)}` : `email=${encodeURIComponent(selectedStudent.email || '')}`}`);
-                    const json = await res.json();
-                    if (json.ok) wData = json.rows || [];
-                    if ((!wData || wData.length === 0) && selectedStudent.email) {
-                        const res2 = await fetch(`/api/admin/workouts/by-student?email=${encodeURIComponent(selectedStudent.email)}`);
-                        const json2 = await res2.json();
-                        if (json2.ok) wData = json2.rows || [];
-                    }
-                } catch {}
-            } else {
-                const { data } = await supabase
-                    .from('workouts')
-                    .select('*, exercises(*, sets(*))')
-                    .eq('user_id', targetId)
-                    .eq('is_template', true)
-                    .order('name');
-                wData = data || [];
-            }
+            const { data } = await supabase
+                .from('workouts')
+                .select('*, exercises(*, sets(*))')
+                .eq('user_id', targetUserId)
+                .eq('is_template', true)
+                .order('name');
+            wData = data || [];
 
             wData = (Array.isArray(wData) ? wData : []).filter((w) => w && typeof w === 'object' && w.is_template === true);
             
             const studentDeduped = (wData || []).sort((a,b) => (a.name||'').localeCompare(b.name||''));
-            const synced = (studentDeduped || []).filter(w => (w?.created_by && w.created_by === user.id));
+            const synced = (studentDeduped || []).filter(w => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
             const syncedIds = new Set((synced || []).map(w => w?.id).filter(Boolean));
             const others = (studentDeduped || []).filter(w => !syncedIds.has(w?.id));
             setStudentWorkouts(others || []);
@@ -835,7 +822,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     my = data || [];
                 }
 
-                my = (my || []).filter(w => (w?.user_id === me.id) && (w?.is_template === true) && !w?.student_id);
+                my = (my || []).filter(w => (w?.user_id === me.id) && (w?.is_template === true));
                 
                 // Helper reintroduzido para deduplicação de TEMPLATES (Meus Treinos)
                 const normalizeTitle = (s) => (s || '')
@@ -1007,28 +994,21 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 }
             }
             let refreshed = [];
-            if (isAdmin || isTeacher) {
-                try {
-                    const res = await fetch(`/api/admin/workouts/by-student?${targetId ? `id=${encodeURIComponent(targetId)}` : `email=${encodeURIComponent(selectedStudent.email || '')}`}`);
-                    const json = await res.json();
-                    if (json.ok) refreshed = json.rows || [];
-                    if ((!refreshed || refreshed.length === 0) && selectedStudent.email) {
-                        const res2 = await fetch(`/api/admin/workouts/by-student?email=${encodeURIComponent(selectedStudent.email)}`);
-                        const json2 = await res2.json();
-                        if (json2.ok) refreshed = json2.rows || [];
-                    }
-                } catch {}
-            } else {
-                const { data } = await supabase
-                    .from('workouts')
-                    .select('*, exercises(*, sets(*))')
-                    .eq('user_id', targetId)
-                    .eq('is_template', true)
-                    .order('name');
-                refreshed = data || [];
-            }
+            const targetUserId = selectedStudent.user_id || '';
+            if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
+            const { data } = await supabase
+                .from('workouts')
+                .select('*, exercises(*, sets(*))')
+                .eq('user_id', targetUserId)
+                .eq('is_template', true)
+                .order('name');
+            refreshed = data || [];
             refreshed = (Array.isArray(refreshed) ? refreshed : []).filter((w) => w && typeof w === 'object' && w.is_template === true);
-            setStudentWorkouts(refreshed || []);
+            const synced = (refreshed || []).filter(w => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
+            const syncedIds = new Set((synced || []).map(w => w?.id).filter(Boolean));
+            const others = (refreshed || []).filter(w => !syncedIds.has(w?.id));
+            setStudentWorkouts(others || []);
+            setSyncedWorkouts(synced || []);
             await alert('Treino enviado com sucesso!', 'Sucesso');
         } catch (e) {
             await alert('Erro ao enviar: ' + (e?.message ?? String(e)));
@@ -2373,8 +2353,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
                                 {templates.length > 0 && (
                                     <button onClick={async () => {
-                                            const targetId = selectedStudent.user_id || selectedStudent.id;
                                             try {
+                                                const targetHint = selectedStudent.user_id || selectedStudent.id;
                                                 const normalize = (s) => (s || '')
                                                     .toLowerCase()
                                                     .normalize('NFD')
@@ -2393,13 +2373,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             const res = await fetch('/api/admin/workouts/sync-templates', {
                                                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({
-                                                    id: targetId,
+                                                    id: targetHint,
                                                     email: selectedStudent.email || '',
                                                     mode: 'all'
                                                 })
                                             })
                                             const json = await res.json();
                                             if (json.ok) {
+                                                const resolvedTargetUserId = String(json?.debug?.targetUserId || selectedStudent.user_id || '').trim();
                                                 // Se rota retorna vazio, reforçar fetch direto por OR user_id/student_id
                                                 let rows = json.rows || [];
                                                 if (!rows || rows.length === 0) {
@@ -2407,15 +2388,16 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                         const { data: refreshed } = await supabase
                                                             .from('workouts')
                                                             .select('*, exercises(*, sets(*))')
-                                                            .or(`user_id.eq.${targetId},student_id.eq.${targetId}`)
+                                                            .eq('user_id', resolvedTargetUserId)
                                                             .eq('is_template', true)
                                                             .order('name');
                                                         rows = refreshed || [];
                                                     } catch {}
                                                 }
-                                                const synced = (rows || []).filter(w => (w?.is_template && (w?.created_by === user.id)))
+                                                const scoped = (rows || []).filter(w => String(w?.user_id || '') === resolvedTargetUserId)
+                                                const synced = (scoped || []).filter(w => (w?.is_template && String(w?.created_by || '') === String(user.id)))
                                                 const syncedIds = new Set((synced || []).map(w => w?.id).filter(Boolean));
-                                                const others = (rows || []).filter(w => !syncedIds.has(w?.id));
+                                                const others = (scoped || []).filter(w => !syncedIds.has(w?.id));
                                                 setStudentWorkouts(others)
                                                 setSyncedWorkouts(synced)
                                                 const msg = `Sincronização contínua ativada: ${json.created_count || 0} criado(s), ${json.updated_count || 0} atualizado(s)`
@@ -2580,13 +2562,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     initialData={editingStudentWorkout}
                                     onSave={async (data) => {
                                         try {
-                                            const targetId = selectedStudent.user_id || selectedStudent.id;
+                                            const targetUserId = selectedStudent.user_id || '';
+                                            if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
                                             if (editingStudentWorkout.id) {
                                                 await updateWorkout(editingStudentWorkout.id, data);
                                             } else {
                                             const { data: nw } = await supabase
                                                 .from('workouts')
-                                                .insert({ user_id: targetId, name: data.title || 'Novo Treino', notes: '', created_by: user.id, is_template: true })
+                                                .insert({ user_id: targetUserId, name: data.title || 'Novo Treino', notes: '', created_by: user.id, is_template: true })
                                                 .select()
                                                 .single();
                                                 const toInsert = (data.exercises || []).map(e => ({
@@ -2606,10 +2589,15 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 const { data: refreshed } = await supabase
                     .from('workouts')
                     .select('*, exercises(*, sets(*))')
-                    .or(`user_id.eq.${targetId},student_id.eq.${targetId}`)
+                    .eq('user_id', targetUserId)
                     .eq('is_template', true)
                     .order('name');
-                setStudentWorkouts(refreshed || []);
+                const list = refreshed || [];
+                const synced = (list || []).filter(w => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
+                const syncedIds = new Set((synced || []).map(w => w?.id).filter(Boolean));
+                const others = (list || []).filter(w => !syncedIds.has(w?.id));
+                setStudentWorkouts(others || []);
+                setSyncedWorkouts(synced || []);
                 setEditingStudentWorkout(null);
             } catch (e) { await alert('Erro ao salvar: ' + (e?.message ?? String(e))); }
                                     }}
