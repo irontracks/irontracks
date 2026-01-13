@@ -34,12 +34,6 @@ const selectTemplate = `
 
 const safeArray = <T>(v: any): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
-const normalizeName = (name: string) =>
-  String(name || '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-
 const sortByOrder = (rows: any[]) =>
   rows.slice().sort((a, b) => (Number(a?.order) || 0) - (Number(b?.order) || 0))
 
@@ -212,7 +206,6 @@ export async function syncAllTemplatesToSubscriber({
   let query = admin
     .from('workouts')
     .select(selectTemplate)
-    .eq('is_template', true)
     .or(`user_id.eq.${sourceUserId},created_by.eq.${sourceUserId}`)
     .order('name')
   if (supportsSourceWorkoutId) query = query.is('source_workout_id', null)
@@ -220,11 +213,16 @@ export async function syncAllTemplatesToSubscriber({
 
   if (error) return { created: 0, updated: 0, failed: 0 }
 
+  const syncable = safeArray<any>(templates).filter((t) => {
+    const exCount = Array.isArray(t?.exercises) ? t.exercises.length : 0
+    return t?.is_template === true || exCount > 0
+  })
+
   let created = 0
   let updated = 0
   let failed = 0
 
-  for (const t of safeArray<any>(templates)) {
+  for (const t of syncable) {
     try {
       const up = await upsertSyncedWorkout({ admin, sourceUserId, targetUserId, template: t })
       if (!up?.workoutId) {
@@ -267,11 +265,12 @@ export async function syncTemplateToSubscribers({
     .from('workouts')
     .select(selectTemplate)
     .eq('id', sourceWorkoutId)
-    .eq('is_template', true)
     .or(`user_id.eq.${sourceUserId},created_by.eq.${sourceUserId}`)
     .maybeSingle()
 
   if (!template?.id) return { created: 0, updated: 0, failed: 0 }
+  const exCount = Array.isArray(template?.exercises) ? template.exercises.length : 0
+  if (template?.is_template !== true && exCount === 0) return { created: 0, updated: 0, failed: 0 }
 
   let created = 0
   let updated = 0

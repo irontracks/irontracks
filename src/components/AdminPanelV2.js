@@ -2429,7 +2429,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             } else {
                                                 const d = json?.debug || null
                                                 if (d) {
-                                                    const extra = `\n\nDiagnóstico:\n- authUserId: ${d.authUserId || '-'}\n- sourceUserId: ${d.sourceUserId || '-'}\n- syncMode: ${d.syncMode || '-'}\n- owner_raw: ${d.owner_raw_count ?? '-'}\n- owner_owned: ${d.owner_owned_count ?? '-'}\n- owner_matched: ${d.owner_matched_count ?? '-'}`
+                                                    const sample = Array.isArray(d.owner_sample_names) ? d.owner_sample_names.slice(0, 3).join(' | ') : '-'
+                                                    const extra = `\n\nDiagnóstico:\n- authUserId: ${d.authUserId || '-'}\n- sourceUserId: ${d.sourceUserId || '-'}\n- syncMode: ${d.syncMode || '-'}\n- owner_raw: ${d.owner_raw_count ?? '-'}\n- owner_owned: ${d.owner_owned_count ?? '-'}\n- owner_matched: ${d.owner_matched_count ?? '-'}\n- sample: ${sample}`
                                                     await alert('Erro: ' + (json.error || 'Falha ao sincronizar') + extra)
                                                 } else {
                                                     await alert('Erro: ' + (json.error || 'Falha ao sincronizar'))

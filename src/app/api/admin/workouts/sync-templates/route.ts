@@ -172,16 +172,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: ownerErr.message, debug: { sourceUserId } }, { status: 400 })
     }
 
-    const isOwnedTemplate = (t: any) => {
+    const isOwnedSyncable = (t: any) => {
       if (!t || typeof t !== 'object') return false
-      if (t?.is_template !== true) return false
       const cb = String(t?.created_by || '')
       const uid = String(t?.user_id || '')
-      return cb === String(sourceUserId) || uid === String(sourceUserId)
+      const owned = cb === String(sourceUserId) || uid === String(sourceUserId)
+      if (!owned) return false
+      const exCount = Array.isArray(t?.exercises) ? t.exercises.length : 0
+      return t?.is_template === true || exCount > 0
     }
 
-    const providedOwned = (providedTemplatesRaw || []).filter(isOwnedTemplate)
-    const ownerOwned = (ownerTemplatesRaw || []).filter(isOwnedTemplate)
+    const providedOwned = (providedTemplatesRaw || []).filter(isOwnedSyncable)
+    const ownerOwned = (ownerTemplatesRaw || []).filter(isOwnedSyncable)
 
     const providedMatched = syncMode === 'all' ? providedOwned : providedOwned.filter((t: any) => matchesGroup(t?.name || ''))
     const ownerMatched = syncMode === 'all' ? ownerOwned : ownerOwned.filter((t: any) => matchesGroup(t?.name || ''))
@@ -206,6 +208,7 @@ export async function POST(req: Request) {
             provided_raw_count: (providedTemplatesRaw || []).length,
             provided_owned_count: providedOwned.length,
             provided_matched_count: providedMatched.length,
+            owner_sample_names: (ownerTemplatesRaw || []).map((t: any) => t?.name || '').filter(Boolean).slice(0, 5),
             letters,
             syncMode,
           },
