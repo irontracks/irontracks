@@ -1,7 +1,7 @@
 'use server';
 
-import { createClient } from '@/utils/supabase/server';
-import { createAdminClient } from '@/utils/supabase/admin';
+import { createClient } from '../utils/supabase/server';
+import { createAdminClient } from '../utils/supabase/admin.js';
 import { revalidatePath } from 'next/cache';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 const parseTrainingNumber = (v) => {
