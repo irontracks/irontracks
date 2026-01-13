@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
+import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 
 export const dynamic = 'force-dynamic'
 
@@ -92,6 +93,9 @@ export async function POST(req: Request) {
 
     const letters = namesArr.map((x) => x[0]).filter(Boolean)
 
+    const modeRaw = String((body as any)?.mode || '').toLowerCase().trim()
+    const syncMode: 'all' | 'letters' = modeRaw === 'all' ? 'all' : 'letters'
+
     const templateIds: string[] = Array.isArray((body as any)?.template_ids)
       ? (body as any).template_ids
           .map((x: any) => String(x || '').trim())
@@ -163,7 +167,9 @@ export async function POST(req: Request) {
             weight,
             reps,
             rpe,
-            set_number
+            set_number,
+            is_warmup,
+            advanced_config
           )
         )
       `
@@ -188,23 +194,45 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: ownerErr.message, debug: { sourceUserId } }, { status: 400 })
     }
 
-    const providedMatched = (providedTemplatesRaw || []).filter((t: any) => matchesGroup(t?.name || ''))
-    const ownerMatched = (ownerTemplatesRaw || []).filter((t: any) => matchesGroup(t?.name || ''))
+    const isOwnedTemplate = (t: any) => {
+      if (!t || typeof t !== 'object') return false
+      if (t?.is_template !== true) return false
+      const cb = String(t?.created_by || '')
+      const uid = String(t?.user_id || '')
+      return cb === String(sourceUserId) || uid === String(sourceUserId)
+    }
+
+    const providedOwned = (providedTemplatesRaw || []).filter(isOwnedTemplate)
+    const ownerOwned = (ownerTemplatesRaw || []).filter(isOwnedTemplate)
+
+    const providedMatched = syncMode === 'all' ? providedOwned : providedOwned.filter((t: any) => matchesGroup(t?.name || ''))
+    const ownerMatched = syncMode === 'all' ? ownerOwned : ownerOwned.filter((t: any) => matchesGroup(t?.name || ''))
 
     let sourceMode: 'provided' | 'owner' | 'global' = providedMatched.length > 0 ? 'provided' : 'owner'
     let sourceRows: any[] = providedMatched.length > 0 ? providedMatched : ownerMatched
     if (sourceRows.length === 0) {
-      const nameOr = buildNameOr(letters)
-      const { data: globalTemplatesRaw, error: globalErr } = await admin
-        .from('workouts')
-        .select(selectTpl)
-        .eq('is_template', true)
-        .or(nameOr || 'id.neq.00000000-0000-0000-0000-000000000000')
-      if (globalErr) {
-        return NextResponse.json({ ok: false, error: globalErr.message, debug: { sourceUserId, nameOr } }, { status: 400 })
-      }
-      sourceMode = 'global'
-      sourceRows = (globalTemplatesRaw || []).filter((t: any) => matchesGroup(t?.name || ''))
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            syncMode === 'all'
+              ? 'Nenhum template seu encontrado para sincronizar.'
+              : 'Nenhum template seu encontrado no padrão (Treino A/B/C...).',
+          debug: {
+            sourceUserId,
+            source_mode: sourceMode,
+            owner_raw_count: (ownerTemplatesRaw || []).length,
+            owner_owned_count: ownerOwned.length,
+            owner_matched_count: ownerMatched.length,
+            provided_raw_count: (providedTemplatesRaw || []).length,
+            provided_owned_count: providedOwned.length,
+            provided_matched_count: providedMatched.length,
+            letters,
+            syncMode,
+          },
+        },
+        { status: 400 },
+      )
     }
 
     const { data: existing, error: existingErr } = await admin
@@ -281,109 +309,124 @@ export async function POST(req: Request) {
       if (k && v?.id) existingMap.set(k, v)
     }
 
+    try {
+      await admin
+        .from('workout_sync_subscriptions')
+        .upsert(
+          { source_user_id: sourceUserId, target_user_id: targetUserId, active: true },
+          { onConflict: 'source_user_id,target_user_id' },
+        )
+    } catch {}
+
     let created = 0
     let updated = 0
     let failed = 0
 
-    for (const t of teacherTemplatesList) {
-      const tName = normalizeName(t.name || '')
-      if (!tName) continue
-      const targetWorkout = existingMap.get(tName)
-      const exs = Array.isArray(t?.exercises) ? t.exercises.filter((x: any) => x && typeof x === 'object') : []
+    if (syncMode === 'all') {
+      const res = await syncAllTemplatesToSubscriber({ sourceUserId, targetUserId })
+      created = res?.created ?? 0
+      updated = res?.updated ?? 0
+      failed = res?.failed ?? 0
+    } else {
+      for (const t of teacherTemplatesList) {
+        const tName = normalizeName(t.name || '')
+        if (!tName) continue
+        const targetWorkout = existingMap.get(tName)
+        const exs = Array.isArray(t?.exercises) ? t.exercises.filter((x: any) => x && typeof x === 'object') : []
 
-      try {
-        if (targetWorkout) {
-          await admin.from('workouts').update({ notes: t.notes, is_template: true }).eq('id', targetWorkout.id)
+        try {
+          if (targetWorkout) {
+            await admin.from('workouts').update({ notes: t.notes, is_template: true }).eq('id', targetWorkout.id)
 
-          const { data: oldExs } = await admin.from('exercises').select('id').eq('workout_id', targetWorkout.id)
-          const oldExIds = (oldExs || []).map((x: any) => x?.id).filter(Boolean)
-          if (oldExIds.length > 0) {
-            await admin.from('sets').delete().in('exercise_id', oldExIds)
-          }
-          await admin.from('exercises').delete().eq('workout_id', targetWorkout.id)
+            const { data: oldExs } = await admin.from('exercises').select('id').eq('workout_id', targetWorkout.id)
+            const oldExIds = (oldExs || []).map((x: any) => x?.id).filter(Boolean)
+            if (oldExIds.length > 0) {
+              await admin.from('sets').delete().in('exercise_id', oldExIds)
+            }
+            await admin.from('exercises').delete().eq('workout_id', targetWorkout.id)
 
-          for (const e of exs) {
-            const { data: newEx } = await admin
-              .from('exercises')
+            for (const e of exs) {
+              const { data: newEx } = await admin
+                .from('exercises')
+                .insert({
+                  workout_id: targetWorkout.id,
+                  name: e.name || '',
+                  notes: e.notes || '',
+                  rest_time: e.rest_time ?? 60,
+                  video_url: e.video_url || '',
+                  method: e.method || 'Normal',
+                  cadence: e.cadence || '2020',
+                  order: e.order ?? 0,
+                })
+                .select()
+                .single()
+
+              const sets = Array.isArray(e?.sets) ? e.sets : []
+              if (newEx?.id && sets.length > 0) {
+                const newSets = sets.map((s: any) => ({
+                  exercise_id: newEx.id,
+                  weight: s.weight ?? null,
+                  reps: s.reps ?? null,
+                  rpe: s.rpe ?? null,
+                  set_number: s.set_number ?? 1,
+                  completed: false,
+                }))
+                await admin.from('sets').insert(newSets)
+              }
+            }
+            updated++
+          } else {
+            const { data: nw, error: wErr } = await admin
+              .from('workouts')
               .insert({
-                workout_id: targetWorkout.id,
-                name: e.name || '',
-                notes: e.notes || '',
-                rest_time: e.rest_time ?? 60,
-                video_url: e.video_url || '',
-                method: e.method || 'Normal',
-                cadence: e.cadence || '2020',
-                order: e.order ?? 0,
+                user_id: targetUserId || null,
+                name: t.name,
+                notes: t.notes,
+                created_by: sourceUserId,
+                is_template: true,
               })
               .select()
               .single()
 
-            const sets = Array.isArray(e?.sets) ? e.sets : []
-            if (newEx?.id && sets.length > 0) {
-              const newSets = sets.map((s: any) => ({
-                exercise_id: newEx.id,
-                weight: s.weight ?? null,
-                reps: s.reps ?? null,
-                rpe: s.rpe ?? null,
-                set_number: s.set_number ?? 1,
-                completed: false,
-              }))
-              await admin.from('sets').insert(newSets)
+            if (wErr || !nw?.id) {
+              failed++
+              continue
+            }
+            created++
+
+            for (const e of exs) {
+              const { data: newEx } = await admin
+                .from('exercises')
+                .insert({
+                  workout_id: nw.id,
+                  name: e.name || '',
+                  notes: e.notes || '',
+                  rest_time: e.rest_time ?? 60,
+                  video_url: e.video_url || '',
+                  method: e.method || 'Normal',
+                  cadence: e.cadence || '2020',
+                  order: e.order ?? 0,
+                })
+                .select()
+                .single()
+
+              const sets = Array.isArray(e?.sets) ? e.sets : []
+              if (newEx?.id && sets.length > 0) {
+                const newSets = sets.map((s: any) => ({
+                  exercise_id: newEx.id,
+                  weight: s.weight ?? null,
+                  reps: s.reps ?? null,
+                  rpe: s.rpe ?? null,
+                  set_number: s.set_number ?? 1,
+                  completed: false,
+                }))
+                await admin.from('sets').insert(newSets)
+              }
             }
           }
-          updated++
-        } else {
-          const { data: nw, error: wErr } = await admin
-            .from('workouts')
-            .insert({
-              user_id: isAuthUser ? (targetUserId || null) : null,
-              student_id: isAuthUser ? null : (targetUserId || null),
-              name: t.name,
-              notes: t.notes,
-              created_by: auth.user.id,
-              is_template: true,
-            })
-            .select()
-            .single()
-
-          if (wErr || !nw?.id) {
-            failed++
-            continue
-          }
-          created++
-
-          for (const e of exs) {
-            const { data: newEx } = await admin
-              .from('exercises')
-              .insert({
-                workout_id: nw.id,
-                name: e.name || '',
-                notes: e.notes || '',
-                rest_time: e.rest_time ?? 60,
-                video_url: e.video_url || '',
-                method: e.method || 'Normal',
-                cadence: e.cadence || '2020',
-                order: e.order ?? 0,
-              })
-              .select()
-              .single()
-
-            const sets = Array.isArray(e?.sets) ? e.sets : []
-            if (newEx?.id && sets.length > 0) {
-              const newSets = sets.map((s: any) => ({
-                exercise_id: newEx.id,
-                weight: s.weight ?? null,
-                reps: s.reps ?? null,
-                rpe: s.rpe ?? null,
-                set_number: s.set_number ?? 1,
-                completed: false,
-              }))
-              await admin.from('sets').insert(newSets)
-            }
-          }
+        } catch {
+          failed++
         }
-      } catch {
-        failed++
       }
     }
 
@@ -399,18 +442,19 @@ export async function POST(req: Request) {
       targetUserId,
       letters,
       source_mode: sourceMode,
+      syncMode,
       provided_ids_count: templateIds.length,
       provided_raw_count: (providedTemplatesRaw || []).length,
       provided_matched_count: providedMatched.length,
       owner_raw_count: (ownerTemplatesRaw || []).length,
       owner_matched_count: ownerMatched.length,
       source_count: sourceRows.length,
-      picked_count: teacherTemplatesList.length,
+      picked_count: syncMode === 'all' ? sourceRows.length : teacherTemplatesList.length,
       failed_count: failed,
       dedup_deleted_count: dedup_deleted,
       owner_sample_names: (ownerTemplatesRaw || []).map((t: any) => t?.name || '').filter(Boolean).slice(0, 10),
       source_sample_names: (sourceRows || []).map((t: any) => t?.name || '').filter(Boolean).slice(0, 10),
-      picked_names: teacherTemplatesList.map((t: any) => t?.name || '').filter(Boolean),
+      picked_names: (syncMode === 'all' ? sourceRows : teacherTemplatesList).map((t: any) => t?.name || '').filter(Boolean),
     }
 
     return NextResponse.json({ ok: true, created_count: created, updated_count: updated, rows: rows || [], debug })

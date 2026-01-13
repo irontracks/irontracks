@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { deleteTemplateFromSubscribers, syncTemplateToSubscribers } from '@/lib/workoutSync';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseTrainingNumber, parseTrainingNumberOrZero } from '@/utils/trainingNumber';
 
@@ -1178,8 +1179,12 @@ export async function createWorkout(data) {
             }
         }
 
-        if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
+    if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
     }
+
+    try {
+        await syncTemplateToSubscribers({ sourceUserId: user.id, sourceWorkoutId: workout.id });
+    } catch {}
 
     revalidatePath('/');
     return workout;
@@ -1256,8 +1261,12 @@ export async function updateWorkout(id, data) {
             }
         }
 
-        if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
+    if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
     }
+
+    try {
+        await syncTemplateToSubscribers({ sourceUserId: user.id, sourceWorkoutId: id });
+    } catch {}
 
     revalidatePath('/');
     return { success: true };
@@ -1272,7 +1281,7 @@ export async function deleteWorkout(id) {
 
     // SECURITY: Ensure user owns the workout before deletion attempt
     // Although RLS should handle this, double-check in logic prevents accidental calls
-    const { data: workout } = await supabase.from('workouts').select('user_id').eq('id', id).single();
+    const { data: workout } = await supabase.from('workouts').select('user_id, is_template').eq('id', id).single();
     if (!workout) return { success: false, error: 'Workout not found' };
     
     // Strict Ownership Check
@@ -1292,6 +1301,10 @@ export async function deleteWorkout(id) {
     const { error } = await supabase.from('workouts').delete().eq('id', id).eq('user_id', user.id);
     if (error) throw error;
     
+    try {
+        if (workout?.is_template) await deleteTemplateFromSubscribers({ sourceUserId: user.id, sourceWorkoutId: id });
+    } catch {}
+
     revalidatePath('/');
     return { success: true };
 }

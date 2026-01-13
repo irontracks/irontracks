@@ -2390,38 +2390,12 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 if (m2 && m2[1]) return m2[1];
                                                 return null;
                                             };
-                                            const matchesLetter = (rawName, letterRaw) => {
-                                                const nn = normalize(rawName);
-                                                const letter = String(letterRaw || '').toLowerCase();
-                                                if (!nn || !letter) return false;
-                                                return nn.startsWith(`treino (${letter}`) || nn.startsWith(`treino ${letter}`) || nn.includes(`(${letter})`) || nn.includes(`(${letter} `);
-                                            };
-                                            const pickBest = (rows, letter) => {
-                                                const list = Array.isArray(rows) ? rows : [];
-                                                const candidates = list.filter(r => matchesLetter(r?.name || '', letter));
-                                                candidates.sort((a, b) => ((b?.exercises || []).length - (a?.exercises || []).length));
-                                                return candidates[0] || null;
-                                            };
-                                            let letters = Array.from(new Set(
-                                                (templates || [])
-                                                    .map(t => extractLetter(t?.name || ''))
-                                                    .filter(Boolean)
-                                            ));
-                                            if (!letters.length) {
-                                                letters = ['a', 'b', 'c', 'd', 'e', 'f'];
-                                            }
-
-                                            const picked = letters
-                                                .map(l => pickBest(templates, l))
-                                                .filter(Boolean);
-                                            const templateIds = picked.map(t => t?.id).filter(Boolean);
                                             const res = await fetch('/api/admin/workouts/sync-templates', {
                                                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({
                                                     id: targetId,
                                                     email: selectedStudent.email || '',
-                                                    names: letters.map(l => String(l).toUpperCase()),
-                                                    template_ids: templateIds
+                                                    mode: 'all'
                                                 })
                                             })
                                             const json = await res.json();
@@ -2439,28 +2413,12 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                         rows = refreshed || [];
                                                     } catch {}
                                                 }
-                                                const synced = (rows || []).filter(w => {
-                                                    const nn = (w?.name || '')
-                                                        .toLowerCase()
-                                                        .normalize('NFD')
-                                                        .replace(/[\u0300-\u036f]/g, '')
-                                                        .replace(/\s+/g, ' ')
-                                                        .trim()
-                                                    const okName = (letters || []).some((l) => {
-                                                        const letter = String(l || '').toLowerCase();
-                                                        if (!letter) return false;
-                                                        return nn.startsWith(`treino (${letter}`) ||
-                                                            nn.startsWith(`treino ${letter}`) ||
-                                                            nn.includes(`(${letter})`) ||
-                                                            nn.includes(`(${letter} `);
-                                                    });
-                                                    return okName && (w?.created_by === user.id);
-                                                })
+                                                const synced = (rows || []).filter(w => (w?.is_template && (w?.created_by === user.id)))
                                                 const syncedIds = new Set((synced || []).map(w => w?.id).filter(Boolean));
                                                 const others = (rows || []).filter(w => !syncedIds.has(w?.id));
                                                 setStudentWorkouts(others)
                                                 setSyncedWorkouts(synced)
-                                                const msg = `Sincronizado: ${json.created_count || 0} criado(s), ${json.updated_count || 0} atualizado(s)`
+                                                const msg = `Sincronização contínua ativada: ${json.created_count || 0} criado(s), ${json.updated_count || 0} atualizado(s)`
                                                 if ((json.created_count || 0) + (json.updated_count || 0) === 0 && json.debug) {
                                                     const d = json.debug || {}
                                                     const extra = `\n\nDiagnóstico:\n- sourceUserId: ${d.sourceUserId || '-'}\n- source_mode: ${d.source_mode || '-'}\n- owner_raw: ${d.owner_raw_count ?? '-'}\n- owner_matched: ${d.owner_matched_count ?? '-'}\n- source_count: ${d.source_count ?? '-'}\n- picked: ${d.picked_count ?? '-'}\n- picked_names: ${(d.picked_names || []).slice(0, 3).join(' | ') || '-'}\n- sample: ${(d.source_sample_names || []).slice(0, 3).join(' | ') || '-'}`
