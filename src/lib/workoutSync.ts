@@ -209,7 +209,12 @@ export async function syncAllTemplatesToSubscriber({
   if (!admin) return { created: 0, updated: 0, failed: 0 }
   await detectSupports(admin)
 
-  let query = admin.from('workouts').select(selectTemplate).eq('is_template', true).eq('user_id', sourceUserId).order('name')
+  let query = admin
+    .from('workouts')
+    .select(selectTemplate)
+    .eq('is_template', true)
+    .or(`user_id.eq.${sourceUserId},created_by.eq.${sourceUserId}`)
+    .order('name')
   if (supportsSourceWorkoutId) query = query.is('source_workout_id', null)
   const { data: templates, error } = await query
 
@@ -263,7 +268,7 @@ export async function syncTemplateToSubscribers({
     .select(selectTemplate)
     .eq('id', sourceWorkoutId)
     .eq('is_template', true)
-    .eq('user_id', sourceUserId)
+    .or(`user_id.eq.${sourceUserId},created_by.eq.${sourceUserId}`)
     .maybeSingle()
 
   if (!template?.id) return { created: 0, updated: 0, failed: 0 }

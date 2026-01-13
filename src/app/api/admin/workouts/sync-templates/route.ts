@@ -55,29 +55,7 @@ export async function POST(req: Request) {
       isAuthUser = !!maybeProfile?.id
     } catch {}
 
-    let sourceUserId = auth.user.id
-    try {
-      if (id || email) {
-        let srow: any = null
-        if (id) {
-          const { data } = await admin
-            .from('students')
-            .select('teacher_id, user_id, id, email')
-            .or(`id.eq.${id},user_id.eq.${id}`)
-            .maybeSingle()
-          srow = data || null
-        }
-        if (!srow && email) {
-          const { data } = await admin
-            .from('students')
-            .select('teacher_id, user_id, id, email')
-            .ilike('email', email)
-            .maybeSingle()
-          srow = data || null
-        }
-        if (srow?.teacher_id) sourceUserId = srow.teacher_id
-      }
-    } catch {}
+    const sourceUserId = auth.user.id
 
     const normalizeName = (s: string) =>
       (s || '')
@@ -220,6 +198,7 @@ export async function POST(req: Request) {
               : 'Nenhum template seu encontrado no padrão (Treino A/B/C...).',
           debug: {
             sourceUserId,
+            authUserId: auth.user.id,
             source_mode: sourceMode,
             owner_raw_count: (ownerTemplatesRaw || []).length,
             owner_owned_count: ownerOwned.length,

@@ -2427,7 +2427,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     await alert(msg)
                                                 }
                                             } else {
-                                                await alert('Erro: ' + (json.error || 'Falha ao sincronizar'))
+                                                const d = json?.debug || null
+                                                if (d) {
+                                                    const extra = `\n\nDiagnóstico:\n- authUserId: ${d.authUserId || '-'}\n- sourceUserId: ${d.sourceUserId || '-'}\n- syncMode: ${d.syncMode || '-'}\n- owner_raw: ${d.owner_raw_count ?? '-'}\n- owner_owned: ${d.owner_owned_count ?? '-'}\n- owner_matched: ${d.owner_matched_count ?? '-'}`
+                                                    await alert('Erro: ' + (json.error || 'Falha ao sincronizar') + extra)
+                                                } else {
+                                                    await alert('Erro: ' + (json.error || 'Falha ao sincronizar'))
+                                                }
                                             }
                                         } catch (e) { await alert('Erro ao sincronizar: ' + (e?.message ?? String(e))) }
                                     }} className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-lg text-xs font-bold">Sincronizar com Meus Treinos</button>
