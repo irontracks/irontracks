@@ -5,6 +5,7 @@ import { buildReportHTML } from '@/utils/report/buildHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { createClient } from '@/utils/supabase/client';
+import StoryComposer from '@/components/StoryComposer';
 
 const parseSessionNotes = (notes) => {
     try {
@@ -58,6 +59,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const reportRef = useRef();
     const [isGenerating, setIsGenerating] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
+    const [showStory, setShowStory] = useState(false);
     const [pdfUrl, setPdfUrl] = useState(null);
     const [pdfBlob, setPdfBlob] = useState(null);
     const pdfFrameRef = useRef(null);
@@ -448,6 +450,13 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                         </div>
                     )}
                 </div>
+                <button
+                    type="button"
+                    onClick={() => { setShowExportMenu(false); setShowStory(true); }}
+                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-3 py-2 rounded-xl font-bold shadow-lg inline-flex items-center gap-2"
+                >
+                    <span className="text-xs">Story</span>
+                </button>
                 <button onClick={onClose} className="bg-white text.black px-3 py-2 rounded-xl font-bold shadow-lg inline-flex items-center gap-2">
                     <ArrowLeft size={18} />
                     <span className="text-xs">Voltar</span>
@@ -823,6 +832,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                     </div>
                 </div>
             )}
+            <StoryComposer open={showStory} session={session} onClose={() => setShowStory(false)} />
         </div>
     );
 };
