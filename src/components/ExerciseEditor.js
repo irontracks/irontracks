@@ -647,124 +647,62 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             }
 
 			if (onSave) {
-				 await onSave({ ...workout, created_by: user.id, user_id: user.id });
+				 const res = await onSave({ ...workout, created_by: user.id, user_id: user.id });
+				 const sync = res?.sync || null;
+				 if (sync) {
+					const created = Number(sync?.created || 0);
+					const updated = Number(sync?.updated || 0);
+					const failed = Number(sync?.failed || 0);
+					const extra = sync?.error
+						? `\n\nSincronização: falhou (${String(sync.error)})`
+						: `\n\nSincronização: ${updated} atualizado(s), ${created} criado(s)${failed ? `, ${failed} falha(s)` : ''}`;
+					await alert("Treino Salvo com Sucesso!" + extra, "Sucesso");
+					if (typeof onSaved === 'function') onSaved();
+					return;
+				 }
 			} else {
-                 // 1. Create/Update Workout
-                 let workoutId = workout.id;
-                 if (workoutId) {
-                     const { error } = await supabase.from('workouts').update({
-                         name: workout.title,
-                         notes: workout.notes,
-                         created_by: user.id 
-                     }).eq('id', workoutId);
-                     if (error) throw error;
-                 } else {
-                     const { data: newW, error } = await supabase.from('workouts').insert({
-                         user_id: user.id, 
-                         created_by: user.id,
-                         name: workout.title,
-                         is_template: true,
-                         notes: workout.notes
-                     }).select().single();
-                     if (error) throw error;
-                     workoutId = newW.id;
-                 }
-
-                 await supabase.from('exercises').delete().eq('workout_id', workoutId);
-
-                 const exercisesToInsert = (workout.exercises || []).map((ex, idx) => ({
-                     workout_id: workoutId,
-                     name: ex.name,
-                     notes: ex.notes,
-                     video_url: ex.videoUrl,
-                     rest_time: ex.restTime,
-                     cadence: ex.cadence,
-                     method: ex.method,
-                     "order": idx
-                 }));
-
-                 if (exercisesToInsert.length > 0) {
-                     const { data: insertedExs, error: exErr } = await supabase.from('exercises').insert(exercisesToInsert).select();
-                     if (exErr) throw exErr;
-
-                    const SETS_INSERT_CHUNK_SIZE = 200;
-                    const chunkArray = (arr, size) => {
-                        const safe = Array.isArray(arr) ? arr : [];
-                        const chunkSize = Math.max(1, Number(size) || 1);
-                        const out = [];
-                        for (let i = 0; i < safe.length; i += chunkSize) out.push(safe.slice(i, i + chunkSize));
-                        return out;
-                    };
-
-                    const insertSetsBulkSafe = async (rows) => {
-                        const chunks = chunkArray(rows, SETS_INSERT_CHUNK_SIZE);
-                        for (const batch of chunks) {
-                            if (!Array.isArray(batch) || batch.length === 0) continue;
-                            const { error } = await supabase.from('sets').insert(batch);
-                            if (!error) continue;
-
-                            const msg = String(error?.message || '').toLowerCase();
-                            const shouldReduce = msg.includes('advanced_config') || msg.includes('is_warmup');
-                            if (!shouldReduce) throw error;
-
-                            const reducedBatch = batch.map((row) => {
-                                if (!row || typeof row !== 'object') return row;
-                                const next = { ...row };
-                                delete next.advanced_config;
-                                return next;
-                            });
-
-                            const { error: reducedErr } = await supabase.from('sets').insert(reducedBatch);
-                            if (!reducedErr) continue;
-
-                            const reducedMsg = String(reducedErr?.message || '').toLowerCase();
-                            if (!reducedMsg.includes('is_warmup')) throw reducedErr;
-
-                            const batchHasWarmup = batch.some((row) => !!(row && typeof row === 'object' && row.is_warmup));
-                            if (batchHasWarmup) {
-                                throw new Error('Seu Supabase não tem a coluna "is_warmup" na tabela "sets". Rode a migration 20251222120000_sets_advanced_logic.sql e tente novamente.');
-                            }
-
-                            const finalBatch = batch.map((row) => {
-                                if (!row || typeof row !== 'object') return row;
-                                const next = { ...row };
-                                delete next.advanced_config;
-                                delete next.is_warmup;
-                                return next;
-                            });
-
-                            const { error: finalErr } = await supabase.from('sets').insert(finalBatch);
-                            if (finalErr) throw finalErr;
-                        }
-                    };
-
-                    const setRows = [];
-                    for (const ex of (insertedExs || [])) {
-                        const original = (typeof ex?.order === 'number' && Array.isArray(workout.exercises))
-                            ? workout.exercises[ex.order]
-                            : (workout.exercises || []).find(e => e?.name === ex.name);
-                        const setDetails = Array.isArray(original?.setDetails)
-                            ? original.setDetails
-                            : (Array.isArray(original?.set_details) ? original.set_details : null);
-                        const numSets = setDetails
-                            ? setDetails.length
-                            : (parseInt(original?.sets) || 0);
-                        for (let i = 0; i < numSets; i += 1) {
-                            const s = setDetails ? setDetails[i] : null;
-                            setRows.push({
-                                exercise_id: ex.id,
-                                reps: s?.reps ?? original?.reps ?? null,
-                                rpe: s?.rpe ?? original?.rpe ?? null,
-                                set_number: s?.set_number ?? (i + 1),
-                                weight: s?.weight ?? null,
-                                is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-                                advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
-                            });
-                        }
+                 const exercisesPayload = (workout.exercises || []).map((ex, idx) => {
+                    const setDetails = Array.isArray(ex?.setDetails)
+                        ? ex.setDetails
+                        : (Array.isArray(ex?.set_details) ? ex.set_details : null);
+                    const headerSets = Number.parseInt(ex?.sets, 10) || 0;
+                    const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0);
+                    const sets = [];
+                    for (let i = 0; i < numSets; i += 1) {
+                        const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null;
+                        sets.push({
+                            weight: s?.weight ?? null,
+                            reps: s?.reps ?? ex?.reps ?? null,
+                            rpe: s?.rpe ?? ex?.rpe ?? null,
+                            set_number: s?.set_number ?? (i + 1),
+                            completed: false,
+                            is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
+                            advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                        });
                     }
+                    return {
+                        name: ex?.name || '',
+                        notes: ex?.notes || '',
+                        video_url: ex?.videoUrl || null,
+                        rest_time: ex?.restTime ?? null,
+                        cadence: ex?.cadence ?? null,
+                        method: ex?.method ?? null,
+                        order: idx,
+                        sets
+                    };
+                 });
 
-                    if (setRows.length > 0) await insertSetsBulkSafe(setRows);
-                 }
+                 const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', {
+                    p_workout_id: workout.id || null,
+                    p_user_id: user.id,
+                    p_created_by: user.id,
+                    p_is_template: true,
+                    p_name: workout.title,
+                    p_notes: workout.notes,
+                    p_exercises: exercisesPayload
+                 });
+                 if (error) throw error;
+                 if (!workoutId) throw new Error('Falha ao salvar treino');
 			}
 			
 			await alert("Treino Salvo com Sucesso!", "Sucesso");

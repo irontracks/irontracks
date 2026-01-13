@@ -68,7 +68,6 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [editingStudentWorkout, setEditingStudentWorkout] = useState(null);
     const [viewWorkout, setViewWorkout] = useState(null);
     const [exportOpen, setExportOpen] = useState(false);
-    const [showImportModal, setShowImportModal] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
     const loadedStudentInfo = useRef(new Set());
     const [systemExporting, setSystemExporting] = useState(false);
@@ -743,12 +742,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
         if (!selectedStudent) return;
         const fetchDetails = async () => {
             setLoading(true);
+            const expectedStudentId = selectedStudent?.id || null;
             let targetUserId = selectedStudent.user_id || '';
             if (!targetUserId && selectedStudent.email) {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('id')
-                    .eq('email', selectedStudent.email)
+                    .ilike('email', selectedStudent.email)
                     .maybeSingle();
                 targetUserId = profile?.id || targetUserId;
             }
@@ -761,10 +761,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         const row = (js.students || []).find(s => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || ((s.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase()));
                         if (row) {
                             const nextTeacher = row.teacher_id || null;
-                            const nextUserId = row.user_id || selectedStudent.user_id || null;
-                            const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== selectedStudent.user_id);
+                            const nextUserId = row.user_id ? String(row.user_id) : '';
+                            const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== String(selectedStudent.user_id || ''));
                             if (shouldUpdate) {
-                                setSelectedStudent(prev => ({ ...prev, teacher_id: nextTeacher, user_id: nextUserId || prev.user_id }));
+                                setSelectedStudent(prev => {
+                                    if (expectedStudentId && prev?.id && String(prev.id) !== String(expectedStudentId)) return prev;
+                                    return { ...prev, teacher_id: nextTeacher, user_id: nextUserId || null };
+                                });
                             }
                         }
                         loadedStudentInfo.current.add(key);
@@ -779,23 +782,29 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     }
                 }
             } catch {}
-            let wData = [];
-            const { data } = await supabase
-                .from('workouts')
-                .select('*, exercises(*, sets(*))')
-                .eq('user_id', targetUserId)
-                .eq('is_template', true)
-                .order('name');
-            wData = data || [];
+            if (targetUserId) {
+                let wData = [];
+                const { data } = await supabase
+                    .from('workouts')
+                    .select('*, exercises(*, sets(*))')
+                    .eq('user_id', targetUserId)
+                    .eq('is_template', true)
+                    .order('name');
+                wData = data || [];
 
-            wData = (Array.isArray(wData) ? wData : []).filter((w) => w && typeof w === 'object' && w.is_template === true);
-            
-            const studentDeduped = (wData || []).sort((a,b) => (a.name||'').localeCompare(b.name||''));
-            const synced = (studentDeduped || []).filter(w => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
-            const syncedIds = new Set((synced || []).map(w => w?.id).filter(Boolean));
-            const others = (studentDeduped || []).filter(w => !syncedIds.has(w?.id));
-            setStudentWorkouts(others || []);
-            setSyncedWorkouts(synced || []);
+                wData = (Array.isArray(wData) ? wData : []).filter((w) => w && typeof w === 'object' && w.is_template === true);
+                
+                const studentDeduped = (wData || []).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+                const synced = (studentDeduped || []).filter(w => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
+                const syncedIds = new Set((synced || []).map(w => w?.id).filter(Boolean));
+                const others = (studentDeduped || []).filter(w => !syncedIds.has(w?.id));
+                setStudentWorkouts(others || []);
+                setSyncedWorkouts(synced || []);
+            } else {
+                setStudentWorkouts([]);
+                setSyncedWorkouts([]);
+                setAssessments([]);
+            }
 
             // Load "Meus Treinos" for assignment list
             const { data: { user: me } } = await supabase.auth.getUser();
@@ -859,12 +868,21 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 const dedupTemplates = Array.from(tMap.values()).sort((a,b) => (a.name||'').localeCompare(b.name||''));
                 setTemplates(dedupTemplates || []);
             }
-            const { data: aData } = await supabase
-                .from('assessments')
-                .select('*')
-                .or(`student_id.eq.${targetId},user_id.eq.${targetId}`)
-                .order('date', { ascending: false });
-            setAssessments(aData || []);
+            if (targetUserId) {
+                const assessmentOrParts = [];
+                if (selectedStudent?.id) assessmentOrParts.push(`student_id.eq.${selectedStudent.id}`);
+                if (targetUserId) assessmentOrParts.push(`user_id.eq.${targetUserId}`);
+                if (assessmentOrParts.length > 0) {
+                    const { data: aData } = await supabase
+                        .from('assessments')
+                        .select('*')
+                        .or(assessmentOrParts.join(','))
+                        .order('date', { ascending: false });
+                    setAssessments(aData || []);
+                } else {
+                    setAssessments([]);
+                }
+            }
             setLoading(false);
         };
         fetchDetails();
@@ -938,13 +956,12 @@ const AdminPanelV2 = ({ user, onClose }) => {
     // Assign template workout to selected student (clone workout and exercises)
     const handleAddTemplateToStudent = async (template) => {
         if (!selectedStudent) return;
-        const targetId = selectedStudent.user_id || selectedStudent.id;
-        if (!targetId && !selectedStudent.email) { await alert('Não foi possível identificar o aluno alvo.'); return; }
+        const targetUserId = selectedStudent.user_id || '';
+        if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
         if (!(await confirm(`Adicionar treino "${template?.name || 'Treino'}" para ${selectedStudent.name || selectedStudent.email}?`))) return;
         try {
             const payload = {
-                user_id: selectedStudent?.user_id ? targetId : null,
-                student_id: selectedStudent?.user_id ? null : targetId,
+                user_id: targetUserId,
                 created_by: user?.id,
                 is_template: true,
                 name: template?.name || '',
@@ -2336,13 +2353,6 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => setShowImportModal(true)}
-                                                className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 text-neutral-200 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-neutral-900 transition-all duration-300 active:scale-95"
-                                            >
-                                                Importar template
-                                            </button>
-                                            <button
-                                                type="button"
                                                 onClick={() => setEditingStudentWorkout({ id: null, title: '', exercises: [] })}
                                                 className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
                                             >
@@ -2354,7 +2364,28 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 {templates.length > 0 && (
                                     <button onClick={async () => {
                                             try {
-                                                const targetHint = selectedStudent.user_id || selectedStudent.id;
+                                                const looksLikeUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || '').trim());
+                                                const maybeId = selectedStudent.user_id || selectedStudent.id || null;
+                                                let payloadId = looksLikeUuid(maybeId) ? String(maybeId) : undefined;
+                                                const payloadEmail = String(selectedStudent.email || '').trim();
+                                                if (!payloadId && payloadEmail) {
+                                                    try {
+                                                        const { data: profile } = await supabase
+                                                            .from('profiles')
+                                                            .select('id')
+                                                            .ilike('email', payloadEmail)
+                                                            .maybeSingle();
+                                                        if (profile?.id) payloadId = String(profile.id);
+                                                    } catch {}
+                                                }
+                                                if (!payloadId && !payloadEmail) {
+                                                    await alert('Aluno sem conta (user_id) e sem email; não é possível sincronizar.');
+                                                    return;
+                                                }
+                                                if (!payloadId && payloadEmail) {
+                                                    await alert('Aluno sem conta (user_id). Não é possível sincronizar.');
+                                                    return;
+                                                }
                                                 const normalize = (s) => (s || '')
                                                     .toLowerCase()
                                                     .normalize('NFD')
@@ -2373,8 +2404,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             const res = await fetch('/api/admin/workouts/sync-templates', {
                                                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({
-                                                    id: targetHint,
-                                                    email: selectedStudent.email || '',
+                                                    id: payloadId,
+                                                    email: payloadEmail,
                                                     mode: 'all'
                                                 })
                                             })
@@ -2486,28 +2517,6 @@ const AdminPanelV2 = ({ user, onClose }) => {
             </div>
         )}
 
-        {showImportModal && (
-            <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowImportModal(false)}>
-                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                        <h3 className="font-bold text-white">Importar Template</h3>
-                        <button onClick={() => setShowImportModal(false)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300"><ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span></button>
-                    </div>
-                    <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto">
-                        {templates.filter(t => t?.is_template === true).length === 0 && (
-                            <p className="text-neutral-500 text-sm">Nenhum template encontrado.</p>
-                        )}
-                        {templates.filter(t => t?.is_template === true).map(t => (
-                            <button key={t.id} onClick={async () => { setShowImportModal(false); await handleAddTemplateToStudent(t); }} className="w-full text-left p-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl border border-neutral-700 flex justify-between group">
-                                <span>{t.name}</span>
-                                <Plus className="text-neutral-500 group-hover:text-yellow-500"/>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        )}
-
                 {editingTemplate && (
                     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingTemplate(null)}>
                         <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -2520,7 +2529,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     initialData={editingTemplate}
                                     onSave={async (data) => {
                                         try {
-                                            await updateWorkout(editingTemplate.id, data);
+                                            const res = await updateWorkout(editingTemplate.id, data);
+                                            const sync = res?.sync || null;
                                             const { data: refreshed } = await supabase
                                                 .from('workouts')
                                                 .select('*, exercises(*, sets(*))')
@@ -2528,6 +2538,17 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 .order('name');
                                             setTemplates(refreshed || []);
                                             setEditingTemplate(null);
+                                            if (sync) {
+                                                const created = Number(sync?.created || 0);
+                                                const updated = Number(sync?.updated || 0);
+                                                const failed = Number(sync?.failed || 0);
+                                                const msg = sync?.error
+                                                    ? `Treino salvo. Sincronização falhou: ${String(sync.error)}`
+                                                    : `Treino salvo. Sincronizados: ${updated} atualizado(s), ${created} criado(s)${failed ? `, ${failed} falha(s)` : ''}.`;
+                                                await alert(msg, 'Sucesso');
+                                            } else {
+                                                await alert('Treino salvo com sucesso!', 'Sucesso');
+                                            }
                                         } catch (e) { await alert('Erro ao salvar: ' + (e?.message ?? String(e))); }
                                     }}
                                     onCancel={() => setEditingTemplate(null)}

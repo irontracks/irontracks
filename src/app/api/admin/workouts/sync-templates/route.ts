@@ -31,6 +31,12 @@ export async function POST(req: Request) {
     if (!targetUserId && resolvedEmail) {
       const { data: profile } = await admin.from('profiles').select('id').ilike('email', resolvedEmail).maybeSingle()
       const { data: student } = await admin.from('students').select('id, user_id, email').ilike('email', resolvedEmail).maybeSingle()
+      if (!profile?.id && student?.id && !student?.user_id) {
+        return NextResponse.json(
+          { ok: false, error: 'Aluno sem conta (user_id). Não é possível sincronizar.' },
+          { status: 400 },
+        )
+      }
       targetUserId = profile?.id || student?.user_id || ''
     }
     if (!targetUserId) return NextResponse.json({ ok: false, error: 'missing target' }, { status: 400 })
@@ -176,19 +182,18 @@ export async function POST(req: Request) {
     const { data: ownerTemplatesRaw, error: ownerErr } = await admin
       .from('workouts')
       .select(selectTpl)
-      .or(`created_by.eq.${sourceUserId},user_id.eq.${sourceUserId}`)
+      .eq('user_id', sourceUserId)
+      .eq('is_template', true)
     if (ownerErr) {
       return NextResponse.json({ ok: false, error: ownerErr.message, debug: { sourceUserId } }, { status: 400 })
     }
 
     const isOwnedSyncable = (t: any) => {
       if (!t || typeof t !== 'object') return false
-      const cb = String(t?.created_by || '')
       const uid = String(t?.user_id || '')
-      const owned = cb === String(sourceUserId) || uid === String(sourceUserId)
+      const owned = uid === String(sourceUserId)
       if (!owned) return false
-      const exCount = Array.isArray(t?.exercises) ? t.exercises.length : 0
-      return t?.is_template === true || exCount > 0
+      return t?.is_template === true
     }
 
     const providedOwned = (providedTemplatesRaw || []).filter(isOwnedSyncable)
@@ -319,6 +324,14 @@ export async function POST(req: Request) {
       updated = res?.updated ?? 0
       failed = res?.failed ?? 0
     } else {
+      let canWriteSourceId = false
+      try {
+        const { error: sErr } = await admin.from('workouts').select('source_workout_id').limit(1)
+        canWriteSourceId = !sErr
+      } catch {
+        canWriteSourceId = false
+      }
+
       for (const t of teacherTemplatesList) {
         const tName = normalizeName(t.name || '')
         if (!tName) continue
@@ -327,7 +340,9 @@ export async function POST(req: Request) {
 
         try {
           if (targetWorkout) {
-            await admin.from('workouts').update({ notes: t.notes, is_template: true }).eq('id', targetWorkout.id)
+            const wUpdate: any = { name: t.name || '', notes: t.notes, is_template: true }
+            if (canWriteSourceId) wUpdate.source_workout_id = t?.id || null
+            await admin.from('workouts').update(wUpdate).eq('id', targetWorkout.id)
 
             const { data: oldExs } = await admin.from('exercises').select('id').eq('workout_id', targetWorkout.id)
             const oldExIds = (oldExs || []).map((x: any) => x?.id).filter(Boolean)

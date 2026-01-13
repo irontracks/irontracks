@@ -1326,12 +1326,14 @@ function IronTracksApp() {
         if (!user || !w || !w.title) return;
         try {
             if (w.id) {
-                await updateWorkout(w.id, w);
+                const res = await updateWorkout(w.id, w);
                 setCurrentWorkout(w);
+                return res;
             } else {
                 const created = await createWorkout(w);
                 const id = created?.id ?? null;
                 setCurrentWorkout({ ...w, id });
+                return created;
             }
         } catch (e) {
             throw e;

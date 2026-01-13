@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,8 +11,7 @@ export async function GET() {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
-    const admin = createAdminClient()
-    const { data, error } = await admin
+    const { data, error } = await supabase
       .from('workouts')
       .select('*, exercises(*, sets(*))')
       .eq('is_template', true)

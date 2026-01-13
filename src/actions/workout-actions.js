@@ -1116,78 +1116,69 @@ export async function createWorkout(data) {
     const user = authData?.user ?? null;
     if (!user) throw new Error('Unauthorized');
 
-    const { data: workout, error } = await supabase
-        .from('workouts')
-        .insert({
-            user_id: user.id,
-            name: String(data?.title ?? ''),
-            notes: String(data?.notes ?? ''),
-            is_template: true,
-            created_by: user.id
-        })
-        .select()
-        .single();
-
-    if (error) throw error;
-
-    // Insert Exercises
     const sourceExercises = Array.isArray(data?.exercises) ? data.exercises : []
-    if (sourceExercises.length > 0) {
-        const exercisesToInsert = sourceExercises
-            .filter((ex) => ex && typeof ex === 'object')
-            .map((ex, idx) => ({
-            workout_id: workout.id,
-            name: String(ex?.name ?? ''),
-            muscle_group: ex?.muscleGroup ?? null,
-            notes: String(ex?.notes ?? ''),
-            video_url: ex?.videoUrl ?? null,
-            rest_time: ex?.restTime ?? null,
-            cadence: ex?.cadence ?? null,
-            method: ex?.method ?? null,
-            "order": idx
-        }));
-
-        const { data: exercises, error: exError } = await supabase
-            .from('exercises')
-            .insert(exercisesToInsert)
-            .select();
-
-        if (exError) throw exError;
-
-        const setRows = [];
-        for (const ex of (exercises || [])) {
-            const originalEx = (typeof ex?.order === 'number' && Array.isArray(data?.exercises))
-                ? (data.exercises[ex.order] || {})
-                : (data.exercises.find(e => e?.name === ex.name) || {});
-            const setDetails = Array.isArray(originalEx?.setDetails)
-                ? originalEx.setDetails
-                : (Array.isArray(originalEx?.set_details) ? originalEx.set_details : null);
-            const headerSets = Number.parseInt(originalEx?.sets, 10) || 0;
+    const exercisesPayload = (sourceExercises || [])
+        .filter((ex) => ex && typeof ex === 'object')
+        .map((ex, idx) => {
+            const setDetails = Array.isArray(ex?.setDetails)
+                ? ex.setDetails
+                : (Array.isArray(ex?.set_details) ? ex.set_details : null);
+            const headerSets = Number.parseInt(ex?.sets, 10) || 0;
             const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0);
-
+            const sets = []
             for (let i = 0; i < numSets; i += 1) {
                 const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null;
-                setRows.push({
-                    exercise_id: ex.id,
-                    reps: s?.reps ?? originalEx?.reps ?? null,
-                    rpe: s?.rpe ?? originalEx?.rpe ?? null,
-                    set_number: s?.set_number ?? (i + 1),
+                sets.push({
                     weight: s?.weight ?? null,
+                    reps: s?.reps ?? ex?.reps ?? null,
+                    rpe: s?.rpe ?? ex?.rpe ?? null,
+                    set_number: s?.set_number ?? (i + 1),
+                    completed: false,
                     is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-                    advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
-                });
+                    advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                })
             }
-        }
+            return {
+                name: String(ex?.name ?? ''),
+                notes: String(ex?.notes ?? ''),
+                video_url: ex?.videoUrl ?? null,
+                rest_time: ex?.restTime ?? null,
+                cadence: ex?.cadence ?? null,
+                method: ex?.method ?? null,
+                order: idx,
+                sets,
+            }
+        });
 
-    if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
+    const { data: workoutId, error: rpcError } = await supabase.rpc('save_workout_atomic', {
+        p_workout_id: null,
+        p_user_id: user.id,
+        p_created_by: user.id,
+        p_is_template: true,
+        p_name: String(data?.title ?? ''),
+        p_notes: String(data?.notes ?? ''),
+        p_exercises: exercisesPayload,
+    })
+    if (rpcError) throw rpcError;
+    if (!workoutId) throw new Error('Falha ao salvar treino');
+
+    const { data: workout, error: readError } = await supabase
+        .from('workouts')
+        .select('*')
+        .eq('id', workoutId)
+        .single();
+    if (readError) throw readError;
+
+    let sync = null;
+    try {
+        const res = await syncTemplateToSubscribers({ sourceUserId: user.id, sourceWorkoutId: workoutId });
+        sync = { created: res?.created ?? 0, updated: res?.updated ?? 0, failed: res?.failed ?? 0 };
+    } catch (e) {
+        sync = { error: e?.message ?? String(e) };
     }
 
-    try {
-        await syncTemplateToSubscribers({ sourceUserId: user.id, sourceWorkoutId: workout.id });
-    } catch {}
-
     revalidatePath('/');
-    return workout;
+    return { ...workout, sync };
 }
 
 export async function updateWorkout(id, data) {
@@ -1197,79 +1188,62 @@ export async function updateWorkout(id, data) {
     const user = authData?.user ?? null;
     if (!user) throw new Error('Unauthorized');
 
-    // Update Workout
-    const { error } = await supabase
-        .from('workouts')
-        .update({
-            name: String(data?.title ?? ''),
-            notes: String(data?.notes ?? '')
-        })
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-    if (error) throw error;
-
-    // For simplicity in this migration: Delete all existing exercises and re-insert.
-    // This is destructive but ensures we match the new state exactly without complex diffing.
-    await supabase.from('exercises').delete().eq('workout_id', id);
-
-    // Re-insert logic (same as create)
     const sourceExercises = Array.isArray(data?.exercises) ? data.exercises : []
-    if (sourceExercises.length > 0) {
-        const exercisesToInsert = sourceExercises
-            .filter((ex) => ex && typeof ex === 'object')
-            .map((ex, idx) => ({
-            workout_id: id,
-            name: String(ex?.name ?? ''),
-            notes: String(ex?.notes ?? ''),
-            video_url: ex?.videoUrl ?? null,
-            rest_time: ex?.restTime ?? null,
-            cadence: ex?.cadence ?? null,
-            method: ex?.method ?? null,
-            "order": idx
-        }));
-
-        const { data: exercises, error: exError } = await supabase
-            .from('exercises')
-            .insert(exercisesToInsert)
-            .select();
-
-        if (exError) throw exError;
-
-        const setRows = [];
-        for (const ex of (exercises || [])) {
-            const originalEx = (typeof ex?.order === 'number' && Array.isArray(data?.exercises))
-                ? (data.exercises[ex.order] || {})
-                : (data.exercises.find(e => e?.name === ex.name) || {});
-            const setDetails = Array.isArray(originalEx?.setDetails)
-                ? originalEx.setDetails
-                : (Array.isArray(originalEx?.set_details) ? originalEx.set_details : null);
-            const headerSets = Number.parseInt(originalEx?.sets, 10) || 0;
+    const exercisesPayload = (sourceExercises || [])
+        .filter((ex) => ex && typeof ex === 'object')
+        .map((ex, idx) => {
+            const setDetails = Array.isArray(ex?.setDetails)
+                ? ex.setDetails
+                : (Array.isArray(ex?.set_details) ? ex.set_details : null);
+            const headerSets = Number.parseInt(ex?.sets, 10) || 0;
             const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0);
-
+            const sets = []
             for (let i = 0; i < numSets; i += 1) {
                 const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null;
-                setRows.push({
-                    exercise_id: ex.id,
-                    reps: s?.reps ?? originalEx?.reps ?? null,
-                    rpe: s?.rpe ?? originalEx?.rpe ?? null,
-                    set_number: s?.set_number ?? (i + 1),
+                sets.push({
                     weight: s?.weight ?? null,
+                    reps: s?.reps ?? ex?.reps ?? null,
+                    rpe: s?.rpe ?? ex?.rpe ?? null,
+                    set_number: s?.set_number ?? (i + 1),
+                    completed: false,
                     is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-                    advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null
-                });
+                    advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                })
             }
-        }
+            return {
+                name: String(ex?.name ?? ''),
+                notes: String(ex?.notes ?? ''),
+                video_url: ex?.videoUrl ?? null,
+                rest_time: ex?.restTime ?? null,
+                cadence: ex?.cadence ?? null,
+                method: ex?.method ?? null,
+                order: idx,
+                sets,
+            }
+        });
 
-    if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
+    const { data: workoutId, error: rpcError } = await supabase.rpc('save_workout_atomic', {
+        p_workout_id: id,
+        p_user_id: user.id,
+        p_created_by: user.id,
+        p_is_template: true,
+        p_name: String(data?.title ?? ''),
+        p_notes: String(data?.notes ?? ''),
+        p_exercises: exercisesPayload,
+    })
+    if (rpcError) throw rpcError;
+    if (!workoutId) throw new Error('Falha ao salvar treino');
+
+    let sync = null;
+    try {
+        const res = await syncTemplateToSubscribers({ sourceUserId: user.id, sourceWorkoutId: workoutId });
+        sync = { created: res?.created ?? 0, updated: res?.updated ?? 0, failed: res?.failed ?? 0 };
+    } catch (e) {
+        sync = { error: e?.message ?? String(e) };
     }
 
-    try {
-        await syncTemplateToSubscribers({ sourceUserId: user.id, sourceWorkoutId: id });
-    } catch {}
-
     revalidatePath('/');
-    return { success: true };
+    return { success: true, sync };
 }
 
 export async function deleteWorkout(id) {

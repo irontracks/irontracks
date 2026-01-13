@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
@@ -16,23 +15,23 @@ export async function GET(req: Request) {
     const id = url.searchParams.get('id') || undefined
     const email = url.searchParams.get('email') || undefined
 
-    const admin = createAdminClient()
+    const supabase = auth.supabase
 
     let targetUserId = ''
     if (id) {
-      const { data: sById } = await admin.from('students').select('user_id').eq('id', id).maybeSingle()
+      const { data: sById } = await supabase.from('students').select('user_id, email').eq('id', id).maybeSingle()
       targetUserId = sById?.user_id || ''
       if (!targetUserId) {
-        const { data: pById } = await admin.from('profiles').select('id').eq('id', id).maybeSingle()
+        const { data: pById } = await supabase.from('profiles').select('id').eq('id', id).maybeSingle()
         targetUserId = pById?.id || ''
       }
     }
 
     if (!targetUserId && email) {
-      const { data: pByEmail } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
+      const { data: pByEmail } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle()
       targetUserId = pByEmail?.id || ''
       if (!targetUserId) {
-        const { data: sByEmail } = await admin.from('students').select('user_id').ilike('email', email).maybeSingle()
+        const { data: sByEmail } = await supabase.from('students').select('user_id').ilike('email', email).maybeSingle()
         targetUserId = sByEmail?.user_id || ''
       }
     }
@@ -40,7 +39,17 @@ export async function GET(req: Request) {
     if (!targetUserId) return NextResponse.json({ ok: false, error: 'missing target' }, { status: 400 })
     if (!looksLikeUuid(targetUserId)) return NextResponse.json({ ok: false, error: 'invalid target' }, { status: 400 })
 
-    const { data: rows } = await admin
+    if (auth.role === 'teacher') {
+      const { data: link } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', targetUserId)
+        .eq('teacher_id', auth.user.id)
+        .maybeSingle()
+      if (!link?.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
+    const { data: rows } = await supabase
       .from('workouts')
       .select('*')
       .eq('is_template', false)

@@ -40,6 +40,28 @@ const sortByOrder = (rows: any[]) =>
 const sortBySetNumber = (rows: any[]) =>
   rows.slice().sort((a, b) => (Number(a?.set_number) || 0) - (Number(b?.set_number) || 0))
 
+const normalizeText = (s: any) =>
+  String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const templateSignature = (tpl: any) => {
+  const nameParts: string[] = []
+  const exs = sortByOrder(safeArray<any>(tpl?.exercises).filter((x) => x && typeof x === 'object'))
+  for (const e of exs) {
+    const en = normalizeText(e?.name || '')
+    const sets = sortBySetNumber(safeArray<any>(e?.sets).filter((x) => x && typeof x === 'object'))
+    const method = normalizeText(e?.method || '')
+    const fallbackSets = method === 'cardio' ? 1 : 4
+    const setCount = sets.length > 0 ? sets.length : fallbackSets
+    nameParts.push(`${en}#${setCount}`)
+  }
+  return nameParts.join('|')
+}
+
 const getAdmin = () => {
   try {
     return createAdminClient()
@@ -49,7 +71,7 @@ const getAdmin = () => {
 }
 
 const detectSupports = async (admin: any) => {
-  if (supportsSourceWorkoutId === null) {
+  if (supportsSourceWorkoutId !== true) {
     try {
       const { error } = await admin.from('workouts').select('id, source_workout_id').limit(1)
       supportsSourceWorkoutId = !error
@@ -58,7 +80,7 @@ const detectSupports = async (admin: any) => {
     }
   }
 
-  if (supportsSubscriptions === null) {
+  if (supportsSubscriptions !== true) {
     try {
       const { error } = await admin.from('workout_sync_subscriptions').select('id').limit(1)
       supportsSubscriptions = !error
@@ -206,17 +228,32 @@ export async function syncAllTemplatesToSubscriber({
   let query = admin
     .from('workouts')
     .select(selectTemplate)
-    .or(`user_id.eq.${sourceUserId},created_by.eq.${sourceUserId}`)
+    .eq('user_id', sourceUserId)
+    .eq('is_template', true)
     .order('name')
-  if (supportsSourceWorkoutId) query = query.is('source_workout_id', null)
   const { data: templates, error } = await query
 
   if (error) return { created: 0, updated: 0, failed: 0 }
 
-  const syncable = safeArray<any>(templates).filter((t) => {
-    const exCount = Array.isArray(t?.exercises) ? t.exercises.length : 0
-    return t?.is_template === true || exCount > 0
-  })
+  const syncable = safeArray<any>(templates).filter((t) => t?.is_template === true)
+
+  let existingBySource = new Map<string, any>()
+  let existingBySignature = new Map<string, any>()
+  if (supportsSourceWorkoutId) {
+    const { data: existing } = await admin
+      .from('workouts')
+      .select(selectTemplate)
+      .eq('user_id', targetUserId)
+      .eq('created_by', sourceUserId)
+      .eq('is_template', true)
+
+    const exRows = safeArray<any>(existing)
+    for (const w of exRows) {
+      const sid = String(w?.source_workout_id || '').trim()
+      if (sid) existingBySource.set(sid, w)
+      else existingBySignature.set(templateSignature(w), w)
+    }
+  }
 
   let created = 0
   let updated = 0
@@ -224,6 +261,26 @@ export async function syncAllTemplatesToSubscriber({
 
   for (const t of syncable) {
     try {
+      const sourceWorkoutId = String(t?.id || '').trim()
+      if (supportsSourceWorkoutId && sourceWorkoutId && !existingBySource.has(sourceWorkoutId)) {
+        const sig = templateSignature(t)
+        const candidate = existingBySignature.get(sig)
+        if (candidate?.id) {
+          await admin
+            .from('workouts')
+            .update({
+              source_workout_id: sourceWorkoutId,
+              name: t?.name ?? '',
+              notes: t?.notes ?? null,
+              is_template: true,
+              created_by: sourceUserId,
+            })
+            .eq('id', candidate.id)
+            .eq('user_id', targetUserId)
+          existingBySource.set(sourceWorkoutId, { ...candidate, source_workout_id: sourceWorkoutId })
+        }
+      }
+
       const up = await upsertSyncedWorkout({ admin, sourceUserId, targetUserId, template: t })
       if (!up?.workoutId) {
         failed++
@@ -250,27 +307,71 @@ export async function syncTemplateToSubscribers({
   const admin = getAdmin()
   if (!admin) return { created: 0, updated: 0, failed: 0 }
   await detectSupports(admin)
-  if (!supportsSubscriptions) return { created: 0, updated: 0, failed: 0 }
-
-  const { data: subs } = await admin
-    .from('workout_sync_subscriptions')
-    .select('target_user_id')
-    .eq('source_user_id', sourceUserId)
-    .eq('active', true)
-
-  const targets = safeArray<any>(subs).map((s) => String(s?.target_user_id || '')).filter(Boolean)
-  if (targets.length === 0) return { created: 0, updated: 0, failed: 0 }
 
   const { data: template } = await admin
     .from('workouts')
     .select(selectTemplate)
     .eq('id', sourceWorkoutId)
-    .or(`user_id.eq.${sourceUserId},created_by.eq.${sourceUserId}`)
+    .eq('user_id', sourceUserId)
+    .eq('is_template', true)
     .maybeSingle()
 
   if (!template?.id) return { created: 0, updated: 0, failed: 0 }
-  const exCount = Array.isArray(template?.exercises) ? template.exercises.length : 0
-  if (template?.is_template !== true && exCount === 0) return { created: 0, updated: 0, failed: 0 }
+
+  const targetsSet = new Set<string>()
+
+  if (supportsSubscriptions) {
+    try {
+      const { data: subs } = await admin
+        .from('workout_sync_subscriptions')
+        .select('target_user_id')
+        .eq('source_user_id', sourceUserId)
+        .eq('active', true)
+      for (const s of safeArray<any>(subs)) {
+        const tid = String(s?.target_user_id || '').trim()
+        if (tid) targetsSet.add(tid)
+      }
+    } catch {}
+  }
+
+  if (supportsSourceWorkoutId) {
+    try {
+      const { data: directTargets } = await admin
+        .from('workouts')
+        .select('user_id')
+        .eq('created_by', sourceUserId)
+        .eq('is_template', true)
+        .eq('source_workout_id', sourceWorkoutId)
+      for (const r of safeArray<any>(directTargets)) {
+        const tid = String(r?.user_id || '').trim()
+        if (tid && tid !== String(sourceUserId)) targetsSet.add(tid)
+      }
+    } catch {}
+
+    const sig = templateSignature(template)
+    try {
+      const { data: candidates } = await admin
+        .from('workouts')
+        .select(selectTemplate)
+        .eq('created_by', sourceUserId)
+        .eq('is_template', true)
+        .neq('user_id', sourceUserId)
+        .is('source_workout_id', null)
+      for (const w of safeArray<any>(candidates)) {
+        if (templateSignature(w) !== sig) continue
+        const wid = String(w?.id || '').trim()
+        const tid = String(w?.user_id || '').trim()
+        if (!wid || !tid) continue
+        try {
+          await admin.from('workouts').update({ source_workout_id: sourceWorkoutId }).eq('id', wid)
+          targetsSet.add(tid)
+        } catch {}
+      }
+    } catch {}
+  }
+
+  const targets = Array.from(targetsSet.values()).filter(Boolean)
+  if (targets.length === 0) return { created: 0, updated: 0, failed: 0 }
 
   let created = 0
   let updated = 0
@@ -278,6 +379,42 @@ export async function syncTemplateToSubscribers({
 
   for (const targetUserId of targets) {
     try {
+      const sourceWorkoutIdStr = String(template?.id || '').trim()
+      if (supportsSourceWorkoutId && sourceWorkoutIdStr) {
+        const { data: bySource } = await admin
+          .from('workouts')
+          .select('id')
+          .eq('user_id', targetUserId)
+          .eq('created_by', sourceUserId)
+          .eq('is_template', true)
+          .eq('source_workout_id', sourceWorkoutIdStr)
+          .maybeSingle()
+        if (!bySource?.id) {
+          const sig = templateSignature(template)
+          const { data: existing } = await admin
+            .from('workouts')
+            .select(selectTemplate)
+            .eq('user_id', targetUserId)
+            .eq('created_by', sourceUserId)
+            .eq('is_template', true)
+            .is('source_workout_id', null)
+          const candidate = safeArray<any>(existing).find((w) => templateSignature(w) === sig)
+          if (candidate?.id) {
+            await admin
+              .from('workouts')
+              .update({
+                source_workout_id: sourceWorkoutIdStr,
+                name: template?.name ?? '',
+                notes: template?.notes ?? null,
+                is_template: true,
+                created_by: sourceUserId,
+              })
+              .eq('id', candidate.id)
+              .eq('user_id', targetUserId)
+          }
+        }
+      }
+
       const up = await upsertSyncedWorkout({ admin, sourceUserId, targetUserId, template })
       if (!up?.workoutId) {
         failed++
