@@ -4,7 +4,23 @@ import { createClient } from '@/utils/supabase/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { parseTrainingNumber, parseTrainingNumberOrZero } from '@/utils/trainingNumber';
+const parseTrainingNumber = (v) => {
+  try {
+    if (v == null) return null;
+    const s = String(v).trim().replace(',', '.');
+    if (!s) return null;
+    const n = Number(s);
+    if (!Number.isFinite(n)) return null;
+    return n;
+  } catch {
+    return null;
+  }
+};
+
+const parseTrainingNumberOrZero = (v) => {
+  const n = parseTrainingNumber(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 const SETS_INSERT_CHUNK_SIZE = 200;
 
