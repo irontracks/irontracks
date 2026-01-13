@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { revalidatePath } from 'next/cache';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseTrainingNumber, parseTrainingNumberOrZero } from '@/utils/trainingNumber';
@@ -35,6 +36,183 @@ const extractJsonFromText = (raw) => {
             return null;
         }
     }
+};
+
+const SYNC_TEMPLATE_SELECT = `
+    id,
+    name,
+    notes,
+    exercises (
+      id,
+      name,
+      notes,
+      muscle_group,
+      rest_time,
+      video_url,
+      method,
+      cadence,
+      order,
+      sets (
+        weight,
+        reps,
+        rpe,
+        set_number,
+        is_warmup,
+        advanced_config
+      )
+    )
+`;
+
+const chunk = (arr, size) => {
+    const out = [];
+    const safe = Array.isArray(arr) ? arr : [];
+    const n = Math.max(1, Number(size) || 1);
+    for (let i = 0; i < safe.length; i += n) out.push(safe.slice(i, i + n));
+    return out;
+};
+
+const cloneTemplateIntoWorkout = async (admin, targetWorkoutId, source) => {
+    await admin
+        .from('workouts')
+        .update({ name: source?.name || '', notes: source?.notes || '', is_template: true })
+        .eq('id', targetWorkoutId);
+
+    const { data: oldExs } = await admin.from('exercises').select('id').eq('workout_id', targetWorkoutId);
+    const oldExIds = (oldExs || []).map((x) => x?.id).filter(Boolean);
+    if (oldExIds.length > 0) {
+        await admin.from('sets').delete().in('exercise_id', oldExIds);
+    }
+    await admin.from('exercises').delete().eq('workout_id', targetWorkoutId);
+
+    const exs = Array.isArray(source?.exercises) ? source.exercises : [];
+    for (const ex of exs) {
+        const { data: newEx, error: exErr } = await admin
+            .from('exercises')
+            .insert({
+                workout_id: targetWorkoutId,
+                name: ex?.name || '',
+                muscle_group: ex?.muscle_group ?? null,
+                notes: ex?.notes || '',
+                rest_time: ex?.rest_time ?? 60,
+                video_url: ex?.video_url || '',
+                method: ex?.method || 'Normal',
+                cadence: ex?.cadence || '2020',
+                order: ex?.order ?? 0,
+            })
+            .select('id')
+            .single();
+        if (exErr || !newEx?.id) continue;
+
+        const sets = Array.isArray(ex?.sets) ? ex.sets : [];
+        if (sets.length > 0) {
+            const newSets = sets.map((s) => ({
+                exercise_id: newEx.id,
+                weight: s?.weight ?? null,
+                reps: s?.reps ?? null,
+                rpe: s?.rpe ?? null,
+                set_number: s?.set_number ?? 1,
+                is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
+                advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                completed: false,
+            }));
+            for (const part of chunk(newSets, 500)) {
+                await admin.from('sets').insert(part);
+            }
+        }
+    }
+};
+
+const propagateTemplateUpsert = async (teacherId, sourceWorkoutId) => {
+    try {
+        if (!teacherId || !sourceWorkoutId) return;
+        const admin = createAdminClient();
+
+        const { data: subs } = await admin
+            .from('workout_sync_subscriptions')
+            .select('id, student_id')
+            .eq('teacher_id', teacherId)
+            .eq('is_active', true);
+
+        const subRows = Array.isArray(subs) ? subs : [];
+        if (subRows.length === 0) return;
+
+        const { data: sourceRow } = await admin.from('workouts').select(SYNC_TEMPLATE_SELECT).eq('id', sourceWorkoutId).maybeSingle();
+        if (!sourceRow || !sourceRow?.id) return;
+
+        const subIds = subRows.map((s) => s?.id).filter(Boolean);
+        const { data: mappings } = await admin
+            .from('workout_sync_mappings')
+            .select('subscription_id, target_workout_id')
+            .in('subscription_id', subIds)
+            .eq('source_workout_id', sourceWorkoutId);
+
+        const bySub = new Map();
+        for (const m of Array.isArray(mappings) ? mappings : []) {
+            const sid = m?.subscription_id;
+            const tid = m?.target_workout_id;
+            if (sid && tid) bySub.set(sid, tid);
+        }
+
+        for (const s of subRows) {
+            const subId = s?.id;
+            const studentId = s?.student_id;
+            if (!subId || !studentId) continue;
+            const existingTargetId = bySub.get(subId) || null;
+            if (existingTargetId) {
+                await cloneTemplateIntoWorkout(admin, existingTargetId, sourceRow);
+                continue;
+            }
+            const { data: nw } = await admin
+                .from('workouts')
+                .insert({
+                    user_id: studentId,
+                    student_id: null,
+                    name: sourceRow?.name || 'Treino',
+                    notes: sourceRow?.notes || '',
+                    created_by: teacherId,
+                    is_template: true,
+                })
+                .select('id')
+                .single();
+            if (!nw?.id) continue;
+            await cloneTemplateIntoWorkout(admin, nw.id, sourceRow);
+            await admin.from('workout_sync_mappings').upsert(
+                { subscription_id: subId, source_workout_id: sourceWorkoutId, target_workout_id: nw.id },
+                { onConflict: 'subscription_id,source_workout_id' }
+            );
+        }
+    } catch {}
+};
+
+const propagateTemplateDelete = async (teacherId, sourceWorkoutId) => {
+    try {
+        if (!teacherId || !sourceWorkoutId) return;
+        const admin = createAdminClient();
+        const { data: subs } = await admin
+            .from('workout_sync_subscriptions')
+            .select('id')
+            .eq('teacher_id', teacherId)
+            .eq('is_active', true);
+        const subIds = (Array.isArray(subs) ? subs : []).map((s) => s?.id).filter(Boolean);
+        if (subIds.length === 0) return;
+
+        const { data: mappings } = await admin
+            .from('workout_sync_mappings')
+            .select('id, target_workout_id')
+            .in('subscription_id', subIds)
+            .eq('source_workout_id', sourceWorkoutId);
+
+        const targetIds = (Array.isArray(mappings) ? mappings : []).map((m) => m?.target_workout_id).filter(Boolean);
+        for (const tid of targetIds) {
+            const { data: exs } = await admin.from('exercises').select('id').eq('workout_id', tid);
+            const exIds = (exs || []).map((x) => x?.id).filter(Boolean);
+            if (exIds.length > 0) await admin.from('sets').delete().in('exercise_id', exIds);
+            await admin.from('exercises').delete().eq('workout_id', tid);
+            await admin.from('workouts').delete().eq('id', tid);
+        }
+        const mappingIds = (Array.isArray(mappings) ? mappings : []).map((m) => m?.id).filter(Boolean);
+        if (mappingIds.length > 0) await admin.from('workout_sync_mappings').delete().in('id', mappingIds);
+    } catch {}
 };
 
 export async function generateAssessmentPlanAi(payload) {
@@ -1178,8 +1356,12 @@ export async function createWorkout(data) {
             }
         }
 
-        if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
+    if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
     }
+
+    try {
+        if (workout?.id) await propagateTemplateUpsert(user.id, workout.id);
+    } catch {}
 
     revalidatePath('/');
     return workout;
@@ -1256,8 +1438,12 @@ export async function updateWorkout(id, data) {
             }
         }
 
-        if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
+    if (setRows.length > 0) await insertSetsBulkSafe(supabase, setRows);
     }
+
+    try {
+        if (id) await propagateTemplateUpsert(user.id, id);
+    } catch {}
 
     revalidatePath('/');
     return { success: true };
@@ -1270,15 +1456,15 @@ export async function deleteWorkout(id) {
     const user = authData?.user ?? null;
     if (!user) throw new Error('Unauthorized');
 
-    // SECURITY: Ensure user owns the workout before deletion attempt
-    // Although RLS should handle this, double-check in logic prevents accidental calls
-    const { data: workout } = await supabase.from('workouts').select('user_id').eq('id', id).single();
+    const { data: workout } = await supabase.from('workouts').select('user_id, is_template').eq('id', id).single();
     if (!workout) return { success: false, error: 'Workout not found' };
     
-    // Strict Ownership Check
     if (workout.user_id !== user.id) {
         console.error(`SECURITY ALERT: User ${user.id} attempted to delete workout ${id} owned by ${workout.user_id}`);
         throw new Error('Você só pode excluir seus próprios treinos.');
+    }
+    if (workout.is_template !== true) {
+        throw new Error('Você só pode excluir templates. Históricos não podem ser apagados aqui.');
     }
 
     // Cascade delete: sets -> exercises -> workout
@@ -1291,6 +1477,10 @@ export async function deleteWorkout(id) {
     
     const { error } = await supabase.from('workouts').delete().eq('id', id).eq('user_id', user.id);
     if (error) throw error;
+
+    try {
+        if (id) await propagateTemplateDelete(user.id, id);
+    } catch {}
     
     revalidatePath('/');
     return { success: true };

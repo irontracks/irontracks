@@ -21,6 +21,8 @@ export async function GET() {
       .from('workouts')
       .select('id, name, user_id')
       .eq('user_id', user.id)
+      .eq('is_template', true)
+      .is('student_id', null)
       .order('name')
 
     const { data, error } = await query
