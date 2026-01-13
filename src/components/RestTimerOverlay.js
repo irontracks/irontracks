@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Timer, X } from 'lucide-react';
-import { playTimerFinishSound } from '@/lib/sounds';
+import React, { useState, useEffect, useRef } from 'react';
+import { Timer, ArrowLeft } from 'lucide-react';
+import { playTimerFinishSound, playTick } from '@/lib/sounds';
 
-const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
+const RestTimerOverlay = ({ targetTime, context, onFinish, onClose }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
+    const warnedRef = useRef(false);
 
     const formatDuration = (s) => {
         const mins = Math.floor(s / 60);
@@ -13,12 +14,55 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
     };
 
     useEffect(() => {
-        if (!targetTime) {
-            setIsFinished(false);
-            return;
+        try {
+            warnedRef.current = false;
+        } catch {}
+    }, [targetTime]);
+
+    useEffect(() => {
+        try {
+            const kind = String(context?.kind ?? '');
+            if (kind !== 'cluster') return;
+            if (isFinished) return;
+            if (warnedRef.current) return;
+            if (timeLeft !== 5) return;
+            try {
+                playTick();
+            } catch {}
+            warnedRef.current = true;
+        } catch {}
+    }, [context?.kind, isFinished, timeLeft]);
+
+    useEffect(() => {
+        let soundInterval;
+        let vibrateInterval;
+
+        if (isFinished) {
+            playTimerFinishSound();
+            soundInterval = setInterval(() => {
+                playTimerFinishSound();
+            }, 1500);
+
+            try {
+                if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                    navigator.vibrate([220, 90, 220]);
+                    vibrateInterval = setInterval(() => {
+                        try {
+                            navigator.vibrate([220, 90, 220]);
+                        } catch {}
+                    }, 1500);
+                }
+            } catch {}
         }
-        
-        setIsFinished(false);
+
+        return () => {
+            if (soundInterval) clearInterval(soundInterval);
+            if (vibrateInterval) clearInterval(vibrateInterval);
+        };
+    }, [isFinished]);
+
+    useEffect(() => {
+        if (!targetTime) return;
         let hasNotified = false;
 
         const updateTimer = () => {
@@ -29,17 +73,17 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
                 setIsFinished(true);
                 if (!hasNotified) {
                     hasNotified = true;
-                    playTimerFinishSound();
-                    if (Notification.permission === 'granted') {
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                         new Notification("⏰ Tempo Esgotado!", { 
                             body: "Hora de voltar para o treino!", 
-                            icon: 'icone.png',
-                            tag: 'timer_finished'
-                        });
+                            icon: 'icone.png', 
+                            tag: 'timer_finished' 
+                        }); 
                     }
                 }
             } else {
                 setTimeLeft(remaining);
+                setIsFinished(false);
             }
         };
 
@@ -52,7 +96,18 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
 
     if (isFinished) {
         return (
-            <div className="fixed inset-0 z-[100] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer" onClick={onFinish}>
+            <div
+                className="fixed inset-0 z-[100] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer"
+                onClick={() => {
+                    try {
+                        if (typeof onFinish === 'function') onFinish(context);
+                    } catch {
+                        try {
+                            if (typeof onFinish === 'function') onFinish();
+                        } catch {}
+                    }
+                }}
+            >
                 <Timer size={120} className="text-black mb-8 animate-bounce"/>
                 <h1 className="text-6xl font-black text-black uppercase tracking-tighter">BORA!</h1>
                 <p className="text-black font-bold mt-4 text-xl">TOQUE PARA VOLTAR</p>
@@ -73,9 +128,18 @@ const RestTimerOverlay = ({ targetTime, onFinish, onClose }) => {
                         <p className="text-4xl font-mono font-black text-white tabular-nums leading-none">{formatDuration(timeLeft)}</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={onClose} className="h-12 w-12 bg-neutral-800 rounded-xl text-neutral-400 border border-neutral-700 hover:text-white hover:bg-neutral-700 flex items-center justify-center"><X size={20}/></button>
-                </div>
+                    <div className="flex gap-2">
+                    <button
+                        onClick={() => {
+                            try {
+                                if (typeof onClose === 'function') onClose();
+                            } catch {}
+                        }}
+                        className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2"
+                    >
+                        <ArrowLeft size={16}/> <span className="text-xs font-bold">Voltar</span>
+                    </button>
+                    </div>
             </div>
         </div>
     );

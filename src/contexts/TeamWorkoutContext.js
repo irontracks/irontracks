@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import { playStartSound } from '@/lib/sounds';
 
 const TeamWorkoutContext = createContext({
     incomingInvites: [],
@@ -23,37 +24,68 @@ export const TeamWorkoutProvider = ({ children, user }) => {
     const [incomingInvites, setIncomingInvites] = useState([]);
     const [teamSession, setTeamSession] = useState(null);
     const [loading, setLoading] = useState(false);
-    const supabase = createClient();
+    const supabase = useMemo(() => createClient(), []);
+
+    const canReceiveInvites = useMemo(() => {
+        const uid = user?.id ? String(user.id) : '';
+        if (!uid) return true;
+        try {
+            if (typeof window === 'undefined') return true;
+            const raw = window.localStorage.getItem(`irontracks.userSettings.v1.${uid}`) || '';
+            const parsed = raw ? JSON.parse(raw) : null;
+            const allow = parsed && typeof parsed === 'object' ? parsed.allowTeamInvites : undefined;
+            return allow !== false;
+        } catch {
+            return true;
+        }
+    }, [user?.id]);
+
+    const refetchInvites = useMemo(() => {
+        return async () => {
+            try {
+                const safeUserId = user?.id ? String(user.id) : '';
+                if (!safeUserId) return;
+                if (!canReceiveInvites) {
+                    setIncomingInvites([]);
+                    return;
+                }
+                const { data } = await supabase
+                    .from('invites')
+                    .select('*, profiles:from_uid(display_name, photo_url)')
+                    .eq('to_uid', safeUserId)
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: false });
+                const list = Array.isArray(data) ? data : [];
+                const mapped = list
+                    .filter((inv) => inv && typeof inv === 'object')
+                    .map(inv => ({
+                        id: inv.id,
+                        created_at: inv.created_at,
+                        from: {
+                            displayName: inv.profiles?.display_name || 'Unknown',
+                            photoURL: inv.profiles?.photo_url,
+                            uid: inv.from_uid
+                        },
+                        workout: inv.workout_data
+                    }));
+                setIncomingInvites(mapped);
+            } catch {
+                return;
+            }
+        };
+    }, [supabase, user?.id, canReceiveInvites]);
 
     // 1. Listen for Incoming Invites
     useEffect(() => {
         if (!user?.id) return;
 
-        // Fetch initial pending invites
-        const fetchInvites = async () => {
-            const { data } = await supabase
-                .from('invites')
-                .select('*, profiles:from_uid(display_name, photo_url)')
-                .eq('to_uid', user.id)
-                .eq('status', 'pending');
-            if (data) {
-                // Map to match expected structure
-                const mapped = data.map(inv => ({
-                    id: inv.id,
-                    from: {
-                        displayName: inv.profiles?.display_name || 'Unknown',
-                        photoURL: inv.profiles?.photo_url,
-                        uid: inv.from_uid
-                    },
-                    workout: inv.workout_data
-                }));
-                setIncomingInvites(mapped);
-            }
-        };
-        fetchInvites();
+        if (!canReceiveInvites) {
+            setIncomingInvites([]);
+            return;
+        }
+        refetchInvites();
 
         // Subscribe to new invites
-        console.log("Subscribing to invites for user:", user.id);
         const channel = supabase
             .channel(`invites:${user.id}`)
             .on(
@@ -65,36 +97,173 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                     filter: `to_uid=eq.${user.id}`
                 },
                 async (payload) => {
-                    console.log("INVITE RECEIVED:", payload);
-                    const newInvite = payload.new;
-                    if (newInvite.status !== 'pending') return;
+                    try {
+                        const newInvite = payload?.new;
+                        if (!newInvite || typeof newInvite !== 'object') return;
+                        if (newInvite.status !== 'pending') return;
 
-                    // Fetch sender profile info
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('display_name, photo_url')
-                        .eq('id', newInvite.from_uid)
-                        .single();
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('display_name, photo_url')
+                            .eq('id', newInvite.from_uid)
+                            .single();
 
-                    setIncomingInvites(prev => [...prev, {
-                        id: newInvite.id,
-                        from: {
-                            displayName: profile?.display_name || 'Unknown',
-                            photoURL: profile?.photo_url,
-                            uid: newInvite.from_uid
-                        },
-                        workout: newInvite.workout_data
-                    }]);
+                        setIncomingInvites(prev => {
+                            const current = Array.isArray(prev) ? prev : [];
+                            const id = newInvite?.id ? String(newInvite.id) : '';
+                            if (id && current.some((i) => String(i?.id || '') === id)) return current;
+
+                            return [{
+                                id: newInvite.id,
+                                created_at: newInvite.created_at,
+                                from: {
+                                    displayName: profile?.display_name || 'Unknown',
+                                    photoURL: profile?.photo_url,
+                                    uid: newInvite.from_uid
+                                },
+                                workout: newInvite.workout_data
+                            }, ...current];
+                        });
+                        try { playStartSound(); } catch {}
+                    } catch {
+                        return;
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'invites',
+                    filter: `to_uid=eq.${user.id}`
+                },
+                (payload) => {
+                    try {
+                        const updated = payload?.new;
+                        if (!updated || typeof updated !== 'object') return;
+                        const id = updated?.id ? String(updated.id) : '';
+                        if (!id) return;
+                        const status = updated?.status ? String(updated.status) : '';
+                        if (status && status !== 'pending') {
+                            setIncomingInvites((prev) => {
+                                const current = Array.isArray(prev) ? prev : [];
+                                return current.filter((i) => String(i?.id || '') !== id);
+                            });
+                        }
+                    } catch {
+                        return;
+                    }
                 }
             )
             .subscribe((status) => {
-                console.log("SUBSCRIPTION STATUS:", status);
+                void status;
             });
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [user?.id]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
+
+    // Fallback: if invites realtime isn't enabled, notifications will still fire
+    useEffect(() => {
+        if (!user?.id) return;
+
+        const safeUserId = String(user.id);
+        let mounted = true;
+        const refetch = async () => {
+            try {
+                const { data } = await supabase
+                    .from('invites')
+                    .select('*, profiles:from_uid(display_name, photo_url)')
+                    .eq('to_uid', safeUserId)
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: false });
+                if (!mounted) return;
+                const list = Array.isArray(data) ? data : [];
+                const mapped = list
+                    .filter((inv) => inv && typeof inv === 'object')
+                    .map(inv => ({
+                        id: inv.id,
+                        created_at: inv.created_at,
+                        from: {
+                            displayName: inv.profiles?.display_name || 'Unknown',
+                            photoURL: inv.profiles?.photo_url,
+                            uid: inv.from_uid
+                        },
+                        workout: inv.workout_data
+                    }));
+                setIncomingInvites(mapped);
+            } catch {
+                return;
+            }
+        };
+
+        const channel = supabase
+            .channel(`invite-notifications:${safeUserId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'notifications',
+                    filter: `user_id=eq.${safeUserId}`
+                },
+                (payload) => {
+                    try {
+                        if (!mounted) return;
+                        const n = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+                        if (!n) return;
+                        const type = String(n?.type ?? '');
+                    if (type !== 'invite') return;
+                        refetchInvites();
+                        try { playStartSound(); } catch {}
+                    } catch {
+                        return;
+                    }
+                }
+            )
+            .subscribe();
+
+        const POLL_MS = 20_000;
+        const pollId = setInterval(() => {
+            try { refetchInvites(); } catch {}
+        }, POLL_MS);
+
+        const handleVisibility = () => {
+            try {
+                if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                    refetchInvites();
+                }
+            } catch {}
+        };
+        const handleFocus = () => {
+            try { refetchInvites(); } catch {}
+        };
+
+        try {
+            if (typeof document !== 'undefined') document.addEventListener('visibilitychange', handleVisibility);
+        } catch {}
+        try {
+            if (typeof window !== 'undefined') window.addEventListener('focus', handleFocus);
+        } catch {}
+
+        return () => {
+            mounted = false;
+            try {
+                supabase.removeChannel(channel);
+            } catch {
+                return;
+            }
+            try { clearInterval(pollId); } catch {}
+            try {
+                if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibility);
+            } catch {}
+            try {
+                if (typeof window !== 'undefined') window.removeEventListener('focus', handleFocus);
+            } catch {}
+        };
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
 
     // 2. Listen to Active Team Session
     useEffect(() => {
@@ -111,15 +280,26 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                     filter: `id=eq.${teamSession.id}`
                 },
                 (payload) => {
-                    const updated = payload.new;
-                    if (updated.status === 'finished') {
-                        setTeamSession(null); // End session
-                    } else {
-                        // Update participants list
-                        setTeamSession(prev => ({
-                            ...prev,
-                            participants: updated.participants || []
-                        }));
+                    try {
+                        const updated = payload?.new;
+                        if (!updated || typeof updated !== 'object') return;
+                        if (updated.status === 'finished') {
+                            setTeamSession(null);
+                            return;
+                        }
+
+                        const nextParticipants = Array.isArray(updated.participants) ? updated.participants : [];
+                        setTeamSession(prev => {
+                            const base = prev && typeof prev === 'object' ? prev : {};
+                            const nextId = base.id ?? teamSession?.id ?? updated.id ?? null;
+                            return {
+                                ...base,
+                                id: nextId,
+                                participants: nextParticipants
+                            };
+                        });
+                    } catch {
+                        return;
                     }
                 }
             )
@@ -128,106 +308,119 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [teamSession?.id]);
+    }, [supabase, teamSession?.id]);
 
     const sendInvite = async (targetUser, workout, currentTeamSessionId = null) => {
-        let sessionId = currentTeamSessionId;
+        try {
+            if (!user?.id) throw new Error('Usuário inválido');
+            const targetUserId = targetUser?.id ? String(targetUser.id) : '';
+            if (!targetUserId) throw new Error('Aluno inválido');
 
-        // Create a session if it doesn't exist yet
-        if (!sessionId) {
-            const { data: session, error } = await supabase
-                .from('team_sessions')
+            let sessionId = currentTeamSessionId;
+
+            if (!sessionId) {
+                const { data: session, error } = await supabase
+                    .from('team_sessions')
+                    .insert({
+                        host_uid: user.id,
+                        status: 'active',
+                        participants: [{ uid: user.id, name: user.displayName, photo: user.photoURL }]
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                sessionId = session?.id;
+                if (!sessionId) throw new Error('Falha ao criar sessão');
+
+                setTeamSession({
+                    id: sessionId,
+                    isHost: true,
+                    hostName: user.displayName,
+                    participants: Array.isArray(session?.participants) ? session.participants : []
+                });
+            }
+
+            const { error: inviteError } = await supabase
+                .from('invites')
                 .insert({
-                    host_uid: user.id,
-                    status: 'active',
-                    participants: [{ uid: user.id, name: user.displayName, photo: user.photoURL }]
-                })
-                .select()
-                .single();
-            
-            if (error) throw error;
-            sessionId = session.id;
-            
-            // Set me as host
-            setTeamSession({
-                id: sessionId,
-                isHost: true,
-                hostName: user.displayName,
-                participants: session.participants
-            });
+                    from_uid: user.id,
+                    to_uid: targetUserId,
+                    workout_data: workout,
+                    team_session_id: sessionId,
+                    status: 'pending'
+                });
+
+            if (inviteError) throw inviteError;
+            return sessionId;
+        } catch (e) {
+            const msg = e?.message || String(e || 'Erro ao enviar convite');
+            throw new Error(msg);
         }
-
-        // Send the invite
-        const { error: inviteError } = await supabase
-            .from('invites')
-            .insert({
-                from_uid: user.id,
-                to_uid: targetUser.id, // targetUser must have 'id' (which is uid)
-                workout_data: workout,
-                team_session_id: sessionId,
-                status: 'pending'
-            });
-
-        if (inviteError) throw inviteError;
-        return sessionId;
     };
 
     const acceptInvite = async (invite, onStartSession) => {
-        // 1. Get the session details
-        const { data: inviteData } = await supabase
-            .from('invites')
-            .select('team_session_id')
-            .eq('id', invite.id)
-            .single();
+        try {
+            const inviteId = invite?.id ? String(invite.id) : '';
+            if (!inviteId) throw new Error('Convite inválido');
+            if (!user?.id) throw new Error('Usuário inválido');
 
-        if (!inviteData) throw new Error("Convite inválido");
+            const { data, error } = await supabase
+                .rpc('accept_team_invite', { invite_id: inviteId });
+            if (error) throw error;
 
-        // 2. Update session participants
-        const { data: sessionData } = await supabase
-            .from('team_sessions')
-            .select('participants')
-            .eq('id', inviteData.team_session_id)
-            .single();
+            const payload = data && typeof data === 'object' ? data : null;
+            const teamSessionId = payload?.team_session_id ? String(payload.team_session_id) : '';
+            if (!teamSessionId) throw new Error('Sessão inválida');
 
-        if (sessionData) {
-            const newParticipants = [
-                ...(sessionData.participants || []),
-                { uid: user.id, name: user.displayName, photo: user.photoURL }
-            ];
+            const newParticipants = Array.isArray(payload?.participants) ? payload.participants : [];
+            const workoutFromInvite = payload?.workout ?? invite?.workout;
 
-            await supabase
-                .from('team_sessions')
-                .update({ participants: newParticipants })
-                .eq('id', inviteData.team_session_id);
-            
-            // Set local state
             setTeamSession({
-                id: inviteData.team_session_id,
+                id: teamSessionId,
                 isHost: false,
                 participants: newParticipants
             });
+
+            setIncomingInvites(prev => {
+                const current = Array.isArray(prev) ? prev : [];
+                return current.filter(i => String(i?.id || '') !== inviteId);
+            });
+
+            try {
+                await supabase
+                    .from('notifications')
+                    .update({ read: true })
+                    .eq('user_id', user.id)
+                    .eq('type', 'invite');
+            } catch {
+            }
+
+            if (onStartSession) onStartSession(workoutFromInvite);
+
+            return workoutFromInvite;
+        } catch (e) {
+            const msg = e?.message || String(e || 'Erro ao aceitar convite');
+            throw new Error(msg);
         }
-
-        // 3. Mark invite as accepted
-        await supabase
-            .from('invites')
-            .update({ status: 'accepted' })
-            .eq('id', invite.id);
-
-        // 4. Remove from local list
-        setIncomingInvites(prev => prev.filter(i => i.id !== invite.id));
-
-        // 5. Trigger app start
-        if (onStartSession) onStartSession(invite.workout);
     };
 
     const rejectInvite = async (inviteId) => {
-        await supabase
-            .from('invites')
-            .update({ status: 'rejected' })
-            .eq('id', inviteId);
-        
-        setIncomingInvites(prev => prev.filter(i => i.id !== inviteId));
+        try {
+            const safeId = inviteId ? String(inviteId) : '';
+            if (!safeId) return;
+            await supabase
+                .from('invites')
+                .update({ status: 'rejected' })
+                .eq('id', safeId);
+
+            setIncomingInvites(prev => {
+                const current = Array.isArray(prev) ? prev : [];
+                return current.filter(i => String(i?.id || '') !== safeId);
+            });
+        } catch {
+            setIncomingInvites(prev => (Array.isArray(prev) ? prev : []));
+        }
     };
 
     const leaveSession = async () => {

@@ -1,7 +1,7 @@
 // Componente principal do formulário de avaliação física
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, 
@@ -16,7 +16,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 
-import { AssessmentFormData } from '@/types/assessment';
+import { AssessmentFormData, isValidGender } from '@/types/assessment';
 import { useAssessment } from '@/hooks/useAssessment';
 import { useDialog } from '@/contexts/DialogContext';
 import { BasicInfoStep } from './BasicInfoStep';
@@ -41,6 +41,28 @@ interface FormStep {
   required: boolean;
 }
 
+const buildDefaultFormData = (): AssessmentFormData => ({
+  assessment_date: new Date().toISOString().split('T')[0],
+  weight: '',
+  height: '',
+  age: '',
+  gender: 'M',
+  arm_circ: '',
+  chest_circ: '',
+  waist_circ: '',
+  hip_circ: '',
+  thigh_circ: '',
+  calf_circ: '',
+  triceps_skinfold: '',
+  biceps_skinfold: '',
+  subscapular_skinfold: '',
+  suprailiac_skinfold: '',
+  abdominal_skinfold: '',
+  thigh_skinfold: '',
+  calf_skinfold: '',
+  observations: ''
+});
+
 export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   studentId,
   studentName,
@@ -51,72 +73,111 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   const { alert } = useDialog();
   
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState<AssessmentFormData>({
-    assessment_date: new Date().toISOString().split('T')[0],
-    weight: '',
-    height: '',
-    age: '',
-    gender: 'M',
-    arm_circ: '',
-    chest_circ: '',
-    waist_circ: '',
-    hip_circ: '',
-    thigh_circ: '',
-    calf_circ: '',
-    triceps_skinfold: '',
-    biceps_skinfold: '',
-    subscapular_skinfold: '',
-    suprailiac_skinfold: '',
-    abdominal_skinfold: '',
-    thigh_skinfold: '',
-    calf_skinfold: '',
-    observations: ''
+  const [formData, setFormData] = useState<AssessmentFormData>(() => {
+    const base = buildDefaultFormData();
+
+    if (typeof window === 'undefined') {
+      return base;
+    }
+
+    try {
+      const storageKey = `assessment_import_${studentId}`;
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) {
+        return base;
+      }
+
+      const parsed = JSON.parse(raw);
+      const source: any = parsed?.formData && typeof parsed.formData === 'object'
+        ? parsed.formData
+        : parsed;
+
+      if (!source || typeof source !== 'object') {
+        return base;
+      }
+
+      const merged: AssessmentFormData = { ...base };
+      (Object.keys(base) as (keyof AssessmentFormData)[]).forEach((field) => {
+        const value = (source as any)[field];
+        if (value !== undefined && value !== null && value !== '') {
+          if (field === 'gender') {
+            if (isValidGender(value)) {
+              merged.gender = value;
+            }
+            return;
+          }
+
+          merged[field as Exclude<keyof AssessmentFormData, 'gender'>] = String(value);
+        }
+      });
+
+      return merged;
+    } catch (error) {
+      console.error('Erro ao aplicar dados de avaliação importados', error);
+      return base;
+    }
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const steps: FormStep[] = [
-    {
-      id: 'basic',
-      title: 'Informações Básicas',
-      description: 'Dados pessoais e antropométricos',
-      icon: User,
-      component: BasicInfoStep,
-      required: true
-    },
-    {
-      id: 'measurements',
-      title: 'Medidas Corporais',
-      description: 'Circunferências e medidas',
-      icon: Ruler,
-      component: MeasurementStep,
-      required: true
-    },
-    {
-      id: 'skinfolds',
-      title: 'Dobras Cutâneas',
-      description: '7 dobras para análise de composição',
-      icon: Ruler,
-      component: SkinfoldStep,
-      required: true
-    },
-    {
-      id: 'photos',
-      title: 'Fotos (Opcional)',
-      description: 'Registro visual da avaliação',
-      icon: Camera,
-      component: PhotoUploadStep,
-      required: false
-    },
-    {
-      id: 'results',
-      title: 'Resultados',
-      description: 'Prévia dos cálculos e resultados',
-      icon: FileText,
-      component: ResultsPreview,
-      required: true
+  React.useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
     }
-  ];
+    try {
+      const storageKey = `assessment_import_${studentId}`;
+      if (window.sessionStorage.getItem(storageKey)) {
+        window.sessionStorage.removeItem(storageKey);
+      }
+    } catch (error) {
+      console.error('Erro ao limpar dados de avaliação importados', error);
+    }
+  }, [studentId]);
+
+  const steps = useMemo<FormStep[]>(() => {
+    return [
+      {
+        id: 'basic',
+        title: 'Informações Básicas',
+        description: 'Dados pessoais e antropométricos',
+        icon: User,
+        component: BasicInfoStep,
+        required: true
+      },
+      {
+        id: 'measurements',
+        title: 'Medidas Corporais',
+        description: 'Circunferências e medidas',
+        icon: Ruler,
+        component: MeasurementStep,
+        required: true
+      },
+      {
+        id: 'skinfolds',
+        title: 'Dobras Cutâneas',
+        description: '7 dobras para análise de composição',
+        icon: Ruler,
+        component: SkinfoldStep,
+        required: true
+      },
+      {
+        id: 'photos',
+        title: 'Fotos (Opcional)',
+        description: 'Registro visual da avaliação',
+        icon: Camera,
+        component: PhotoUploadStep,
+        required: false
+      },
+      {
+        id: 'results',
+        title: 'Resultados',
+        description: 'Prévia dos cálculos e resultados',
+        icon: FileText,
+        component: ResultsPreview,
+        required: true
+      }
+    ];
+  }, []);
 
   const CurrentStepComponent = steps[currentStep].component;
 
@@ -181,7 +242,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
     }
   }, [currentStep, validateStep]);
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = async () => {
     if (!validateStep(currentStep)) {
       return;
     }
@@ -199,7 +260,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
       console.error('Erro ao salvar avaliação:', error);
       await alert('Erro ao salvar avaliação. Verifique os dados e tente novamente.','Erro');
     }
-  }, [formData, studentId, currentStep, createAssessment, onSuccess, validateStep]);
+  };
 
   const updateFormData = useCallback((updates: Partial<AssessmentFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }));
@@ -217,18 +278,16 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   // Validação de permissão deve ser feita pelo componente pai conforme a aplicação
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      {/* Header */}
+    <div className="max-w-4xl mx-auto p-6 text-white">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="text-3xl font-bold text-white mb-2">
           Nova Avaliação Física
         </h1>
-        <p className="text-gray-600">
-          Aluno: <span className="font-semibold">{studentName}</span>
+        <p className="text-sm text-neutral-400">
+          Aluno: <span className="font-semibold text-white">{studentName}</span>
         </p>
       </div>
 
-      {/* Progress Steps */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           {steps.map((step, index) => (
@@ -237,8 +296,8 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
                 onClick={() => handleStepClick(index)}
                 className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   index <= currentStep
-                    ? 'bg-blue-600 border-blue-600 text-white'
-                    : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
+                    ? 'bg-yellow-500 border-yellow-500 text-black'
+                    : 'bg-neutral-900 border-neutral-700 text-neutral-500 hover:border-neutral-500'
                 } ${index < currentStep ? 'cursor-pointer' : ''}`}
                 disabled={index > currentStep + 1}
               >
@@ -246,7 +305,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
               </button>
               {index < steps.length - 1 && (
                 <div className={`w-24 h-1 mx-2 transition-all duration-200 ${
-                  index < currentStep ? 'bg-blue-600' : 'bg-gray-300'
+                  index < currentStep ? 'bg-yellow-500' : 'bg-neutral-700'
                 }`} />
               )}
             </div>
@@ -255,12 +314,12 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         <div className="flex justify-between mt-2">
           {steps.map((step, index) => (
             <div key={step.id} className="text-center flex-1">
-              <p className={`text-sm font-medium ${
-                index <= currentStep ? 'text-blue-600' : 'text-gray-500'
+              <p className={`text-sm font-semibold ${
+                index <= currentStep ? 'text-yellow-500' : 'text-neutral-500'
               }`}>
                 {step.title}
               </p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-neutral-500 mt-1">
                 {step.description}
               </p>
             </div>
@@ -268,18 +327,16 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         </div>
       </div>
 
-      {/* Error Alert */}
       {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="mb-6 p-4 bg-red-900/40 border border-red-500/40 rounded-xl">
           <div className="flex items-center">
             <AlertCircle className="h-5 w-5 text-red-400 mr-2" />
-            <p className="text-red-800">{error}</p>
+            <p className="text-sm text-red-100">{error}</p>
           </div>
         </div>
       )}
 
-      {/* Form Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+      <div className="bg-neutral-900 rounded-2xl border border-neutral-800 shadow-lg">
         <div className="p-6">
           <AnimatePresence mode="wait">
             <motion.div
@@ -299,7 +356,6 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
               ) : steps[currentStep].id === 'results' ? (
                 <ResultsPreview
                   formData={formData}
-                  onSave={handleSubmit}
                   onBack={handlePrevious}
                   studentName={studentName}
                 />
@@ -315,18 +371,17 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
           </AnimatePresence>
         </div>
 
-        {/* Navigation Buttons */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg flex justify-between items-center">
+        <div className="px-6 py-4 bg-neutral-950/60 border-t border-neutral-800 rounded-b-2xl flex justify-between items-center">
           <button
             onClick={handlePrevious}
             disabled={currentStep === 0}
-            className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center px-4 py-2 text-sm font-medium text-neutral-200 bg-neutral-900 border border-neutral-700 rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Anterior
           </button>
 
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-neutral-500">
             Passo {currentStep + 1} de {steps.length}
           </div>
 
@@ -334,7 +389,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center px-4 py-2 text-sm font-semibold text-black bg-yellow-500 border border-yellow-500 rounded-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-yellow-900/30"
             >
               <Save className="w-4 h-4 mr-2" />
               {loading ? 'Salvando...' : 'Salvar Avaliação'}
@@ -342,7 +397,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
           ) : (
             <button
               onClick={handleNext}
-              className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+              className="flex items-center px-4 py-2 text-sm font-semibold text-black bg-yellow-500 border border-yellow-500 rounded-lg hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-900/30"
             >
               Próximo
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -351,11 +406,10 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         </div>
       </div>
 
-      {/* Cancel Button */}
       <div className="mt-6 text-center">
         <button
           onClick={onCancel}
-          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors"
         >
           Cancelar avaliação
         </button>

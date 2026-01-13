@@ -1,7 +1,10 @@
 import React, { useState, useRef } from 'react';
+import NextImage from 'next/image';
 import { motion } from 'framer-motion';
 import { Camera, Upload, X, CheckCircle } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
+
+const PHOTO_PREVIEW_SIZE = 1024;
 
 interface PhotoUploadStepProps {
   formData: AssessmentFormData;
@@ -120,8 +123,8 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
       className="space-y-6"
     >
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Fotos da Avaliação</h2>
-        <p className="text-gray-600">Adicione fotos para acompanhar a evolução física (opcional)</p>
+        <h2 className="text-2xl font-bold text-white mb-2">Fotos da Avaliação</h2>
+        <p className="text-neutral-400">Adicione fotos para acompanhar a evolução física (opcional)</p>
       </div>
 
       <div className="grid gap-6">
@@ -129,23 +132,26 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
           const existingPhoto = photos.find(p => p.type === type);
 
           return (
-            <div key={type} className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+            <div key={type} className="border-2 border-dashed border-neutral-700 rounded-xl p-6 bg-neutral-900">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{label}</h3>
-                  <p className="text-sm text-gray-600">{description}</p>
+                  <h3 className="text-lg font-bold text-white">{label}</h3>
+                  <p className="text-sm text-neutral-400">{description}</p>
                 </div>
                 {existingPhoto && (
-                  <CheckCircle className="w-6 h-6 text-green-500" />
+                  <CheckCircle className="w-6 h-6 text-yellow-500" />
                 )}
               </div>
 
               {existingPhoto ? (
                 <div className="relative">
-                  <img
+                  <NextImage
                     src={existingPhoto.preview}
                     alt={`Foto ${label}`}
+                    width={PHOTO_PREVIEW_SIZE}
+                    height={PHOTO_PREVIEW_SIZE}
                     className="w-full h-48 object-cover rounded-lg"
+                    unoptimized
                   />
                   <button
                     onClick={() => removePhoto(existingPhoto.id)}
@@ -156,14 +162,14 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
                 </div>
               ) : (
                 <div
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+                  className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${isDragging ? 'border-yellow-500 bg-yellow-500/10' : 'border-neutral-700 hover:border-neutral-600'
                     }`}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, type)}
                 >
-                  <Camera className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-2">Arraste a foto aqui ou</p>
+                  <Camera className="w-12 h-12 text-neutral-500 mx-auto mb-4" />
+                  <p className="text-neutral-400 mb-2">Arraste a foto aqui ou</p>
                   <button
                     onClick={() => {
                       if (fileInputRef.current) {
@@ -174,7 +180,7 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
                         fileInputRef.current.click();
                       }
                     }}
-                    className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    className="inline-flex items-center px-4 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
                   >
                     <Upload className="w-4 h-4 mr-2" />
                     Escolher Foto
@@ -196,20 +202,20 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
       <div className="flex justify-between pt-6">
         <button
           onClick={onBack}
-          className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+          className="px-6 py-2 border border-neutral-700 bg-neutral-900 rounded-xl text-neutral-300 hover:bg-neutral-800 transition-colors"
         >
           Voltar
         </button>
         <button
           onClick={handleNext}
-          className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={!isComplete}
         >
           Próximo
         </button>
       </div>
 
-      <p className="text-sm text-gray-500 text-center">
+      <p className="text-sm text-neutral-500 text-center">
         As fotos são opcionais mas ajudam a visualizar a evolução física
       </p>
     </motion.div>

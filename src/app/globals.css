@@ -38,6 +38,14 @@
   }
 }
 
+.pb-safe-extra {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
+}
+
+.pt-header-safe {
+  padding-top: 80px;
+}
+
 /* Custom Utilities */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

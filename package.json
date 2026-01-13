@@ -3,6 +3,9 @@
   "version": "2.4.14",
   "private": true,
   "scripts": {
+    "predev": "node scripts/ensure-next-compiled-commander.mjs",
+    "prebuild": "node scripts/ensure-next-compiled-commander.mjs",
+    "prestart": "node scripts/ensure-next-compiled-commander.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -11,9 +14,12 @@
     "postversion": "git config user.email \"djmkapple@gmail.com\" && npx vercel --prod"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@supabase/auth-js": "^2.89.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.87.3",
     "chart.js": "^4.5.1",
+    "commander": "^12.1.0",
     "framer-motion": "^12.23.26",
     "html2pdf.js": "^0.12.1",
     "lucide-react": "^0.559.0",

@@ -6,46 +6,70 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return supabaseResponse
+  }
+
+  const redirectWithCookies = (url: URL) => {
+    const response = NextResponse.redirect(url)
+    try {
+      const cookies = supabaseResponse.cookies.getAll()
+      try {
+        ;(response.cookies as any).setAll?.(cookies)
+      } catch {}
+      cookies.forEach((cookie) => {
+        try {
+          response.cookies.set(cookie.name, cookie.value)
+        } catch {}
+      })
+    } catch {}
+    return response
+  }
+
+  let supabase: ReturnType<typeof createServerClient> | null = null
+  try {
+    supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
         getAll() {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
-          )
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, { ...(options || {}) })
           )
         },
       },
-    }
-  )
+    })
+  } catch {
+    return supabaseResponse
+  }
 
-  // IMPORTANT: Avoid writing any logic between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
+  if (!supabase) {
+    return supabaseResponse
+  }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let isAuthenticated = false
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    isAuthenticated = Boolean(user?.id)
+  } catch {
+    isAuthenticated = false
+  }
 
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith('/login') &&
-    !request.nextUrl.pathname.startsWith('/auth')
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
-    // const url = request.nextUrl.clone()
-    // url.pathname = '/login'
-    // return NextResponse.redirect(url)
+  const pathname = request.nextUrl.pathname
+
+  if (isAuthenticated && pathname === '/') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return redirectWithCookies(url)
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
