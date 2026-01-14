@@ -1701,11 +1701,11 @@ function IronTracksApp({ initialUser, initialProfile }) {
     );
 }
 
-export default function Home() {
+export default function IronTracksAppClient({ initialUser, initialProfile }) {
     return (
         <ErrorBoundary>
             <DialogProvider>
-                <IronTracksApp />
+                <IronTracksApp initialUser={initialUser} initialProfile={initialProfile} />
                 <GlobalDialog />
             </DialogProvider>
         </ErrorBoundary>
