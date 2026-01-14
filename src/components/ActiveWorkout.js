@@ -146,6 +146,12 @@ export default function ActiveWorkout(props) {
     return isObject(cfg) ? cfg : null;
   };
 
+  const getPlannedSet = (ex, setIdx) => {
+    const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
+    const sd = sdArr?.[setIdx] && typeof sdArr[setIdx] === 'object' ? sdArr[setIdx] : null;
+    return sd && typeof sd === 'object' ? sd : null;
+  };
+
   const getLog = (key) => {
     const v = logs?.[key];
     return v && typeof v === 'object' ? v : {};
@@ -380,12 +386,16 @@ export default function ActiveWorkout(props) {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
+    const plannedSet = getPlannedSet(ex, setIdx);
     const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
     const weightValue = String(log?.weight ?? cfg?.weight ?? '');
     const repsValue = String(log?.reps ?? '');
     const rpeValue = String(log?.rpe ?? '');
     const notesValue = String(log?.notes ?? '');
     const done = !!log?.done;
+
+    const plannedReps = String(plannedSet?.reps ?? ex?.reps ?? '').trim();
+    const plannedRpe = String(plannedSet?.rpe ?? ex?.rpe ?? '').trim();
 
     const isHeaderRow = setIdx === 0;
     const notesId = `notes-${key}`;
@@ -412,10 +422,147 @@ export default function ActiveWorkout(props) {
             <div className="ml-auto flex items-center gap-2">Ações</div>
           </div>
         )}
-        <div className="rounded-lg bg-neutral-900/40 border border-neutral-800 px-2 py-2 space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-            <div className="flex items-center gap-1 ml-auto sm:ml-0">
+        <div className="rounded-lg bg-neutral-900/40 border border-neutral-800 px-2 py-2 space-y-2 sm:space-y-0">
+          <div className="sm:hidden">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+                {plannedReps ? (
+                  <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 truncate">
+                    Reps: {plannedReps}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-1 ml-auto">
+                <button
+                  type="button"
+                  onClick={toggleNotes}
+                  className={
+                    isNotesOpen || hasNotes
+                      ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                      : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+                  }
+                >
+                  <MessageSquare size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextDone = !done;
+                    updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
+                    if (nextDone && restTime && restTime > 0) {
+                      startTimer(restTime, { kind: 'rest', key });
+                    }
+                  }}
+                  className={
+                    done
+                      ? 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black font-black shadow-yellow-500/20 shadow-sm active:scale-95 transition duration-150'
+                      : 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150'
+                  }
+                >
+                  <Check size={16} />
+                  <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 mt-2">
+              <input
+                inputMode="decimal"
+                value={weightValue}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? '';
+                  updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                }}
+                placeholder="Peso (kg)"
+                className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+              />
+              <div className="relative">
+                <input
+                  inputMode="decimal"
+                  value={repsValue}
+                  onChange={(e) => {
+                    const v = e?.target?.value ?? '';
+                    updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                  }}
+                  placeholder="Reps"
+                  className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 pr-10 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+                />
+                {plannedReps ? (
+                  <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-200/70 bg-black/30 border border-neutral-700/60 rounded px-1.5 py-0.5">
+                    {plannedReps}
+                  </div>
+                ) : null}
+              </div>
+              <div className="relative">
+                <input
+                  inputMode="decimal"
+                  value={rpeValue}
+                  onChange={(e) => {
+                    const v = e?.target?.value ?? '';
+                    updateLog(key, { rpe: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                  }}
+                  placeholder="RPE"
+                  className="w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-1.5 pr-10 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
+                />
+                {plannedRpe ? (
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-yellow-500/45">
+                    {plannedRpe}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+            <div className="w-24">
+              <input
+                inputMode="decimal"
+                value={weightValue}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? '';
+                  updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                }}
+                placeholder="Peso (kg)"
+                className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+              />
+            </div>
+            <div className="w-24 relative">
+              <input
+                inputMode="decimal"
+                value={repsValue}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? '';
+                  updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                }}
+                placeholder="Reps"
+                className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 pr-10 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+              />
+              {plannedReps ? (
+                <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-200/70 bg-black/30 border border-neutral-700/60 rounded px-1.5 py-0.5">
+                  {plannedReps}
+                </div>
+              ) : null}
+            </div>
+            <div className="w-24 relative">
+              <input
+                inputMode="decimal"
+                value={rpeValue}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? '';
+                  updateLog(key, { rpe: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                }}
+                placeholder="RPE"
+                className="w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-1.5 pr-10 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
+              />
+              {plannedRpe ? (
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-yellow-500/45">
+                  {plannedRpe}
+                </div>
+              ) : null}
+            </div>
+            <div className="ml-auto flex items-center gap-2">
               <button
                 type="button"
                 onClick={toggleNotes}
@@ -446,39 +593,6 @@ export default function ActiveWorkout(props) {
                 <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
               </button>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 sm:max-w-sm">
-            <input
-              inputMode="decimal"
-              value={weightValue}
-              onChange={(e) => {
-                const v = e?.target?.value ?? '';
-                updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-              }}
-              placeholder="Peso (kg)"
-              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
-            />
-            <input
-              inputMode="decimal"
-              value={repsValue}
-              onChange={(e) => {
-                const v = e?.target?.value ?? '';
-                updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-              }}
-              placeholder="Reps"
-              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
-            />
-            <input
-              inputMode="decimal"
-              value={rpeValue}
-              onChange={(e) => {
-                const v = e?.target?.value ?? '';
-                updateLog(key, { rpe: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-              }}
-              placeholder="RPE"
-              className="w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-1.5 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
-            />
           </div>
         </div>
         {isNotesOpen && (
@@ -841,6 +955,7 @@ export default function ActiveWorkout(props) {
 
   const renderExercise = (ex, exIdx) => {
     const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
+    const observation = String(ex?.notes || '').trim();
     const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
     const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
     const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
@@ -866,6 +981,14 @@ export default function ActiveWorkout(props) {
               <span className="opacity-30">•</span>
               <span className="truncate">{String(ex?.method || 'Normal')}</span>
             </div>
+            {observation ? (
+              <div className="mt-2 rounded-xl bg-neutral-900/50 border border-yellow-500/20 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-widest text-yellow-500 font-black">
+                  Observação do professor
+                </div>
+                <div className="mt-1 text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>
+              </div>
+            ) : null}
           </div>
           <div className="mt-1 text-neutral-400">
             {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
@@ -905,8 +1028,9 @@ export default function ActiveWorkout(props) {
   return (
     <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
       <div className="sticky top-0 z-40 bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 py-4 pt-safe">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
             <BackButton onClick={props?.onBack} />
             <button
               type="button"
@@ -926,12 +1050,15 @@ export default function ActiveWorkout(props) {
               <UserPlus size={16} />
               <span className="text-sm font-black hidden sm:inline">Convidar</span>
             </button>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="font-black text-white truncate text-right">{String(workout?.title || 'Treino')}</div>
-            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-1">
+            </div>
+            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2">
               <Clock size={14} className="text-yellow-500" />
               <span className="font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
+            </div>
+          </div>
+          <div className="mt-2 px-1">
+            <div className="font-black text-white text-center leading-tight break-words">
+              {String(workout?.title || 'Treino')}
             </div>
           </div>
         </div>

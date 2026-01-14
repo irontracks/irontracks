@@ -1,5 +1,4 @@
 import "./globals.css";
-import DeployBadge from './_components/DeployBadge'
 
 export const metadata = {
   title: "IronTracks - Alta Performance",
@@ -37,7 +36,6 @@ export default function RootLayout({ children }) {
         className="antialiased bg-neutral-950 text-white"
       >
         {children}
-        <DeployBadge />
       </body>
     </html>
   );

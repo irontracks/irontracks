@@ -91,24 +91,106 @@ const fitCover = ({ canvasW, canvasH, imageW, imageH }) => {
   return { scale: coverScale, dw, dh }
 }
 
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n))
-
 const storyLayouts = [
   { id: 'bottom-row', label: 'Normal' },
   { id: 'right-stack', label: 'Direita' },
   { id: 'left-stack', label: 'Esquerda' },
   { id: 'top-row', label: 'Topo' },
+  { id: 'live', label: 'LIVE' },
 ]
+
+const defaultLivePositions = {
+  brand: { x: 0.083, y: 0.14 },
+  title: { x: 0.083, y: 0.245 },
+  subtitle: { x: 0.083, y: 0.365 },
+  cardVolume: { x: 0.083, y: 0.66 },
+  cardTempo: { x: 0.37, y: 0.66 },
+  cardKcal: { x: 0.657, y: 0.66 },
+}
+
+const clamp01 = (n) => Math.max(0, Math.min(1, Number(n) || 0))
+
+const clampPctWithSize = ({ pos, size }) => {
+  const px = clamp01(pos?.x)
+  const py = clamp01(pos?.y)
+  const sw = clamp01(size?.w)
+  const sh = clamp01(size?.h)
+  return {
+    x: Math.max(0, Math.min(1 - sw, px)),
+    y: Math.max(0, Math.min(1 - sh, py)),
+  }
+}
+
+const computeLiveSizes = ({ ctx, metrics }) => {
+  try {
+    const left = SAFE_SIDE
+    const right = CANVAS_W - SAFE_SIDE
+    const title = safeString(metrics?.title).toUpperCase()
+    const words = title.split(/\s+/).filter(Boolean)
+    const lines = []
+    let line = ''
+    ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+    for (const w of words) {
+      const candidate = line ? `${line} ${w}` : w
+      if (ctx.measureText(candidate).width <= right - left) line = candidate
+      else {
+        if (line) lines.push(line)
+        line = w
+      }
+      if (lines.length >= 2) break
+    }
+    if (line && lines.length < 2) lines.push(line)
+
+    const brandW = (() => {
+      ctx.font = 'italic 900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+      const ironW = ctx.measureText('IRON').width
+      const tracksW = ctx.measureText('TRACKS').width
+      return ironW + tracksW
+    })()
+    const brandH = 56
+
+    const titleW = (() => {
+      ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+      return Math.max(...lines.map((l) => ctx.measureText(l).width), 0)
+    })()
+    const titleH = lines.length * 40
+
+    const subtitleW = (() => {
+      ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+      const dateText = metrics?.date ? `• ${metrics.date}` : ''
+      return ctx.measureText(`RELATÓRIO DO TREINO ${dateText}`.trim()).width
+    })()
+    const subtitleH = 34
+
+    const cardW = Math.floor((right - left - 18 * 2) / 3)
+    const cardH = 130
+
+    return {
+      brand: { w: brandW / CANVAS_W, h: brandH / CANVAS_H },
+      title: { w: titleW / CANVAS_W, h: titleH / CANVAS_H },
+      subtitle: { w: subtitleW / CANVAS_W, h: subtitleH / CANVAS_H },
+      card: { w: cardW / CANVAS_W, h: cardH / CANVAS_H },
+      titleLines: lines,
+    }
+  } catch {
+    return {
+      brand: { w: 0.5, h: 0.04 },
+      title: { w: 0.7, h: 0.08 },
+      subtitle: { w: 0.8, h: 0.04 },
+      card: { w: 0.26, h: 0.07 },
+      titleLines: [],
+    }
+  }
+}
 
 const drawStory = ({
   ctx,
   canvasW,
   canvasH,
   backgroundImage,
-  zoom,
-  offset,
   metrics,
   layout,
+  livePositions,
 }) => {
   ctx.clearRect(0, 0, canvasW, canvasH)
   ctx.fillStyle = '#000000'
@@ -118,11 +200,10 @@ const drawStory = ({
     const iw = Number(backgroundImage.naturalWidth) || 0
     const ih = Number(backgroundImage.naturalHeight) || 0
     const { scale: coverScale } = fitCover({ canvasW, canvasH, imageW: iw, imageH: ih })
-    const finalScale = coverScale * (Number(zoom) || 1)
-    const dw = iw * finalScale
-    const dh = ih * finalScale
-    const cx = (canvasW - dw) / 2 + (Number(offset?.x) || 0)
-    const cy = (canvasH - dh) / 2 + (Number(offset?.y) || 0)
+    const dw = iw * coverScale
+    const dh = ih * coverScale
+    const cx = (canvasW - dw) / 2
+    const cy = (canvasH - dh) / 2
     ctx.drawImage(backgroundImage, cx, cy, dw, dh)
   } else {
     const g = ctx.createLinearGradient(0, 0, canvasW, canvasH)
@@ -141,6 +222,93 @@ const drawStory = ({
   const left = SAFE_SIDE
   const right = canvasW - SAFE_SIDE
   const safeBottomY = canvasH - SAFE_BOTTOM
+
+  const gap = 18
+  const cardH = 130
+
+  const layoutId = storyLayouts.some((l) => l.id === layout) ? layout : 'bottom-row'
+
+  if (layoutId === 'live') {
+    const safe = livePositions && typeof livePositions === 'object' ? livePositions : defaultLivePositions
+    const sizes = computeLiveSizes({ ctx, metrics })
+
+    const brandPos = clampPctWithSize({ pos: safe.brand, size: sizes.brand })
+    const titlePos = clampPctWithSize({ pos: safe.title, size: sizes.title })
+    const subtitlePos = clampPctWithSize({ pos: safe.subtitle, size: sizes.subtitle })
+
+    const cardVolumePos = clampPctWithSize({ pos: safe.cardVolume, size: sizes.card })
+    const cardTempoPos = clampPctWithSize({ pos: safe.cardTempo, size: sizes.card })
+    const cardKcalPos = clampPctWithSize({ pos: safe.cardKcal, size: sizes.card })
+
+    const brandX = brandPos.x * CANVAS_W
+    const brandY = brandPos.y * CANVAS_H
+
+    ctx.textBaseline = 'top'
+    ctx.font = 'italic 900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+    ctx.fillStyle = '#ffffff'
+    ctx.fillText('IRON', brandX, brandY)
+    const ironW = ctx.measureText('IRON').width
+    ctx.fillStyle = '#facc15'
+    ctx.fillText('TRACKS', brandX + ironW, brandY)
+
+    const titleX = titlePos.x * CANVAS_W
+    const titleY = titlePos.y * CANVAS_H
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+    ;(sizes.titleLines ?? []).forEach((l, idx) => {
+      ctx.fillText(l, titleX, titleY + idx * 40)
+    })
+
+    const subtitleX = subtitlePos.x * CANVAS_W
+    const subtitleY = subtitlePos.y * CANVAS_H
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'
+    ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+    const dateText = metrics?.date ? `• ${metrics.date}` : ''
+    ctx.fillText(`RELATÓRIO DO TREINO ${dateText}`.trim(), subtitleX, subtitleY)
+
+    const cards = [
+      { label: 'VOLUME', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` },
+      { label: 'TEMPO', value: formatDuration(metrics?.totalTime) },
+      { label: 'KCAL', value: String(metrics?.kcal || 0) },
+    ]
+
+    const cardFill = 'rgba(0,0,0,0.62)'
+    const cardStroke = 'rgba(255,255,255,0.18)'
+
+    const drawCard = (box, c) => {
+      if (!box || !c) return
+      const x = box.x
+      const y = box.y
+      const w = box.w
+      const h = box.h
+      ctx.save()
+      drawRoundedRect(ctx, x, y, w, h, 26)
+      ctx.fillStyle = cardFill
+      ctx.fill()
+      ctx.lineWidth = 2
+      ctx.strokeStyle = cardStroke
+      ctx.stroke()
+      ctx.restore()
+
+      ctx.fillStyle = 'rgba(255,255,255,0.65)'
+      ctx.font = '900 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+      ctx.fillText(c.label, x + 22, y + 18)
+
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '900 42px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+      ctx.fillText(c.value, x + 22, y + 54)
+    }
+
+    const cardW = Math.floor((CANVAS_W - SAFE_SIDE * 2 - gap * 2) / 3)
+    const cardsBoxes = [
+      { x: cardVolumePos.x * CANVAS_W, y: cardVolumePos.y * CANVAS_H, w: cardW, h: cardH },
+      { x: cardTempoPos.x * CANVAS_W, y: cardTempoPos.y * CANVAS_H, w: cardW, h: cardH },
+      { x: cardKcalPos.x * CANVAS_W, y: cardKcalPos.y * CANVAS_H, w: cardW, h: cardH },
+    ]
+
+    cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c))
+    return
+  }
 
   ctx.textBaseline = 'top'
 
@@ -175,11 +343,6 @@ const drawStory = ({
     { label: 'TEMPO', value: formatDuration(metrics?.totalTime) },
     { label: 'KCAL', value: String(metrics?.kcal || 0) },
   ]
-
-  const gap = 18
-  const cardH = 130
-
-  const layoutId = storyLayouts.some((l) => l.id === layout) ? layout : 'bottom-row'
 
   let titleY = 0
   let subtitleY = 0
@@ -267,18 +430,16 @@ export default function StoryComposer({ open, session, onClose }) {
   const previewCanvasRef = useRef(null)
   const inputRef = useRef(null)
   const scrollAreaRef = useRef(null)
-  const pointersRef = useRef(new Map())
-  const pinchRef = useRef({ startDist: 0, startZoom: 1 })
-  const touchScrollRef = useRef({ startY: 0, scrollEl: null })
 
   const [backgroundUrl, setBackgroundUrl] = useState('')
   const [backgroundImage, setBackgroundImage] = useState(null)
-  const [offset, setOffset] = useState({ x: 0, y: 0 })
-  const [zoom, setZoom] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [showSafeGuide, setShowSafeGuide] = useState(true)
   const [layout, setLayout] = useState('bottom-row')
+  const [livePositions, setLivePositions] = useState(defaultLivePositions)
+  const [draggingKey, setDraggingKey] = useState(null)
+  const dragRef = useRef({ key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } })
 
   const metrics = useMemo(() => {
     const title = safeString(session?.workoutTitle || session?.name || 'Treino')
@@ -296,90 +457,68 @@ export default function StoryComposer({ open, session, onClose }) {
     }
   }, [session])
 
+  const liveSizes = useMemo(() => {
+    try {
+      if (typeof window === 'undefined') return computeLiveSizes({ ctx: null, metrics })
+      const c = document.createElement('canvas')
+      const ctx = c.getContext('2d')
+      if (!ctx) return computeLiveSizes({ ctx: null, metrics })
+      return computeLiveSizes({ ctx, metrics })
+    } catch {
+      return computeLiveSizes({ ctx: null, metrics })
+    }
+  }, [metrics])
+
   useEffect(() => {
     if (!open) return
     setError('')
     setBusy(false)
     setShowSafeGuide(true)
-    pointersRef.current = new Map()
+    setLivePositions(defaultLivePositions)
+    setDraggingKey(null)
+    dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
   }, [open])
 
   useEffect(() => {
     if (!open) return
-    const prevHtmlOverflow = document.documentElement.style.overflow
-    const prevBodyOverflow = document.body.style.overflow
-    const prevBodyOverscroll = document.body.style.overscrollBehavior
-    document.documentElement.style.overflow = 'hidden'
+
+    const scrollY = window.scrollY
+    const originalStyle = {
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+      overflow: document.body.style.overflow,
+    }
+
+    document.body.style.position = 'fixed'
+    document.body.style.top = `-${scrollY}px`
+    document.body.style.width = '100%'
     document.body.style.overflow = 'hidden'
-    document.body.style.overscrollBehavior = 'contain'
+
     return () => {
-      document.documentElement.style.overflow = prevHtmlOverflow
-      document.body.style.overflow = prevBodyOverflow
-      document.body.style.overscrollBehavior = prevBodyOverscroll
+      document.body.style.position = originalStyle.position
+      document.body.style.top = originalStyle.top
+      document.body.style.width = originalStyle.width
+      document.body.style.overflow = originalStyle.overflow
+      window.scrollTo(0, scrollY)
     }
   }, [open])
 
   useEffect(() => {
     if (!open) return
-    const overlay = overlayRef.current
-    if (!overlay) return
-
-    const getScrollEl = (target) => {
+    const prevent = (e) => {
       try {
-        const el = scrollAreaRef.current
-        if (!el) return null
-        if (!(target instanceof Node)) return null
-        return el.contains(target) ? el : null
-      } catch {
-        return null
-      }
-    }
-
-    const onTouchStart = (ev) => {
-      try {
-        const y = ev?.touches?.[0]?.clientY
-        touchScrollRef.current = {
-          startY: typeof y === 'number' ? y : 0,
-          scrollEl: getScrollEl(ev?.target),
-        }
-      } catch {}
-    }
-
-    const onTouchMove = (ev) => {
-      try {
-        const scrollEl = touchScrollRef.current?.scrollEl
-        const y = ev?.touches?.[0]?.clientY
-        const currentY = typeof y === 'number' ? y : 0
-        const startY = Number(touchScrollRef.current?.startY || 0)
-        const deltaY = currentY - startY
-
-        if (!scrollEl) {
-          ev.preventDefault()
-          return
-        }
-
-        const canScroll = scrollEl.scrollHeight > scrollEl.clientHeight + 1
-        if (!canScroll) {
-          ev.preventDefault()
-          return
-        }
-
-        const atTop = scrollEl.scrollTop <= 0
-        const atBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 1
-
-        if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
-          ev.preventDefault()
-        }
+        e.preventDefault()
       } catch {
       }
     }
-
-    overlay.addEventListener('touchstart', onTouchStart, { passive: true })
-    overlay.addEventListener('touchmove', onTouchMove, { passive: false })
-
+    document.addEventListener('gesturestart', prevent, { passive: false })
+    document.addEventListener('gesturechange', prevent, { passive: false })
+    document.addEventListener('gestureend', prevent, { passive: false })
     return () => {
-      overlay.removeEventListener('touchstart', onTouchStart)
-      overlay.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('gesturestart', prevent)
+      document.removeEventListener('gesturechange', prevent)
+      document.removeEventListener('gestureend', prevent)
     }
   }, [open])
 
@@ -410,75 +549,93 @@ export default function StoryComposer({ open, session, onClose }) {
       }
       setBackgroundUrl(url)
       setBackgroundImage(img)
-      setOffset({ x: 0, y: 0 })
-      setZoom(1)
     } catch {
       setError('Não foi possível carregar a imagem.')
     }
   }
 
-  const onPointerDown = (e) => {
+  const getSizeForKey = (key) => {
+    if (key === 'brand') return liveSizes?.brand ?? { w: 0.5, h: 0.05 }
+    if (key === 'title') return liveSizes?.title ?? { w: 0.7, h: 0.08 }
+    if (key === 'subtitle') return liveSizes?.subtitle ?? { w: 0.8, h: 0.05 }
+    return liveSizes?.card ?? { w: 0.26, h: 0.08 }
+  }
+
+  const onPiecePointerDown = (key, e) => {
     try {
-      if (!backgroundImage) return
-      const next = new Map(pointersRef.current)
-      next.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      pointersRef.current = next
-      if (next.size === 2) {
-        const pts = Array.from(next.values())
-        const dx = pts[0].x - pts[1].x
-        const dy = pts[0].y - pts[1].y
-        pinchRef.current = { startDist: Math.hypot(dx, dy), startZoom: zoom }
-      }
+      if (layout !== 'live') return
+      if (!key) return
+      if (!e?.currentTarget) return
+      if (typeof e?.pointerId !== 'number') return
+      e.preventDefault?.()
+      e.stopPropagation?.()
+      const startPos = livePositions?.[key] ?? defaultLivePositions?.[key] ?? { x: 0.1, y: 0.1 }
+      dragRef.current = { key, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startPos }
+      setDraggingKey(key)
       e.currentTarget?.setPointerCapture?.(e.pointerId)
     } catch {
     }
   }
 
-  const onPointerMove = (e) => {
+  const onPiecePointerMove = (key, e) => {
     try {
+      if (layout !== 'live') return
+      const activeKey = dragRef.current?.key
+      const activePointerId = dragRef.current?.pointerId
+      if (!activeKey || activeKey !== key) return
+      if (typeof activePointerId !== 'number') return
+      if (e?.pointerId !== activePointerId) return
       const preview = previewRef.current
-      if (!preview) return
-      const rect = preview.getBoundingClientRect()
-      if (!rect.width || !rect.height) return
-
-      const next = new Map(pointersRef.current)
-      const prevPoint = next.get(e.pointerId)
-      next.set(e.pointerId, { x: e.clientX, y: e.clientY })
-      pointersRef.current = next
-
-      if (next.size === 2) {
-        const pts = Array.from(next.values())
-        const dx = pts[0].x - pts[1].x
-        const dy = pts[0].y - pts[1].y
-        const dist = Math.hypot(dx, dy)
-        const base = pinchRef.current?.startDist || 0
-        const ratio = base > 0 ? dist / base : 1
-        const z = clamp((pinchRef.current?.startZoom || 1) * ratio, 1, 1.8)
-        setZoom(z)
-        return
-      }
-
-      if (next.size !== 1) return
-      if (!prevPoint) return
-
-      const dx = e.clientX - prevPoint.x
-      const dy = e.clientY - prevPoint.y
-
-      const scaleX = CANVAS_W / rect.width
-      const scaleY = CANVAS_H / rect.height
-
-      setOffset((prev) => ({ x: (prev?.x || 0) + dx * scaleX, y: (prev?.y || 0) + dy * scaleY }))
+      const rect = preview?.getBoundingClientRect?.()
+      if (!rect?.width || !rect?.height) return
+      e.preventDefault?.()
+      e.stopPropagation?.()
+      const dxPct = (Number(e.clientX) - Number(dragRef.current?.startX || 0)) / rect.width
+      const dyPct = (Number(e.clientY) - Number(dragRef.current?.startY || 0)) / rect.height
+      const startPos = dragRef.current?.startPos ?? { x: 0, y: 0 }
+      const nextPos = { x: (Number(startPos.x) || 0) + dxPct, y: (Number(startPos.y) || 0) + dyPct }
+      const size = getSizeForKey(key)
+      const clamped = clampPctWithSize({ pos: nextPos, size })
+      setLivePositions((prev) => ({ ...(prev ?? defaultLivePositions), [key]: clamped }))
     } catch {
     }
   }
 
-  const onPointerUp = (e) => {
+  const onPiecePointerUp = (key, e) => {
     try {
-      const next = new Map(pointersRef.current)
-      next.delete(e.pointerId)
-      pointersRef.current = next
-      e.currentTarget?.releasePointerCapture?.(e.pointerId)
+      const activeKey = dragRef.current?.key
+      const activePointerId = dragRef.current?.pointerId
+      if (!activeKey || activeKey !== key) return
+      if (typeof activePointerId !== 'number') return
+      if (e?.pointerId !== activePointerId) return
+      e.preventDefault?.()
+      e.stopPropagation?.()
+      e.currentTarget?.releasePointerCapture?.(activePointerId)
+      dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
+      setDraggingKey(null)
     } catch {
+    }
+  }
+
+  const livePieces = useMemo(() => {
+    return [
+      { key: 'brand', label: 'IRONTRACKS' },
+      { key: 'title', label: 'TREINO' },
+      { key: 'subtitle', label: 'RELATÓRIO' },
+      { key: 'cardVolume', label: 'VOLUME' },
+      { key: 'cardTempo', label: 'TEMPO' },
+      { key: 'cardKcal', label: 'KCAL' },
+    ]
+  }, [])
+
+  const onSelectLayout = (nextLayout) => {
+    try {
+      const value = safeString(nextLayout)
+      setLayout(value || 'bottom-row')
+      setDraggingKey(null)
+      dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
+    } catch {
+      setLayout('bottom-row')
     }
   }
 
@@ -488,7 +645,7 @@ export default function StoryComposer({ open, session, onClose }) {
     canvas.height = CANVAS_H
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('no_ctx')
-    drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics, layout })
+    drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions })
     return canvas
   }
 
@@ -500,11 +657,11 @@ export default function StoryComposer({ open, session, onClose }) {
     if (!ctx) return
     let raf = 0
     const draw = () => {
-      drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics, layout })
+      drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions })
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, zoom, offset.x, offset.y, metrics, layout])
+  }, [open, backgroundImage, metrics, layout, livePositions])
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob)
@@ -555,7 +712,7 @@ export default function StoryComposer({ open, session, onClose }) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm overscroll-contain"
+      className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm"
       onMouseDown={() => {
         if (!busy) onClose?.()
       }}
@@ -570,7 +727,7 @@ export default function StoryComposer({ open, session, onClose }) {
               <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Foto</div>
               <div className="text-white font-black truncate">{metrics.title || 'Treino'}</div>
               <div className="text-[11px] text-neutral-400 font-semibold truncate">
-                Escolha uma foto de fundo e arraste para ajustar
+                Escolha uma foto de fundo
               </div>
             </div>
             <button
@@ -589,10 +746,7 @@ export default function StoryComposer({ open, session, onClose }) {
             <div className="flex flex-col items-center gap-3">
               <div
                 ref={previewRef}
-                className="relative w-full max-w-[380px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-black touch-none"
-                onPointerDown={onPointerDown}
-                onPointerMove={onPointerMove}
-                onPointerUp={onPointerUp}
+                className="relative w-full max-w-[380px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-black"
               >
                 <canvas
                   ref={previewCanvasRef}
@@ -614,6 +768,38 @@ export default function StoryComposer({ open, session, onClose }) {
                       }}
                     />
                   </>
+                ) : null}
+
+                {layout === 'live' ? (
+                  <div className="absolute inset-0 pointer-events-none">
+                    {livePieces.map((p) => {
+                      const pos = livePositions?.[p.key] ?? defaultLivePositions?.[p.key] ?? { x: 0.1, y: 0.1 }
+                      const isDragging = draggingKey === p.key
+                      return (
+                        <button
+                          key={p.key}
+                          type="button"
+                          className={[
+                            'absolute pointer-events-auto select-none touch-none',
+                            'px-2 py-1 rounded-xl border text-[10px] font-black uppercase tracking-widest',
+                            isDragging
+                              ? 'bg-yellow-500 text-black border-yellow-500'
+                              : 'bg-neutral-900/80 text-white border-neutral-700',
+                          ].join(' ')}
+                          style={{
+                            left: `${clamp01(pos.x) * 100}%`,
+                            top: `${clamp01(pos.y) * 100}%`,
+                          }}
+                          onPointerDown={(e) => onPiecePointerDown(p.key, e)}
+                          onPointerMove={(e) => onPiecePointerMove(p.key, e)}
+                          onPointerUp={(e) => onPiecePointerUp(p.key, e)}
+                          onPointerCancel={(e) => onPiecePointerUp(p.key, e)}
+                        >
+                          {p.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 ) : null}
               </div>
 
@@ -660,7 +846,7 @@ export default function StoryComposer({ open, session, onClose }) {
                     <button
                       key={l.id}
                       type="button"
-                      onClick={() => setLayout(l.id)}
+                      onClick={() => onSelectLayout(l.id)}
                       className={[
                         'h-11 rounded-2xl border text-xs font-black uppercase tracking-widest',
                         layout === l.id
@@ -673,6 +859,21 @@ export default function StoryComposer({ open, session, onClose }) {
                     </button>
                   ))}
                 </div>
+                {layout === 'live' ? (
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="text-[11px] text-neutral-400 font-semibold">
+                      Toque e arraste as tags no preview
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLivePositions(defaultLivePositions)}
+                      className="h-9 px-3 rounded-2xl bg-neutral-900 border border-neutral-800 text-white font-black uppercase tracking-widest text-[10px] hover:bg-neutral-800"
+                      disabled={busy}
+                    >
+                      Reset LIVE
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <button
