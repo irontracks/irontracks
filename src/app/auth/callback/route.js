@@ -14,7 +14,14 @@ export async function GET(request) {
   const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
   const isLocalEnv = process.env.NODE_ENV === 'development'
   const baseOrigin = forwardedHost && !isLocalEnv ? `${forwardedProto}://${forwardedHost}` : originFromUrl
-  const safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
+  let safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
+  if (!isLocalEnv) {
+    try {
+      const u = new URL(safeOrigin)
+      u.protocol = 'https:'
+      safeOrigin = u.origin
+    } catch {}
+  }
   const rawNext = String(next || '/dashboard')
   const safeNext = rawNext.startsWith('/') ? rawNext : '/dashboard'
   const redirectUrl = new URL(safeNext, safeOrigin)

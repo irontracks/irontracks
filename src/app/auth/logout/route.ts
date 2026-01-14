@@ -11,7 +11,14 @@ export async function GET(request: Request) {
   const forwardedProto = (request.headers.get('x-forwarded-proto') || 'https').trim()
   const isLocalEnv = process.env.NODE_ENV === 'development'
   const baseOrigin = forwardedHost && !isLocalEnv ? `${forwardedProto}://${forwardedHost}` : originFromUrl
-  const safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
+  let safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
+  if (!isLocalEnv) {
+    try {
+      const u = new URL(safeOrigin)
+      u.protocol = 'https:'
+      safeOrigin = u.origin
+    } catch {}
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
