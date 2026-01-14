@@ -138,10 +138,10 @@ const mapWorkoutRow = (w) => {
 	};
 };
 
-function IronTracksApp() {
+function IronTracksApp({ initialUser, initialProfile }) {
     const { confirm, alert } = useDialog();
-    const [user, setUser] = useState(null);
-    const [authLoading, setAuthLoading] = useState(true); // Start loading
+    const [user, setUser] = useState(initialUser ?? null);
+    const [authLoading, setAuthLoading] = useState(false);
     const [view, setView] = useState('dashboard');
     const [directChat, setDirectChat] = useState(null);
     const [workouts, setWorkouts] = useState([]);
@@ -178,9 +178,7 @@ function IronTracksApp() {
     const [showAdminPanel, setShowAdminPanel] = useState(false);
     const userSettingsApi = useUserSettings(user?.id)
 
-    const supabaseRef = useRef(null);
-    if (!supabaseRef.current) supabaseRef.current = createClient();
-    const supabase = supabaseRef.current;
+    const supabase = useRef(createClient()).current;
     const router = useRouter();
     const isFetching = useRef(false);
 
@@ -693,235 +691,16 @@ function IronTracksApp() {
         };
     }, [supabase, user?.id, view]);
 
-    // LOGICA DE AUTH SIMPLIFICADA E ROBUSTA
     useEffect(() => {
-        let mounted = true;
-        let watchdog;
-        let recoveryTimer;
-
-        const AUTH_WATCHDOG_TIMEOUT_MS = 5000;
-        const AUTH_RECOVERY_RETRY_DELAY_MS = 350;
-        const AUTH_RECOVERY_MAX_RETRIES = 4;
-        let recoveryAttempts = 0;
-
-        const checkUser = async () => {
-            try {
-                let currentUser = null;
-                try {
-                    const { data: { session } } = await supabase.auth.getSession();
-                    currentUser = session?.user ?? null;
-                } catch (_) {}
-                if (!currentUser) {
-                    const { data: { user: u } } = await supabase.auth.getUser();
-                    currentUser = u ?? null;
-                }
-
-                if (mounted) {
-                    if (currentUser) {
-                        recoveryAttempts = 0;
-                        const meta = currentUser?.user_metadata || {};
-                        const emailRaw = String(currentUser?.email || '').trim();
-                        const emailUser = emailRaw.includes('@') ? emailRaw.split('@')[0] : (emailRaw || 'Usuário');
-                        const displayName = meta?.full_name || meta?.name || emailUser;
-                        const photoURL = meta?.avatar_url || meta?.picture || null;
-                        const normalizedEmail = emailRaw.toLowerCase().trim();
-
-                        let resolvedRole = 'user';
-                        let resolvedIsCoach = false;
-                        let resolvedCoachPending = false;
-
-                        if (normalizedEmail && normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
-                            resolvedRole = 'admin';
-                            resolvedIsCoach = true;
-                        } else {
-                            try {
-                                const { data: p } = await supabase
-                                    .from('profiles')
-                                    .select('role')
-                                    .eq('id', currentUser.id)
-                                    .maybeSingle();
-                                const pr = (p?.role || '').toLowerCase();
-                                if (pr === 'admin' || pr === 'teacher') {
-                                    resolvedRole = pr;
-                                    resolvedIsCoach = true;
-                                }
-                            } catch (_) {}
-
-                            try {
-                                const r = await fetch('/api/teachers/me', { cache: 'no-store' });
-                                const j = await r.json();
-                                const st = (j?.teacher?.status || j?.teacher?.payment_status || '').toLowerCase().trim();
-                                const teacherUserId = j?.teacher?.user_id || null;
-                                const teacherEmail = String(j?.teacher?.email || '').toLowerCase().trim();
-                                const isTeacherOwner = Boolean(
-                                    teacherUserId && teacherUserId === currentUser.id && teacherEmail && teacherEmail === normalizedEmail
-                                );
-                                if (j.ok && j.teacher && (st === 'active' || st === 'pending')) {
-                                    resolvedRole = 'teacher';
-                                    resolvedIsCoach = true;
-                                    resolvedCoachPending = st === 'pending';
-                                }
-                                if (isTeacherOwner && (st === 'cancelar' || st === 'cancelled')) {
-                                    await alert('Sua conta está suspensa. Entre em contato com o administrador.');
-                                }
-                            } catch (_) {}
-                        }
-
-                        const nextUser = {
-                            ...currentUser,
-                            displayName,
-                            photoURL,
-                            role: resolvedRole,
-                            email: normalizedEmail || currentUser.email,
-                        };
-
-                        setUser(prev => {
-                            if (!prev) return nextUser;
-                            if (prev.id !== nextUser.id) return nextUser;
-                            if (prev.role !== nextUser.role) return nextUser;
-                            if (prev.displayName !== nextUser.displayName) return nextUser;
-                            if (prev.photoURL !== nextUser.photoURL) return nextUser;
-                            return prev;
-                        });
-
-                        setIsCoach(Boolean(resolvedIsCoach));
-                        setCoachPending(Boolean(resolvedCoachPending));
-                    } else {
-                        const isInDashboard =
-                            typeof window !== 'undefined' &&
-                            String(window.location?.pathname || '').startsWith('/dashboard');
-                        if (isInDashboard && recoveryAttempts < AUTH_RECOVERY_MAX_RETRIES) {
-                            recoveryAttempts += 1;
-                            try { console.log('Redirecionamento bloqueado para debug'); } catch {}
-                            setAuthLoading(true);
-                            try { clearTimeout(recoveryTimer); } catch {}
-                            recoveryTimer = setTimeout(() => {
-                                try { if (mounted) checkUser(); } catch {}
-                            }, AUTH_RECOVERY_RETRY_DELAY_MS);
-                            return;
-                        }
-                        setUser(null);
-                    }
-                    setAuthLoading(false);
-                }
-            } catch (error) {
-                console.error("Auth check failed", error);
-                if (mounted) {
-                    const isInDashboard =
-                        typeof window !== 'undefined' &&
-                        String(window.location?.pathname || '').startsWith('/dashboard');
-                    if (isInDashboard && recoveryAttempts < AUTH_RECOVERY_MAX_RETRIES) {
-                        recoveryAttempts += 1;
-                        try { console.log('Redirecionamento bloqueado para debug'); } catch {}
-                        setAuthLoading(true);
-                        try { clearTimeout(recoveryTimer); } catch {}
-                        recoveryTimer = setTimeout(() => {
-                            try { if (mounted) checkUser(); } catch {}
-                        }, AUTH_RECOVERY_RETRY_DELAY_MS);
-                        return;
-                    }
-                    setUser(null);
-                    setAuthLoading(false);
-                }
-            }
-        };
-
-        setAuthLoading(true);
-        watchdog = setTimeout(() => { if (mounted) setAuthLoading(false); }, AUTH_WATCHDOG_TIMEOUT_MS);
-        checkUser();
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (!mounted) return;
-            
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-                 if (session?.user) {
-                     recoveryAttempts = 0;
-                     const meta = session?.user?.user_metadata || {};
-                     const emailRaw = String(session?.user?.email || '').trim();
-                     const emailUser = emailRaw.includes('@') ? emailRaw.split('@')[0] : (emailRaw || 'Usuário');
-                     const displayName = meta?.full_name || meta?.name || emailUser;
-                     const photoURL = meta?.avatar_url || meta?.picture || null;
-                     const normalizedEmail = emailRaw.toLowerCase().trim();
-
-                     let resolvedRole = 'user';
-                     let resolvedIsCoach = false;
-                     let resolvedCoachPending = false;
-
-                     if (normalizedEmail && normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
-                         resolvedRole = 'admin';
-                         resolvedIsCoach = true;
-                     } else {
-                         try {
-                             const { data: p } = await supabase
-                                 .from('profiles')
-                                 .select('role')
-                                 .eq('id', session.user.id)
-                                 .maybeSingle();
-                             const pr = (p?.role || '').toLowerCase();
-                             if (pr === 'admin' || pr === 'teacher') {
-                                 resolvedRole = pr;
-                                 resolvedIsCoach = true;
-                             }
-                         } catch (_) {}
-
-                         try {
-                             const rr = await fetch('/api/teachers/me', { cache: 'no-store' });
-                             const jj = await rr.json();
-                             const teacherStatus = jj.ok ? (jj.teacher?.status || jj.teacher?.payment_status) : null;
-                             const st = String(teacherStatus || '').toLowerCase().trim();
-                             const teacherUserId = jj?.teacher?.user_id || null;
-                             const teacherEmail = String(jj?.teacher?.email || '').toLowerCase().trim();
-                             const isTeacherOwner = Boolean(
-                                 teacherUserId && teacherUserId === session.user.id && teacherEmail && teacherEmail === normalizedEmail
-                             );
-                             resolvedCoachPending = st === 'pending';
-                             if (jj.ok && jj.teacher && (st === 'active' || st === 'pending')) {
-                                 resolvedRole = 'teacher';
-                                 resolvedIsCoach = true;
-                             }
-                             if (isTeacherOwner && (st === 'cancelar' || st === 'cancelled')) {
-                                 await alert('Sua conta está suspensa. Entre em contato com o administrador.');
-                             }
-                         } catch (_) {}
-                     }
-
-                     const nextUser = {
-                         ...session.user,
-                         displayName,
-                         photoURL,
-                         role: resolvedRole,
-                         email: normalizedEmail || session.user.email,
-                     };
-
-                     setUser(prev => {
-                         if (!prev) return nextUser;
-                         if (prev.id !== nextUser.id) return nextUser;
-                         if (prev.role !== nextUser.role) return nextUser;
-                         if (prev.displayName !== nextUser.displayName) return nextUser;
-                         if (prev.photoURL !== nextUser.photoURL) return nextUser;
-                         return prev;
-                     });
-
-                     setIsCoach(Boolean(resolvedIsCoach));
-                     setCoachPending(Boolean(resolvedCoachPending));
-
-                    // Student status check intentionally avoids forcing logout to prevent auth loops
-                 }
-                 setAuthLoading(false);
-            } else if (event === 'SIGNED_OUT') {
-                setUser(null);
-                clearClientSessionState();
-                setAuthLoading(false);
-            }
-        });
-
-        return () => {
-            mounted = false;
-            clearTimeout(watchdog);
-            clearTimeout(recoveryTimer);
-            subscription.unsubscribe();
-        };
-    }, [supabase, alert, clearClientSessionState]);
+        const meta = initialUser?.user_metadata || {}
+        const emailRaw = String(initialUser?.email || '').trim()
+        const emailUser = emailRaw.includes('@') ? emailRaw.split('@')[0] : (emailRaw || 'Usuário')
+        const displayName = meta?.full_name || meta?.name || emailUser
+        const photoURL = meta?.avatar_url || meta?.picture || null
+        const nextUser = { ...initialUser, displayName, photoURL, role: initialProfile?.role || 'student' }
+        setUser(nextUser)
+        setIsCoach(String(initialProfile?.role || '').toLowerCase() === 'teacher')
+    }, [initialUser, initialProfile])
 
     // Sync Profile Separately (Optimized)
     useEffect(() => {
@@ -1181,15 +960,8 @@ function IronTracksApp() {
     const handleLogout = async () => {
         const ok = await confirm("Deseja realmente sair da sua conta?", "Sair");
         if (!ok) return;
-        await safeSignOut('local');
-        clearClientSessionState();
-        setUser(null);
-        setAuthLoading(false);
-        try {
-            window.location.href = '/';
-        } catch {
-            try { router.refresh(); } catch {}
-        }
+        try { clearClientSessionState(); } catch {}
+        try { window.location.href = '/auth/logout'; } catch {}
     };
 
     const handleSaveProfile = async () => {
@@ -1454,7 +1226,7 @@ function IronTracksApp() {
     };
 
     if (authLoading) return <LoadingScreen />;
-    if (!user) return <LoginScreen />;
+    if (!user) return null;
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;
