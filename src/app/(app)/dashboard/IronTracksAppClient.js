@@ -698,7 +698,8 @@ function IronTracksApp({ initialUser, initialProfile }) {
         const photoURL = meta?.avatar_url || meta?.picture || null
         const nextUser = { ...initialUser, displayName, photoURL, role: initialProfile?.role || 'student' }
         setUser(nextUser)
-        setIsCoach(String(initialProfile?.role || '').toLowerCase() === 'teacher')
+        const role = String(initialProfile?.role || '').toLowerCase()
+        setIsCoach(role === 'teacher' || role === 'admin')
     }, [initialUser, initialProfile])
 
     // Sync Profile Separately (Optimized)
