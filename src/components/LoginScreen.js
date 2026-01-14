@@ -21,46 +21,8 @@ const LoginScreen = () => {
                 const fromQuery = String(url.searchParams.get('next') || '').trim();
                 if (fromQuery && fromQuery.startsWith('/')) nextPath = fromQuery;
             } catch {}
-
-            try {
-                const raw = String(document.cookie || '');
-                const list = raw
-                    .split(';')
-                    .map((p) => p.trim())
-                    .filter(Boolean)
-                    .map((p) => {
-                        const idx = p.indexOf('=')
-                        return { name: idx < 0 ? '' : p.slice(0, idx).trim(), value: idx < 0 ? '' : p.slice(idx + 1) }
-                    })
-                    .filter((c) => c?.name && c.name.startsWith('sb-'))
-                sessionStorage.setItem('irontracks.pkce.backup.v1', JSON.stringify(list))
-            } catch {}
-
-            try {
-                const ls = window?.localStorage;
-                if (ls) {
-                    const items = [];
-                    for (let i = 0; i < ls.length; i += 1) {
-                        const k = ls.key(i);
-                        if (!k) continue;
-                        const kl = String(k).toLowerCase();
-                        if (!kl.startsWith('sb-')) continue;
-                        if (!(kl.includes('code') && kl.includes('verifier')) && !kl.includes('pkce')) continue;
-                        items.push({ key: k, value: ls.getItem(k) });
-                    }
-                    sessionStorage.setItem('irontracks.pkce.lsbackup.v1', JSON.stringify(items));
-                }
-            } catch {}
-
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: `${window.location.origin}/auth/oauth?next=${encodeURIComponent(nextPath)}`,
-                },
-            });
-
-            if (error) throw error;
-            // O redirecionamento acontece aqui, então não precisamos setar isLoading false
+            window.location.href = `/auth/login?next=${encodeURIComponent(nextPath)}`
+            return
         } catch (error) {
             console.error("Login Error:", error);
             setIsLoading(false);
