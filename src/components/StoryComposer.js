@@ -93,51 +93,12 @@ const fitCover = ({ canvasW, canvasH, imageW, imageH }) => {
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n))
 
-const storyPresets = [
-  { id: 'clean', label: 'Clean', filter: 'contrast(1.08) saturate(1.12) brightness(1.04)' },
-  { id: 'pop', label: 'Pop', filter: 'contrast(1.18) saturate(1.28) brightness(1.06)' },
-  { id: 'strava', label: 'Strava', filter: 'contrast(1.22) saturate(1.22) brightness(1.02)' },
-  { id: 'mono', label: 'Mono', filter: 'grayscale(1) contrast(1.14) brightness(1.04)' },
-  { id: 'warm', label: 'Warm', filter: 'contrast(1.12) saturate(1.16) brightness(1.04) sepia(0.18)' },
-]
-
 const storyLayouts = [
   { id: 'bottom-row', label: 'Normal' },
   { id: 'right-stack', label: 'Direita' },
   { id: 'left-stack', label: 'Esquerda' },
   { id: 'top-row', label: 'Topo' },
 ]
-
-const drawVignette = ({ ctx, canvasW, canvasH, strength }) => {
-  const s = clamp(Number(strength) || 0, 0, 1)
-  if (s <= 0) return
-  const g = ctx.createRadialGradient(canvasW / 2, canvasH * 0.45, canvasH * 0.25, canvasW / 2, canvasH * 0.45, canvasH * 0.8)
-  g.addColorStop(0, `rgba(0,0,0,0)`)
-  g.addColorStop(1, `rgba(0,0,0,${0.75 * s})`)
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, canvasW, canvasH)
-}
-
-const drawGrain = ({ ctx, canvasW, canvasH, strength }) => {
-  const s = clamp(Number(strength) || 0, 0, 1)
-  if (s <= 0) return
-  const dots = Math.floor(24000 * s)
-  ctx.save()
-  ctx.globalAlpha = 0.06 * s
-  ctx.fillStyle = '#ffffff'
-  for (let i = 0; i < dots; i++) {
-    const x = Math.random() * canvasW
-    const y = Math.random() * canvasH
-    ctx.fillRect(x, y, 1, 1)
-  }
-  ctx.fillStyle = '#000000'
-  for (let i = 0; i < Math.floor(dots * 0.7); i++) {
-    const x = Math.random() * canvasW
-    const y = Math.random() * canvasH
-    ctx.fillRect(x, y, 1, 1)
-  }
-  ctx.restore()
-}
 
 const drawStory = ({
   ctx,
@@ -148,16 +109,10 @@ const drawStory = ({
   offset,
   metrics,
   layout,
-  preset,
-  vignette,
-  grain,
 }) => {
   ctx.clearRect(0, 0, canvasW, canvasH)
   ctx.fillStyle = '#000000'
   ctx.fillRect(0, 0, canvasW, canvasH)
-
-  const presetDef = storyPresets.find((p) => p.id === preset) || storyPresets[0]
-  const bgFilter = presetDef?.filter || 'none'
 
   if (backgroundImage) {
     const iw = Number(backgroundImage.naturalWidth) || 0
@@ -168,10 +123,7 @@ const drawStory = ({
     const dh = ih * finalScale
     const cx = (canvasW - dw) / 2 + (Number(offset?.x) || 0)
     const cy = (canvasH - dh) / 2 + (Number(offset?.y) || 0)
-    ctx.save()
-    ctx.filter = bgFilter
     ctx.drawImage(backgroundImage, cx, cy, dw, dh)
-    ctx.restore()
   } else {
     const g = ctx.createLinearGradient(0, 0, canvasW, canvasH)
     g.addColorStop(0, '#0a0a0a')
@@ -185,16 +137,6 @@ const drawStory = ({
   baseOverlay.addColorStop(1, 'rgba(0,0,0,0.78)')
   ctx.fillStyle = baseOverlay
   ctx.fillRect(0, 0, canvasW, canvasH)
-
-  if (preset === 'strava') {
-    const topOverlay = ctx.createLinearGradient(0, 0, 0, canvasH * 0.45)
-    topOverlay.addColorStop(0, 'rgba(0,0,0,0.55)')
-    topOverlay.addColorStop(1, 'rgba(0,0,0,0)')
-    ctx.fillStyle = topOverlay
-    ctx.fillRect(0, 0, canvasW, canvasH)
-  }
-
-  drawVignette({ ctx, canvasW, canvasH, strength: vignette })
 
   const left = SAFE_SIDE
   const right = canvasW - SAFE_SIDE
@@ -289,8 +231,8 @@ const drawStory = ({
   const dateText = metrics?.date ? `• ${metrics.date}` : ''
   ctx.fillText(`RELATÓRIO DO TREINO ${dateText}`.trim(), left, subtitleY)
 
-  const cardFill = preset === 'strava' ? 'rgba(0,0,0,0.62)' : 'rgba(0,0,0,0.55)'
-  const cardStroke = preset === 'strava' ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.12)'
+  const cardFill = 'rgba(0,0,0,0.62)'
+  const cardStroke = 'rgba(255,255,255,0.18)'
 
   cards.forEach((c, idx) => {
     const box = cardsBoxes[idx]
@@ -317,27 +259,23 @@ const drawStory = ({
     ctx.fillText(c.value, x + 22, y + 54)
   })
 
-  drawGrain({ ctx, canvasW, canvasH, strength: grain })
 }
 
 export default function StoryComposer({ open, session, onClose }) {
   const previewRef = useRef(null)
   const previewCanvasRef = useRef(null)
   const inputRef = useRef(null)
+  const pointersRef = useRef(new Map())
+  const pinchRef = useRef({ startDist: 0, startZoom: 1 })
 
   const [backgroundUrl, setBackgroundUrl] = useState('')
   const [backgroundImage, setBackgroundImage] = useState(null)
-  const [dragging, setDragging] = useState(false)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [showSafeGuide, setShowSafeGuide] = useState(true)
   const [layout, setLayout] = useState('bottom-row')
-  const [preset, setPreset] = useState('clean')
-  const [vignette, setVignette] = useState(0.35)
-  const [grain, setGrainState] = useState(0.18)
 
   const metrics = useMemo(() => {
     const title = safeString(session?.workoutTitle || session?.name || 'Treino')
@@ -359,8 +297,8 @@ export default function StoryComposer({ open, session, onClose }) {
     if (!open) return
     setError('')
     setBusy(false)
-    setDragging(false)
     setShowSafeGuide(true)
+    pointersRef.current = new Map()
   }, [open])
 
   useEffect(() => {
@@ -415,8 +353,15 @@ export default function StoryComposer({ open, session, onClose }) {
   const onPointerDown = (e) => {
     try {
       if (!backgroundImage) return
-      setDragging(true)
-      setDragStart({ x: e.clientX, y: e.clientY })
+      const next = new Map(pointersRef.current)
+      next.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      pointersRef.current = next
+      if (next.size === 2) {
+        const pts = Array.from(next.values())
+        const dx = pts[0].x - pts[1].x
+        const dy = pts[0].y - pts[1].y
+        pinchRef.current = { startDist: Math.hypot(dx, dy), startZoom: zoom }
+      }
       e.currentTarget?.setPointerCapture?.(e.pointerId)
     } catch {
     }
@@ -424,30 +369,49 @@ export default function StoryComposer({ open, session, onClose }) {
 
   const onPointerMove = (e) => {
     try {
-      if (!dragging) return
       const preview = previewRef.current
       if (!preview) return
       const rect = preview.getBoundingClientRect()
       if (!rect.width || !rect.height) return
 
-      const dx = e.clientX - dragStart.x
-      const dy = e.clientY - dragStart.y
+      const next = new Map(pointersRef.current)
+      const prevPoint = next.get(e.pointerId)
+      next.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      pointersRef.current = next
+
+      if (next.size === 2) {
+        const pts = Array.from(next.values())
+        const dx = pts[0].x - pts[1].x
+        const dy = pts[0].y - pts[1].y
+        const dist = Math.hypot(dx, dy)
+        const base = pinchRef.current?.startDist || 0
+        const ratio = base > 0 ? dist / base : 1
+        const z = clamp((pinchRef.current?.startZoom || 1) * ratio, 1, 1.8)
+        setZoom(z)
+        return
+      }
+
+      if (next.size !== 1) return
+      if (!prevPoint) return
+
+      const dx = e.clientX - prevPoint.x
+      const dy = e.clientY - prevPoint.y
 
       const scaleX = CANVAS_W / rect.width
       const scaleY = CANVAS_H / rect.height
 
       setOffset((prev) => ({ x: (prev?.x || 0) + dx * scaleX, y: (prev?.y || 0) + dy * scaleY }))
-      setDragStart({ x: e.clientX, y: e.clientY })
     } catch {
     }
   }
 
   const onPointerUp = (e) => {
     try {
-      setDragging(false)
+      const next = new Map(pointersRef.current)
+      next.delete(e.pointerId)
+      pointersRef.current = next
       e.currentTarget?.releasePointerCapture?.(e.pointerId)
     } catch {
-      setDragging(false)
     }
   }
 
@@ -457,7 +421,7 @@ export default function StoryComposer({ open, session, onClose }) {
     canvas.height = CANVAS_H
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('no_ctx')
-    drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics, layout, preset, vignette, grain })
+    drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics, layout })
     return canvas
   }
 
@@ -469,11 +433,11 @@ export default function StoryComposer({ open, session, onClose }) {
     if (!ctx) return
     let raf = 0
     const draw = () => {
-      drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics, layout, preset, vignette, grain })
+      drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, zoom, offset, metrics, layout })
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, zoom, offset.x, offset.y, metrics, layout, preset, vignette, grain])
+  }, [open, backgroundImage, zoom, offset.x, offset.y, metrics, layout])
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob)
@@ -523,11 +487,11 @@ export default function StoryComposer({ open, session, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm overscroll-contain"
+      className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm overscroll-contain touch-none"
       onMouseDown={() => {
         if (!busy) onClose?.()
       }}
-      onTouchStart={() => {}}
+      style={{ touchAction: 'none' }}
     >
       <div
         className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center pt-safe"
@@ -641,72 +605,6 @@ export default function StoryComposer({ open, session, onClose }) {
                     </button>
                   ))}
                 </div>
-
-                <div className="mt-4 text-xs font-black uppercase tracking-widest text-neutral-400">Efeito</div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {storyPresets.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => setPreset(p.id)}
-                      className={[
-                        'h-11 rounded-2xl border text-xs font-black uppercase tracking-widest',
-                        preset === p.id
-                          ? 'bg-yellow-500 text-black border-yellow-500'
-                          : 'bg-neutral-900 text-white border-neutral-800 hover:bg-neutral-800',
-                      ].join(' ')}
-                      disabled={busy}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
-                <div className="flex items-center justify-between text-xs text-neutral-300 font-bold">
-                  <span>Zoom</span>
-                  <span className="font-mono">{Number(zoom).toFixed(2)}x</span>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={1.8}
-                  step={0.01}
-                  value={zoom}
-                  onChange={(e) => setZoom(Number(e.target.value))}
-                  className="w-full mt-2"
-                  disabled={busy}
-                />
-                <div className="mt-4 flex items-center justify-between text-xs text-neutral-300 font-bold">
-                  <span>Vignette</span>
-                  <span className="font-mono">{Math.round(Number(vignette) * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={0.8}
-                  step={0.01}
-                  value={vignette}
-                  onChange={(e) => setVignette(Number(e.target.value))}
-                  className="w-full mt-2"
-                  disabled={busy}
-                />
-
-                <div className="mt-4 flex items-center justify-between text-xs text-neutral-300 font-bold">
-                  <span>Grain</span>
-                  <span className="font-mono">{Math.round(Number(grain) * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={0.6}
-                  step={0.01}
-                  value={grain}
-                  onChange={(e) => setGrainState(Number(e.target.value))}
-                  className="w-full mt-2"
-                  disabled={busy}
-                />
               </div>
 
               <button
