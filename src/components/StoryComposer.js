@@ -212,7 +212,7 @@ const drawStory = ({
 
   const title = safeString(metrics?.title).toUpperCase()
   ctx.fillStyle = '#ffffff'
-  ctx.font = '900 74px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+  ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
 
   const lines = []
   const words = title.split(/\s+/).filter(Boolean)
@@ -245,7 +245,7 @@ const drawStory = ({
 
   if (layoutId === 'top-row') {
     titleY = Math.max(brandY + 92, SAFE_TOP + 130)
-    subtitleY = titleY + lines.length * 86 + 12
+    subtitleY = titleY + lines.length * 40 + 12
     const cardY = subtitleY + 56
     const cardW = Math.floor((right - left - gap * 2) / 3)
     cardsBoxes = cards.map((_, idx) => ({
@@ -266,11 +266,11 @@ const drawStory = ({
       h: cardH,
     }))
     subtitleY = cardsBoxes[0].y - 56
-    titleY = Math.max(brandY + 92, subtitleY - 24 - lines.length * 86)
+    titleY = Math.max(brandY + 92, subtitleY - 24 - lines.length * 40)
   } else {
     const cardY = safeBottomY - 24 - cardH
     subtitleY = cardY - 56
-    titleY = Math.max(brandY + 92, subtitleY - 24 - lines.length * 86)
+    titleY = Math.max(brandY + 92, subtitleY - 24 - lines.length * 40)
     const cardW = Math.floor((right - left - gap * 2) / 3)
     cardsBoxes = cards.map((_, idx) => ({
       x: left + idx * (cardW + gap),
@@ -281,7 +281,7 @@ const drawStory = ({
   }
 
   lines.forEach((l, idx) => {
-    ctx.fillText(l, left, titleY + idx * 86)
+    ctx.fillText(l, left, titleY + idx * 40)
   })
 
   ctx.fillStyle = 'rgba(255,255,255,0.85)'
