@@ -361,6 +361,21 @@ export default function StoryComposer({ open, session, onClose }) {
   }, [open])
 
   useEffect(() => {
+    if (!open) return
+    const prevHtmlOverflow = document.documentElement.style.overflow
+    const prevBodyOverflow = document.body.style.overflow
+    const prevBodyOverscroll = document.body.style.overscrollBehavior
+    document.documentElement.style.overflow = 'hidden'
+    document.body.style.overflow = 'hidden'
+    document.body.style.overscrollBehavior = 'contain'
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow
+      document.body.style.overflow = prevBodyOverflow
+      document.body.style.overscrollBehavior = prevBodyOverscroll
+    }
+  }, [open])
+
+  useEffect(() => {
     return () => {
       try {
         if (backgroundUrl) URL.revokeObjectURL(backgroundUrl)
@@ -504,92 +519,118 @@ export default function StoryComposer({ open, session, onClose }) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 pt-safe pb-safe">
-      <div className="w-full max-w-5xl bg-neutral-900 border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Foto</div>
-            <div className="text-white font-black truncate">{metrics.title || 'Treino'}</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => onClose?.()}
-            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-            aria-label="Fechar"
-            disabled={busy}
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="flex flex-col items-center gap-3">
-            <div
-              ref={previewRef}
-              className="relative w-full max-w-[360px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-black touch-none"
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
+    <div
+      className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm overscroll-contain"
+      onMouseDown={() => {
+        if (!busy) onClose?.()
+      }}
+      onTouchStart={() => {}}
+    >
+      <div
+        className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center pt-safe"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+          <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Foto</div>
+              <div className="text-white font-black truncate">{metrics.title || 'Treino'}</div>
+              <div className="text-[11px] text-neutral-400 font-semibold truncate">
+                Escolha uma foto de fundo e arraste para ajustar
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onClose?.()}
+              className="w-11 h-11 rounded-2xl bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 inline-flex items-center justify-center"
+              aria-label="Fechar"
+              disabled={busy}
             >
-              <canvas
-                ref={previewCanvasRef}
-                width={CANVAS_W}
-                height={CANVAS_H}
-                className="absolute inset-0 w-full h-full"
-              />
+              <X size={18} />
+            </button>
+          </div>
 
-              {showSafeGuide ? (
-                <>
-                  <div className="absolute inset-x-0 top-0 bg-black/45" style={{ height: `${(SAFE_TOP / CANVAS_H) * 100}%` }} />
-                  <div className="absolute inset-x-0 bottom-0 bg-black/45" style={{ height: `${(SAFE_BOTTOM / CANVAS_H) * 100}%` }} />
-                  <div
-                    className="absolute border border-yellow-500/60 rounded-2xl pointer-events-none"
-                    style={{
-                      left: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
-                      right: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
-                      top: `${(SAFE_TOP / CANVAS_H) * 100}%`,
-                      bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
-                    }}
-                  />
-                </>
+          <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="flex flex-col items-center gap-3">
+              <div
+                ref={previewRef}
+                className="relative w-full max-w-[380px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-black touch-none"
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+              >
+                <canvas
+                  ref={previewCanvasRef}
+                  width={CANVAS_W}
+                  height={CANVAS_H}
+                  className="absolute inset-0 w-full h-full"
+                />
+
+                {showSafeGuide ? (
+                  <>
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/55" />
+                    <div
+                      className="absolute border border-yellow-500/60 rounded-2xl pointer-events-none"
+                      style={{
+                        left: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
+                        right: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
+                        top: `${(SAFE_TOP / CANVAS_H) * 100}%`,
+                        bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
+                      }}
+                    />
+                  </>
+                ) : null}
+              </div>
+
+              <div className="w-full max-w-[380px] flex items-center gap-2">
+                <label
+                  htmlFor="irontracks-story-bg"
+                  className={[
+                    'flex-1 h-12 rounded-2xl bg-neutral-900 border border-neutral-800 text-white font-black uppercase tracking-widest text-xs hover:bg-neutral-800 inline-flex items-center justify-center',
+                    busy ? 'opacity-60 pointer-events-none' : '',
+                  ].join(' ')}
+                >
+                  Escolher Foto
+                </label>
+                <input
+                  id="irontracks-story-bg"
+                  ref={inputRef}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(e) => loadBackground(e.target.files?.[0] || null)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSafeGuide((v) => !v)}
+                  className="h-12 px-4 rounded-2xl bg-neutral-900 border border-neutral-800 text-white font-black uppercase tracking-widest text-xs hover:bg-neutral-800"
+                  disabled={busy}
+                >
+                  {showSafeGuide ? 'Guia On' : 'Guia Off'}
+                </button>
+              </div>
+
+              {error ? (
+                <div className="w-full max-w-[380px] rounded-2xl border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-200">
+                  {error}
+                </div>
               ) : null}
             </div>
 
-            <div className="w-full max-w-[360px] flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="flex-1 h-10 rounded-2xl bg-neutral-950 border border-neutral-800 text-white font-black uppercase tracking-widest text-xs hover:bg-neutral-800"
-                disabled={busy}
-              >
-                Escolher Foto
-              </button>
-              <input
-                ref={inputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => loadBackground(e.target.files?.[0] || null)}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
-              <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Ajustes</div>
-              <div className="mt-3">
-                <div className="text-xs text-neutral-300 font-bold">Layout</div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-3">
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Layout</div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   {storyLayouts.map((l) => (
                     <button
                       key={l.id}
                       type="button"
                       onClick={() => setLayout(l.id)}
                       className={[
-                        'h-10 rounded-2xl border text-xs font-black uppercase tracking-widest',
+                        'h-11 rounded-2xl border text-xs font-black uppercase tracking-widest',
                         layout === l.id
                           ? 'bg-yellow-500 text-black border-yellow-500'
-                          : 'bg-neutral-950 text-white border-neutral-800 hover:bg-neutral-800',
+                          : 'bg-neutral-900 text-white border-neutral-800 hover:bg-neutral-800',
                       ].join(' ')}
                       disabled={busy}
                     >
@@ -598,18 +639,18 @@ export default function StoryComposer({ open, session, onClose }) {
                   ))}
                 </div>
 
-                <div className="mt-4 text-xs text-neutral-300 font-bold">Efeito</div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-4 text-xs font-black uppercase tracking-widest text-neutral-400">Efeito</div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
                   {storyPresets.map((p) => (
                     <button
                       key={p.id}
                       type="button"
                       onClick={() => setPreset(p.id)}
                       className={[
-                        'h-10 rounded-2xl border text-xs font-black uppercase tracking-widest',
+                        'h-11 rounded-2xl border text-xs font-black uppercase tracking-widest',
                         preset === p.id
                           ? 'bg-yellow-500 text-black border-yellow-500'
-                          : 'bg-neutral-950 text-white border-neutral-800 hover:bg-neutral-800',
+                          : 'bg-neutral-900 text-white border-neutral-800 hover:bg-neutral-800',
                       ].join(' ')}
                       disabled={busy}
                     >
@@ -617,7 +658,9 @@ export default function StoryComposer({ open, session, onClose }) {
                     </button>
                   ))}
                 </div>
+              </div>
 
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
                 <div className="flex items-center justify-between text-xs text-neutral-300 font-bold">
                   <span>Zoom</span>
                   <span className="font-mono">{Number(zoom).toFixed(2)}x</span>
@@ -632,16 +675,7 @@ export default function StoryComposer({ open, session, onClose }) {
                   className="w-full mt-2"
                   disabled={busy}
                 />
-                <div className="mt-2 text-xs text-neutral-500">
-                  Arraste a imagem para reposicionar.
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
-              <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Finalização</div>
-              <div className="mt-3">
-                <div className="flex items-center justify-between text-xs text-neutral-300 font-bold">
+                <div className="mt-4 flex items-center justify-between text-xs text-neutral-300 font-bold">
                   <span>Vignette</span>
                   <span className="font-mono">{Math.round(Number(vignette) * 100)}%</span>
                 </div>
@@ -671,37 +705,15 @@ export default function StoryComposer({ open, session, onClose }) {
                   disabled={busy}
                 />
               </div>
-            </div>
 
-            <button
-              type="button"
-              onClick={() => setShowSafeGuide((v) => !v)}
-              className="h-11 rounded-2xl bg-neutral-950 border border-neutral-800 text-white font-black uppercase tracking-widest text-xs hover:bg-neutral-800"
-              disabled={busy}
-            >
-              {showSafeGuide ? 'Ocultar Safe Area' : 'Mostrar Safe Area'}
-            </button>
-
-            {error ? (
-              <div className="rounded-2xl border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-200">
-                {error}
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={shareImage}
-              className="h-12 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest text-xs hover:bg-yellow-400 inline-flex items-center justify-center gap-2"
-              disabled={busy}
-            >
-              <Share2 size={16} /> Compartilhar (JPG)
-            </button>
-
-            <div className="rounded-2xl border border-neutral-800 bg-neutral-950 p-4 text-sm text-neutral-300">
-              <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dica</div>
-              <div className="mt-2">
-                Para melhor resultado, use uma foto vertical e recorte com zoom.
-              </div>
+              <button
+                type="button"
+                onClick={shareImage}
+                className="h-12 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest text-xs hover:bg-yellow-400 inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                disabled={busy}
+              >
+                <Share2 size={16} /> Compartilhar (JPG)
+              </button>
             </div>
           </div>
         </div>
