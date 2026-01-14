@@ -262,11 +262,14 @@ const drawStory = ({
 }
 
 export default function StoryComposer({ open, session, onClose }) {
+  const overlayRef = useRef(null)
   const previewRef = useRef(null)
   const previewCanvasRef = useRef(null)
   const inputRef = useRef(null)
+  const scrollAreaRef = useRef(null)
   const pointersRef = useRef(new Map())
   const pinchRef = useRef({ startDist: 0, startZoom: 1 })
+  const touchScrollRef = useRef({ startY: 0, scrollEl: null })
 
   const [backgroundUrl, setBackgroundUrl] = useState('')
   const [backgroundImage, setBackgroundImage] = useState(null)
@@ -313,6 +316,70 @@ export default function StoryComposer({ open, session, onClose }) {
       document.documentElement.style.overflow = prevHtmlOverflow
       document.body.style.overflow = prevBodyOverflow
       document.body.style.overscrollBehavior = prevBodyOverscroll
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    const overlay = overlayRef.current
+    if (!overlay) return
+
+    const getScrollEl = (target) => {
+      try {
+        const el = scrollAreaRef.current
+        if (!el) return null
+        if (!(target instanceof Node)) return null
+        return el.contains(target) ? el : null
+      } catch {
+        return null
+      }
+    }
+
+    const onTouchStart = (ev) => {
+      try {
+        const y = ev?.touches?.[0]?.clientY
+        touchScrollRef.current = {
+          startY: typeof y === 'number' ? y : 0,
+          scrollEl: getScrollEl(ev?.target),
+        }
+      } catch {}
+    }
+
+    const onTouchMove = (ev) => {
+      try {
+        const scrollEl = touchScrollRef.current?.scrollEl
+        const y = ev?.touches?.[0]?.clientY
+        const currentY = typeof y === 'number' ? y : 0
+        const startY = Number(touchScrollRef.current?.startY || 0)
+        const deltaY = currentY - startY
+
+        if (!scrollEl) {
+          ev.preventDefault()
+          return
+        }
+
+        const canScroll = scrollEl.scrollHeight > scrollEl.clientHeight + 1
+        if (!canScroll) {
+          ev.preventDefault()
+          return
+        }
+
+        const atTop = scrollEl.scrollTop <= 0
+        const atBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 1
+
+        if ((atTop && deltaY > 0) || (atBottom && deltaY < 0)) {
+          ev.preventDefault()
+        }
+      } catch {
+      }
+    }
+
+    overlay.addEventListener('touchstart', onTouchStart, { passive: true })
+    overlay.addEventListener('touchmove', onTouchMove, { passive: false })
+
+    return () => {
+      overlay.removeEventListener('touchstart', onTouchStart)
+      overlay.removeEventListener('touchmove', onTouchMove)
     }
   }, [open])
 
@@ -487,6 +554,7 @@ export default function StoryComposer({ open, session, onClose }) {
 
   return (
     <div
+      ref={overlayRef}
       className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm overscroll-contain"
       onMouseDown={() => {
         if (!busy) onClose?.()
@@ -496,7 +564,7 @@ export default function StoryComposer({ open, session, onClose }) {
         className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center pt-safe"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[calc(100dvh-24px)] flex flex-col">
+        <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[calc(100vh-24px)] flex flex-col min-h-0">
           <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Foto</div>
@@ -516,7 +584,7 @@ export default function StoryComposer({ open, session, onClose }) {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <div ref={scrollAreaRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
             <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="flex flex-col items-center gap-3">
               <div
