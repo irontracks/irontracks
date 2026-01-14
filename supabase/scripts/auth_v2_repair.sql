@@ -8,6 +8,7 @@ SELECT
   COALESCE(u.raw_user_meta_data->>'picture', u.raw_user_meta_data->>'avatar_url'),
   now(),
   CASE
+    WHEN EXISTS (SELECT 1 FROM public.admin_emails a WHERE a.email = lower(u.email)) THEN 'admin'
     WHEN EXISTS (SELECT 1 FROM public.teachers t WHERE lower(t.email) = lower(u.email)) THEN 'teacher'
     ELSE 'student'
   END
@@ -27,4 +28,3 @@ SET user_id = u.id
 FROM auth.users u
 WHERE lower(s.email) = lower(u.email)
   AND (s.user_id IS NULL OR s.user_id = u.id);
-

@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,11 +20,12 @@ export async function GET(request: Request) {
   }
 
   let response = NextResponse.redirect(new URL('/', safeOrigin))
+  const cookieStore = await cookies()
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
-        return []
+        return cookieStore.getAll()
       },
       setAll(cookiesToSet) {
         response = NextResponse.redirect(new URL('/', safeOrigin))
@@ -40,4 +42,3 @@ export async function GET(request: Request) {
 
   return response
 }
-

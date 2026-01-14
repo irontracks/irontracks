@@ -1,5 +1,16 @@
 BEGIN;
 
+-- Admin emails registry (avoids hardcoding in multiple places)
+CREATE TABLE IF NOT EXISTS public.admin_emails (
+  email text PRIMARY KEY
+);
+
+DO $$ BEGIN
+  INSERT INTO public.admin_emails (email)
+  VALUES (lower('djmkapple@gmail.com'))
+  ON CONFLICT (email) DO NOTHING;
+END $$;
+
 -- Ensure profiles has required columns
 DO $$
 BEGIN
@@ -25,7 +36,7 @@ DECLARE
   v_name text;
   v_photo text;
 BEGIN
-  IF lower(COALESCE(NEW.email,'')) = lower(COALESCE(current_setting('app.admin_email', true), '')) THEN
+  IF EXISTS (SELECT 1 FROM public.admin_emails a WHERE a.email = lower(COALESCE(NEW.email,''))) THEN
     v_role := 'admin';
   ELSIF EXISTS (SELECT 1 FROM public.teachers t WHERE lower(t.email) = lower(NEW.email)) THEN
     v_role := 'teacher';
@@ -58,19 +69,47 @@ BEGIN
 END;
 $$;
 
+-- Invite-only (teachers/students/admin emails)
+CREATE OR REPLACE FUNCTION public.enforce_invite_whitelist_v2() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.admin_emails a WHERE a.email = lower(COALESCE(NEW.email,''))) THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.students s WHERE lower(s.email) = lower(NEW.email))
+     AND NOT EXISTS (SELECT 1 FROM public.teachers t WHERE lower(t.email) = lower(NEW.email)) THEN
+    RAISE EXCEPTION 'Acesso Negado: Este email não foi cadastrado.';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS t_enforce_invite_whitelist ON auth.users;
+CREATE TRIGGER t_enforce_invite_whitelist
+BEFORE INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.enforce_invite_whitelist_v2();
+
 DROP TRIGGER IF EXISTS t_link_user_and_profile ON auth.users;
 CREATE TRIGGER t_link_user_and_profile
 AFTER INSERT ON auth.users
 FOR EACH ROW EXECUTE FUNCTION public.link_user_and_profile_v2();
 
 -- RLS policies (minimal)
+CREATE OR REPLACE FUNCTION public.is_admin() RETURNS boolean
+LANGUAGE sql STABLE AS $$
+  SELECT COALESCE((SELECT role = 'admin' FROM public.profiles WHERE id = auth.uid()), false);
+$$;
+
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   DROP POLICY IF EXISTS profiles_select_self ON public.profiles;
   DROP POLICY IF EXISTS profiles_update_self ON public.profiles;
+  DROP POLICY IF EXISTS profiles_admin_all ON public.profiles;
 END $$;
 CREATE POLICY profiles_select_self ON public.profiles FOR SELECT USING (id = auth.uid());
 CREATE POLICY profiles_update_self ON public.profiles FOR UPDATE USING (id = auth.uid()) WITH CHECK (id = auth.uid());
+CREATE POLICY profiles_admin_all ON public.profiles FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
 COMMIT;
-
