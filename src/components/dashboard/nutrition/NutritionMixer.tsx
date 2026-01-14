@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { motion } from 'framer-motion'
 
-import { logMealAction } from '@/app/dashboard/nutrition/actions'
+import { logMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
