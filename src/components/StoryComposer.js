@@ -203,9 +203,12 @@ const drawStory = ({
   ctx.textBaseline = 'top'
 
   const brandY = SAFE_TOP + 24
+  ctx.font = 'italic 900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+  ctx.fillStyle = '#ffffff'
+  ctx.fillText('IRON', left, brandY)
+  const ironW = ctx.measureText('IRON').width
   ctx.fillStyle = '#facc15'
-  ctx.font = '900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
-  ctx.fillText('IRONTRACKS', left, brandY)
+  ctx.fillText('TRACKS', left + ironW, brandY)
 
   const title = safeString(metrics?.title).toUpperCase()
   ctx.fillStyle = '#ffffff'
