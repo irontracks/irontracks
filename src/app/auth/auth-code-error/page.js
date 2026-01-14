@@ -8,6 +8,13 @@ import { AlertTriangle, ArrowLeft } from 'lucide-react';
 function AuthCodeErrorInner() {
   const sp = useSearchParams();
   const err = (sp?.get('error') || '').trim();
+  const errLower = String(err || '').toLowerCase();
+  const hint =
+    errLower.includes('signups not allowed') || errLower.includes('signup') || errLower.includes('sign up')
+      ? 'Parece que o Supabase está bloqueando novos usuários (signups).'
+      : errLower.includes('test user') || errLower.includes('access denied') || errLower.includes('consent') || errLower.includes('access_denied')
+      ? 'Parece bloqueio do Google OAuth (app em modo Testing / test users).'
+      : '';
   return (
     <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-6 text-center">
       <div className="bg-neutral-800 p-8 rounded-2xl border border-neutral-700 max-w-md w-full shadow-2xl">
@@ -21,6 +28,11 @@ function AuthCodeErrorInner() {
           Não foi possível validar seu login.
           {err ? ` (${err})` : ''}
         </p>
+        {hint ? (
+          <div className="mb-6 rounded-xl border border-neutral-700 bg-neutral-900 p-4 text-left text-sm text-neutral-300">
+            {hint}
+          </div>
+        ) : null}
 
         <Link
           href="/"

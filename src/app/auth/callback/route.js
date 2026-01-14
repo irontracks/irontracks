@@ -6,6 +6,8 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/dashboard'
+  const errorParam = searchParams.get('error')
+  const errorDescription = searchParams.get('error_description')
 
   const originFromUrl = new URL(request.url).origin
   const forwardedHost = request.headers.get('x-forwarded-host')
@@ -13,9 +15,18 @@ export async function GET(request) {
   const isLocalEnv = process.env.NODE_ENV === 'development'
   const baseOrigin = forwardedHost && !isLocalEnv ? `${forwardedProto}://${forwardedHost}` : originFromUrl
   const safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
-  const redirectUrl = new URL(next, safeOrigin)
+  const rawNext = String(next || '/dashboard')
+  const safeNext = rawNext.startsWith('/') ? rawNext : '/dashboard'
+  const redirectUrl = new URL(safeNext, safeOrigin)
 
   let response = NextResponse.redirect(redirectUrl)
+
+  const rawError = String(errorDescription || errorParam || '').trim()
+  if (rawError && !code) {
+    return NextResponse.redirect(
+      new URL(`/auth/auth-code-error?error=${encodeURIComponent(rawError)}`, safeOrigin),
+    )
+  }
 
   if (!code) {
     return NextResponse.redirect(new URL('/auth/auth-code-error?error=missing_code', safeOrigin))
