@@ -36,6 +36,22 @@ const LoginScreen = () => {
                 sessionStorage.setItem('irontracks.pkce.backup.v1', JSON.stringify(list))
             } catch {}
 
+            try {
+                const ls = window?.localStorage;
+                if (ls) {
+                    const items = [];
+                    for (let i = 0; i < ls.length; i += 1) {
+                        const k = ls.key(i);
+                        if (!k) continue;
+                        const kl = String(k).toLowerCase();
+                        if (!kl.startsWith('sb-')) continue;
+                        if (!(kl.includes('code') && kl.includes('verifier')) && !kl.includes('pkce')) continue;
+                        items.push({ key: k, value: ls.getItem(k) });
+                    }
+                    sessionStorage.setItem('irontracks.pkce.lsbackup.v1', JSON.stringify(items));
+                }
+            } catch {}
+
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {

@@ -64,9 +64,31 @@ function OAuthCallbackInner() {
           } catch {}
         }
 
+        const restorePkceLocalStorageBestEffort = () => {
+          try {
+            const raw = window?.sessionStorage?.getItem('irontracks.pkce.lsbackup.v1') || ''
+            if (!raw) return
+            const parsed = JSON.parse(raw)
+            const list = Array.isArray(parsed) ? parsed : []
+            if (list.length === 0) return
+            const ls = window?.localStorage
+            if (!ls) return
+            list.forEach((it: any) => {
+              try {
+                const k = String(it?.key || '')
+                const v = typeof it?.value === 'string' ? it.value : null
+                if (!k || v === null) return
+                if (ls.getItem(k) !== null) return
+                ls.setItem(k, v)
+              } catch {}
+            })
+          } catch {}
+        }
+
         const supabase = createClient()
 
         restorePkceCookiesBestEffort()
+        restorePkceLocalStorageBestEffort()
 
         let exchangeError: any = null
         try {
@@ -82,6 +104,7 @@ function OAuthCallbackInner() {
 
         if (exchangeError && looksLikeMissingVerifier) {
           restorePkceCookiesBestEffort()
+          restorePkceLocalStorageBestEffort()
           try {
             const res2 = await supabase.auth.exchangeCodeForSession(code)
             exchangeError = res2?.error || null
@@ -115,6 +138,7 @@ function OAuthCallbackInner() {
 
         try {
           window?.sessionStorage?.removeItem('irontracks.pkce.backup.v1')
+          window?.sessionStorage?.removeItem('irontracks.pkce.lsbackup.v1')
         } catch {}
 
         if (!cancelled) router.replace(next)
@@ -156,4 +180,3 @@ export default function OAuthCallbackPage() {
     </Suspense>
   )
 }
-
