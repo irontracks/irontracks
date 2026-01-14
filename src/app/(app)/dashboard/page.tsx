@@ -2,7 +2,16 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import IronTracksAppClient from './IronTracksAppClient'
 
-export default async function DashboardPage() {
+type SP = Record<string, string | string[] | undefined>
+
+export default async function DashboardPage({ searchParams }: { searchParams?: SP }) {
+  const code = typeof searchParams?.code === 'string' ? searchParams?.code : ''
+  const next = typeof searchParams?.next === 'string' ? searchParams?.next : ''
+  if (code) {
+    const safeNext = next && next.startsWith('/') ? next : '/dashboard'
+    redirect(`/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(safeNext)}`)
+  }
+
   const supabase = await createClient()
   const {
     data: { user },
@@ -30,4 +39,3 @@ export default async function DashboardPage() {
 
   return <IronTracksAppClient initialUser={initialUser} initialProfile={initialProfile} />
 }
-
