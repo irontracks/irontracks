@@ -487,17 +487,16 @@ export default function StoryComposer({ open, session, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm overscroll-contain touch-none"
+      className="fixed inset-0 z-[2500] bg-black/80 backdrop-blur-sm overscroll-contain"
       onMouseDown={() => {
         if (!busy) onClose?.()
       }}
-      style={{ touchAction: 'none' }}
     >
       <div
         className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center pt-safe"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl">
+        <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[calc(100dvh-24px)] flex flex-col">
           <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Foto</div>
@@ -517,7 +516,8 @@ export default function StoryComposer({ open, session, onClose }) {
             </button>
           </div>
 
-          <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="flex-1 overflow-y-auto overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="flex flex-col items-center gap-3">
               <div
                 ref={previewRef}
@@ -616,6 +616,7 @@ export default function StoryComposer({ open, session, onClose }) {
                 <Share2 size={16} /> Compartilhar (JPG)
               </button>
             </div>
+          </div>
           </div>
         </div>
       </div>
