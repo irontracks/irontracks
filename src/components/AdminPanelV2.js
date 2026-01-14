@@ -24,7 +24,6 @@ import { updateWorkout, deleteWorkout } from '@/actions/workout-actions';
 import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
 
-const ADMIN_EMAIL = 'djmkapple@gmail.com';
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
@@ -36,7 +35,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const supabase = supabaseRef.current;
     
     // Permission Logic
-    const isAdmin = user?.role === 'admin' || user?.email?.toLowerCase().trim() === ADMIN_EMAIL.toLowerCase().trim();
+    const isAdmin = user?.role === 'admin';
     const isTeacher = user?.role === 'teacher';
     const unauthorized = !isAdmin && !isTeacher;
 

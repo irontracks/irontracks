@@ -1,18 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
+import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
+    const supabase = auth.supabase
+    const user = auth.user
 
     const body = await req.json().catch(() => ({}))
     const studentId = body?.studentId as string | undefined
@@ -38,11 +36,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'student_not_found' }, { status: 404 })
     }
 
-    if (
-      student.teacher_id &&
-      student.teacher_id !== user.id &&
-      (user.email || '').toLowerCase().trim() !== ADMIN_EMAIL.toLowerCase().trim()
-    ) {
+    if (student.teacher_id && student.teacher_id !== user.id && auth.role !== 'admin') {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
@@ -68,4 +62,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

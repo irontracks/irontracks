@@ -66,8 +66,6 @@ const minButtonClass = 'min-h-[44px]'
 
 const PIX_QR_SIZE = 224
 
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
-
 const normalizePixImageSrc = (encodedImage: string) => {
   const s = (encodedImage || '').trim()
   if (!s) return ''
@@ -149,12 +147,6 @@ export default function MarketplacePage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user?.id) return
     setUserId(user.id)
-
-    const normalizedEmail = (user.email || '').toLowerCase().trim()
-    if (normalizedEmail && normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
-      setRole('admin')
-      return
-    }
 
     const { data: profile } = await supabase
       .from('profiles')

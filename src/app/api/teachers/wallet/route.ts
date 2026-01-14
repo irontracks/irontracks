@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
-
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
 
 const isMissingColumn = (err: any, column: string) => {
   const msg = String(err?.message || '').toLowerCase()
@@ -17,22 +16,12 @@ const canUseWalletFields = (err: any) => {
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.id || !user?.email) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
-
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
     const normalizedEmail = String(user.email || '').toLowerCase().trim()
-    const isAdminEmail = normalizedEmail && normalizedEmail === ADMIN_EMAIL.toLowerCase().trim()
 
     const admin = createAdminClient()
-
-    if (!isAdminEmail) {
-      const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle()
-      const role = String(profile?.role || '').toLowerCase().trim()
-      if (role !== 'teacher' && role !== 'admin') {
-        return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
-      }
-    }
 
     const escapedEmailForLike = normalizedEmail.replace(/([%_\\])/g, '\\$1')
 
@@ -92,22 +81,12 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.id || !user?.email) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
-
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
     const normalizedEmail = String(user.email || '').toLowerCase().trim()
-    const isAdminEmail = normalizedEmail && normalizedEmail === ADMIN_EMAIL.toLowerCase().trim()
 
     const admin = createAdminClient()
-
-    if (!isAdminEmail) {
-      const { data: profile } = await admin.from('profiles').select('role, display_name').eq('id', user.id).maybeSingle()
-      const role = String(profile?.role || '').toLowerCase().trim()
-      if (role !== 'teacher' && role !== 'admin') {
-        return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
-      }
-    }
 
     const body = await req.json().catch(() => ({} as any))
     const walletId = String(body?.asaas_wallet_id || body?.walletId || '').trim()
@@ -183,4 +162,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

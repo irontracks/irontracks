@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
-
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
 
 const getRole = async (admin: ReturnType<typeof createAdminClient>, userId: string) => {
   const { data } = await admin.from('profiles').select('role, email').eq('id', userId).maybeSingle()
@@ -39,9 +38,10 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) return auth.response
+    const supabase = auth.supabase
+    const user = auth.user
 
     const body = await req.json().catch(() => ({}))
     const name = (body?.name || '').trim()
@@ -60,14 +60,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'invalid_status' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    const prof = await getRole(admin, user.id)
-    const normalizedEmail = (user.email || '').toLowerCase().trim()
-    const isAdmin = prof.role === 'admin' || normalizedEmail === ADMIN_EMAIL.toLowerCase()
-    const isTeacher = prof.role === 'teacher'
-    if (!isAdmin && !isTeacher) {
-      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
-    }
+    await getRole(createAdminClient(), user.id)
 
     const { data, error } = await supabase
       .from('teacher_plans')
@@ -88,4 +81,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

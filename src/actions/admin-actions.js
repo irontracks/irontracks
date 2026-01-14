@@ -2,8 +2,7 @@
 
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
-
-const ADMIN_EMAIL = 'djmkapple@gmail.com'
+import { requireRole } from '@/utils/auth/route'
 
 function getErrorMessage(err) {
     try {
@@ -20,16 +19,9 @@ function getErrorMessage(err) {
 }
 
 async function checkAdmin() {
-    const supabase = await createClient()
-    const { data, error } = await supabase.auth.getUser()
-    if (error) throw error
-    const user = data?.user ?? null
-    const email = (user?.email || '').toLowerCase().trim()
-    const adminEmail = ADMIN_EMAIL.toLowerCase().trim()
-    if (!user || email !== adminEmail) {
-        throw new Error('Unauthorized')
-    }
-    return user
+    const auth = await requireRole(['admin'])
+    if (!auth.ok) throw new Error('Unauthorized')
+    return auth.user
 }
 
 export async function sendBroadcastMessage(title, message) {
@@ -89,7 +81,7 @@ export async function registerStudent(email, password, name) {
             id: data.user.id,
             email: email,
             display_name: name,
-            role: 'user',
+            role: 'student',
             photo_url: null,
             last_seen: new Date()
         })
@@ -153,7 +145,7 @@ export async function clearAllStudents() {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
-        const { error } = await adminDb.from('profiles').delete().neq('email', ADMIN_EMAIL)
+        const { error } = await adminDb.from('profiles').delete().neq('role', 'admin')
         if (error) throw error
         return { success: true }
     } catch (e) {

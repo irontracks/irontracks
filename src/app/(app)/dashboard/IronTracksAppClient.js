@@ -57,7 +57,6 @@ import { useUserSettings } from '@/hooks/useUserSettings'
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 
-const ADMIN_EMAIL = 'djmkapple@gmail.com';
 const appId = 'irontracks-production';
 
 const mapWorkoutRow = (w) => {
