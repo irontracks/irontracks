@@ -15,10 +15,31 @@ const LoginScreen = () => {
         setErrorMsg('');
         
         try {
+            let nextPath = '/dashboard'
+            try {
+                const url = new URL(window.location.href);
+                const fromQuery = String(url.searchParams.get('next') || '').trim();
+                if (fromQuery && fromQuery.startsWith('/')) nextPath = fromQuery;
+            } catch {}
+
+            try {
+                const raw = String(document.cookie || '');
+                const list = raw
+                    .split(';')
+                    .map((p) => p.trim())
+                    .filter(Boolean)
+                    .map((p) => {
+                        const idx = p.indexOf('=')
+                        return { name: idx < 0 ? '' : p.slice(0, idx).trim(), value: idx < 0 ? '' : p.slice(idx + 1) }
+                    })
+                    .filter((c) => c?.name && c.name.startsWith('sb-'))
+                sessionStorage.setItem('irontracks.pkce.backup.v1', JSON.stringify(list))
+            } catch {}
+
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/auth/callback`,
+                    redirectTo: `${window.location.origin}/auth/oauth?next=${encodeURIComponent(nextPath)}`,
                 },
             });
 
