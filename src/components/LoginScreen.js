@@ -3,12 +3,10 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { Dumbbell } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
 
 const LoginScreen = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
-    const supabase = createClient();
 
     const handleLogin = async () => {
         setIsLoading(true);
