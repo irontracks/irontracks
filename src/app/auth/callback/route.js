@@ -24,18 +24,18 @@ export async function GET(request) {
   const rawError = String(errorDescription || errorParam || '').trim()
   if (rawError && !code) {
     return NextResponse.redirect(
-      new URL(`/auth/auth-code-error?error=${encodeURIComponent(rawError)}`, safeOrigin),
+      new URL(`/auth/error?error=${encodeURIComponent(rawError)}`, safeOrigin),
     )
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL('/auth/auth-code-error?error=missing_code', safeOrigin))
+    return NextResponse.redirect(new URL('/auth/error?error=missing_code', safeOrigin))
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(new URL('/auth/auth-code-error?error=missing_env', safeOrigin))
+    return NextResponse.redirect(new URL('/auth/error?error=missing_env', safeOrigin))
   }
 
   const supabase = createServerClient(
@@ -59,11 +59,11 @@ export async function GET(request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       return NextResponse.redirect(
-        new URL(`/auth/auth-code-error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin)
+        new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin)
       )
     }
   } catch (e) {
-    return NextResponse.redirect(new URL('/auth/auth-code-error?error=exchange_failed', safeOrigin))
+    return NextResponse.redirect(new URL('/auth/error?error=exchange_failed', safeOrigin))
   }
 
   return response
