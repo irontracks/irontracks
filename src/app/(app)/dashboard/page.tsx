@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import IronTracksAppClient from './IronTracksAppClient'
+import { resolveRoleByUser } from '@/utils/auth/route'
 
 type SP = Record<string, string | string[] | undefined>
 
@@ -25,6 +26,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
     .eq('id', user.id)
     .maybeSingle()
 
+  const resolved = await resolveRoleByUser({ id: user.id, email: user.email ?? null })
+
   const initialUser = {
     id: user.id,
     email: user.email ?? null,
@@ -32,7 +35,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: S
   }
 
   const initialProfile = {
-    role: profile?.role ?? null,
+    role: resolved?.role ?? profile?.role ?? null,
     display_name: profile?.display_name ?? null,
     photo_url: profile?.photo_url ?? null,
   }
