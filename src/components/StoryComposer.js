@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Share2, X } from 'lucide-react'
+import { getKcalEstimate } from '@/utils/calories/kcalClient'
 
 const CANVAS_W = 1080
 const CANVAS_H = 1920
@@ -438,6 +439,7 @@ export default function StoryComposer({ open, session, onClose }) {
   const [showSafeGuide, setShowSafeGuide] = useState(true)
   const [layout, setLayout] = useState('bottom-row')
   const [livePositions, setLivePositions] = useState(defaultLivePositions)
+  const [kcalEstimate, setKcalEstimate] = useState(0)
   const [draggingKey, setDraggingKey] = useState(null)
   const dragRef = useRef({ key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } })
 
@@ -447,7 +449,7 @@ export default function StoryComposer({ open, session, onClose }) {
     const logs = session?.logs && typeof session.logs === 'object' ? session.logs : {}
     const volume = calculateTotalVolume(logs)
     const totalTime = Number(session?.totalTime) || 0
-    const kcal = computeKcal({ session, volume })
+    const kcal = Number.isFinite(Number(kcalEstimate)) && Number(kcalEstimate) > 0 ? Number(kcalEstimate) : computeKcal({ session, volume })
     return {
       title,
       date,
@@ -455,7 +457,24 @@ export default function StoryComposer({ open, session, onClose }) {
       totalTime,
       kcal,
     }
-  }, [session])
+  }, [session, kcalEstimate])
+
+  useEffect(() => {
+    if (!open) return
+    if (!session) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
+        if (cancelled) return
+        if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
+      } catch {
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, session?.id])
 
   const liveSizes = useMemo(() => {
     try {

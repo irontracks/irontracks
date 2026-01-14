@@ -6,6 +6,7 @@ import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { createClient } from '@/utils/supabase/client';
 import StoryComposer from '@/components/StoryComposer';
+import { getKcalEstimate } from '@/utils/calories/kcalClient';
 
 const parseSessionNotes = (notes) => {
     try {
@@ -165,6 +166,27 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         resolvePreviousFromHistory().catch(() => {});
     }, [resolvePreviousFromHistory]);
 
+    const [kcalEstimate, setKcalEstimate] = useState(0);
+
+    useEffect(() => {
+        if (!session) {
+            setKcalEstimate(0);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null });
+                if (cancelled) return;
+                if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)));
+            } catch {
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [session?.id, session?.totalTime]);
+
     if (!session) return null;
 
     const formatDate = (ts) => {
@@ -209,6 +231,8 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const durationInMinutes = (Number(session?.totalTime) || 0) / 60;
     const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? session.outdoorBike : null;
     const calories = (() => {
+        const ov = Number(kcalEstimate);
+        if (Number.isFinite(ov) && ov > 0) return Math.round(ov);
         const bikeKcal = Number(outdoorBike?.caloriesKcal);
         if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal);
         return Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
@@ -276,7 +300,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         try {
             setIsGenerating(true);
             const prev = effectivePreviousSession ?? (await resolvePreviousFromHistory());
-            const html = buildReportHTML(session, prev, user?.displayName || user?.email || '');
+            const html = buildReportHTML(session, prev, user?.displayName || user?.email || '', calories);
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             setPdfBlob(blob);
