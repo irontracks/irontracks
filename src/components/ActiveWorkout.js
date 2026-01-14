@@ -425,14 +425,7 @@ export default function ActiveWorkout(props) {
         <div className="rounded-lg bg-neutral-900/40 border border-neutral-800 px-2 py-2 space-y-2 sm:space-y-0">
           <div className="sm:hidden">
             <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-                {plannedReps ? (
-                  <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 truncate">
-                    Reps: {plannedReps}
-                  </div>
-                ) : null}
-              </div>
+              <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
               <div className="flex items-center gap-1 ml-auto">
                 <button
                   type="button"
@@ -489,7 +482,7 @@ export default function ActiveWorkout(props) {
                   className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 pr-10 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
                 />
                 {plannedReps ? (
-                  <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-200/70 bg-black/30 border border-neutral-700/60 rounded px-1.5 py-0.5">
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-500/60">
                     {plannedReps}
                   </div>
                 ) : null}
@@ -540,7 +533,7 @@ export default function ActiveWorkout(props) {
                 className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 pr-10 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
               />
               {plannedReps ? (
-                <div className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-200/70 bg-black/30 border border-neutral-700/60 rounded px-1.5 py-0.5">
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-500/60">
                   {plannedReps}
                 </div>
               ) : null}
@@ -557,7 +550,7 @@ export default function ActiveWorkout(props) {
                 className="w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-1.5 pr-10 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
               />
               {plannedRpe ? (
-                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-yellow-500/45">
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-yellow-500/35">
                   {plannedRpe}
                 </div>
               ) : null}
@@ -983,10 +976,7 @@ export default function ActiveWorkout(props) {
             </div>
             {observation ? (
               <div className="mt-2 rounded-xl bg-neutral-900/50 border border-yellow-500/20 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-widest text-yellow-500 font-black">
-                  Observação do professor
-                </div>
-                <div className="mt-1 text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>
+                <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>
               </div>
             ) : null}
           </div>
