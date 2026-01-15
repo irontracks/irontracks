@@ -23,6 +23,9 @@ export async function POST(req: Request) {
       const { data: tProfile } = await admin.from('profiles').select('id').ilike('email', teacher_email).maybeSingle()
       teacher_user_id = tProfile?.id || null
     }
+    if (!teacher_user_id && String(teacher_email || '').trim()) {
+      return NextResponse.json({ ok: false, error: 'teacher profile not found' }, { status: 404 })
+    }
     // Validate teacher exists in profiles when assigning (teachers table is optional metadata)
     if (teacher_user_id) {
       const { data: tProfile } = await admin.from('profiles').select('id').eq('id', teacher_user_id).maybeSingle()
