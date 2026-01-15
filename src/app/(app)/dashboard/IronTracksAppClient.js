@@ -232,16 +232,31 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const restoreAdminPanelIfNeeded = useCallback(() => {
         try {
             if (typeof window === 'undefined') return;
-            const open = sessionStorage.getItem(ADMIN_PANEL_OPEN_KEY);
-            if (open !== '1') return;
+            const role = String(user?.role || '').toLowerCase();
+            const isPrivileged = role === 'admin' || role === 'teacher';
+            if (!isPrivileged) return;
+
+            const validTabs = new Set(['dashboard', 'students', 'teachers', 'templates', 'videos', 'broadcast', 'system']);
             const url = new URL(window.location.href);
-            const urlTab = String(url.searchParams.get('tab') || '').trim();
-            const storedTab = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
+            const urlTabRaw = String(url.searchParams.get('tab') || '').trim();
+            const urlTab = validTabs.has(urlTabRaw) ? urlTabRaw : '';
+
+            const open = sessionStorage.getItem(ADMIN_PANEL_OPEN_KEY);
+            const storedTabRaw = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
+            const storedTab = validTabs.has(storedTabRaw) ? storedTabRaw : '';
+
+            const shouldOpen = open === '1' || !!urlTab;
+            if (!shouldOpen) return;
+
             const tab = urlTab || storedTab || 'dashboard';
+            try {
+                sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
+                sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, tab);
+            } catch {}
             if (!urlTab && tab) setUrlTabParam(tab);
             setShowAdminPanel(true);
         } catch {}
-    }, [setUrlTabParam]);
+    }, [setUrlTabParam, user?.role]);
 
     const signOutInFlightRef = useRef(false);
     const serverSessionSyncRef = useRef({ timer: null, lastKey: '' });
