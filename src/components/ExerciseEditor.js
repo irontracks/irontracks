@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, X, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Play, X, Image as ImageIcon } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 
@@ -1007,6 +1007,24 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
                                                 placeholder="https://youtube.com/..."
                                             />
+                                            {String(exercise.videoUrl || '').trim() ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        try {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                        } catch {}
+                                                        try {
+                                                            window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
+                                                        } catch {}
+                                                    }}
+                                                    className="mt-2 inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-xs font-bold"
+                                                >
+                                                    <Play size={14} />
+                                                    Ver vídeo
+                                                </button>
+                                            ) : null}
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
