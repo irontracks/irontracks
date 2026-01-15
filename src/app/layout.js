@@ -3,6 +3,28 @@ import "./globals.css";
 export const metadata = {
   title: "IronTracks - Alta Performance",
   description: "Track your workouts and progress with IronTracks.",
+  metadataBase: new URL("https://irontracks.com.br"),
+  openGraph: {
+    title: "IronTracks - Alta Performance",
+    description: "Track your workouts and progress with IronTracks.",
+    url: "https://irontracks.com.br",
+    siteName: "IronTracks",
+    type: "website",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "IronTracks",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "IronTracks - Alta Performance",
+    description: "Track your workouts and progress with IronTracks.",
+    images: ["/opengraph-image"],
+  },
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
