@@ -2188,15 +2188,22 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     <div className="text-sm text-neutral-200 truncate">{title}</div>
                                                     {channel ? <div className="text-xs text-neutral-500 truncate">{channel}</div> : null}
                                                     {url ? (
-                                                        <a
-                                                            href={url}
-                                                            target="_blank"
-                                                            rel="noreferrer"
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                try {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                } catch {}
+                                                                try {
+                                                                    window.open(url, '_blank', 'noopener,noreferrer');
+                                                                } catch {}
+                                                            }}
                                                             className="mt-2 inline-flex items-center gap-2 text-yellow-400 hover:text-yellow-300 text-xs font-bold"
                                                         >
                                                             <Play size={14} />
                                                             Abrir no YouTube
-                                                        </a>
+                                                        </button>
                                                     ) : null}
                                                 </div>
                                                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -2657,13 +2664,20 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                         if (currentUid && !list.some(t => t.user_id === currentUid)) {
                                                             list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
                                                         }
+                                                        const currentTeacher = currentUid ? list.find(t => t.user_id === currentUid) : null;
+                                                        const currentValue = currentUid
+                                                            ? (currentTeacher?.email ? String(currentTeacher.email) : `uid:${currentUid}`)
+                                                            : '';
                                                         return (
                                                             <select
-                                                                value={currentUid}
+                                                                value={currentValue}
                                                                 onChange={async (e) => {
-                                                                    const teacherUserId = e.target.value || '';
-                                                                    const opt = Array.from(e.target.options).find(o => o.selected);
-                                                                    const teacherEmail = opt ? opt.getAttribute('data-email') || '' : '';
+                                                                    const raw = String(e.target.value || '').trim();
+                                                                    const teacherEmail = raw && !raw.startsWith('uid:') ? raw : '';
+                                                                    const teacherObj = teacherEmail
+                                                                        ? list.find(t => String(t?.email || '').toLowerCase() === teacherEmail.toLowerCase())
+                                                                        : null;
+                                                                    const teacherUserId = teacherObj?.user_id || (raw.startsWith('uid:') ? raw.slice(4) : '');
                                                                     try {
                                                                         const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null, teacher_email: teacherEmail })});
                                                                         const json = await res.json();
@@ -2684,13 +2698,18 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                                         } else {
                                                                             await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));
                                                                         }
-                                                                    } catch {}
+                                                                    } catch (e) {
+                                                                        await alert('Erro: ' + (e?.message ?? String(e)));
+                                                                    }
                                                                 }}
                                                                 className="min-h-[44px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs w-full sm:w-auto max-w-full border border-neutral-800 focus:border-yellow-500 focus:outline-none"
                                                             >
                                                                 <option value="">Sem Professor</option>
                                                                 {list.map(t => (
-                                                                    <option key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)} value={t.user_id || ''} data-email={t.email || ''}>
+                                                                    <option
+                                                                        key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)}
+                                                                        value={t.email ? String(t.email) : (t.user_id ? `uid:${t.user_id}` : '')}
+                                                                    >
                                                                         {t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')}
                                                                     </option>
                                                                 ))}
