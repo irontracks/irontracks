@@ -1928,11 +1928,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     e.stopPropagation();
                                                     if (!(await confirm('Excluir este treino?', 'Apagar Treino'))) return;
                                                     try {
-                                                        await deleteWorkout(t.id);
+                                                        const res = await deleteWorkout(t.id);
+                                                        if (!res?.success) {
+                                                            await alert('Erro ao excluir: ' + (res?.error || 'Falha ao excluir treino'));
+                                                            return;
+                                                        }
                                                         setTemplates(prev => prev.filter(x => x.id !== t.id));
-                                                    } catch (err) {
-                                                        await alert('Erro ao excluir: ' + (err?.message ?? String(err)));
-                                                    }
+                                                    } catch (err) { await alert('Erro ao excluir: ' + (err?.message ?? String(err))); }
                                                 }}
                                                 className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 hover:border-red-500/40 hover:bg-red-900/20 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all duration-300 active:scale-95"
                                             >

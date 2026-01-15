@@ -1313,40 +1313,47 @@ export async function updateWorkout(id, data) {
 }
 
 export async function deleteWorkout(id) {
-    const supabase = await createClient();
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError) throw authError;
-    const user = authData?.user ?? null;
-    if (!user) throw new Error('Unauthorized');
-
-    // SECURITY: Ensure user owns the workout before deletion attempt
-    // Although RLS should handle this, double-check in logic prevents accidental calls
-    const { data: workout } = await supabase.from('workouts').select('user_id, is_template').eq('id', id).single();
-    if (!workout) return { success: false, error: 'Workout not found' };
-    
-    // Strict Ownership Check
-    if (workout.user_id !== user.id) {
-        console.error(`SECURITY ALERT: User ${user.id} attempted to delete workout ${id} owned by ${workout.user_id}`);
-        throw new Error('Você só pode excluir seus próprios treinos.');
-    }
-
-    // Cascade delete: sets -> exercises -> workout
-    const { data: exs } = await supabase.from('exercises').select('id').eq('workout_id', id);
-    const exIds = (exs || []).map(e => e.id);
-    if (exIds.length > 0) {
-        await supabase.from('sets').delete().in('exercise_id', exIds);
-    }
-    await supabase.from('exercises').delete().eq('workout_id', id);
-    
-    const { error } = await supabase.from('workouts').delete().eq('id', id).eq('user_id', user.id);
-    if (error) throw error;
-    
     try {
-        if (workout?.is_template) await deleteTemplateFromSubscribers({ sourceUserId: user.id, sourceWorkoutId: id });
-    } catch {}
+        const supabase = await createClient();
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError) return { success: false, error: authError.message };
+        const user = authData?.user ?? null;
+        if (!user?.id) return { success: false, error: 'Unauthorized' };
 
-    revalidatePath('/');
-    return { success: true };
+        const { data: workout, error: workoutError } = await supabase
+            .from('workouts')
+            .select('user_id, is_template')
+            .eq('id', id)
+            .maybeSingle();
+        if (workoutError) return { success: false, error: workoutError.message };
+        if (!workout) return { success: false, error: 'Workout not found' };
+
+        if (workout.user_id !== user.id) {
+            return { success: false, error: 'Você só pode excluir seus próprios treinos.' };
+        }
+
+        const { data: exs, error: exError } = await supabase.from('exercises').select('id').eq('workout_id', id);
+        if (exError) return { success: false, error: exError.message };
+        const exIds = (exs || []).map(e => e.id);
+        if (exIds.length > 0) {
+            const { error: setsError } = await supabase.from('sets').delete().in('exercise_id', exIds);
+            if (setsError) return { success: false, error: setsError.message };
+        }
+        const { error: exDelError } = await supabase.from('exercises').delete().eq('workout_id', id);
+        if (exDelError) return { success: false, error: exDelError.message };
+
+        const { error } = await supabase.from('workouts').delete().eq('id', id).eq('user_id', user.id);
+        if (error) return { success: false, error: error.message };
+
+        try {
+            if (workout?.is_template) await deleteTemplateFromSubscribers({ sourceUserId: user.id, sourceWorkoutId: id });
+        } catch {}
+
+        revalidatePath('/');
+        return { success: true };
+    } catch (e) {
+        return { success: false, error: e?.message ?? String(e) };
+    }
 }
 
 // IMPORT JSON ACTION

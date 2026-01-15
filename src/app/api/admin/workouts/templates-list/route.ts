@@ -17,7 +17,7 @@ export async function GET() {
       .from('workouts')
       .select('*, exercises(*, sets(*))')
       .eq('is_template', true)
-      .or(`created_by.eq.${user.id},user_id.eq.${user.id}`)
+      .eq('user_id', user.id)
       .order('name')
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
