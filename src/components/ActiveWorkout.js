@@ -994,11 +994,12 @@ export default function ActiveWorkout(props) {
                     window.open(videoUrl, '_blank', 'noopener,noreferrer');
                   } catch {}
                 }}
-                className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
+                className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
                 title="Ver vídeo"
                 aria-label="Ver vídeo"
               >
                 <Play size={16} />
+                <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">Vídeo</span>
               </button>
             ) : null}
             {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
