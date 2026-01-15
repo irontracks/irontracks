@@ -50,6 +50,7 @@ import GlobalDialog from '@/components/GlobalDialog';
 import { playStartSound, unlockAudio } from '@/lib/sounds';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { estimateExerciseSeconds, toMinutesRounded, calculateExerciseDuration } from '@/utils/pacing';
+import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { BackButton } from '@/components/ui/BackButton';
 import StudentDashboard from '@/components/dashboard/StudentDashboard'
 import SettingsModal from '@/components/SettingsModal'
@@ -257,6 +258,61 @@ function IronTracksApp({ initialUser, initialProfile }) {
             setShowAdminPanel(true);
         } catch {}
     }, [setUrlTabParam, user?.role]);
+
+    const resolveExerciseVideos = useCallback(async (exercises) => {
+        try {
+            const list = Array.isArray(exercises) ? exercises : [];
+            const missingNames = list
+                .map((ex) => {
+                    const name = String(ex?.name || '').trim();
+                    if (!name) return null;
+                    const current = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
+                    if (current) return null;
+                    return name;
+                })
+                .filter(Boolean);
+
+            const uniqueNames = Array.from(new Set(missingNames)).slice(0, 80);
+            if (!uniqueNames.length) return { exercises: list, updates: [] };
+
+            const res = await fetch('/api/exercise-library/resolve', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ names: uniqueNames }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) return { exercises: list, updates: [] };
+
+            const videos = json?.videos && typeof json.videos === 'object' ? json.videos : {};
+            const updates = [];
+
+            const next = list.map((ex) => {
+                const current = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
+                if (current) return ex;
+                const normalized = normalizeExerciseName(String(ex?.name || ''));
+                const url = normalized ? String(videos[normalized] || '').trim() : '';
+                if (!url) return ex;
+                if (ex?.id) updates.push({ id: ex.id, url });
+                return { ...ex, videoUrl: url, video_url: url };
+            });
+
+            return { exercises: next, updates };
+        } catch {
+            return { exercises: Array.isArray(exercises) ? exercises : [], updates: [] };
+        }
+    }, []);
+
+    const persistExerciseVideoUrls = useCallback(async (updates) => {
+        try {
+            const rows = Array.isArray(updates) ? updates : [];
+            const filtered = rows
+                .map((r) => ({ id: String(r?.id || '').trim(), url: String(r?.url || '').trim() }))
+                .filter((r) => !!r.id && !!r.url)
+                .slice(0, 100);
+            if (!filtered.length) return;
+            await Promise.allSettled(filtered.map((r) => supabase.from('exercises').update({ video_url: r.url }).eq('id', r.id)));
+        } catch {}
+    }, [supabase]);
 
     const signOutInFlightRef = useRef(false);
     const serverSessionSyncRef = useRef({ timer: null, lastKey: '' });
@@ -1209,9 +1265,15 @@ function IronTracksApp({ initialUser, initialProfile }) {
         const workoutTitle = String(workout?.title || workout?.name || 'Treino');
         const ok = await confirm(`Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`, 'Iniciar Treino');
         if (!ok) return;
+        let resolvedExercises = exercisesList;
+        try {
+            const resolved = await resolveExerciseVideos(exercisesList);
+            resolvedExercises = Array.isArray(resolved?.exercises) ? resolved.exercises : exercisesList;
+            persistExerciseVideoUrls(resolved?.updates || []);
+        } catch {}
         playStartSound();
         setActiveSession({
-            workout: { ...workout, exercises: exercisesList },
+            workout: { ...workout, exercises: resolvedExercises },
             logs: {},
             startedAt: Date.now(),
             timerTargetTime: null
@@ -1286,7 +1348,14 @@ function IronTracksApp({ initialUser, initialProfile }) {
 				return;
 			}
 			const mapped = mapWorkoutRow(data);
-			setCurrentWorkout(mapped);
+            try {
+                const resolved = await resolveExerciseVideos(mapped?.exercises || []);
+                const exercises = Array.isArray(resolved?.exercises) ? resolved.exercises : (mapped?.exercises || []);
+                persistExerciseVideoUrls(resolved?.updates || []);
+                setCurrentWorkout({ ...mapped, exercises });
+            } catch {
+                setCurrentWorkout(mapped);
+            }
 			setView('edit');
 		} catch (e) {
 			const msg = e?.message || String(e || '');
