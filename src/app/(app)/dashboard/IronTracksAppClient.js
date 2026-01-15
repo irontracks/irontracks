@@ -184,6 +184,65 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const router = useRouter();
     const isFetching = useRef(false);
 
+    const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open';
+    const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
+
+    const setUrlTabParam = useCallback((nextTab) => {
+        try {
+            if (typeof window === 'undefined') return;
+            const tabValue = String(nextTab || '').trim();
+            if (!tabValue) return;
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tabValue);
+            window.history.replaceState({}, '', url);
+        } catch {}
+    }, []);
+
+    const removeUrlTabParam = useCallback(() => {
+        try {
+            if (typeof window === 'undefined') return;
+            const url = new URL(window.location.href);
+            url.searchParams.delete('tab');
+            window.history.replaceState({}, '', url);
+        } catch {}
+    }, []);
+
+    const openAdminPanel = useCallback((tab) => {
+        setShowAdminPanel(true);
+        try {
+            if (typeof window !== 'undefined') {
+                sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
+                if (tab) sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, String(tab));
+                if (tab) setUrlTabParam(tab);
+            }
+        } catch {}
+    }, [setUrlTabParam]);
+
+    const closeAdminPanel = useCallback(() => {
+        setShowAdminPanel(false);
+        try {
+            if (typeof window !== 'undefined') {
+                sessionStorage.removeItem(ADMIN_PANEL_OPEN_KEY);
+                sessionStorage.removeItem(ADMIN_PANEL_TAB_KEY);
+            }
+        } catch {}
+        removeUrlTabParam();
+    }, [removeUrlTabParam]);
+
+    const restoreAdminPanelIfNeeded = useCallback(() => {
+        try {
+            if (typeof window === 'undefined') return;
+            const open = sessionStorage.getItem(ADMIN_PANEL_OPEN_KEY);
+            if (open !== '1') return;
+            const url = new URL(window.location.href);
+            const urlTab = String(url.searchParams.get('tab') || '').trim();
+            const storedTab = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
+            const tab = urlTab || storedTab || 'dashboard';
+            if (!urlTab && tab) setUrlTabParam(tab);
+            setShowAdminPanel(true);
+        } catch {}
+    }, [setUrlTabParam]);
+
     const signOutInFlightRef = useRef(false);
     const serverSessionSyncRef = useRef({ timer: null, lastKey: '' });
     const serverSessionSyncWarnedRef = useRef(false);
@@ -804,6 +863,25 @@ function IronTracksApp({ initialUser, initialProfile }) {
         setIsCoach(role === 'teacher' || role === 'admin')
     }, [initialUser, initialProfile])
 
+    useEffect(() => {
+        restoreAdminPanelIfNeeded();
+        const onVisibility = () => {
+            if (typeof document === 'undefined') return;
+            if (document.visibilityState === 'visible') restoreAdminPanelIfNeeded();
+        };
+        const onPageShow = () => restoreAdminPanelIfNeeded();
+        try {
+            document.addEventListener('visibilitychange', onVisibility);
+            window.addEventListener('pageshow', onPageShow);
+        } catch {}
+        return () => {
+            try {
+                document.removeEventListener('visibilitychange', onVisibility);
+                window.removeEventListener('pageshow', onPageShow);
+            } catch {}
+        };
+    }, [restoreAdminPanelIfNeeded]);
+
     // Sync Profile Separately (Optimized)
     useEffect(() => {
         if (user?.id) {
@@ -1411,12 +1489,24 @@ function IronTracksApp({ initialUser, initialProfile }) {
                                 hasUnreadChat={hasUnreadChat}
                                 hasUnreadNotification={hasUnreadNotification}
                                 onOpenAdmin={() => {
-                                    setShowAdminPanel(true);
                                     if (typeof window !== 'undefined') {
                                         const url = new URL(window.location);
                                         url.searchParams.delete('view');
                                         window.history.replaceState({}, '', url);
                                     }
+                                    const tab = (() => {
+                                        try {
+                                            const url = new URL(window.location.href);
+                                            const current = String(url.searchParams.get('tab') || '').trim();
+                                            if (current) return current;
+                                        } catch {}
+                                        try {
+                                            const stored = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
+                                            if (stored) return stored;
+                                        } catch {}
+                                        return 'dashboard';
+                                    })();
+                                    openAdminPanel(tab);
                                 }}
                                 onOpenChatList={() => setView('chatList')}
                                 onOpenGlobalChat={() => setView('globalChat')}
@@ -1836,7 +1926,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
                 {/* Admin Panel Modal controlled by State */}
                 {showAdminPanel && (
-                    <AdminPanelV2 user={user} onClose={() => setShowAdminPanel(false)} />
+                    <AdminPanelV2 user={user} onClose={closeAdminPanel} />
                 )}
 
                 {settingsOpen && (

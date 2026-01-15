@@ -607,6 +607,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
            const url = `${window.location.pathname}?${sp.toString()}`;
            window.history.replaceState(null, '', url);
        }
+       try {
+           sessionStorage.setItem('irontracks_admin_panel_open', '1');
+           sessionStorage.setItem('irontracks_admin_panel_tab', String(tab || 'dashboard'));
+       } catch {}
     }, [tab]);
 
     useEffect(() => {
