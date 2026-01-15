@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { deleteTemplateFromSubscribers, syncTemplateToSubscribers } from '@/lib/workoutSync';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseTrainingNumber, parseTrainingNumberOrZero } from '@/utils/trainingNumber';
+import { createAdminClient } from '@/utils/supabase/admin'
+import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 
 const SETS_INSERT_CHUNK_SIZE = 200;
 
@@ -1117,7 +1119,7 @@ export async function createWorkout(data) {
     if (!user) throw new Error('Unauthorized');
 
     const sourceExercises = Array.isArray(data?.exercises) ? data.exercises : []
-    const exercisesPayload = (sourceExercises || [])
+    let exercisesPayload = (sourceExercises || [])
         .filter((ex) => ex && typeof ex === 'object')
         .map((ex, idx) => {
             const setDetails = Array.isArray(ex?.setDetails)
@@ -1149,6 +1151,38 @@ export async function createWorkout(data) {
                 sets,
             }
         });
+
+    try {
+        const missing = exercisesPayload
+            .map((ex) => {
+                const name = String(ex?.name ?? '').trim();
+                const hasVideo = !!String(ex?.video_url ?? '').trim();
+                if (!name || hasVideo) return null;
+                const normalized = normalizeExerciseName(name);
+                if (!normalized) return null;
+                return normalized;
+            })
+            .filter(Boolean);
+
+        const unique = Array.from(new Set(missing));
+        if (unique.length) {
+            const admin = createAdminClient();
+            const { data: lib } = await admin
+                .from('exercise_library')
+                .select('normalized_name, video_url')
+                .in('normalized_name', unique)
+                .limit(unique.length);
+
+            const rows = Array.isArray(lib) ? lib : [];
+            const map = new Map(rows.map((r) => [String(r?.normalized_name || ''), String(r?.video_url || '')]));
+            exercisesPayload = exercisesPayload.map((ex) => {
+                if (ex?.video_url) return ex;
+                const normalized = normalizeExerciseName(String(ex?.name ?? ''));
+                const url = normalized ? map.get(normalized) : null;
+                return url ? { ...ex, video_url: url } : ex;
+            });
+        }
+    } catch {}
 
     const { data: workoutId, error: rpcError } = await supabase.rpc('save_workout_atomic', {
         p_workout_id: null,
@@ -1189,7 +1223,7 @@ export async function updateWorkout(id, data) {
     if (!user) throw new Error('Unauthorized');
 
     const sourceExercises = Array.isArray(data?.exercises) ? data.exercises : []
-    const exercisesPayload = (sourceExercises || [])
+    let exercisesPayload = (sourceExercises || [])
         .filter((ex) => ex && typeof ex === 'object')
         .map((ex, idx) => {
             const setDetails = Array.isArray(ex?.setDetails)
@@ -1221,6 +1255,38 @@ export async function updateWorkout(id, data) {
                 sets,
             }
         });
+
+    try {
+        const missing = exercisesPayload
+            .map((ex) => {
+                const name = String(ex?.name ?? '').trim();
+                const hasVideo = !!String(ex?.video_url ?? '').trim();
+                if (!name || hasVideo) return null;
+                const normalized = normalizeExerciseName(name);
+                if (!normalized) return null;
+                return normalized;
+            })
+            .filter(Boolean);
+
+        const unique = Array.from(new Set(missing));
+        if (unique.length) {
+            const admin = createAdminClient();
+            const { data: lib } = await admin
+                .from('exercise_library')
+                .select('normalized_name, video_url')
+                .in('normalized_name', unique)
+                .limit(unique.length);
+
+            const rows = Array.isArray(lib) ? lib : [];
+            const map = new Map(rows.map((r) => [String(r?.normalized_name || ''), String(r?.video_url || '')]));
+            exercisesPayload = exercisesPayload.map((ex) => {
+                if (ex?.video_url) return ex;
+                const normalized = normalizeExerciseName(String(ex?.name ?? ''));
+                const url = normalized ? map.get(normalized) : null;
+                return url ? { ...ex, video_url: url } : ex;
+            });
+        }
+    } catch {}
 
     const { data: workoutId, error: rpcError } = await supabase.rpc('save_workout_atomic', {
         p_workout_id: id,

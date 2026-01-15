@@ -23,7 +23,11 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
   try {
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!apiKey) {
-      return { ok: false, error: "API de IA não configurada" };
+      return {
+        ok: false,
+        error:
+          "API de IA não configurada. Configure GOOGLE_GENERATIVE_AI_API_KEY na Vercel (Environment Variables → Preview/Production) e faça Redeploy.",
+      };
     }
 
     const file = formData.get("file");

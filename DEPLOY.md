@@ -35,6 +35,21 @@ Se no Preview aparecer **Erro de autenticação** com `missing_env`, significa q
    - Exemplo: `https://SEU-PREVIEW.vercel.app/auth/callback`
 3. Salve.
 
+## 1.2) (Opcional) Configurar Gemini (IronScanner)
+Se ao importar treino por imagem/PDF aparecer **“API de IA não configurada”**, falta a variável `GOOGLE_GENERATIVE_AI_API_KEY` no deploy (Preview/Production).
+
+### A) Criar a chave do Gemini
+1. Abra o Google AI Studio e crie uma API key.
+2. Copie a chave.
+
+### B) Vercel: configurar variáveis (Preview e Production)
+1. Vercel → Project → **Settings → Environment Variables**.
+2. Crie/adicione:
+   - `GOOGLE_GENERATIVE_AI_API_KEY` (marque **Preview** e **Production**)
+3. (Opcional) Para fixar modelo:
+   - `GOOGLE_GENERATIVE_AI_MODEL_ID=gemini-2.5-flash`
+4. Salve e faça **Redeploy** do Preview.
+
 ## 2) Como fazer deploy do jeito certo (dia a dia)
 
 ### A) Criar um Preview (para testar antes)

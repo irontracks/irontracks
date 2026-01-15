@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Pencil, Plus, Save, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Pencil, Play, Plus, Save, UserPlus, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { BackButton } from '@/components/ui/BackButton';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
@@ -954,6 +954,7 @@ export default function ActiveWorkout(props) {
     const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
     const collapsedNow = collapsed.has(exIdx);
     const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+    const videoUrl = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
 
     return (
       <div key={`ex-${exIdx}`} className="rounded-xl bg-neutral-800 border border-neutral-700 p-4">
@@ -980,7 +981,26 @@ export default function ActiveWorkout(props) {
               </div>
             ) : null}
           </div>
-          <div className="mt-1 text-neutral-400">
+          <div className="mt-1 flex items-center gap-2 text-neutral-400">
+            {videoUrl ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  try {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  } catch {}
+                  try {
+                    window.open(videoUrl, '_blank', 'noopener,noreferrer');
+                  } catch {}
+                }}
+                className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
+                title="Ver vídeo"
+                aria-label="Ver vídeo"
+              >
+                <Play size={16} />
+              </button>
+            ) : null}
             {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
           </div>
         </button>
