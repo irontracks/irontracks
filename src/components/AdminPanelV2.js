@@ -89,6 +89,11 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [videoQueue, setVideoQueue] = useState([]);
     const [videoLoading, setVideoLoading] = useState(false);
     const [videoBackfillLimit, setVideoBackfillLimit] = useState('20');
+    const [videoMissingCount, setVideoMissingCount] = useState(null);
+    const [videoMissingLoading, setVideoMissingLoading] = useState(false);
+    const [videoCycleRunning, setVideoCycleRunning] = useState(false);
+    const [videoCycleStats, setVideoCycleStats] = useState({ processed: 0, created: 0, skipped: 0 });
+    const videoCycleStopRef = useRef(false);
 
     useEffect(() => {
         if (unauthorized) onClose && onClose();
@@ -688,6 +693,69 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     useEffect(() => {
         if (tab !== 'videos' || !isAdmin) return;
+        const normalizeExercise = (value) => {
+            const s = String(value || '').trim().toLowerCase();
+            if (!s) return '';
+            return s
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim()
+                .replace(/\s+/g, ' ');
+        };
+
+        const fetchMissing = async () => {
+            setVideoMissingLoading(true);
+            try {
+                const { data: rows, error } = await supabase
+                    .from('exercises')
+                    .select('name, video_url')
+                    .or('video_url.is.null,video_url.eq.')
+                    .limit(2000);
+
+                if (error) throw error;
+
+                const normalized = new Set();
+                for (const r of (rows || [])) {
+                    const name = String(r?.name || '').trim();
+                    if (!name) continue;
+                    const n = normalizeExercise(name);
+                    if (!n) continue;
+                    normalized.add(n);
+                    if (normalized.size >= 1000) break;
+                }
+
+                const normalizedList = Array.from(normalized);
+                if (!normalizedList.length) {
+                    setVideoMissingCount(0);
+                    return;
+                }
+
+                const { data: libRows } = await supabase
+                    .from('exercise_library')
+                    .select('normalized_name, video_url')
+                    .in('normalized_name', normalizedList)
+                    .limit(normalizedList.length);
+
+                const withVideo = new Set(
+                    (libRows || [])
+                        .filter((x) => !!String(x?.video_url || '').trim())
+                        .map((x) => String(x?.normalized_name || '').trim())
+                        .filter(Boolean)
+                );
+
+                let missing = 0;
+                for (const n of normalizedList) {
+                    if (!withVideo.has(n)) missing += 1;
+                }
+                setVideoMissingCount(missing);
+            } catch {
+                setVideoMissingCount(null);
+            } finally {
+                setVideoMissingLoading(false);
+            }
+        };
+
         const fetchVideos = async () => {
             setVideoLoading(true);
             try {
@@ -705,6 +773,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             }
         };
         fetchVideos();
+        fetchMissing();
     }, [tab, isAdmin, supabase]);
 
     useEffect(() => {
@@ -1883,6 +1952,120 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         <h2 className="text-base md:text-lg font-black tracking-tight">Vídeos (Fila)</h2>
                                     </div>
                                     <div className="mt-1 text-xs text-neutral-400 font-semibold">{videoQueue.length} pendentes</div>
+                                </div>
+                            </div>
+
+                            <div className="mt-3 rounded-2xl bg-neutral-950/60 border border-neutral-800 p-3 flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Diagnóstico</div>
+                                    <div className="text-xs text-neutral-300 font-semibold">
+                                        {videoMissingLoading
+                                            ? 'Calculando exercícios sem vídeo...'
+                                            : (typeof videoMissingCount === 'number'
+                                                ? `${videoMissingCount} exercícios sem vídeo (estimativa)`
+                                                : 'Não foi possível calcular agora')}
+                                    </div>
+                                    {videoCycleRunning ? (
+                                        <div className="mt-1 text-[11px] text-neutral-500 font-semibold">
+                                            Ciclo: processados {videoCycleStats.processed} • criados {videoCycleStats.created} • pulados {videoCycleStats.skipped}
+                                        </div>
+                                    ) : null}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    {typeof videoMissingCount === 'number' && videoMissingCount > 0 ? (
+                                        <button
+                                            type="button"
+                                            disabled={videoLoading || videoCycleRunning}
+                                            onClick={async () => {
+                                                const limit = Math.max(1, Math.min(50, Math.min(videoMissingCount, Number(videoBackfillLimit) || 20)));
+                                                if (!(await confirm(`Gerar sugestões para até ${limit} exercícios sem vídeo?`, 'Gerar Sugestões (lote)'))) return;
+                                                setVideoLoading(true);
+                                                try {
+                                                    const res = await fetch('/api/admin/exercise-videos/backfill', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ limit }),
+                                                    });
+                                                    const json = await res.json().catch(() => ({}));
+                                                    if (!json?.ok) throw new Error(json?.error || 'Falha no backfill');
+                                                    const { data, error } = await supabase
+                                                        .from('exercise_videos')
+                                                        .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                                                        .eq('status', 'pending')
+                                                        .order('created_at', { ascending: false })
+                                                        .limit(60);
+                                                    if (!error) setVideoQueue(data || []);
+                                                    await alert(`Criados: ${json.created ?? 0} | Processados: ${json.processed ?? 0} | Pulados: ${json.skipped ?? 0}`);
+                                                } catch (e) {
+                                                    await alert('Erro: ' + (e?.message ?? String(e)));
+                                                } finally {
+                                                    setVideoLoading(false);
+                                                }
+                                            }}
+                                            className="min-h-[40px] px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-[11px] uppercase tracking-widest border border-yellow-400/60 active:scale-95 transition-all disabled:opacity-50"
+                                        >
+                                            Gerar Lote
+                                        </button>
+                                    ) : null}
+
+                                    {!videoCycleRunning && typeof videoMissingCount === 'number' && videoMissingCount > 0 ? (
+                                        <button
+                                            type="button"
+                                            disabled={videoLoading}
+                                            onClick={async () => {
+                                                const perCycle = Math.max(1, Math.min(50, Number(videoBackfillLimit) || 20));
+                                                if (!(await confirm(`Rodar backfill em ciclos de ${perCycle} até acabar?`, 'Backfill contínuo'))) return;
+                                                videoCycleStopRef.current = false;
+                                                setVideoCycleRunning(true);
+                                                setVideoCycleStats({ processed: 0, created: 0, skipped: 0 });
+                                                try {
+                                                    while (!videoCycleStopRef.current) {
+                                                        const res = await fetch('/api/admin/exercise-videos/backfill', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ limit: perCycle }),
+                                                        });
+                                                        const json = await res.json().catch(() => ({}));
+                                                        if (!json?.ok) throw new Error(json?.error || 'Falha no backfill');
+
+                                                        setVideoCycleStats((prev) => ({
+                                                            processed: prev.processed + (json.processed ?? 0),
+                                                            created: prev.created + (json.created ?? 0),
+                                                            skipped: prev.skipped + (json.skipped ?? 0),
+                                                        }));
+
+                                                        if ((json.processed ?? 0) <= 0 || (json.created ?? 0) <= 0) break;
+                                                    }
+                                                    const { data, error } = await supabase
+                                                        .from('exercise_videos')
+                                                        .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                                                        .eq('status', 'pending')
+                                                        .order('created_at', { ascending: false })
+                                                        .limit(60);
+                                                    if (!error) setVideoQueue(data || []);
+                                                } catch (e) {
+                                                    await alert('Erro: ' + (e?.message ?? String(e)));
+                                                } finally {
+                                                    setVideoCycleRunning(false);
+                                                }
+                                            }}
+                                            className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                                        >
+                                            Rodar contínuo
+                                        </button>
+                                    ) : null}
+
+                                    {videoCycleRunning ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                videoCycleStopRef.current = true;
+                                            }}
+                                            className="min-h-[40px] px-4 py-2 rounded-xl bg-red-900/30 border border-red-700 hover:bg-red-900/40 text-red-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
+                                        >
+                                            Pausar
+                                        </button>
+                                    ) : null}
                                 </div>
                             </div>
 
