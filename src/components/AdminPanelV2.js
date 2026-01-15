@@ -4,7 +4,7 @@ import Image from 'next/image';
 import {
 	Crown, X, UserCog, AlertCircle, Trash2, Megaphone, Plus, Copy, ArrowLeft,
 	MessageSquare, Send, RefreshCw, Dumbbell, Share2, UserPlus, AlertTriangle, Edit3, ShieldAlert,
-	ChevronDown, FileText, Download, History, Search
+		ChevronDown, FileText, Download, History, Search, Play
 } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -84,6 +84,11 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [teacherQuery, setTeacherQuery] = useState('');
     const [teacherStatusFilter, setTeacherStatusFilter] = useState('all');
     const [templateQuery, setTemplateQuery] = useState('');
+
+    const [videoExerciseName, setVideoExerciseName] = useState('');
+    const [videoQueue, setVideoQueue] = useState([]);
+    const [videoLoading, setVideoLoading] = useState(false);
+    const [videoBackfillLimit, setVideoBackfillLimit] = useState('20');
 
     useEffect(() => {
         if (unauthorized) onClose && onClose();
@@ -582,7 +587,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
        const sp = new URLSearchParams(window.location.search);
        const t = sp.get('tab');
        // Only restore if valid tab, otherwise default to dashboard
-       if (t && ['dashboard','students','teachers','templates','broadcast','system'].includes(t)) {
+       if (t && ['dashboard','students','teachers','templates','videos','broadcast','system'].includes(t)) {
            setTab(t);
        }
     }, []);
@@ -680,6 +685,27 @@ const AdminPanelV2 = ({ user, onClose }) => {
         };
         fetchTemplates();
     }, [tab, isAdmin, isTeacher, supabase]);
+
+    useEffect(() => {
+        if (tab !== 'videos' || !isAdmin) return;
+        const fetchVideos = async () => {
+            setVideoLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('exercise_videos')
+                    .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: false })
+                    .limit(60);
+                if (!error) setVideoQueue(data || []);
+            } catch {
+                setVideoQueue([]);
+            } finally {
+                setVideoLoading(false);
+            }
+        };
+        fetchVideos();
+    }, [tab, isAdmin, supabase]);
 
     useEffect(() => {
         const fetchMyWorkoutsCount = async () => {
@@ -1138,7 +1164,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
 	let TAB_LABELS = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
 	if (isAdmin) {
-		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', system: 'SISTEMA' };
+		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', videos: 'VÍDEOS', system: 'SISTEMA' };
 	}
 
 	const tabKeys = Object.keys(TAB_LABELS);
@@ -1432,6 +1458,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     else if (key === 'students') subtitle = 'Gestão de alunos e status';
                                     else if (key === 'templates') subtitle = 'Biblioteca de treinos-base';
                                     else if (key === 'teachers') subtitle = 'Gestão de professores e convites';
+                                    else if (key === 'videos') subtitle = 'Fila de vídeos por exercício';
                                     else if (key === 'system') subtitle = 'Backup, broadcasts e operações críticas';
 
                                     let iconColor = isActive ? 'text-yellow-400' : 'text-neutral-400';
@@ -1467,6 +1494,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     {key === 'students' && <UserPlus size={16} className={iconColor} />}
                                                     {key === 'templates' && <Dumbbell size={16} className={iconColor} />}
                                                     {key === 'teachers' && <UserCog size={16} className={iconColor} />}
+                                                    {key === 'videos' && <Play size={16} className={iconColor} />}
                                                     {key === 'system' && <ShieldAlert size={16} className={iconColor} />}
                                                 </div>
                                                 <div className="min-w-0 text-left">
@@ -1840,6 +1868,226 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {tab === 'videos' && !selectedStudent && isAdmin && (
+                    <div className="w-full space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <Play size={18} className="text-yellow-500" />
+                                        <h2 className="text-base md:text-lg font-black tracking-tight">Vídeos (Fila)</h2>
+                                    </div>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">{videoQueue.length} pendentes</div>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                                <input
+                                    value={videoExerciseName}
+                                    onChange={(e) => setVideoExerciseName(e.target.value)}
+                                    placeholder="Ex.: Supino reto com barra"
+                                    className="flex-1 min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
+                                />
+                                <button
+                                    type="button"
+                                    disabled={videoLoading || !String(videoExerciseName || '').trim()}
+                                    onClick={async () => {
+                                        const name = String(videoExerciseName || '').trim();
+                                        if (!name) return;
+                                        setVideoLoading(true);
+                                        try {
+                                            const res = await fetch('/api/admin/exercise-videos/suggest', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ name }),
+                                            });
+                                            const json = await res.json().catch(() => ({}));
+                                            if (!json?.ok) throw new Error(json?.error || 'Falha ao gerar sugestões');
+                                            setVideoExerciseName('');
+                                            const { data, error } = await supabase
+                                                .from('exercise_videos')
+                                                .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                                                .eq('status', 'pending')
+                                                .order('created_at', { ascending: false })
+                                                .limit(60);
+                                            if (!error) setVideoQueue(data || []);
+                                            await alert(`Sugestões criadas: ${json?.created ?? 0}`);
+                                        } catch (e) {
+                                            await alert('Erro: ' + (e?.message ?? String(e)));
+                                        } finally {
+                                            setVideoLoading(false);
+                                        }
+                                    }}
+                                    className="w-full sm:w-auto min-h-[44px] px-5 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-yellow-500 hover:bg-yellow-400 text-black border border-yellow-400/60 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+                                >
+                                    {videoLoading ? 'Gerando...' : 'Gerar Sugestões'}
+                                </button>
+                            </div>
+
+                            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                                <input
+                                    value={videoBackfillLimit}
+                                    onChange={(e) => setVideoBackfillLimit(e.target.value)}
+                                    inputMode="numeric"
+                                    placeholder="20"
+                                    className="w-full sm:w-28 min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-4 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
+                                />
+                                <button
+                                    type="button"
+                                    disabled={videoLoading}
+                                    onClick={async () => {
+                                        const limit = Math.max(1, Math.min(50, Number(videoBackfillLimit) || 20));
+                                        if (!(await confirm(`Gerar sugestões em lote para até ${limit} exercícios sem vídeo?`, 'Backfill de Vídeos'))) return;
+                                        setVideoLoading(true);
+                                        try {
+                                            const res = await fetch('/api/admin/exercise-videos/backfill', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ limit }),
+                                            });
+                                            const json = await res.json().catch(() => ({}));
+                                            if (!json?.ok) throw new Error(json?.error || 'Falha no backfill');
+                                            const { data, error } = await supabase
+                                                .from('exercise_videos')
+                                                .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                                                .eq('status', 'pending')
+                                                .order('created_at', { ascending: false })
+                                                .limit(60);
+                                            if (!error) setVideoQueue(data || []);
+                                            await alert(`Backfill concluído. Processados: ${json.processed ?? 0} | Criados: ${json.created ?? 0} | Pulados: ${json.skipped ?? 0}`);
+                                        } catch (e) {
+                                            await alert('Erro no backfill: ' + (e?.message ?? String(e)));
+                                        } finally {
+                                            setVideoLoading(false);
+                                        }
+                                    }}
+                                    className="w-full sm:w-auto min-h-[44px] px-5 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-all"
+                                >
+                                    {videoLoading ? 'Executando...' : 'Backfill (lote)'}
+                                </button>
+                                <div className="text-[11px] text-neutral-500 font-semibold flex items-center px-1">
+                                    Limite por execução (1–50)
+                                </div>
+                            </div>
+                        </div>
+
+                        {videoLoading && videoQueue.length === 0 ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center">
+                                <p className="text-neutral-500">Carregando fila...</p>
+                            </div>
+                        ) : videoQueue.length === 0 ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center">
+                                <p className="text-neutral-500">Nenhuma sugestão pendente.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {(videoQueue || []).map((row) => {
+                                    const exName = String(row?.exercise_library?.display_name_pt || row?.normalized_name || '').trim() || 'Exercício';
+                                    const title = String(row?.title || '').trim() || 'Vídeo';
+                                    const channel = String(row?.channel_title || '').trim();
+                                    const url = String(row?.url || '').trim();
+                                    const exerciseLibraryId = row?.exercise_library_id || null;
+                                    return (
+                                        <div
+                                            key={row.id}
+                                            className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700 flex flex-col gap-3"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Exercício</div>
+                                                    <div className="font-black text-white truncate">{exName}</div>
+                                                    <div className="mt-2 text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Sugestão</div>
+                                                    <div className="text-sm text-neutral-200 truncate">{title}</div>
+                                                    {channel ? <div className="text-xs text-neutral-500 truncate">{channel}</div> : null}
+                                                    {url ? (
+                                                        <a
+                                                            href={url}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="mt-2 inline-flex items-center gap-2 text-yellow-400 hover:text-yellow-300 text-xs font-bold"
+                                                        >
+                                                            <Play size={14} />
+                                                            Abrir no YouTube
+                                                        </a>
+                                                    ) : null}
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            if (!exerciseLibraryId) return;
+                                                            setVideoLoading(true);
+                                                            try {
+                                                                await supabase
+                                                                    .from('exercise_videos')
+                                                                    .update({ is_primary: false })
+                                                                    .eq('exercise_library_id', exerciseLibraryId);
+                                                                const { error } = await supabase
+                                                                    .from('exercise_videos')
+                                                                    .update({ status: 'approved', is_primary: true, approved_at: new Date().toISOString() })
+                                                                    .eq('id', row.id);
+                                                                if (error) throw error;
+                                                                await supabase
+                                                                    .from('exercise_library')
+                                                                    .update({ video_url: url })
+                                                                    .eq('id', exerciseLibraryId);
+                                                                const { data, error: refreshErr } = await supabase
+                                                                    .from('exercise_videos')
+                                                                    .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                                                                    .eq('status', 'pending')
+                                                                    .order('created_at', { ascending: false })
+                                                                    .limit(60);
+                                                                if (!refreshErr) setVideoQueue(data || []);
+                                                                await alert('Vídeo aprovado e definido como padrão.');
+                                                            } catch (e) {
+                                                                await alert('Erro ao aprovar: ' + (e?.message ?? String(e)));
+                                                            } finally {
+                                                                setVideoLoading(false);
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-4 py-2 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black text-[11px] uppercase tracking-widest border border-green-400/40 active:scale-95 transition-all disabled:opacity-50"
+                                                        disabled={videoLoading}
+                                                    >
+                                                        Aprovar
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            setVideoLoading(true);
+                                                            try {
+                                                                const { error } = await supabase
+                                                                    .from('exercise_videos')
+                                                                    .update({ status: 'rejected', is_primary: false })
+                                                                    .eq('id', row.id);
+                                                                if (error) throw error;
+                                                                const { data, error: refreshErr } = await supabase
+                                                                    .from('exercise_videos')
+                                                                    .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                                                                    .eq('status', 'pending')
+                                                                    .order('created_at', { ascending: false })
+                                                                    .limit(60);
+                                                                if (!refreshErr) setVideoQueue(data || []);
+                                                            } catch (e) {
+                                                                await alert('Erro ao rejeitar: ' + (e?.message ?? String(e)));
+                                                            } finally {
+                                                                setVideoLoading(false);
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                                                        disabled={videoLoading}
+                                                    >
+                                                        Rejeitar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
