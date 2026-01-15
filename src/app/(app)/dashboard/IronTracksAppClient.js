@@ -1419,7 +1419,11 @@ function IronTracksApp({ initialUser, initialProfile }) {
 		const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
 		if (!(await confirm(`Apagar o treino "${name}"?`, "Excluir Treino"))) return;
 		try {
-			await deleteWorkout(id);
+			const res = await deleteWorkout(id);
+			if (!res?.success) {
+				await alert("Erro: " + (res?.error || 'Falha ao excluir treino'));
+				return;
+			}
 			await fetchWorkouts();
 		} catch (e) { await alert("Erro: " + (e?.message ?? String(e))); }
 	};
