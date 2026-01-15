@@ -5,9 +5,10 @@ import { resolveRoleByUser } from '@/utils/auth/route'
 
 type SP = Record<string, string | string[] | undefined>
 
-export default async function DashboardPage({ searchParams }: { searchParams?: SP }) {
-  const code = typeof searchParams?.code === 'string' ? searchParams?.code : ''
-  const next = typeof searchParams?.next === 'string' ? searchParams?.next : ''
+export default async function DashboardPage({ searchParams }: { searchParams?: Promise<SP> }) {
+  const sp = await searchParams
+  const code = typeof sp?.code === 'string' ? sp?.code : ''
+  const next = typeof sp?.next === 'string' ? sp?.next : ''
   if (code) {
     const safeNext = next && next.startsWith('/') ? next : '/dashboard'
     redirect(`/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(safeNext)}`)

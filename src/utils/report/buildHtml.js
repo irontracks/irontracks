@@ -1,4 +1,4 @@
-export function buildReportHTML(session, previousSession, studentName = '') {
+export function buildReportHTML(session, previousSession, studentName = '', kcalOverride = null) {
   const formatDate = (ts) => {
     if (!ts) return ''
     const d = ts.toDate ? ts.toDate() : new Date(ts)
@@ -34,6 +34,8 @@ export function buildReportHTML(session, previousSession, studentName = '') {
     || (Array.isArray(session?.exerciseDurations) ? session.exerciseDurations.reduce((a,b)=>a+(b||0),0) : 0)
   const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? session.outdoorBike : null
   const calories = (() => {
+    const ov = Number(kcalOverride)
+    if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
     return Math.round((currentVolume * 0.02) + (durationInMinutes * 4))

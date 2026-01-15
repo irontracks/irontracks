@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, X, Image as ImageIcon } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 
@@ -725,19 +725,41 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 	return (
 		<div className="h-full flex flex-col bg-neutral-900">
 			<div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between bg-neutral-950 sticky top-0 z-30 pt-safe">
-				<div className="w-full flex items-center justify-between gap-3 min-h-[48px]">
-					<h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap">
-						Editar Treino
-					</h2>
-					<div className="flex items-center gap-2">
+				<div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-[48px]">
+					<div className="flex items-center justify-between gap-3 min-w-0">
+						<h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap truncate min-w-0">
+							Editar Treino
+						</h2>
+						<div className="shrink-0 flex items-center gap-2">
+							<button
+								type="button"
+								onClick={handleCancel}
+								className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors"
+								title="Fechar"
+							>
+								<X size={16} />
+							</button>
+							<button
+								type="button"
+								onClick={handleSave}
+								disabled={saving}
+								className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
+							>
+								<Save size={18} />
+								<span className="hidden sm:inline">{saving ? 'SALVANDO...' : 'SALVAR'}</span>
+							</button>
+						</div>
+					</div>
+					<div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 						<button
 							onClick={handleScannerFileClick}
 							disabled={scannerLoading}
-							className="flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
+							className="shrink-0 flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
 							title="Importar treino via IA (foto/PDF)"
 						>
 							<ImageIcon size={18} />
-							<span className="text-sm font-bold">Importar Treino (Foto/PDF)</span>
+							<span className="text-sm font-bold hidden sm:inline">Importar Treino (Foto/PDF)</span>
+							<span className="text-sm font-bold sm:hidden">Importar</span>
 						</button>
 						<input
 							ref={scannerFileInputRef}
@@ -749,21 +771,14 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 						/>
 						<button
 							onClick={handleImportJsonClick}
-							className="flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
+							className="shrink-0 flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
 							title="Carregar JSON"
 						>
 							<Upload size={18} />
-							<span className="text-sm font-bold">Carregar JSON</span>
+							<span className="text-sm font-bold hidden sm:inline">Carregar JSON</span>
+							<span className="text-sm font-bold sm:hidden">JSON</span>
 						</button>
 						<input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportJson} />
-						<button
-							onClick={handleSave}
-							disabled={saving}
-							className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
-						>
-							<Save size={18} />
-							<span>{saving ? 'SALVANDO...' : 'SALVAR'}</span>
-						</button>
 					</div>
 				</div>
 			</div>
@@ -792,14 +807,6 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                             </button>
                             <label className="text-xs font-bold text-neutral-500 uppercase">Nome do Treino</label>
                         </div>
-                        <button
-                            onClick={handleImportJsonClick}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 text-blue-400 hover:text-white rounded-full hover:bg-blue-500/10 transition-colors text-xs"
-                            title="Importar JSON"
-                        >
-                            <Upload size={16} />
-                            <span>Importar JSON</span>
-                        </button>
                     </div>
                     <input
                         value={workout.title || ''}

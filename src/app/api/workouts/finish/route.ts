@@ -7,6 +7,7 @@ export async function POST(request: Request) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
     const body = await request.json()
@@ -28,6 +29,11 @@ export async function POST(request: Request) {
       .single()
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+
+    try {
+      await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)
+    } catch {}
+
     return NextResponse.json({ ok: true, saved: data })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
