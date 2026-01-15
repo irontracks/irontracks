@@ -23,6 +23,7 @@ import { sendBroadcastMessage, clearAllStudents, clearAllTeachers, clearAllWorko
 import { updateWorkout, deleteWorkout } from '@/actions/workout-actions';
 import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
+import { normalizeWorkoutTitle, workoutTitleKey } from '@/utils/workoutTitle';
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
 
@@ -55,6 +56,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [usersList, setUsersList] = useState([]);
     const [teachersList, setTeachersList] = useState([]);
     const [templates, setTemplates] = useState([]);
+    const [templatesUserId, setTemplatesUserId] = useState('');
     const [myWorkoutsCount, setMyWorkoutsCount] = useState(0);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [subTab, setSubTab] = useState('workouts');
@@ -619,15 +621,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
             try {
                 const { data: { user: currentUser } } = await supabase.auth.getUser();
                 if (!currentUser) return;
+                setTemplatesUserId(currentUser.id || '');
                 let list = [];
                 if (isAdmin || isTeacher) {
                     try {
                         const res = await fetch('/api/admin/workouts/mine');
                         const json = await res.json();
                         if (json.ok) {
-                            list = (json.rows || []).filter(
-                                w => w?.is_template === true && (w?.created_by === currentUser.id || w?.user_id === currentUser.id)
-                            );
+                            list = (json.rows || []).filter((w) => w?.is_template === true && w?.user_id === currentUser.id);
                         }
                     } catch (e) { console.error("API fetch error", e); }
 
@@ -637,11 +638,9 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 .from('workouts')
                                 .select('*, exercises(*, sets(*))')
                                 .eq('is_template', true)
-                                .or(`created_by.eq.${currentUser.id},user_id.eq.${currentUser.id}`)
+                                .eq('user_id', currentUser.id)
                                 .order('name');
-                            list = (data || []).filter(
-                                w => w?.is_template === true && (w?.created_by === currentUser.id || w?.user_id === currentUser.id)
-                            );
+                            list = (data || []).filter((w) => w?.is_template === true && w?.user_id === currentUser.id);
                         } catch (e) { console.error("Supabase fetch error", e); }
                     }
                 } else {
@@ -664,12 +663,6 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     }
                 } catch {}
                 // Deduplicar por título, priorizando treinos completos (maior número de exercícios)
-                const normalize = (s) => (s || '')
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\s+/g,' ')
-                    .trim();
                 const score = (w) => {
                     const exs = Array.isArray(w.exercises) ? w.exercises : [];
                     const exCount = exs.length;
@@ -679,14 +672,23 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 for (const w of (list || [])) {
                     if (!w || !w.name) continue; // Defensive check
                     try {
-                        const key = normalize(w.name);
+                        const key = workoutTitleKey(w.name);
                         const prev = byTitle.get(key);
-                        if (!prev || score(w) > score(prev) || (score(w) === score(prev) && !!w.is_template && !prev.is_template)) {
+                        const curHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(w?.name || ''));
+                        const prevHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(prev?.name || ''));
+                        if (
+                            !prev
+                            || score(w) > score(prev)
+                            || (score(w) === score(prev) && curHasPrefix && !prevHasPrefix)
+                            || (score(w) === score(prev) && !!w.is_template && !prev.is_template)
+                        ) {
                             byTitle.set(key, w);
                         }
                     } catch (e) { console.error("Error processing workout", w, e); }
                 }
-                const deduped = Array.from(byTitle.values()).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+                const deduped = Array.from(byTitle.values())
+                    .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name || '') }))
+                    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
                 setTemplates(deduped || []);
             } catch (err) {
                 console.error("Critical error fetching templates", err);
@@ -789,15 +791,9 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     const res = await fetch('/api/admin/workouts/mine');
                     const json = await res.json();
                     if (json.ok) {
-                        const normalize = (s) => (s || '')
-                            .toLowerCase()
-                            .normalize('NFD')
-                            .replace(/[\u0300-\u036f]/g, '')
-                            .replace(/\s+/g,' ')
-                            .trim();
                         const byTitle = new Map();
                         for (const w of (json.rows || [])) {
-                            const key = normalize(w.name);
+                            const key = workoutTitleKey(w.name);
                             if (!byTitle.has(key)) byTitle.set(key, w);
                         }
                         const count = byTitle.size;
@@ -932,21 +928,21 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 my = (my || []).filter(w => (w?.user_id === me.id) && (w?.is_template === true));
                 
                 // Helper reintroduzido para deduplicação de TEMPLATES (Meus Treinos)
-                const normalizeTitle = (s) => (s || '')
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\s+/g,' ')
-                    .trim();
-
                 const tMap = new Map();
                 for (const w of (my || [])) {
-                    const key = normalizeTitle(w.name);
+                    const key = workoutTitleKey(w.name);
                     const prev = tMap.get(key);
                     const exs = Array.isArray(w.exercises) ? w.exercises : [];
                     const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                     const score = (x) => (Array.isArray(x) ? x.length : 0);
-                    if (!prev || score(exs) > score(prevExs) || (score(exs) === score(prevExs) && !!w.is_template && !prev?.is_template)) {
+                    const curHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(w?.name || ''));
+                    const prevHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(prev?.name || ''));
+                    if (
+                        !prev
+                        || score(exs) > score(prevExs)
+                        || (score(exs) === score(prevExs) && curHasPrefix && !prevHasPrefix)
+                        || (score(exs) === score(prevExs) && !!w.is_template && !prev?.is_template)
+                    ) {
                         tMap.set(key, w);
                     }
                 }
@@ -955,15 +951,17 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     const jsonLegacy = await resLegacy.json();
                     if (jsonLegacy.ok) {
                         for (const r of (jsonLegacy.rows || [])) {
-                            const key = normalizeTitle(r.name);
+                            const key = workoutTitleKey(r.name);
                             const prev = tMap.get(key);
-                            const candidate = { id: r.id || r.uuid, name: r.name, exercises: [] };
+                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] };
                             const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                             if (!prev || prevExs.length < 1) tMap.set(key, candidate);
                         }
                     }
                 } catch {}
-                const dedupTemplates = Array.from(tMap.values()).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+                const dedupTemplates = Array.from(tMap.values())
+                    .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name || '') }))
+                    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
                 setTemplates(dedupTemplates || []);
             }
             if (targetUserId) {
@@ -1913,7 +1911,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         onClick={() => openEditTemplate(t)}
                                     >
                                         <div className="min-w-0">
-                                            <h3 className="font-black text-white truncate">{t.name}</h3>
+                                            <h3 className="font-black text-white truncate">{normalizeWorkoutTitle(t.name)}</h3>
                                             <p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -1928,6 +1926,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     e.stopPropagation();
                                                     if (!(await confirm('Excluir este treino?', 'Apagar Treino'))) return;
                                                     try {
+                                                        if (templatesUserId && t?.user_id && String(t.user_id) !== String(templatesUserId)) {
+                                                            await alert('Esse treino pertence a um aluno. Para não apagar o treino dele, a exclusão aqui é bloqueada.');
+                                                            return;
+                                                        }
                                                         const res = await deleteWorkout(t.id);
                                                         if (!res?.success) {
                                                             await alert('Erro ao excluir: ' + (res?.error || 'Falha ao excluir treino'));
@@ -2533,7 +2535,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         onClick={() => setEditingTeacher(t)}
                                     >
                                         <div className="min-w-0">
-                                            <h3 className="font-black text-white truncate">{t.name}</h3>
+                                            <h3 className="font-black text-white truncate">{normalizeWorkoutTitle(t.name)}</h3>
                                             <p className="text-xs text-neutral-400 truncate">{t.email}</p>
                                             <div className="mt-2 flex flex-wrap items-center gap-2">
                                                 <span className="px-3 py-1.5 rounded-full bg-neutral-900 border border-neutral-700 text-[11px] font-black uppercase tracking-wide text-neutral-200">
@@ -2641,8 +2643,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.35)] mb-6">
-                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)] mb-6">
+                                <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                                     <div className="flex items-start gap-3 md:gap-4 min-w-0">
                                         <button
                                             type="button"
@@ -2661,71 +2663,71 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedStatusTone}`}> {selectedStatusLabel}</span>
                                             </div>
                                             <p className="text-xs md:text-sm text-neutral-400 font-semibold truncate">{selectedStudent?.email}</p>
-                                            {isAdmin && (Array.isArray(teachersList) ? teachersList.length : 0) > 0 && (
-                                                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Professor</span>
-                                                    {(() => {
-                                                        const currentUid = selectedStudent.teacher_id || '';
-                                                        const list = Array.isArray(teachersList) ? [...teachersList] : [];
-                                                        if (currentUid && !list.some(t => t.user_id === currentUid)) {
-                                                            list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
-                                                        }
-                                                        const currentValue = currentUid ? `uid:${currentUid}` : '';
-                                                        return (
-                                                            <select
-                                                                value={currentValue}
-                                                                onChange={async (e) => {
-                                                                    const raw = String(e.target.value || '').trim();
-                                                                    const teacherUserId = raw.startsWith('uid:') ? raw.slice(4) : '';
-                                                                    try {
-                                                                        const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null })});
-                                                                        const json = await res.json();
-                                                                        if (json.ok) {
-                                                                            const nextTid = json.teacher_user_id || teacherUserId || null;
-                                                                            setSelectedStudent(prev => ({ ...prev, teacher_id: nextTid }));
-                                                                            setUsersList(prev => prev.map(x => (
-                                                                                (x.id === selectedStudent.id)
-                                                                                || (x.user_id === selectedStudent.user_id)
-                                                                                || ((x.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase())
-                                                                            ) ? { ...x, teacher_id: nextTid } : x));
-                                                                            try { if (selectedStudent.email) localStorage.setItem('student_teacher_'+selectedStudent.email, nextTid || ''); } catch {}
-                                                                            try {
-                                                                                const resp = await fetch('/api/admin/students/list');
-                                                                                const js = await resp.json();
-                                                                                if (js.ok) setUsersList(js.students || []);
-                                                                            } catch {}
-                                                                        } else {
-                                                                            await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));
-                                                                        }
-                                                                    } catch (e) {
-                                                                        await alert('Erro: ' + (e?.message ?? String(e)));
-                                                                    }
-                                                                }}
-                                                                className="min-h-[44px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs w-full sm:w-auto max-w-full border border-neutral-800 focus:border-yellow-500 focus:outline-none"
-                                                            >
-                                                                <option value="">Sem Professor</option>
-                                                                {list.map(t => (
-                                                                    <option
-                                                                        key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)}
-                                                                        value={t.user_id ? `uid:${t.user_id}` : ''}
-                                                                        disabled={!t.user_id}
-                                                                    >
-                                                                        {(t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')) + (!t.user_id ? ' (sem conta)' : '')}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        );
-                                                    })()}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex flex-col sm:flex-row md:flex-row items-stretch md:items-center gap-2">
+                                        {isAdmin && (Array.isArray(teachersList) ? teachersList.length : 0) > 0 && (
+                                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                                <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest text-neutral-500">Professor</span>
+                                                {(() => {
+                                                    const currentUid = selectedStudent.teacher_id || '';
+                                                    const list = Array.isArray(teachersList) ? [...teachersList] : [];
+                                                    if (currentUid && !list.some(t => t.user_id === currentUid)) {
+                                                        list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
+                                                    }
+                                                    const currentValue = currentUid ? `uid:${currentUid}` : '';
+                                                    return (
+                                                        <select
+                                                            value={currentValue}
+                                                            onChange={async (e) => {
+                                                                const raw = String(e.target.value || '').trim();
+                                                                const teacherUserId = raw.startsWith('uid:') ? raw.slice(4) : '';
+                                                                try {
+                                                                    const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null })});
+                                                                    const json = await res.json();
+                                                                    if (json.ok) {
+                                                                        const nextTid = json.teacher_user_id || teacherUserId || null;
+                                                                        setSelectedStudent(prev => ({ ...prev, teacher_id: nextTid }));
+                                                                        setUsersList(prev => prev.map(x => (
+                                                                            (x.id === selectedStudent.id)
+                                                                            || (x.user_id === selectedStudent.user_id)
+                                                                            || ((x.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase())
+                                                                        ) ? { ...x, teacher_id: nextTid } : x));
+                                                                        try { if (selectedStudent.email) localStorage.setItem('student_teacher_'+selectedStudent.email, nextTid || ''); } catch {}
+                                                                        try {
+                                                                            const resp = await fetch('/api/admin/students/list');
+                                                                            const js = await resp.json();
+                                                                            if (js.ok) setUsersList(js.students || []);
+                                                                        } catch {}
+                                                                    } else {
+                                                                        await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));
+                                                                    }
+                                                                } catch (e) {
+                                                                    await alert('Erro: ' + (e?.message ?? String(e)));
+                                                                }
+                                                            }}
+                                                            className="min-h-[44px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs w-full sm:w-64 md:w-72 border border-neutral-800 focus:border-yellow-500 focus:outline-none"
+                                                        >
+                                                            <option value="">Sem Professor</option>
+                                                            {list.map(t => (
+                                                                <option
+                                                                    key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)}
+                                                                    value={t.user_id ? `uid:${t.user_id}` : ''}
+                                                                    disabled={!t.user_id}
+                                                                >
+                                                                    {(t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')) + (!t.user_id ? ' (sem conta)' : '')}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={() => setEditingStudent(true)}
-                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 shrink-0"
                                             title="Editar"
                                         >
                                             <Edit3 size={18} className="text-yellow-500" /> Editar
@@ -2907,7 +2909,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         {syncedWorkouts.map(w => (
                                             <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer" onClick={() => setViewWorkout(w)}>
                                                 <div>
-                                                    <h4 className="font-bold text-white">{w.name}</h4>
+                                                    <h4 className="font-bold text-white">{normalizeWorkoutTitle(w.name)}</h4>
                                                     <p className="text-xs text-neutral-500">{w.exercises?.length || 0} exercícios</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -2922,7 +2924,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 {studentWorkouts.map(w => (
                             <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer" onClick={() => setViewWorkout(w)}>
                                 <div>
-                                    <h4 className="font-bold text-white">{w.name}</h4>
+                                    <h4 className="font-bold text-white">{normalizeWorkoutTitle(w.name)}</h4>
                                     <p className="text-xs text-neutral-500">{w.exercises?.length || 0} exercícios</p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -3082,7 +3084,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewWorkout(null)}>
                         <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                <h3 className="font-bold text-white">Treino: {viewWorkout.name}</h3>
+                                <h3 className="font-bold text-white">Treino: {normalizeWorkoutTitle(viewWorkout.name)}</h3>
                                 <button onClick={() => setViewWorkout(null)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300"><ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span></button>
                             </div>
                             <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">

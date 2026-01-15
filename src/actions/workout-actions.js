@@ -7,6 +7,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { parseTrainingNumber, parseTrainingNumberOrZero } from '@/utils/trainingNumber';
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
+import { resolveRoleByUser } from '@/utils/auth/route'
+import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 
 const SETS_INSERT_CHUNK_SIZE = 200;
 
@@ -1189,7 +1191,7 @@ export async function createWorkout(data) {
         p_user_id: user.id,
         p_created_by: user.id,
         p_is_template: true,
-        p_name: String(data?.title ?? ''),
+        p_name: normalizeWorkoutTitle(String(data?.title ?? '')),
         p_notes: String(data?.notes ?? ''),
         p_exercises: exercisesPayload,
     })
@@ -1293,7 +1295,7 @@ export async function updateWorkout(id, data) {
         p_user_id: user.id,
         p_created_by: user.id,
         p_is_template: true,
-        p_name: String(data?.title ?? ''),
+        p_name: normalizeWorkoutTitle(String(data?.title ?? '')),
         p_notes: String(data?.notes ?? ''),
         p_exercises: exercisesPayload,
     })
@@ -1319,6 +1321,43 @@ export async function deleteWorkout(id) {
         if (authError) return { success: false, error: authError.message };
         const user = authData?.user ?? null;
         if (!user?.id) return { success: false, error: 'Unauthorized' };
+
+        const resolved = await resolveRoleByUser({ id: user.id, email: user.email ?? null })
+        const role = resolved?.role || 'user'
+
+        if (role === 'admin') {
+            const admin = createAdminClient()
+            const { data: workout, error: wErr } = await admin
+                .from('workouts')
+                .select('id, user_id, created_by, is_template')
+                .eq('id', id)
+                .maybeSingle()
+            if (wErr) return { success: false, error: wErr.message }
+            if (!workout?.id) return { success: false, error: 'Workout not found' }
+
+            const { data: exs, error: exErr } = await admin.from('exercises').select('id').eq('workout_id', id)
+            if (exErr) return { success: false, error: exErr.message }
+            const exIds = (exs || []).map((e) => e.id).filter(Boolean)
+            if (exIds.length > 0) {
+                const { error: setsErr } = await admin.from('sets').delete().in('exercise_id', exIds)
+                if (setsErr) return { success: false, error: setsErr.message }
+            }
+            const { error: exDelErr } = await admin.from('exercises').delete().eq('workout_id', id)
+            if (exDelErr) return { success: false, error: exDelErr.message }
+
+            const { error: delErr } = await admin.from('workouts').delete().eq('id', id)
+            if (delErr) return { success: false, error: delErr.message }
+
+            try {
+                const sourceUserId = String(workout?.created_by || '').trim() || String(workout?.user_id || '').trim()
+                if (workout?.is_template === true && sourceUserId && String(workout?.user_id || '') === String(workout?.created_by || '')) {
+                    await deleteTemplateFromSubscribers({ sourceUserId, sourceWorkoutId: id })
+                }
+            } catch {}
+
+            revalidatePath('/')
+            return { success: true }
+        }
 
         const { data: workout, error: workoutError } = await supabase
             .from('workouts')
@@ -1367,7 +1406,7 @@ export async function importData(jsonData) {
     // 1. Import Workouts
     const workouts = Array.isArray(jsonData?.workouts) ? jsonData.workouts : []
     for (const w of workouts) {
-        const workoutName = w?.title || w?.name || 'Treino Importado'
+        const workoutName = normalizeWorkoutTitle(w?.title || w?.name || 'Treino Importado')
         const workoutNotes = w?.notes ?? null
         const isTemplate = w?.is_template === false ? false : true
 

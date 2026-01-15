@@ -2,6 +2,7 @@ import React from 'react';
 import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Play, X, Image as ImageIcon } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
+import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
@@ -773,7 +774,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     p_user_id: user.id,
                     p_created_by: user.id,
                     p_is_template: true,
-                    p_name: workout.title,
+                    p_name: normalizeWorkoutTitle(workout.title),
                     p_notes: workout.notes,
                     p_exercises: exercisesPayload
                  });

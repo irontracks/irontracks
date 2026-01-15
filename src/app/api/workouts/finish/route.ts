@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 
 export async function POST(request: Request) {
   try {
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
       .insert({
         user_id: user.id,
         created_by: user.id,
-        name: session.workoutTitle || 'Treino Realizado',
+        name: normalizeWorkoutTitle(session.workoutTitle || 'Treino Realizado'),
         date: new Date(session?.date ?? new Date()),
         completed_at: new Date().toISOString(),
         is_template: false,
@@ -39,4 +40,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-
