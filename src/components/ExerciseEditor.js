@@ -733,20 +733,20 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 						<div className="shrink-0 flex items-center gap-2">
 							<button
 								type="button"
-								onClick={handleCancel}
-								className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors"
-								title="Fechar"
-							>
-								<X size={16} />
-							</button>
-							<button
-								type="button"
 								onClick={handleSave}
 								disabled={saving}
 								className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
 							>
 								<Save size={18} />
 								<span className="hidden sm:inline">{saving ? 'SALVANDO...' : 'SALVAR'}</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => onCancel?.()}
+								className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors"
+								title="Fechar"
+							>
+								<X size={16} />
 							</button>
 						</div>
 					</div>

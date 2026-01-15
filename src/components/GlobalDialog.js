@@ -56,7 +56,7 @@ const GlobalDialog = () => {
 	};
 
 	return (
-		<div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+		<div className="fixed inset-0 z-[5000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
 			<div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-scale-in">
 				<div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-800/50">
 					<h3 className="font-bold text-white flex items-center gap-2">
