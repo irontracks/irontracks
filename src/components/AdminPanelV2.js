@@ -2668,22 +2668,15 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                         if (currentUid && !list.some(t => t.user_id === currentUid)) {
                                                             list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
                                                         }
-                                                        const currentTeacher = currentUid ? list.find(t => t.user_id === currentUid) : null;
-                                                        const currentValue = currentUid
-                                                            ? (currentTeacher?.email ? String(currentTeacher.email) : `uid:${currentUid}`)
-                                                            : '';
+                                                        const currentValue = currentUid ? `uid:${currentUid}` : '';
                                                         return (
                                                             <select
                                                                 value={currentValue}
                                                                 onChange={async (e) => {
                                                                     const raw = String(e.target.value || '').trim();
-                                                                    const teacherEmail = raw && !raw.startsWith('uid:') ? raw : '';
-                                                                    const teacherObj = teacherEmail
-                                                                        ? list.find(t => String(t?.email || '').toLowerCase() === teacherEmail.toLowerCase())
-                                                                        : null;
-                                                                    const teacherUserId = teacherObj?.user_id || (raw.startsWith('uid:') ? raw.slice(4) : '');
+                                                                    const teacherUserId = raw.startsWith('uid:') ? raw.slice(4) : '';
                                                                     try {
-                                                                        const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null, teacher_email: teacherEmail })});
+                                                                        const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null })});
                                                                         const json = await res.json();
                                                                         if (json.ok) {
                                                                             const nextTid = json.teacher_user_id || teacherUserId || null;
@@ -2712,9 +2705,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                                 {list.map(t => (
                                                                     <option
                                                                         key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)}
-                                                                        value={t.email ? String(t.email) : (t.user_id ? `uid:${t.user_id}` : '')}
+                                                                        value={t.user_id ? `uid:${t.user_id}` : ''}
+                                                                        disabled={!t.user_id}
                                                                     >
-                                                                        {t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')}
+                                                                        {(t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')) + (!t.user_id ? ' (sem conta)' : '')}
                                                                     </option>
                                                                 ))}
                                                             </select>

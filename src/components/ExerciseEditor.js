@@ -22,7 +22,83 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 			onChange?.({ ...workout, exercises: validExercises });
 		}
 	}, [workout, onChange]);
+    React.useEffect(() => {
+        if (!Array.isArray(workout?.exercises)) return;
+        let changed = false;
+        const nextExercises = workout.exercises.map((ex) => {
+            if (!ex || typeof ex !== 'object') return ex;
 
+            const existingDetailsRaw = Array.isArray(ex?.setDetails) ? ex.setDetails : [];
+            const setsFromField = Math.max(0, parseInt(ex?.sets) || 0);
+            const setsFromDetails = Array.isArray(existingDetailsRaw) ? existingDetailsRaw.length : 0;
+            const desiredCount = Math.max(setsFromField, setsFromDetails);
+            if (!desiredCount) return ex;
+
+            const nextDetails = ensureSetDetails(ex, desiredCount);
+            let next = ex;
+
+            if (setsFromField !== desiredCount || ex?.sets === '' || ex?.sets == null) {
+                next = { ...next, sets: desiredCount };
+                changed = true;
+            }
+
+            const detailsString = JSON.stringify(existingDetailsRaw || []);
+            const nextDetailsString = JSON.stringify(nextDetails || []);
+            if (detailsString !== nextDetailsString) {
+                next = { ...next, setDetails: nextDetails };
+                changed = true;
+            }
+
+            const method = normalizeMethod(next?.method);
+            if (method !== 'Rest-Pause') return next;
+
+            const findRpConfig = () => {
+                for (const s of nextDetails) {
+                    const cfg = s?.advanced_config ?? s?.advancedConfig ?? null;
+                    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) continue;
+                    const hasAny =
+                        Object.prototype.hasOwnProperty.call(cfg, 'initial_reps') ||
+                        Object.prototype.hasOwnProperty.call(cfg, 'mini_sets') ||
+                        Object.prototype.hasOwnProperty.call(cfg, 'rest_time_sec');
+                    if (hasAny) return cfg;
+                }
+                return null;
+            };
+
+            const template = findRpConfig();
+            const repsNum = Number.parseInt(String(next?.reps ?? ''), 10);
+            const fallbackTemplate = {
+                initial_reps: Number.isFinite(repsNum) ? repsNum : null,
+                mini_sets: null,
+                rest_time_sec: REST_PAUSE_DEFAULT_PAUSE_SEC,
+            };
+
+            const rp = template || fallbackTemplate;
+
+            const propagated = nextDetails.map((s) => {
+                const cfg = s?.advanced_config ?? s?.advancedConfig ?? null;
+                const baseCfg = cfg && typeof cfg === 'object' && !Array.isArray(cfg) ? cfg : {};
+                const nextCfg = {
+                    ...baseCfg,
+                    initial_reps: baseCfg?.initial_reps ?? rp.initial_reps,
+                    mini_sets: baseCfg?.mini_sets ?? rp.mini_sets,
+                    rest_time_sec: baseCfg?.rest_time_sec ?? rp.rest_time_sec,
+                };
+                return { ...s, advanced_config: nextCfg };
+            });
+
+            const propagatedString = JSON.stringify(propagated || []);
+            if (propagatedString !== nextDetailsString) {
+                next = { ...next, setDetails: propagated };
+                changed = true;
+            }
+
+            return next;
+        });
+
+        if (!changed) return;
+        onChange?.({ ...workout, exercises: nextExercises });
+    }, [workout, onChange]);
 	if (!workout) return null;
 
     const normalizeMethod = (method) => {
@@ -832,7 +908,9 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                         const nextExercise = hasNext ? (workout.exercises || [])[index + 1] : null;
                         const nextType = nextExercise ? getExerciseType(nextExercise) : null;
                         const canShowLinkButton = hasNext && exerciseType !== 'cardio' && nextType !== 'cardio';
-                        const setsCount = Math.max(0, parseInt(exercise?.sets) || 0);
+                        const setsFromField = Math.max(0, parseInt(exercise?.sets) || 0);
+                        const setsFromDetails = Array.isArray(exercise?.setDetails) ? exercise.setDetails.length : 0;
+                        const setsCount = Math.max(setsFromField, setsFromDetails);
                         const setDetails = ensureSetDetails(exercise, setsCount);
 
                         return (
@@ -931,7 +1009,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 <div className="flex items-center gap-1">
                                                     <input
                                                         type="number"
-                                                        value={exercise.sets || ''}
+                                                        value={setsCount || ''}
                                                         onChange={e => updateExercise(index, 'sets', e.target.value)}
                                                         className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
                                                     />
@@ -1000,31 +1078,34 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
                                     <div className="space-y-3 pt-2">
                                         <div>
-                                            <label className="text-[10px] text-blue-400 uppercase font-bold mb-1 block">Vídeo Demonstração (URL)</label>
+                                            <div className="flex items-center justify-between gap-3 mb-1">
+                                                <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
+                                                {String(exercise.videoUrl || '').trim() ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            try {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                            } catch {}
+                                                            try {
+                                                                window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
+                                                            } catch {}
+                                                        }}
+                                                        className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
+                                                        title="Ver vídeo"
+                                                    >
+                                                        <Play size={14} />
+                                                        Ver vídeo
+                                                    </button>
+                                                ) : null}
+                                            </div>
                                             <input
                                                 value={exercise.videoUrl || ''}
                                                 onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
                                                 className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
                                                 placeholder="https://youtube.com/..."
                                             />
-                                            {String(exercise.videoUrl || '').trim() ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        try {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                        } catch {}
-                                                        try {
-                                                            window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
-                                                        } catch {}
-                                                    }}
-                                                    className="mt-2 inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-xs font-bold"
-                                                >
-                                                    <Play size={14} />
-                                                    Ver vídeo
-                                                </button>
-                                            ) : null}
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
