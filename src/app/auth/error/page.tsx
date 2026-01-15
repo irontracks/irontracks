@@ -10,7 +10,9 @@ function AuthErrorInner() {
   const err = useMemo(() => String(sp?.get('error') || '').trim(), [sp])
   const errLower = String(err || '').toLowerCase()
   const hint =
-    errLower.includes('signups not allowed') || errLower.includes('signup') || errLower.includes('sign up')
+    errLower.includes('missing_env')
+      ? 'Faltam variáveis do Supabase neste ambiente (Preview). Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY na Vercel (Environment Variables → Preview) e faça Redeploy.'
+      : errLower.includes('signups not allowed') || errLower.includes('signup') || errLower.includes('sign up')
       ? 'Parece que o Supabase está bloqueando novos usuários (signups).'
       : errLower.includes('test user') ||
         errLower.includes('access denied') ||
@@ -66,4 +68,3 @@ export default function AuthErrorPage() {
     </Suspense>
   )
 }
-

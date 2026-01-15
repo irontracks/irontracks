@@ -10,6 +10,31 @@ Você testa em **Preview** via Pull Request e só depois publica em **Production
 4. Confirme a branch de produção (recomendado: `main`).
 5. Clique em **Deploy**.
 
+## 1.1) (Obrigatório) Fazer login funcionar no Preview (Supabase)
+Se no Preview aparecer **Erro de autenticação** com `missing_env`, significa que faltam as variáveis do Supabase no ambiente Preview.
+
+### A) Vercel: configurar variáveis no ambiente Preview
+1. Vercel → Project → **Settings → Environment Variables**.
+2. Adicione (ou confirme) marcando **Preview** (e também **Production** se quiser):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Clique em **Save**.
+4. Vá em **Deployments** → abra o Preview → **Redeploy**.
+
+### B) Supabase: onde pegar os valores
+1. Supabase → seu projeto → **Project Settings → API**.
+2. Copie:
+   - **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+   - **anon public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### C) Supabase: permitir o redirect do Google no Preview
+1. Supabase → **Authentication → URL Configuration**.
+2. Em **Additional Redirect URLs**, adicione a URL do seu Preview:
+   - Pegue em Vercel → Deployment Details → **Domains**.
+   - Use o domínio que termina com `.vercel.app` e adicione `/auth/callback`.
+   - Exemplo: `https://SEU-PREVIEW.vercel.app/auth/callback`
+3. Salve.
+
 ## 2) Como fazer deploy do jeito certo (dia a dia)
 
 ### A) Criar um Preview (para testar antes)
