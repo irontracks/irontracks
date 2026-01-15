@@ -174,6 +174,9 @@ function IronTracksApp({ initialUser, initialProfile }) {
 	const [activeSession, setActiveSession] = useState(null);
 	const suppressForeignFinishToastUntilRef = useRef(0);
     const [sessionTicker, setSessionTicker] = useState(0);
+    const [editActiveOpen, setEditActiveOpen] = useState(false);
+    const [editActiveDraft, setEditActiveDraft] = useState(null);
+    const editActiveBaseRef = useRef(null);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
     const userSettingsApi = useUserSettings(user?.id)
 
@@ -184,6 +187,104 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const signOutInFlightRef = useRef(false);
     const serverSessionSyncRef = useRef({ timer: null, lastKey: '' });
     const serverSessionSyncWarnedRef = useRef(false);
+
+    const generateExerciseKey = useCallback(() => {
+        try {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+        } catch {}
+        return `ex_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    }, []);
+
+    const normalizeWorkoutForEditor = useCallback((raw) => {
+        try {
+            const base = raw && typeof raw === 'object' ? raw : {};
+            const title = String(base.title || base.name || 'Treino').trim() || 'Treino';
+            const exercisesRaw = Array.isArray(base.exercises) ? base.exercises : [];
+            const exercisesInitial = exercisesRaw.filter((ex) => ex && typeof ex === 'object').map((ex) => {
+                const existing = ex?._itx_exKey ? String(ex._itx_exKey) : '';
+                const fromId = ex?.id != null ? `id_${String(ex.id)}` : '';
+                const nextKey = existing || fromId || generateExerciseKey();
+                return { ...ex, _itx_exKey: nextKey };
+            });
+
+            const seen = new Set();
+            const exercises = exercisesInitial.map((ex) => {
+                const k = String(ex?._itx_exKey || '');
+                if (!k || seen.has(k)) {
+                    const nextKey = generateExerciseKey();
+                    seen.add(nextKey);
+                    return { ...ex, _itx_exKey: nextKey };
+                }
+                seen.add(k);
+                return ex;
+            });
+
+            return { ...base, title, exercises };
+        } catch {
+            return { title: 'Treino', exercises: [] };
+        }
+    }, [generateExerciseKey]);
+
+    const stripWorkoutInternalKeys = useCallback((workout) => {
+        try {
+            const w = workout && typeof workout === 'object' ? workout : {};
+            const exercises = Array.isArray(w.exercises)
+                ? w.exercises.map((ex) => {
+                      if (!ex || typeof ex !== 'object') return ex;
+                      const { _itx_exKey, ...rest } = ex;
+                      return rest;
+                  })
+                : w.exercises;
+            return { ...w, exercises };
+        } catch {
+            return workout;
+        }
+    }, []);
+
+    const reindexSessionLogsAfterWorkoutEdit = useCallback((oldWorkout, newWorkout, logs) => {
+        try {
+            const safeLogs = logs && typeof logs === 'object' ? logs : {};
+            const oldExercises = Array.isArray(oldWorkout?.exercises) ? oldWorkout.exercises : [];
+            const newExercises = Array.isArray(newWorkout?.exercises) ? newWorkout.exercises : [];
+            const oldKeyByIndex = oldExercises.map((ex) => String(ex?._itx_exKey || ''));
+            const newIndexByKey = new Map();
+            newExercises.forEach((ex, idx) => {
+                const k = String(ex?._itx_exKey || '');
+                if (!k) return;
+                if (newIndexByKey.has(k)) return;
+                newIndexByKey.set(k, idx);
+            });
+
+            const result = {};
+
+            Object.entries(safeLogs).forEach(([k, v]) => {
+                const parts = String(k || '').split('-');
+                if (parts.length !== 2) {
+                    result[k] = v;
+                    return;
+                }
+                const oldIdx = Number(parts[0]);
+                const setIdx = Number(parts[1]);
+                if (!Number.isFinite(oldIdx) || !Number.isFinite(setIdx)) {
+                    result[k] = v;
+                    return;
+                }
+                const exKey = oldKeyByIndex[oldIdx] || '';
+                const newIdx = exKey ? newIndexByKey.get(exKey) : undefined;
+                if (typeof newIdx !== 'number' || newIdx < 0) return;
+                const ex = newExercises[newIdx] || null;
+                const headerSets = Number.parseInt(ex?.sets, 10) || 0;
+                const details = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
+                const maxSets = headerSets || (Array.isArray(details) ? details.length : 0);
+                if (maxSets && setIdx >= maxSets) return;
+                result[`${newIdx}-${setIdx}`] = v;
+            });
+
+            return result;
+        } catch {
+            return logs && typeof logs === 'object' ? logs : {};
+        }
+    }, []);
 
     const clearSupabaseCookiesBestEffort = useCallback(() => {
         try {
@@ -462,6 +563,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
             const key = `irontracks.activeSession.v2.${user.id}`;
             if (!activeSession) {
                 localStorage.removeItem(key);
+                localStorage.removeItem('activeSession');
                 return;
             }
 
@@ -1057,6 +1159,12 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
 	const handleFinishSession = async (sessionData, showReport) => {
 		suppressForeignFinishToastUntilRef.current = Date.now() + 8000;
+        try {
+            if (user?.id) {
+                localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`);
+            }
+            localStorage.removeItem('activeSession');
+        } catch {}
 		setActiveSession(null);
 		if (showReport === false) {
 			setView('dashboard');
@@ -1111,6 +1219,39 @@ function IronTracksApp({ initialUser, initialProfile }) {
             throw e;
         }
     };
+
+    const handleOpenActiveWorkoutEditor = useCallback(() => {
+        try {
+            if (!activeSession?.workout) return;
+            const base = normalizeWorkoutForEditor(activeSession.workout);
+            editActiveBaseRef.current = base;
+            setEditActiveDraft(base);
+            setEditActiveOpen(true);
+        } catch {}
+    }, [activeSession?.workout, normalizeWorkoutForEditor]);
+
+    const handleCloseActiveWorkoutEditor = useCallback(() => {
+        try {
+            setEditActiveOpen(false);
+            setEditActiveDraft(null);
+            editActiveBaseRef.current = null;
+        } catch {}
+    }, []);
+
+    const handleSaveActiveWorkoutEditor = useCallback(async (workoutFromEditor) => {
+        const normalized = normalizeWorkoutForEditor(workoutFromEditor);
+        const cleaned = stripWorkoutInternalKeys(normalized);
+        const res = await handleSaveWorkout(cleaned);
+        setActiveSession((prev) => {
+            if (!prev) return prev;
+            const oldWorkout = editActiveBaseRef.current || normalizeWorkoutForEditor(prev.workout);
+            const nextLogs = reindexSessionLogsAfterWorkoutEdit(oldWorkout, normalized, prev.logs || {});
+            return { ...prev, workout: normalized, logs: nextLogs };
+        });
+        editActiveBaseRef.current = normalized;
+        setEditActiveDraft(normalized);
+        return res;
+    }, [handleSaveWorkout, normalizeWorkoutForEditor, reindexSessionLogsAfterWorkoutEdit, stripWorkoutInternalKeys]);
 
 	const handleDeleteWorkout = async (id, title) => {
 		const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
@@ -1361,7 +1502,31 @@ function IronTracksApp({ initialUser, initialProfile }) {
                             isCoach={isCoach}
                             onUpdateSession={(updates) => setActiveSession(prev => ({ ...prev, ...updates }))}
                             nextWorkout={nextWorkout}
+                            onEditWorkout={() => handleOpenActiveWorkoutEditor()}
                         />
+                    )}
+
+                    {editActiveOpen && view === 'active' && editActiveDraft && (
+                        <div
+                            className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
+                            onClick={() => handleCloseActiveWorkoutEditor()}
+                        >
+                            <div
+                                className="w-full max-w-5xl h-[92vh] bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <ExerciseEditor
+                                    workout={editActiveDraft}
+                                    onCancel={() => handleCloseActiveWorkoutEditor()}
+                                    onChange={(w) => setEditActiveDraft(normalizeWorkoutForEditor(w))}
+                                    onSave={handleSaveActiveWorkoutEditor}
+                                    onSaved={() => {
+                                        fetchWorkouts().catch(() => {});
+                                        handleCloseActiveWorkoutEditor();
+                                    }}
+                                />
+                            </div>
+                        </div>
                     )}
 
                     {view === 'history' && (

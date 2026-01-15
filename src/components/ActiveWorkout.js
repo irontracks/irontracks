@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Plus, Save, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Pencil, Plus, Save, UserPlus, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { BackButton } from '@/components/ui/BackButton';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
@@ -1022,6 +1022,19 @@ export default function ActiveWorkout(props) {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
             <BackButton onClick={props?.onBack} />
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  if (typeof props?.onEditWorkout === 'function') props.onEditWorkout(workout);
+                } catch {}
+              }}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors active:scale-95"
+              title="Editar treino"
+            >
+              <Pencil size={16} className="text-yellow-500" />
+              <span className="text-sm font-black hidden sm:inline">Editar</span>
+            </button>
             <button
               type="button"
               onClick={() => setAddExerciseOpen(true)}

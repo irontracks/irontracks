@@ -31,6 +31,12 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="icon" href="/icone.png" type="image/png" />
         <link rel="apple-touch-icon" href="/icone.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(()=>{const ping=()=>{try{fetch('/api/auth/ping',{method:'GET',credentials:'include',cache:'no-store'}).catch(()=>{});}catch{}};document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ping();});window.addEventListener('focus',ping);})();",
+          }}
+        />
       </head>
       <body
         className="antialiased bg-neutral-950 text-white"

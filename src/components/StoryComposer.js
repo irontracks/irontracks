@@ -474,7 +474,7 @@ export default function StoryComposer({ open, session, onClose }) {
     return () => {
       cancelled = true
     }
-  }, [open, session?.id])
+  }, [open, session])
 
   const liveSizes = useMemo(() => {
     try {

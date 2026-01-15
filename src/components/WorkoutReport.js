@@ -185,7 +185,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         return () => {
             cancelled = true;
         };
-    }, [session?.id, session?.totalTime]);
+    }, [session]);
 
     if (!session) return null;
 
