@@ -1,14 +1,16 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { playStartSound } from '@/lib/sounds';
 
 const TeamWorkoutContext = createContext({
     incomingInvites: [],
+    acceptedInviteNotice: null,
     teamSession: null,
     sendInvite: async () => { },
     acceptInvite: async () => { },
     rejectInvite: async () => { },
     leaveSession: async () => { },
+    dismissAcceptedInvite: () => { },
     loading: false
 });
 
@@ -22,9 +24,11 @@ export const useTeamWorkout = () => {
 
 export const TeamWorkoutProvider = ({ children, user }) => {
     const [incomingInvites, setIncomingInvites] = useState([]);
+    const [acceptedInviteNotice, setAcceptedInviteNotice] = useState(null);
     const [teamSession, setTeamSession] = useState(null);
     const [loading, setLoading] = useState(false);
     const supabase = useMemo(() => createClient(), []);
+    const seenAcceptedInviteIdsRef = useRef(new Set());
 
     const canReceiveInvites = useMemo(() => {
         const uid = user?.id ? String(user.id) : '';
@@ -310,6 +314,123 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         };
     }, [supabase, teamSession?.id]);
 
+    // 3. Host: listen for invite acceptance (realtime + polling fallback)
+    useEffect(() => {
+        const userId = user?.id ? String(user.id) : '';
+        if (!userId) return;
+        let mounted = true;
+        let channel = null;
+
+        const showAccepted = async (inviteRow) => {
+            try {
+                if (!mounted) return;
+                const id = inviteRow?.id ? String(inviteRow.id) : '';
+                if (!id) return;
+                if (seenAcceptedInviteIdsRef.current.has(id)) return;
+                seenAcceptedInviteIdsRef.current.add(id);
+
+                const toUid = inviteRow?.to_uid ? String(inviteRow.to_uid) : '';
+                const teamSessionId = inviteRow?.team_session_id ? String(inviteRow.team_session_id) : '';
+
+                let profile = null;
+                if (toUid) {
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('display_name, photo_url')
+                        .eq('id', toUid)
+                        .maybeSingle();
+                    profile = data && typeof data === 'object' ? data : null;
+                }
+
+                if (!mounted) return;
+                setAcceptedInviteNotice({
+                    inviteId: id,
+                    teamSessionId: teamSessionId || null,
+                    user: {
+                        displayName: profile?.display_name || 'Seu parceiro',
+                        photoURL: profile?.photo_url || null,
+                        uid: toUid || null,
+                    }
+                });
+                try { playStartSound(); } catch {}
+            } catch {
+                return;
+            }
+        };
+
+        const pollAccepted = async () => {
+            try {
+                if (!mounted) return;
+                const currentSessionId = teamSession?.id ? String(teamSession.id) : '';
+                if (!currentSessionId) return;
+
+                const { data } = await supabase
+                    .from('invites')
+                    .select('id, to_uid, team_session_id, status')
+                    .eq('from_uid', userId)
+                    .eq('team_session_id', currentSessionId)
+                    .eq('status', 'accepted')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                const list = Array.isArray(data) ? data : [];
+                for (const inv of list) {
+                    const id = inv?.id ? String(inv.id) : '';
+                    if (!id) continue;
+                    if (seenAcceptedInviteIdsRef.current.has(id)) continue;
+                    await showAccepted(inv);
+                    break;
+                }
+            } catch {
+                return;
+            }
+        };
+
+        try {
+            channel = supabase
+                .channel(`invites-accepted:${userId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'invites',
+                        filter: `from_uid=eq.${userId}`,
+                    },
+                    (payload) => {
+                        try {
+                            if (!mounted) return;
+                            const updated = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+                            if (!updated) return;
+                            const status = updated?.status ? String(updated.status) : '';
+                            if (status !== 'accepted') return;
+                            const currentSessionId = teamSession?.id ? String(teamSession.id) : '';
+                            const inviteSessionId = updated?.team_session_id ? String(updated.team_session_id) : '';
+                            if (currentSessionId && inviteSessionId && inviteSessionId !== currentSessionId) return;
+                            showAccepted(updated);
+                        } catch {
+                            return;
+                        }
+                    }
+                )
+                .subscribe();
+        } catch {}
+
+        const pollId = setInterval(() => {
+            try { pollAccepted(); } catch {}
+        }, 20_000);
+
+        try { pollAccepted(); } catch {}
+
+        return () => {
+            mounted = false;
+            try {
+                if (channel) supabase.removeChannel(channel);
+            } catch {}
+            try { clearInterval(pollId); } catch {}
+        };
+    }, [supabase, user?.id, teamSession?.id]);
+
     const sendInvite = async (targetUser, workout, currentTeamSessionId = null) => {
         try {
             if (!user?.id) throw new Error('Usuário inválido');
@@ -428,14 +549,20 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         // Ideally we would remove ourselves from the participants list in DB too
     };
 
+    const dismissAcceptedInvite = () => {
+        setAcceptedInviteNotice(null);
+    };
+
     return (
         <TeamWorkoutContext.Provider value={{
             incomingInvites,
+            acceptedInviteNotice,
             teamSession,
             sendInvite,
             acceptInvite,
             rejectInvite,
             leaveSession,
+            dismissAcceptedInvite,
             loading
         }}>
             {children}

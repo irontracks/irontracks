@@ -40,6 +40,7 @@ import NotificationToast from '@/components/NotificationToast';
 import LoadingScreen from '@/components/LoadingScreen';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import IncomingInviteModal from '@/components/IncomingInviteModal';
+import InviteAcceptedModal from '@/components/InviteAcceptedModal';
 import NotificationCenter from '@/components/NotificationCenter';
 import HeaderActionsMenu from '@/components/HeaderActionsMenu';
 import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge';
@@ -1382,12 +1383,32 @@ function IronTracksApp({ initialUser, initialProfile }) {
         }
     };
 
-    const handleOpenActiveWorkoutEditor = useCallback(() => {
+    const handleOpenActiveWorkoutEditor = useCallback((options = {}) => {
         try {
             if (!activeSession?.workout) return;
             const base = normalizeWorkoutForEditor(activeSession.workout);
+            const shouldAddExercise = options && typeof options === 'object' ? !!options.addExercise : false;
+            const nextBase = shouldAddExercise
+                ? {
+                    ...base,
+                    exercises: [
+                        ...(Array.isArray(base?.exercises) ? base.exercises : []),
+                        {
+                            name: '',
+                            sets: 4,
+                            reps: '10',
+                            rpe: '8',
+                            cadence: '2020',
+                            restTime: 60,
+                            method: 'Normal',
+                            videoUrl: '',
+                            notes: ''
+                        }
+                    ]
+                }
+                : base;
             editActiveBaseRef.current = base;
-            setEditActiveDraft(base);
+            setEditActiveDraft(nextBase);
             setEditActiveOpen(true);
         } catch {}
     }, [activeSession?.workout, normalizeWorkoutForEditor]);
@@ -1550,6 +1571,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
         <TeamWorkoutProvider user={user}>
             <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
                 <IncomingInviteModal onStartSession={handleStartSession} />
+                <InviteAcceptedModal />
 
                 {/* Header */}
                 {isHeaderVisible && (
@@ -1681,6 +1703,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                             onUpdateSession={(updates) => setActiveSession(prev => ({ ...prev, ...updates }))}
                             nextWorkout={nextWorkout}
                             onEditWorkout={() => handleOpenActiveWorkoutEditor()}
+                            onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
                         />
                     )}
 
@@ -1708,13 +1731,11 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     )}
 
                     {view === 'history' && (
-                        <div className="p-4 pb-24">
-                            <HistoryList
-                                user={user}
-                                onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }}
-                                onBack={() => setView('dashboard')}
-                            />
-                        </div>
+                        <HistoryList
+                            user={user}
+                            onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }}
+                            onBack={() => setView('dashboard')}
+                        />
                     )}
 
                     {/* Evolução removida conforme solicitação */}

@@ -56,18 +56,11 @@ export default function ActiveWorkout(props) {
   const [finishing, setFinishing] = useState(false);
   const [openNotesKeys, setOpenNotesKeys] = useState(() => new Set());
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [addExerciseOpen, setAddExerciseOpen] = useState(false);
-  const [addExerciseDraft, setAddExerciseDraft] = useState(() => ({
-    name: '',
-    sets: '3',
-    restTime: '60',
-  }));
 
   const restPauseRefs = useRef({});
   const clusterRefs = useRef({});
   const MAX_EXTRA_SETS_PER_EXERCISE = 50;
   const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
-  const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;
 
   useEffect(() => {
     const id = setInterval(() => setTicker(Date.now()), 1000);
@@ -224,37 +217,6 @@ export default function ActiveWorkout(props) {
     } catch (e) {
       try {
         await alert('Não foi possível adicionar série extra: ' + (e?.message || String(e || '')));
-      } catch {}
-    }
-  };
-
-  const addExtraExerciseToWorkout = async () => {
-    if (!workout || typeof props?.onUpdateSession !== 'function') return;
-    if (exercises.length >= MAX_EXTRA_EXERCISES_PER_WORKOUT) return;
-    const name = String(addExerciseDraft?.name || '').trim();
-    if (!name) {
-      try {
-        await alert('Informe o nome do exercício.', 'Exercício extra');
-      } catch {}
-      return;
-    }
-    const sets = Math.max(1, Number.parseInt(String(addExerciseDraft?.sets || '3'), 10) || 1);
-    const rest = parseTrainingNumber(addExerciseDraft?.restTime);
-    const restTime = Number.isFinite(rest) && rest > 0 ? rest : null;
-    const nextExercise = {
-      name,
-      sets,
-      restTime,
-      method: 'Normal',
-      setDetails: [],
-    };
-    try {
-      props.onUpdateSession({ workout: { ...workout, exercises: [...exercises, nextExercise] } });
-      setAddExerciseOpen(false);
-      setAddExerciseDraft({ name: '', sets: String(sets), restTime: String(restTime ?? DEFAULT_EXTRA_EXERCISE_REST_TIME_S) });
-    } catch (e) {
-      try {
-        await alert('Não foi possível adicionar exercício extra: ' + (e?.message || String(e || '')));
       } catch {}
     }
   };
@@ -1154,7 +1116,15 @@ export default function ActiveWorkout(props) {
             </button>
             <button
               type="button"
-              onClick={() => setAddExerciseOpen(true)}
+              onClick={() => {
+                try {
+                  if (typeof props?.onAddExercise === 'function') {
+                    props.onAddExercise();
+                    return;
+                  }
+                  if (typeof props?.onEditWorkout === 'function') props.onEditWorkout(workout);
+                } catch {}
+              }}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95"
               title="Adicionar exercício extra"
             >
@@ -1199,75 +1169,6 @@ export default function ActiveWorkout(props) {
           }
         }}
       />
-
-      {addExerciseOpen && (
-        <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setAddExerciseOpen(false)}>
-          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
-                <div className="text-lg font-black text-white truncate">Adicionar exercício extra</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAddExerciseOpen(false)}
-                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
-                <input
-                  value={String(addExerciseDraft?.name ?? '')}
-                  onChange={(e) => setAddExerciseDraft((prev) => ({ ...(prev || {}), name: e?.target?.value ?? '' }))}
-                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
-                  placeholder="Ex: Supino reto"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
-                  <input
-                    inputMode="decimal"
-                    value={String(addExerciseDraft?.sets ?? '')}
-                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...(prev || {}), sets: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
-                    placeholder="3"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
-                  <input
-                    inputMode="decimal"
-                    value={String(addExerciseDraft?.restTime ?? '')}
-                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...(prev || {}), restTime: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
-                    placeholder="60"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-neutral-800 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setAddExerciseOpen(false)}
-                className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={addExtraExerciseToWorkout}
-                className="flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
-              >
-                Adicionar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-6 py-4 pb-28 space-y-4">
         {exercises.length === 0 ? (
