@@ -449,6 +449,12 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     });
 
     const isTeamSession = partners.length > 0;
+    const workoutTitleRaw = String(session?.workoutTitle || '').trim();
+    const workoutTitleMain = (() => {
+        const m = workoutTitleRaw.match(/^\s*.+?\s*-\s*(.+)$/);
+        const v = (m ? m[1] : workoutTitleRaw).trim();
+        return v || 'Treino';
+    })();
 
     return (
         <div className="fixed inset-0 z-[1000] bg-neutral-900 text-black flex flex-col">
@@ -491,14 +497,36 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
             <div className="flex-1 overflow-y-auto">
             <div ref={reportRef} className="min-h-screen bg-white text-black p-6 md:p-8 max-w-4xl mx-auto">
-                <div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end">
-                    <div>
-                        <h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1>
-                        <p className="text-sm font-bold uppercase tracking-widest text-neutral-500">Relatório de Performance</p>
+                <div className="pb-8 mb-8">
+                    <div className="flex items-start justify-between gap-6">
+                        <div className="min-w-0">
+                            <div className="flex flex-col">
+                                <div className="text-xl font-black tracking-tight leading-none">
+                                    <span className="text-neutral-900">IRON</span>
+                                    <span className="text-yellow-500">TRACKS</span>
+                                </div>
+                                <div className="mt-1 text-[9px] font-black uppercase tracking-[0.24em] text-neutral-500 leading-none">
+                                    Relatório de Performance
+                                </div>
+                            </div>
+
+                            <div className="mt-4 min-w-0">
+                                <h1 className="text-4xl sm:text-5xl font-black uppercase leading-tight tracking-tight text-neutral-900 text-balance break-normal hyphens-none">
+                                    {workoutTitleMain}
+                                </h1>
+                            </div>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                            <div className="font-mono text-xs font-semibold text-neutral-700">
+                                {formatDate(session.date)}
+                            </div>
+                        </div>
                     </div>
-                    <div className="text-right">
-                        <p className="text-2xl font-bold">{session.workoutTitle}</p>
-                        <p className="text-neutral-600">{formatDate(session.date)}</p>
+
+                    <div className="relative mt-6">
+                        <div className="h-px bg-neutral-200" />
+                        <div className="absolute left-0 top-0 h-px w-28 bg-yellow-500" />
                     </div>
                 </div>
 

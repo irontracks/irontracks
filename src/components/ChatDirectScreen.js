@@ -90,7 +90,13 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         } catch (error) {
             console.error('Erro ao obter canal:', error);
             const msg = error?.message || String(error || '');
-            await alert('Erro ao iniciar conversa: ' + msg);
+            if (/dm_blocked/i.test(msg) || /row-level security/i.test(msg) || /policy/i.test(msg)) {
+                await alert('Não foi possível iniciar a conversa. Um dos usuários desativou mensagens diretas nas configurações.');
+            } else if (/forbidden/i.test(msg)) {
+                await alert('Não foi possível iniciar a conversa: acesso negado.');
+            } else {
+                await alert('Erro ao iniciar conversa: ' + msg);
+            }
             throw error;
         }
     }, [alert, resolvedOtherUserId, supabase, user?.id]);

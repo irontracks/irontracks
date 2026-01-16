@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -34,29 +34,27 @@ interface AssessmentHistoryProps {
 }
 
 export default function AssessmentHistory({ studentId: propStudentId }: AssessmentHistoryProps) {
-  const studentId = propStudentId;
-
-  if (!studentId) {
-    return (
-      <div className="p-4">
-        <div className="bg-red-900/20 border border-red-500/40 rounded-xl p-4 text-red-400">
-          ID do aluno não fornecido.
-        </div>
-      </div>
-    );
-  }
-
+  const studentId = propStudentId ? String(propStudentId) : '';
   const { getStudentAssessments } = useAssessment();
   const [assessments, setAssessments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let mounted = true;
     (async () => {
       try {
+        if (!studentId) {
+          if (mounted) {
+            setAssessments([]);
+            setError('ID do aluno não fornecido.');
+            setLoading(false);
+          }
+          return;
+        }
         setLoading(true);
-        const list = await getStudentAssessments(studentId!);
+        const list = await getStudentAssessments(studentId);
         if (mounted) setAssessments(list);
       } catch (e: any) {
         if (mounted) setError(e?.message || 'Erro ao carregar avaliações');
@@ -66,7 +64,6 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     })();
     return () => { mounted = false; };
   }, [studentId, getStudentAssessments]);
-  const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
 
   const sortedAssessments = useMemo(() => {
     return [...(assessments || [])].sort((a, b) =>

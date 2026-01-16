@@ -50,6 +50,19 @@ export default function ActiveWorkout(props) {
   const exercises = Array.isArray(workout?.exercises) ? workout.exercises : [];
   const logs = session?.logs && typeof session.logs === 'object' ? session.logs : {};
   const ui = session?.ui && typeof session.ui === 'object' ? session.ui : {};
+  const settings = props?.settings && typeof props.settings === 'object' ? props.settings : null;
+  const defaultRestSeconds = (() => {
+    const raw = Number(settings?.restTimerDefaultSeconds ?? 90);
+    if (!Number.isFinite(raw)) return 90;
+    return Math.max(15, Math.min(600, Math.round(raw)));
+  })();
+  const autoStartDefaultRest = Boolean(settings?.autoRestTimerWhenMissing ?? false);
+  const resolveRestTimeSeconds = (ex) => {
+    const raw = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+    if (raw && raw > 0) return raw;
+    if (!autoStartDefaultRest) return 0;
+    return defaultRestSeconds;
+  };
 
   const [ticker, setTicker] = useState(Date.now());
   const [collapsed, setCollapsed] = useState(() => new Set());
@@ -349,7 +362,7 @@ export default function ActiveWorkout(props) {
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
     const plannedSet = getPlannedSet(ex, setIdx);
-    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = resolveRestTimeSeconds(ex);
     const weightValue = String(log?.weight ?? cfg?.weight ?? '');
     const repsValue = String(log?.reps ?? '');
     const rpeValue = String(log?.rpe ?? '');
@@ -587,7 +600,7 @@ export default function ActiveWorkout(props) {
           rest_time_sec: Number.isFinite(cfgRestRaw) && cfgRestRaw >= 1 ? cfgRestRaw : 15,
         }
       : cfgRaw;
-    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = resolveRestTimeSeconds(ex);
 
     const pauseSec = parseTrainingNumber(cfg?.rest_time_sec) ?? 15;
     const miniSets = Math.max(0, Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0));
@@ -798,7 +811,7 @@ export default function ActiveWorkout(props) {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
-    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = resolveRestTimeSeconds(ex);
 
     const totalRepsPlanned = parseTrainingNumber(cfg?.total_reps);
     const clusterSize = parseTrainingNumber(cfg?.cluster_size);
@@ -1003,7 +1016,7 @@ export default function ActiveWorkout(props) {
     const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
     const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
     const collapsedNow = collapsed.has(exIdx);
-    const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+    const restTime = resolveRestTimeSeconds(ex);
     const videoUrl = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
 
     return (

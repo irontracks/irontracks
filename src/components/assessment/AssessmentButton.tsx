@@ -18,8 +18,10 @@ export default function AssessmentButton({
   className = '' 
 }: AssessmentButtonProps) {
   const [showForm, setShowForm] = useState(false);
+  const [importing, setImporting] = useState(false);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scanInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleNewAssessment = () => {
     router.push(`/assessments/new/${studentId}`);
@@ -38,6 +40,45 @@ export default function AssessmentButton({
   const handleImportClick = () => {
     if (!fileInputRef.current) return;
     fileInputRef.current.click();
+  };
+
+  const handleScanClick = () => {
+    if (!scanInputRef.current) return;
+    scanInputRef.current.click();
+  };
+
+  const mergeImportedFormData = (base: any, incoming: any) => {
+    const out: any = { ...(base && typeof base === 'object' ? base : {}) };
+    const keys = [
+      'assessment_date',
+      'weight',
+      'height',
+      'age',
+      'gender',
+      'arm_circ',
+      'chest_circ',
+      'waist_circ',
+      'hip_circ',
+      'thigh_circ',
+      'calf_circ',
+      'triceps_skinfold',
+      'biceps_skinfold',
+      'subscapular_skinfold',
+      'suprailiac_skinfold',
+      'abdominal_skinfold',
+      'thigh_skinfold',
+      'calf_skinfold',
+      'observations',
+    ];
+    keys.forEach((k) => {
+      const nextVal = incoming?.[k];
+      if (nextVal === undefined || nextVal === null || nextVal === '') return;
+      const prevVal = out?.[k];
+      if (prevVal === undefined || prevVal === null || prevVal === '') {
+        out[k] = nextVal;
+      }
+    });
+    return out;
   };
 
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -110,6 +151,73 @@ export default function AssessmentButton({
     }
   };
 
+  const handleScanFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const files = event.target.files ? Array.from(event.target.files) : [];
+      if (!files.length) return;
+      if (importing) return;
+
+      setImporting(true);
+
+      let mergedFormData: any = {};
+
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+
+        const res = await fetch('/api/assessment-scanner', {
+          method: 'POST',
+          body: form,
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!data || !data.ok) {
+          const msg = String(data?.error || 'Falha ao processar arquivo');
+          if (typeof window !== 'undefined') window.alert(msg);
+          return;
+        }
+
+        const nextForm = data?.formData && typeof data.formData === 'object' ? data.formData : null;
+        if (nextForm) mergedFormData = mergeImportedFormData(mergedFormData, nextForm);
+      }
+
+      const hasCoreField =
+        mergedFormData &&
+        typeof mergedFormData === 'object' &&
+        ('weight' in mergedFormData || 'height' in mergedFormData || 'assessment_date' in mergedFormData);
+
+      if (!hasCoreField) {
+        if (typeof window !== 'undefined') {
+          window.alert('Não foi possível extrair dados suficientes da avaliação.');
+        }
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        try {
+          const storageKey = `assessment_import_${studentId}`;
+          window.sessionStorage.setItem(storageKey, JSON.stringify({ formData: mergedFormData }));
+        } catch (error) {
+          console.error('Erro ao salvar avaliação importada na sessão', error);
+          window.alert('Não foi possível preparar os dados importados. Tente novamente.');
+          return;
+        }
+      }
+
+      router.push(`/assessments/new/${studentId}`);
+    } catch (error) {
+      console.error('Erro ao importar avaliação por imagem/PDF', error);
+      if (typeof window !== 'undefined') {
+        window.alert('Falha ao importar avaliação por imagem/PDF.');
+      }
+    } finally {
+      setImporting(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
   if (showForm) {
     return (
       <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-20" onClick={() => setShowForm(false)}>
@@ -166,12 +274,32 @@ export default function AssessmentButton({
             <Upload className="w-4 h-4 mr-2" />
             Importar JSON
           </button>
+          <button
+            onClick={handleScanClick}
+            disabled={importing}
+            className={
+              importing
+                ? "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
+                : "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+            }
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {importing ? "Importando..." : "Importar Foto/PDF"}
+          </button>
           <input
             ref={fileInputRef}
             type="file"
             accept="application/json"
             className="hidden"
             onChange={handleImportFileChange}
+          />
+          <input
+            ref={scanInputRef}
+            type="file"
+            accept="image/*,application/pdf"
+            multiple
+            className="hidden"
+            onChange={handleScanFileChange}
           />
         </div>
       </div>
@@ -215,6 +343,26 @@ export default function AssessmentButton({
         <FileText className="w-4 h-4 mr-2" />
         Histórico
       </button>
+      <button
+        onClick={handleScanClick}
+        disabled={importing}
+        className={
+          importing
+            ? "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
+            : "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+        }
+      >
+        <Upload className="w-4 h-4 mr-2" />
+        {importing ? "Importando..." : "Importar Foto/PDF"}
+      </button>
+      <input
+        ref={scanInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        multiple
+        className="hidden"
+        onChange={handleScanFileChange}
+      />
     </div>
   );
 }

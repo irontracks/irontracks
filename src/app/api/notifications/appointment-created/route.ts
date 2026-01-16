@@ -46,6 +46,16 @@ export async function POST(req: Request) {
     }
 
     const admin = createAdminClient()
+    const { data: prefRow } = await admin
+      .from('user_settings')
+      .select('preferences')
+      .eq('user_id', targetUserId)
+      .maybeSingle()
+
+    const prefs = prefRow?.preferences && typeof prefRow.preferences === 'object' ? prefRow.preferences : null
+    const allow = prefs ? prefs.notifyAppointments !== false : true
+    if (!allow) return NextResponse.json({ ok: true, notified: false })
+
     const { error: insertError } = await admin.from('notifications').insert({
       user_id: targetUserId,
       title,

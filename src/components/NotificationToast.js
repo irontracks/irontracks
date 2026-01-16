@@ -3,6 +3,8 @@ import Image from 'next/image';
 import { X } from 'lucide-react';
 
 const NotificationToast = (props) => {
+    const settings = props?.settings && typeof props.settings === 'object' ? props.settings : null;
+    const allowToast = settings ? settings.inAppToasts !== false : true;
     const rawNotification = props?.notification ?? null;
     const legacyMessage = props?.message ?? null;
     const legacySender = props?.sender ?? null;
@@ -16,7 +18,7 @@ const NotificationToast = (props) => {
         }
         : null);
 
-    if (!notification) return null;
+    if (!notification || !allowToast) return null;
 
     const handleRootClick = () => {
         try {
