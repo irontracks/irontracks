@@ -1,0 +1,226 @@
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+
+export async function generateWorkoutPdf(session, previousSession) {
+  const pdfDoc = await PDFDocument.create()
+  const page = pdfDoc.addPage([595, 842])
+  const { width, height } = page.getSize()
+  const margin = 36
+  const lineH = 18
+  const titleSize = 24
+  const textSize = 12
+  const monoSize = 12
+  const boldSize = 14
+
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+  let y = height - margin
+
+  const drawText = (text, x, size = textSize, f = font, color = rgb(0, 0, 0)) => {
+    page.drawText(String(text ?? ''), { x, y, size, font: f, color })
+    y -= lineH
+  }
+
+  const drawKV = (k, v) => {
+    page.drawText(String(k), { x: margin, y, size: textSize, font: bold, color: rgb(0.4, 0.4, 0.4) })
+    page.drawText(String(v), { x: margin + 120, y, size: textSize, font, color: rgb(0, 0, 0) })
+    y -= lineH
+  }
+
+  const ensureSpace = (rows = 1) => {
+    if (y - rows * lineH < margin) {
+      const p = pdfDoc.addPage([595, 842])
+      y = 842 - margin
+    }
+  }
+
+  const formatDate = (ts) => {
+    if (!ts) return ''
+    const d = ts.toDate ? ts.toDate() : new Date(ts)
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+  }
+
+  const formatDuration = (s) => {
+    const mins = Math.floor((s || 0) / 60)
+    const secs = Math.floor((s || 0) % 60)
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`
+  }
+
+  const calcVolume = (logs) => {
+    let v = 0
+    Object.values(logs || {}).forEach(l => { if (l?.weight && l?.reps) v += Number(l.weight) * Number(l.reps) })
+    return v
+  }
+
+  const currentVolume = calcVolume(session?.logs)
+  const prevVolume = calcVolume(previousSession?.logs)
+  const delta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0
+  const durationM = (session?.totalTime || 0) / 60
+  const calories = Math.round((currentVolume * 0.02) + (durationM * 4))
+
+  page.drawText('IRONTRACKS', { x: margin, y, size: titleSize, font: bold })
+  y -= lineH
+  page.drawText('Relatório de Performance', { x: margin, y, size: textSize, font })
+  y -= lineH
+  drawKV('Treino', session?.workoutTitle || 'Treino')
+  drawKV('Data', formatDate(session?.date))
+  y -= 6
+
+  page.drawRectangle({ x: margin - 4, y: y - 4, width: width - margin * 2 + 8, height: 4, color: rgb(0, 0, 0) })
+  y -= lineH
+
+  drawKV('Tempo', formatDuration(session?.totalTime))
+  drawKV('Volume', `${currentVolume.toLocaleString()} kg`)
+  drawKV('Evolução', `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`)
+  drawKV('Calorias', `~${calories}`)
+  y -= lineH
+
+  const prevMap = {}
+  if (previousSession?.exercises && previousSession?.logs) {
+    previousSession.exercises.forEach((ex, exIdx) => {
+      const exLogs = []
+      Object.keys(previousSession.logs).forEach(key => {
+        const [eIdx] = key.split('-')
+        if (Number(eIdx) === exIdx) exLogs.push(previousSession.logs[key])
+      })
+      prevMap[ex.name] = exLogs
+    })
+  }
+
+  (session?.exercises || []).forEach((ex, exIdx) => {
+    ensureSpace(3)
+    page.drawText(`${exIdx + 1}. ${ex.name || ''}`, { x: margin, y, size: boldSize, font: bold })
+    y -= lineH
+    page.drawText(`Método: ${ex.method || 'Normal'}  RPE: ${ex.rpe || '-'}  Cad: ${ex.cadence || '-'}`, { x: margin, y, size: textSize, font })
+    y -= lineH
+    ensureSpace(2)
+    page.drawText('Série   Carga   Reps   Evolução', { x: margin, y, size: monoSize, font })
+    y -= lineH
+    const sets = Number(ex.sets || 0)
+    const prevLogs = prevMap[ex.name] || []
+    for (let sIdx = 0; sIdx < sets; sIdx++) {
+      ensureSpace(1)
+      const key = `${exIdx}-${sIdx}`
+      const log = session?.logs?.[key]
+      const prev = prevLogs[sIdx]
+      if (!log || (!log.weight && !log.reps)) continue
+      let evol = '-'
+      if (prev?.weight) {
+        const d = Number(log.weight) - Number(prev.weight)
+        evol = d === 0 ? '=' : `${d > 0 ? '+' : ''}${d}kg`
+      }
+      page.drawText(`#${sIdx + 1}`.padEnd(7) + String(log.weight || '-').padEnd(7) + String(log.reps || '-').padEnd(7) + evol, { x: margin, y, size: monoSize, font })
+      y -= lineH
+    }
+    y -= 6
+  })
+
+  const bytes = await pdfDoc.save()
+  return new Blob([bytes], { type: 'application/pdf' })
+}
+
+export async function generateAssessmentPdf(formData, results, studentName) {
+  const pdfDoc = await PDFDocument.create()
+  let page = pdfDoc.addPage([595, 842])
+  const { width, height } = page.getSize()
+  const margin = 36
+  const lineH = 18
+  const titleSize = 24
+  const textSize = 12
+  const boldSize = 14
+
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+  const bold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+  let y = height - margin
+
+  const drawText = (text, x, size = textSize, f = font, color = rgb(0, 0, 0)) => {
+    page.drawText(String(text ?? ''), { x, y, size, font: f, color })
+    y -= lineH
+  }
+
+  const drawKV = (k, v) => {
+    page.drawText(String(k), { x: margin, y, size: textSize, font: bold, color: rgb(0.4, 0.4, 0.4) })
+    page.drawText(String(v), { x: margin + 160, y, size: textSize, font, color: rgb(0, 0, 0) })
+    y -= lineH
+  }
+
+  const ensureSpace = (rows = 1) => {
+    if (y - rows * lineH < margin) {
+      page = pdfDoc.addPage([595, 842])
+      y = 842 - margin
+    }
+  }
+
+  const formatNumber = (n, d = 1) => {
+    const v = Number(n || 0)
+    return isNaN(v) ? '-' : v.toFixed(d)
+  }
+
+  drawText('IRONTRACKS', margin, titleSize, bold)
+  drawText('Avaliação Física', margin)
+  drawKV('Aluno', studentName || '-')
+  drawKV('Data', formData.assessment_date || '-')
+  y -= 6
+  page.drawRectangle({ x: margin - 4, y: y - 4, width: width - margin * 2 + 8, height: 4, color: rgb(0, 0, 0) })
+  y -= lineH
+
+  // Dados básicos
+  drawText('Dados Básicos', margin, boldSize, bold)
+  drawKV('Peso', `${formData.weight || '-'} kg`)
+  drawKV('Altura', `${formData.height || '-'} cm`)
+  drawKV('Idade', `${formData.age || '-'} anos`)
+  drawKV('Gênero', formData.gender === 'M' ? 'Masculino' : 'Feminino')
+  y -= 6
+
+  // Composição corporal
+  drawText('Composição Corporal', margin, boldSize, bold)
+  drawKV('% Gordura', `${formatNumber(results?.bodyComposition?.bodyFatPercentage, 1)}%`)
+  drawKV('Massa Magra', `${formatNumber(results?.leanMass, 1)} kg`)
+  drawKV('Massa Gorda', `${formatNumber(results?.fatMass, 1)} kg`)
+  drawKV('IMC', formatNumber(results?.bmi, 1))
+  drawKV('BMR', `${formatNumber(results?.bmr, 0)} kcal/dia`)
+  y -= 6
+
+  // Circunferências
+  drawText('Circunferências (cm)', margin, boldSize, bold)
+  const circ = [
+    ['Braço', formData.arm_circ],
+    ['Tórax', formData.chest_circ],
+    ['Cintura', formData.waist_circ],
+    ['Quadril', formData.hip_circ],
+    ['Coxa', formData.thigh_circ],
+    ['Panturrilha', formData.calf_circ]
+  ]
+  circ.forEach(([k, v]) => { if (v) drawKV(k, `${v} cm`) })
+  y -= 6
+
+  // Dobras cutâneas
+  drawText('Dobras Cutâneas (mm)', margin, boldSize, bold)
+  const skin = [
+    ['Tricipital', formData.triceps_skinfold],
+    ['Bicipital', formData.biceps_skinfold],
+    ['Subescapular', formData.subscapular_skinfold],
+    ['Suprailíaca', formData.suprailiac_skinfold],
+    ['Abdominal', formData.abdominal_skinfold],
+    ['Coxa', formData.thigh_skinfold],
+    ['Panturrilha', formData.calf_skinfold]
+  ]
+  skin.forEach(([k, v]) => { if (v) drawKV(k, `${v} mm`) })
+
+  if (results?.bodyComposition?.sumOfSkinfolds || results?.bodyComposition?.sum_skinfolds) {
+    const sum = results?.bodyComposition?.sumOfSkinfolds || results?.bodyComposition?.sum_skinfolds
+    drawKV('Soma das dobras', `${formatNumber(sum, 1)} mm`)
+  }
+
+  // Observações
+  if (formData.observations) {
+    y -= 6
+    drawText('Observações', margin, boldSize, bold)
+    const text = String(formData.observations)
+    page.drawText(text, { x: margin, y, size: textSize, font })
+  }
+
+  const bytes = await pdfDoc.save()
+  return new Blob([bytes], { type: 'application/pdf' })
+}

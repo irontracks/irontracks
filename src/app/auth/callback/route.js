@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
@@ -49,6 +50,7 @@ export async function GET(request) {
     supabaseUrl,
     supabaseAnonKey,
     {
+      cookieOptions: getSupabaseCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll()

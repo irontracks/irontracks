@@ -1,0 +1,152 @@
+export function buildReportHTML(session, previousSession) {
+  const formatDate = (ts) => {
+    if (!ts) return ''
+    const d = ts.toDate ? ts.toDate() : new Date(ts)
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+  }
+  const formatDuration = (s) => {
+    const mins = Math.floor(s / 60)
+    const secs = Math.floor(s % 60)
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`
+  }
+  const calculateTotalVolume = (logs) => {
+    let volume = 0
+    Object.values(logs || {}).forEach(log => {
+      if (log && log.weight && log.reps) volume += (parseFloat(log.weight) * parseFloat(log.reps))
+    })
+    return volume
+  }
+  const currentVolume = calculateTotalVolume(session.logs)
+  const prevVolume = previousSession ? calculateTotalVolume(previousSession.logs) : 0
+  const volumeDelta = prevVolume > 0 ? (((currentVolume - prevVolume) / prevVolume) * 100).toFixed(1) : '0.0'
+  const durationInMinutes = (session.totalTime || 0) / 60
+  const calories = Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
+
+  const prevLogsMap = {}
+  if (previousSession && previousSession.exercises && previousSession.logs) {
+    previousSession.exercises.forEach((ex, exIdx) => {
+      const exLogs = []
+      Object.keys(previousSession.logs).forEach(key => {
+        const [eIdx, sIdx] = key.split('-')
+        if (parseInt(eIdx) === exIdx) exLogs.push(previousSession.logs[key])
+      })
+      prevLogsMap[ex.name] = exLogs
+    })
+  }
+
+  const rowsHtml = (ex, exIdx) => {
+    const sets = parseInt(ex.sets || 0)
+    const prevLogs = prevLogsMap[ex.name] || []
+    let rows = ''
+    for (let sIdx = 0; sIdx < sets; sIdx++) {
+      const key = `${exIdx}-${sIdx}`
+      const log = session.logs ? session.logs[key] : null
+      const prevLog = prevLogs[sIdx]
+      if (!log || (!log.weight && !log.reps)) continue
+      let progressionText = '-'
+      let progressionClass = ''
+      if (prevLog && prevLog.weight) {
+        const delta = parseFloat(log.weight) - parseFloat(prevLog.weight)
+        if (delta > 0) { progressionText = `+${delta}kg`; progressionClass = 'color: #065f46; font-weight: 700; background: #ecfdf5' }
+        else if (delta < 0) { progressionText = `${delta}kg`; progressionClass = 'color: #dc2626; font-weight: 700' }
+        else progressionText = '='
+      }
+      rows += `
+        <tr style="border-bottom:1px solid #eee">
+          <td style="padding:12px; font-family: ui-monospace; color:#6b7280">#${sIdx + 1}</td>
+          <td style="padding:12px; text-align:center; font-weight:700; font-size:16px">${log.weight || '-'}</td>
+          <td style="padding:12px; text-align:center; font-family: ui-monospace">${log.reps || '-'}</td>
+          <td style="padding:12px; text-align:center; font-size:12px; text-transform:uppercase; ${progressionClass}">${progressionText}</td>
+        </tr>`
+    }
+    return rows
+  }
+
+  const exercisesHtml = (session.exercises || []).map((ex, exIdx) => `
+    <div style="page-break-inside: avoid; margin-bottom:24px">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px; border-bottom:2px solid #e5e7eb; padding-bottom:8px">
+        <h3 style="font-size:18px; font-weight:800; text-transform:uppercase; display:flex; align-items:center; gap:8px">
+          <span style="background:#000; color:#fff; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:4px; font-size:12px">${exIdx + 1}</span>
+          ${ex.name || ''}
+        </h3>
+        <div style="display:flex; gap:12px; font-size:12px; font-family: ui-monospace; color:#6b7280">
+          ${ex.method && ex.method !== 'Normal' ? `<span style="color:#dc2626; font-weight:700; text-transform:uppercase">${ex.method}</span>` : ''}
+          ${ex.rpe ? `<span>RPE: <span style="font-weight:700; color:#000">${ex.rpe}</span></span>` : ''}
+          <span>Cad: <span style="font-weight:700; color:#000">${ex.cadence || '-'}</span></span>
+        </div>
+      </div>
+      <table style="width:100%; font-size:14px; border-collapse:collapse">
+        <thead>
+          <tr style="color:#6b7280; border-bottom:1px solid #f3f4f6">
+            <th style="padding:8px; text-align:left; width:64px">Série</th>
+            <th style="padding:8px; text-align:center; width:96px">Carga</th>
+            <th style="padding:8px; text-align:center; width:96px">Reps</th>
+            <th style="padding:8px; text-align:center; width:128px">Evolução</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml(ex, exIdx)}
+        </tbody>
+      </table>
+    </div>
+  `).join('')
+
+  return `<!doctype html>
+  <html>
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Relatório IronTracks</title>
+      <style>
+        body { background:#fff; color:#000; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+        .container { max-width:860px; margin:0 auto; padding:24px; }
+        .header { border-bottom:4px solid #000; padding-bottom:24px; margin-bottom:32px; display:flex; justify-content:space-between; align-items:flex-end }
+        .brand { font-size:36px; font-weight:900; font-style:italic; letter-spacing:-0.02em }
+        .muted { color:#6b7280; font-weight:700; text-transform:uppercase; letter-spacing:.2em }
+        .card { background:#f5f5f5; border:1px solid #e5e7eb; border-radius:12px; padding:16px }
+        .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div>
+            <div class="brand">IRON<span class="muted" style="color:#6b7280">TRACKS</span></div>
+            <div class="muted">Relatório de Performance</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:20px; font-weight:800">${session.workoutTitle || 'Treino'}</div>
+            <div style="color:#6b7280">${formatDate(session.date)}</div>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="card">
+            <div class="muted" style="margin-bottom:4px">Tempo Total</div>
+            <div style="font-size:28px; font-family: ui-monospace; font-weight:800">${formatDuration(session.totalTime || 0)}</div>
+          </div>
+          <div class="card">
+            <div class="muted" style="margin-bottom:4px">Volume (Kg)</div>
+            <div style="display:flex; gap:8px; align-items:baseline">
+              <div style="font-size:28px; font-family: ui-monospace; font-weight:800">${currentVolume.toLocaleString()}kg</div>
+              ${previousSession ? `<span style="font-size:12px; font-weight:700; color:${parseFloat(volumeDelta) >= 0 ? '#16a34a' : '#dc2626'}">${parseFloat(volumeDelta) > 0 ? '+' : ''}${volumeDelta}%</span>` : ''}
+            </div>
+          </div>
+          <div class="card" style="background:#fff4e5; border-color:#fed7aa">
+            <div class="muted" style="color:#ea580c; margin-bottom:4px">Calorias</div>
+            <div style="font-size:28px; font-family: ui-monospace; font-weight:800; color:#ea580c">~${calories}</div>
+          </div>
+          <div style="background:#000; color:#fff; border-radius:12px; padding:16px">
+            <div class="muted" style="color:#9ca3af; margin-bottom:4px">Status</div>
+            <div style="font-size:16px; font-weight:800; text-transform:uppercase; font-style:italic">Concluído</div>
+          </div>
+        </div>
+
+        ${exercisesHtml}
+
+        <div style="margin-top:32px; padding-top:16px; border-top:1px solid #e5e7eb; text-align:center; font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:.2em">IronTracks System</div>
+      </div>
+    </body>
+  </html>`
+}
+
