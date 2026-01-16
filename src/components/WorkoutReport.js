@@ -718,7 +718,12 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                     <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200 flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p>
                         <div className="flex flex-col gap-1">
-                            <p className="text-3xl font-mono font-bold">{currentVolume.toLocaleString()}kg</p>
+                            <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 min-w-0">
+                                <span className="text-2xl sm:text-3xl font-mono font-bold leading-none min-w-0">
+                                    {currentVolume.toLocaleString('pt-BR')}
+                                </span>
+                                <span className="text-sm font-black text-neutral-500">kg</span>
+                            </div>
                             {effectivePreviousSession && Number.isFinite(volumeDelta) && (
                                 <span
                                     className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold w-fit ${
