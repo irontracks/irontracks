@@ -590,9 +590,9 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
 
     return (
         <>
-        <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra pt-header-safe"}>
+        <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra"}>
             {!embedded && (
-                <div className="flex items-center gap-3 mb-4 pt-safe flex-wrap">
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
                     <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
                     <div className="min-w-0">
                         <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>

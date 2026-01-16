@@ -737,11 +737,11 @@ export default function StoryComposer({ open, session, onClose }) {
       }}
     >
       <div
-        className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center pt-safe"
+        className="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[calc(100vh-24px)] flex flex-col min-h-0">
-          <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+        <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[calc(100dvh_-_24px)] flex flex-col min-h-0">
+          <div className="px-4 pb-4 pt-[calc(1rem_+_env(safe-area-inset-top))] border-b border-neutral-800 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Foto</div>
               <div className="text-white font-black truncate">{metrics.title || 'Treino'}</div>
