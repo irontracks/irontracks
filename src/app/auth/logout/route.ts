@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
   const cookieStore = await cookies()
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
   })
 
   try {
-    await supabase.auth.signOut({ scope: 'global' })
+    await supabase.auth.signOut({ scope: 'local' })
   } catch {}
 
   return response
