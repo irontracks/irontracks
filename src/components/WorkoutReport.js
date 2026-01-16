@@ -451,42 +451,46 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const isTeamSession = partners.length > 0;
 
     return (
-        <div className="fixed inset-0 z-[1000] overflow-y-auto bg-neutral-900 text-black">
-            <div className={`fixed top-4 right-4 mt-safe mr-safe flex gap-2 no-print z-[1100] pointer-events-auto ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="relative">
+        <div className="fixed inset-0 z-[1000] bg-neutral-900 text-black flex flex-col">
+            <div className={`sticky top-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800 px-4 md:px-6 pt-safe pb-3 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="max-w-4xl mx-auto flex items-center justify-end gap-2">
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowExportMenu(v => !v)}
+                            className="min-h-[44px] flex items-center gap-2 px-4 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 rounded-xl transition-colors border border-neutral-800"
+                        >
+                            <Download size={16} className="text-yellow-500" />
+                            <span className="text-sm font-black">Salvar</span>
+                        </button>
+                        {showExportMenu && (
+                            <div className="absolute right-0 mt-2 w-52 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
+                                <button onClick={() => { setShowExportMenu(false); handleDownloadPDF(); }} className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm text-neutral-200 hover:bg-neutral-900">
+                                    <FileText size={16} className="text-yellow-500" />
+                                    <span className="font-bold">Salvar PDF</span>
+                                </button>
+                                <button onClick={handleDownloadJson} className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm text-neutral-200 hover:bg-neutral-900">
+                                    <Code size={16} className="text-yellow-500" />
+                                    <span className="font-bold">Salvar JSON</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                     <button
-                        onClick={() => setShowExportMenu(v => !v)}
-                        className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
+                        type="button"
+                        onClick={() => { setShowExportMenu(false); setShowStory(true); }}
+                        className="min-h-[44px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 rounded-xl font-black shadow-lg inline-flex items-center gap-2"
                     >
-                        <Download size={16} />
-                        <span className="text-sm font-medium">Salvar</span>
+                        <span className="text-xs uppercase tracking-widest">Foto</span>
                     </button>
-                    {showExportMenu && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-lg shadow-xl overflow-hidden">
-                            <button onClick={() => { setShowExportMenu(false); handleDownloadPDF(); }} className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm text-gray-800 hover:bg-gray-50">
-                                <FileText size={16} className="text-gray-600" />
-                                <span>Salvar PDF</span>
-                            </button>
-                            <button onClick={handleDownloadJson} className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm text-gray-800 hover:bg-gray-50">
-                                <Code size={16} className="text-gray-600" />
-                                <span>Salvar JSON</span>
-                            </button>
-                        </div>
-                    )}
+                    <button onClick={onClose} className="min-h-[44px] bg-neutral-900 hover:bg-neutral-800 text-white px-4 rounded-xl font-black shadow-lg inline-flex items-center gap-2 border border-neutral-800">
+                        <ArrowLeft size={18} />
+                        <span className="text-xs uppercase tracking-widest">Voltar</span>
+                    </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => { setShowExportMenu(false); setShowStory(true); }}
-                    className="bg-yellow-500 hover:bg-yellow-400 text-black px-3 py-2 rounded-xl font-bold shadow-lg inline-flex items-center gap-2"
-                >
-                    <span className="text-xs">FOTO</span>
-                </button>
-                <button onClick={onClose} className="bg-white text.black px-3 py-2 rounded-xl font-bold shadow-lg inline-flex items-center gap-2">
-                    <ArrowLeft size={18} />
-                    <span className="text-xs">Voltar</span>
-                </button>
             </div>
-            <div ref={reportRef} className="min-h-screen bg-white text-black p-8 max-w-4xl mx-auto" style={{ paddingTop: 'calc(2rem + env(safe-area-inset-top))' }}>
+
+            <div className="flex-1 overflow-y-auto">
+            <div ref={reportRef} className="min-h-screen bg-white text-black p-6 md:p-8 max-w-4xl mx-auto">
                 <div className="border-b-4 border-black pb-6 mb-8 flex justify-between items-end">
                     <div>
                         <h1 className="text-4xl font-black italic tracking-tighter mb-1">IRON<span className="text-neutral-500">TRACKS</span></h1>
@@ -839,6 +843,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 <div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">
                     IronTracks System • {getCurrentDate()}
                 </div>
+            </div>
             </div>
 
             {pdfUrl && (
