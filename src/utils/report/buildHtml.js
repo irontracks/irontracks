@@ -240,8 +240,16 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
         .card-accent .muted { color: #ea580c; }
         .card-invert { background: #0b0b0c; border-color: #0b0b0c; color: #fff; }
         .card-invert .muted { color: #9ca3af; }
-        .value { font-size: 28px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight: 800; }
+        .value {
+          font-size: clamp(20px, 5.6vw, 28px);
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+          font-weight: 800;
+          line-height: 1.05;
+          overflow-wrap: anywhere;
+        }
         .value-accent { color: #ea580c; }
+        .value-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+        .unit { font-size: 12px; font-weight: 900; color: #6b7280; text-transform: uppercase; letter-spacing: .08em; }
         .stats {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -285,17 +293,18 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
         <div class="stats">
           <div class="card">
             <div class="muted" style="margin-bottom:4px">Tempo Total</div>
-            <div style="font-size:28px; font-family: ui-monospace; font-weight:800">${formatDuration(session.totalTime || 0)}</div>
+            <div class="value">${formatDuration(session.totalTime || 0)}</div>
           </div>
           <div class="card">
             <div class="muted" style="margin-bottom:4px">Tempo Real</div>
-            <div style="font-size:28px; font-family: ui-monospace; font-weight:800">${formatDuration(realTotalTime || 0)}</div>
+            <div class="value">${formatDuration(realTotalTime || 0)}</div>
           </div>
           <div class="card">
             <div class="muted" style="margin-bottom:4px">Volume (Kg)</div>
-            <div style="display:flex; gap:8px; align-items:baseline">
-              <div style="font-size:28px; font-family: ui-monospace; font-weight:800">${currentVolume.toLocaleString()}kg</div>
-              ${previousSession ? `<span style="font-size:12px; font-weight:700; color:${parseFloat(volumeDelta) >= 0 ? '#16a34a' : '#dc2626'}">${parseFloat(volumeDelta) > 0 ? '+' : ''}${volumeDelta}%</span>` : ''}
+            <div class="value-row">
+              <span class="value">${currentVolume.toLocaleString('pt-BR')}</span>
+              <span class="unit">kg</span>
+              ${previousSession ? `<span style="font-size:12px; font-weight:800; color:${parseFloat(volumeDelta) >= 0 ? '#16a34a' : '#dc2626'}">${parseFloat(volumeDelta) > 0 ? '+' : ''}${volumeDelta}%</span>` : ''}
             </div>
           </div>
           <div class="card card-accent">
