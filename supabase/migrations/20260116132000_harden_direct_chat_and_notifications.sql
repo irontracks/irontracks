@@ -12,9 +12,20 @@ BEGIN;
 -- ---------------------------------------------------------------------
 -- NOTE: NOT VALID avoids migration failure if historical rows are non-canonical.
 -- New inserts/updates will be enforced.
-ALTER TABLE public.direct_channels
-  ADD CONSTRAINT IF NOT EXISTS direct_channels_user_order_chk
-  CHECK (user1_id < user2_id) NOT VALID;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint c
+    WHERE c.conname = 'direct_channels_user_order_chk'
+      AND c.conrelid = 'public.direct_channels'::regclass
+  ) THEN
+    ALTER TABLE public.direct_channels
+      ADD CONSTRAINT direct_channels_user_order_chk
+      CHECK (user1_id < user2_id) NOT VALID;
+  END IF;
+END
+$$;
 
 -- ---------------------------------------------------------------------
 -- 2) DM permission helper (pair-safe, avoids leaking other users settings)
@@ -355,4 +366,3 @@ END;
 $fn$;
 
 COMMIT;
-
