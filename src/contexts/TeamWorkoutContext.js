@@ -44,6 +44,22 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         }
     }, [user?.id]);
 
+    const soundOpts = useMemo(() => {
+        const uid = user?.id ? String(user.id) : '';
+        if (!uid) return { enabled: true, volume: 1 };
+        try {
+            if (typeof window === 'undefined') return { enabled: true, volume: 1 };
+            const raw = window.localStorage.getItem(`irontracks.userSettings.v1.${uid}`) || '';
+            const parsed = raw ? JSON.parse(raw) : null;
+            const enabled = parsed && typeof parsed === 'object' ? parsed.enableSounds !== false : true;
+            const volumeRaw = parsed && typeof parsed === 'object' ? Number(parsed.soundVolume ?? 100) : 100;
+            const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1;
+            return { enabled, volume };
+        } catch {
+            return { enabled: true, volume: 1 };
+        }
+    }, [user?.id]);
+
     const refetchInvites = useMemo(() => {
         return async () => {
             try {
@@ -128,7 +144,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                                 workout: newInvite.workout_data
                             }, ...current];
                         });
-                        try { playStartSound(); } catch {}
+                        try { playStartSound(soundOpts); } catch {}
                     } catch {
                         return;
                     }
@@ -167,7 +183,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites, soundOpts]);
 
     // Fallback: if invites realtime isn't enabled, notifications will still fire
     useEffect(() => {
@@ -221,7 +237,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                         const type = String(n?.type ?? '');
                     if (type !== 'invite') return;
                         refetchInvites();
-                        try { playStartSound(); } catch {}
+                        try { playStartSound(soundOpts); } catch {}
                     } catch {
                         return;
                     }
@@ -267,7 +283,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                 if (typeof window !== 'undefined') window.removeEventListener('focus', handleFocus);
             } catch {}
         };
-    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites, soundOpts]);
 
     // 2. Listen to Active Team Session
     useEffect(() => {
@@ -352,7 +368,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                         uid: toUid || null,
                     }
                 });
-                try { playStartSound(); } catch {}
+                try { playStartSound(soundOpts); } catch {}
             } catch {
                 return;
             }
@@ -429,7 +445,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
             } catch {}
             try { clearInterval(pollId); } catch {}
         };
-    }, [supabase, user?.id, teamSession?.id]);
+    }, [supabase, user?.id, teamSession?.id, soundOpts]);
 
     const sendInvite = async (targetUser, workout, currentTeamSessionId = null) => {
         try {

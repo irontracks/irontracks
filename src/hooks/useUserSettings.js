@@ -3,11 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS = {
   units: 'kg',
   dashboardDensity: 'comfortable',
   enableSounds: true,
   allowTeamInvites: true,
+  soundVolume: 100,
+  inAppToasts: true,
+  notificationPermissionPrompt: true,
+  restTimerNotify: true,
+  restTimerVibrate: true,
+  restTimerRepeatAlarm: true,
+  restTimerRepeatIntervalMs: 1500,
+  restTimerTickCountdown: true,
+  restTimerDefaultSeconds: 90,
+  autoRestTimerWhenMissing: false,
 }
 
 const STORAGE_KEY = 'irontracks.userSettings.v1'

@@ -4,6 +4,15 @@ let __unlocked = false;
 const UNLOCK_SILENT_GAIN = 0.000001;
 const UNLOCK_SILENT_DURATION_S = 0.03;
 
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+const resolveSoundOpts = (opts) => {
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const enabled = o.enabled !== false;
+    const volume = clamp01(Number.isFinite(Number(o.volume)) ? Number(o.volume) : 1);
+    return { enabled, volume };
+};
+
 const ensureCtx = (opts) => {
     if (typeof window === 'undefined') return null;
     const AC = window.AudioContext || window.webkitAudioContext;
@@ -42,8 +51,10 @@ export const unlockAudio = () => {
     } catch {}
 };
 
-export const playStartSound = () => {
+export const playStartSound = (opts) => {
     try {
+        const { enabled, volume } = resolveSoundOpts(opts);
+        if (!enabled || volume <= 0) return;
         const ctx = ensureCtx();
         if (!ctx) return;
         const osc = ctx.createOscillator();
@@ -56,7 +67,7 @@ export const playStartSound = () => {
         osc.frequency.setValueAtTime(440, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
 
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.setValueAtTime(0.3 * volume, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
 
         osc.start();
@@ -66,8 +77,10 @@ export const playStartSound = () => {
     }
 };
 
-export const playFinishSound = () => {
+export const playFinishSound = (opts) => {
     try {
+        const { enabled, volume } = resolveSoundOpts(opts);
+        if (!enabled || volume <= 0) return;
         const ctx = ensureCtx();
         if (!ctx) return;
         const playNote = (freq, time, duration) => {
@@ -77,7 +90,7 @@ export const playFinishSound = () => {
             gain.connect(ctx.destination);
             osc.type = 'triangle';
             osc.frequency.value = freq;
-            gain.gain.setValueAtTime(0.2, time);
+            gain.gain.setValueAtTime(0.2 * volume, time);
             gain.gain.exponentialRampToValueAtTime(0.01, time + duration);
             osc.start(time);
             osc.stop(time + duration);
@@ -92,8 +105,10 @@ export const playFinishSound = () => {
     }
 };
 
-export const playTimerFinishSound = () => {
+export const playTimerFinishSound = (opts) => {
     try {
+        const { enabled, volume } = resolveSoundOpts(opts);
+        if (!enabled || volume <= 0) return;
         const ctx = ensureCtx();
         if (!ctx) return;
         const osc = ctx.createOscillator();
@@ -106,7 +121,7 @@ export const playTimerFinishSound = () => {
         osc.frequency.setValueAtTime(0, ctx.currentTime + 0.11);
         osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
         osc.frequency.setValueAtTime(0, ctx.currentTime + 0.31);
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.setValueAtTime(0.3 * volume, ctx.currentTime);
         gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.5);
         osc.start();
         osc.stop(ctx.currentTime + 0.5);
@@ -115,8 +130,10 @@ export const playTimerFinishSound = () => {
     }
 };
 
-export const playTick = () => {
+export const playTick = (opts) => {
     try {
+        const { enabled, volume } = resolveSoundOpts(opts);
+        if (!enabled || volume <= 0) return;
         const ctx = ensureCtx();
         if (!ctx) return;
         const osc = ctx.createOscillator();
@@ -125,7 +142,7 @@ export const playTick = () => {
         gain.connect(ctx.destination);
         osc.type = 'sine';
         osc.frequency.setValueAtTime(1200, ctx.currentTime);
-        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2 * volume, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.12);
         osc.start();
         osc.stop(ctx.currentTime + 0.12);

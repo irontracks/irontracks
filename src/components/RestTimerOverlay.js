@@ -2,10 +2,26 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 
-const RestTimerOverlay = ({ targetTime, context, onFinish, onClose }) => {
+const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
     const warnedRef = useRef(false);
+    const safeSettings = settings && typeof settings === 'object' ? settings : null;
+    const soundsEnabled = safeSettings ? safeSettings.enableSounds !== false : true;
+    const soundVolume = (() => {
+        const raw = Number(safeSettings?.soundVolume ?? 100);
+        if (!Number.isFinite(raw)) return 1;
+        return Math.max(0, Math.min(1, raw / 100));
+    })();
+    const allowNotify = safeSettings ? safeSettings.restTimerNotify !== false : true;
+    const allowVibrate = safeSettings ? safeSettings.restTimerVibrate !== false : true;
+    const repeatAlarm = safeSettings ? safeSettings.restTimerRepeatAlarm !== false : true;
+    const repeatIntervalMs = (() => {
+        const raw = Number(safeSettings?.restTimerRepeatIntervalMs ?? 1500);
+        if (!Number.isFinite(raw)) return 1500;
+        return Math.max(600, Math.min(6000, Math.round(raw)));
+    })();
+    const allowTickCountdown = safeSettings ? safeSettings.restTimerTickCountdown !== false : true;
 
     const formatDuration = (s) => {
         const mins = Math.floor(s / 60);
@@ -26,31 +42,39 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose }) => {
             if (isFinished) return;
             if (warnedRef.current) return;
             if (timeLeft !== 5) return;
+            if (!allowTickCountdown) return;
+            if (!soundsEnabled) return;
             try {
-                playTick();
+                playTick({ volume: soundVolume, enabled: soundsEnabled });
             } catch {}
             warnedRef.current = true;
         } catch {}
-    }, [context?.kind, isFinished, timeLeft]);
+    }, [allowTickCountdown, context?.kind, isFinished, soundVolume, soundsEnabled, timeLeft]);
 
     useEffect(() => {
         let soundInterval;
         let vibrateInterval;
 
         if (isFinished) {
-            playTimerFinishSound();
-            soundInterval = setInterval(() => {
-                playTimerFinishSound();
-            }, 1500);
+            if (soundsEnabled) {
+                playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
+                if (repeatAlarm) {
+                    soundInterval = setInterval(() => {
+                        playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
+                    }, repeatIntervalMs);
+                }
+            }
 
             try {
-                if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+                if (allowVibrate && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
                     navigator.vibrate([220, 90, 220]);
-                    vibrateInterval = setInterval(() => {
-                        try {
-                            navigator.vibrate([220, 90, 220]);
-                        } catch {}
-                    }, 1500);
+                    if (repeatAlarm) {
+                        vibrateInterval = setInterval(() => {
+                            try {
+                                navigator.vibrate([220, 90, 220]);
+                            } catch {}
+                        }, repeatIntervalMs);
+                    }
                 }
             } catch {}
         }
@@ -59,7 +83,7 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose }) => {
             if (soundInterval) clearInterval(soundInterval);
             if (vibrateInterval) clearInterval(vibrateInterval);
         };
-    }, [isFinished]);
+    }, [allowVibrate, isFinished, repeatAlarm, repeatIntervalMs, soundVolume, soundsEnabled]);
 
     useEffect(() => {
         if (!targetTime) return;
@@ -73,12 +97,12 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose }) => {
                 setIsFinished(true);
                 if (!hasNotified) {
                     hasNotified = true;
-                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-                        new Notification("⏰ Tempo Esgotado!", { 
-                            body: "Hora de voltar para o treino!", 
-                            icon: 'icone.png', 
-                            tag: 'timer_finished' 
-                        }); 
+                    if (allowNotify && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                        new Notification("⏰ Tempo Esgotado!", {
+                            body: "Hora de voltar para o treino!",
+                            icon: 'icone.png',
+                            tag: 'timer_finished'
+                        });
                     }
                 }
             } else {
@@ -90,7 +114,7 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose }) => {
         updateTimer();
         const interval = setInterval(updateTimer, 100);
         return () => clearInterval(interval);
-    }, [targetTime]);
+    }, [allowNotify, targetTime]);
 
     if (!targetTime) return null;
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function DeployBadge() {
   const [info, setInfo] = useState(null)
@@ -27,13 +27,13 @@ export default function DeployBadge() {
     }
   }, [])
 
-  const text = useMemo(() => {
+  const text = (() => {
     const v = info?.version ? `v${String(info.version)}` : null
     const sha = info?.commitSha ? String(info.commitSha).slice(0, 7) : null
     const ref = info?.commitRef ? String(info.commitRef) : null
     const parts = [v, sha || ref].filter(Boolean)
     return parts.join(' · ')
-  }, [info?.commitRef, info?.commitSha, info?.version])
+  })()
 
   if (!text) return null
 
@@ -54,4 +54,3 @@ export default function DeployBadge() {
     </button>
   )
 }
-

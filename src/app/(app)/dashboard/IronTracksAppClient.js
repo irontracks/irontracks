@@ -1272,16 +1272,27 @@ function IronTracksApp({ initialUser, initialProfile }) {
             resolvedExercises = Array.isArray(resolved?.exercises) ? resolved.exercises : exercisesList;
             persistExerciseVideoUrls(resolved?.updates || []);
         } catch {}
-        playStartSound();
+        {
+            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+            const enabled = s ? s.enableSounds !== false : true
+            const volumeRaw = Number(s?.soundVolume ?? 100)
+            const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1
+            playStartSound({ enabled, volume })
+        }
         setActiveSession({
             workout: { ...workout, exercises: resolvedExercises },
             logs: {},
             startedAt: Date.now(),
-            timerTargetTime: null
+            timerTargetTime: null,
+            timerContext: null
         });
         setView('active');
-        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        {
+            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+            const allowPrompt = s ? s.notificationPermissionPrompt !== false : true
+            if (allowPrompt && typeof Notification !== 'undefined' && Notification.permission === 'default') {
             Notification.requestPermission().catch(e => console.warn('Erro permissão notificação:', e));
+            }
         }
     };
 
@@ -1296,12 +1307,13 @@ function IronTracksApp({ initialUser, initialProfile }) {
         });
     };
 
-    const handleStartTimer = (duration) => {
+    const handleStartTimer = (duration, context) => {
         setActiveSession((prev) => {
             if (!prev) return prev;
             return {
                 ...prev,
-                timerTargetTime: Date.now() + (duration * 1000)
+                timerTargetTime: Date.now() + (duration * 1000),
+                timerContext: context && typeof context === 'object' ? context : null
             };
         });
     };
@@ -1309,7 +1321,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const handleCloseTimer = () => {
         setActiveSession((prev) => {
             if (!prev) return prev;
-            return { ...prev, timerTargetTime: null };
+            return { ...prev, timerTargetTime: null, timerContext: null };
         });
     };
 
@@ -1695,6 +1707,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                         <ActiveWorkout
                             session={activeSession}
                             user={user}
+                            settings={userSettingsApi?.settings ?? null}
                             onUpdateLog={handleUpdateSessionLog}
                             onFinish={handleFinishSession}
                             onBack={() => setView('dashboard')}
@@ -1981,6 +1994,8 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 {activeSession?.timerTargetTime && (
                     <RestTimerOverlay
                         targetTime={activeSession.timerTargetTime}
+                        context={activeSession.timerContext}
+                        settings={userSettingsApi?.settings ?? null}
                         onClose={handleCloseTimer}
                         onFinish={handleCloseTimer}
                     />
@@ -1988,6 +2003,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
                 {notification && (
                     <NotificationToast
+                        settings={userSettingsApi?.settings ?? null}
                         message={notification.text}
                         sender={notification.senderName}
                         onClick={() => { setView('chat'); setNotification(null); }}
