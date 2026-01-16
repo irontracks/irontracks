@@ -1,9 +1,10 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Save, Download, Trash2, RotateCcw } from 'lucide-react'
+import { X, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert } from 'lucide-react'
 import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
+import { createClient } from '@/utils/supabase/client'
 
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v)
 
@@ -24,6 +25,9 @@ export default function SettingsModal(props) {
   const units = String(draft?.units || 'kg')
   const enableSounds = Boolean(draft?.enableSounds ?? true)
   const allowTeamInvites = Boolean(draft?.allowTeamInvites ?? true)
+  const allowDirectMessages = Boolean(draft?.allowDirectMessages ?? true)
+  const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
+  const notifyAppointments = Boolean(draft?.notifyAppointments ?? true)
   const soundVolume = Math.max(0, Math.min(100, Number(draft?.soundVolume ?? 100) || 0))
   const inAppToasts = Boolean(draft?.inAppToasts ?? true)
   const notificationPermissionPrompt = Boolean(draft?.notificationPermissionPrompt ?? true)
@@ -249,6 +253,65 @@ export default function SettingsModal(props) {
                   {notificationPermissionPrompt ? 'Ativo' : 'Desligado'}
                 </button>
               </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Notificação de mensagem direta</div>
+                  <div className="text-xs text-neutral-400">Aparece no centro de notificações.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('notifyDirectMessages', !notifyDirectMessages)}
+                  className={
+                    notifyDirectMessages
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {notifyDirectMessages ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Notificação de agenda</div>
+                  <div className="text-xs text-neutral-400">Lembretes e eventos criados pelo coach.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('notifyAppointments', !notifyAppointments)}
+                  className={
+                    notifyAppointments
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {notifyAppointments ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
+            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Privacidade</div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Mensagens diretas</div>
+                  <div className="text-xs text-neutral-400">Permite iniciar e receber conversas diretas.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('allowDirectMessages', !allowDirectMessages)}
+                  className={
+                    allowDirectMessages
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {allowDirectMessages ? 'Ativo' : 'Bloqueado'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -413,6 +476,91 @@ export default function SettingsModal(props) {
                 <Trash2 size={16} className="text-yellow-500" />
                 Limpar cache
               </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/account/export', { method: 'GET' })
+                    const data = await res.json().catch(() => null)
+                    if (!data || !data.ok) {
+                      await alert('Falha ao exportar dados: ' + (data?.error || ''))
+                      return
+                    }
+                    const payload = JSON.stringify(data, null, 2)
+                    const blob = new Blob([payload], { type: 'application/json' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `irontracks-account-export-${new Date().toISOString()}.json`
+                    document.body.appendChild(a)
+                    a.click()
+                    a.remove()
+                    URL.revokeObjectURL(url)
+                  } catch (e) {
+                    await alert('Falha ao exportar dados: ' + (e?.message ?? String(e)))
+                  }
+                }}
+                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 inline-flex items-center justify-center gap-2"
+              >
+                <Download size={16} className="text-yellow-500" />
+                Exportar meus dados
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const supabase = createClient()
+                    await supabase.auth.signOut({ scope: 'global' })
+                    try { window.location.href = '/auth/login' } catch {}
+                  } catch (e) {
+                    await alert('Falha ao sair: ' + (e?.message ?? String(e)))
+                  }
+                }}
+                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 inline-flex items-center justify-center gap-2"
+              >
+                <LogOut size={16} className="text-yellow-500" />
+                Sair de todos
+              </button>
+            </div>
+
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const typed = typeof window !== 'undefined' ? window.prompt('Digite EXCLUIR para confirmar a exclusão da conta:') : null
+                    if (String(typed || '').trim().toUpperCase() !== 'EXCLUIR') return
+                    const res = await fetch('/api/account/delete', {
+                      method: 'POST',
+                      headers: { 'content-type': 'application/json' },
+                      body: JSON.stringify({ confirm: 'EXCLUIR' }),
+                    })
+                    const data = await res.json().catch(() => null)
+                    if (!data || !data.ok) {
+                      await alert('Falha ao excluir conta: ' + (data?.error || ''))
+                      return
+                    }
+                    try {
+                      const supabase = createClient()
+                      await supabase.auth.signOut({ scope: 'global' })
+                    } catch {}
+                    try { window.location.href = '/auth/login' } catch {}
+                  } catch (e) {
+                    await alert('Falha ao excluir conta: ' + (e?.message ?? String(e)))
+                  }
+                }}
+                className="w-full min-h-[44px] px-4 py-3 rounded-xl bg-red-600/15 border border-red-500/40 text-red-200 font-black hover:bg-red-600/25 inline-flex items-center justify-center gap-2"
+              >
+                <ShieldAlert size={16} className="text-red-300" />
+                Excluir minha conta
+              </button>
+              <div className="mt-2 text-[11px] text-neutral-400">
+                Remove seus dados do app e encerra acesso. Ação irreversível.
+              </div>
             </div>
           </div>
         </div>

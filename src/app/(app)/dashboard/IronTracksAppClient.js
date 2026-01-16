@@ -876,6 +876,8 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
     useEffect(() => {
         if (!user?.id) return;
+        const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+        const allowNotifyDm = s ? s.notifyDirectMessages !== false : true
 
         const channel = supabase
             .channel(`direct-messages-badge:${user.id}`)
@@ -885,6 +887,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 table: 'direct_messages'
             }, async (payload) => {
                 try {
+                    if (!allowNotifyDm) return;
                     const msg = payload.new;
                     if (!msg || msg.sender_id === user.id) return;
 
@@ -921,7 +924,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, user?.id, view]);
+    }, [supabase, user?.id, userSettingsApi?.settings, view]);
 
     useEffect(() => {
         const meta = initialUser?.user_metadata || {}

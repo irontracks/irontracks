@@ -32,6 +32,16 @@ export async function POST(req: Request) {
     }
 
     const admin = createAdminClient()
+    const { data: prefRow } = await admin
+      .from('user_settings')
+      .select('preferences')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const prefs = prefRow?.preferences && typeof prefRow.preferences === 'object' ? prefRow.preferences : null
+    const allow = prefs ? prefs.notifyDirectMessages !== false : true
+    if (!allow) return NextResponse.json({ ok: true, skipped: true })
+
     const { error } = await admin.from('notifications').insert({
       user_id: user.id,
       title: safeSenderName,
