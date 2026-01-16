@@ -22,7 +22,7 @@ export const useTeamWorkout = () => {
     return context;
 };
 
-export const TeamWorkoutProvider = ({ children, user }) => {
+export const TeamWorkoutProvider = ({ children, user, settings }) => {
     const [incomingInvites, setIncomingInvites] = useState([]);
     const [acceptedInviteNotice, setAcceptedInviteNotice] = useState(null);
     const [teamSession, setTeamSession] = useState(null);
@@ -31,34 +31,18 @@ export const TeamWorkoutProvider = ({ children, user }) => {
     const seenAcceptedInviteIdsRef = useRef(new Set());
 
     const canReceiveInvites = useMemo(() => {
-        const uid = user?.id ? String(user.id) : '';
-        if (!uid) return true;
-        try {
-            if (typeof window === 'undefined') return true;
-            const raw = window.localStorage.getItem(`irontracks.userSettings.v1.${uid}`) || '';
-            const parsed = raw ? JSON.parse(raw) : null;
-            const allow = parsed && typeof parsed === 'object' ? parsed.allowTeamInvites : undefined;
-            return allow !== false;
-        } catch {
-            return true;
-        }
-    }, [user?.id]);
+        const s = settings && typeof settings === 'object' ? settings : null;
+        const allow = s ? s.allowTeamInvites : undefined;
+        return allow !== false;
+    }, [settings]);
 
     const soundOpts = useMemo(() => {
-        const uid = user?.id ? String(user.id) : '';
-        if (!uid) return { enabled: true, volume: 1 };
-        try {
-            if (typeof window === 'undefined') return { enabled: true, volume: 1 };
-            const raw = window.localStorage.getItem(`irontracks.userSettings.v1.${uid}`) || '';
-            const parsed = raw ? JSON.parse(raw) : null;
-            const enabled = parsed && typeof parsed === 'object' ? parsed.enableSounds !== false : true;
-            const volumeRaw = parsed && typeof parsed === 'object' ? Number(parsed.soundVolume ?? 100) : 100;
-            const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1;
-            return { enabled, volume };
-        } catch {
-            return { enabled: true, volume: 1 };
-        }
-    }, [user?.id]);
+        const s = settings && typeof settings === 'object' ? settings : null;
+        const enabled = s ? s.enableSounds !== false : true;
+        const volumeRaw = s ? Number(s.soundVolume ?? 100) : 100;
+        const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1;
+        return { enabled, volume };
+    }, [settings]);
 
     const refetchInvites = useMemo(() => {
         return async () => {

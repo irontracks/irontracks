@@ -1583,7 +1583,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
     return (
-        <TeamWorkoutProvider user={user}>
+        <TeamWorkoutProvider user={user} settings={userSettingsApi?.settings ?? null}>
             <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
                 <IncomingInviteModal onStartSession={handleStartSession} />
                 <InviteAcceptedModal />
