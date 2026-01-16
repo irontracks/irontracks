@@ -205,17 +205,63 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
       <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>Relatório IronTracks</title>
       <style>
-        body { background:#fff; color:#000; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; margin:0; }
-        .container { max-width:860px; margin:0 auto; padding:24px; }
-        .header { border-bottom:4px solid #000; padding-bottom:24px; margin-bottom:32px; display:flex; justify-content:space-between; align-items:flex-end }
-        .brand { font-size:36px; font-weight:900; font-style:italic; letter-spacing:-0.02em }
-        .muted { color:#6b7280; font-weight:700; text-transform:uppercase; letter-spacing:.2em }
-        .card { background:#f5f5f5; border:1px solid #e5e7eb; border-radius:12px; padding:16px }
-        .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px }
+        * { box-sizing: border-box; }
+        body {
+          background: #fff;
+          color: #0b0b0c;
+          font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+          margin: 0;
+          line-height: 1.35;
+        }
+        img { max-width: 100%; height: auto; }
+        .container { max-width: 880px; margin: 0 auto; padding: 28px; }
+        .header {
+          border-bottom: 3px solid #0b0b0c;
+          padding-bottom: 20px;
+          margin-bottom: 24px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+        .brand { font-size: 34px; font-weight: 900; font-style: italic; letter-spacing: -0.03em; line-height: 1; }
+        .muted { color: #6b7280; font-weight: 800; text-transform: uppercase; letter-spacing: .18em; font-size: 11px; }
+        .card {
+          background: #f7f7f8;
+          border: 1px solid #e5e7eb;
+          border-radius: 14px;
+          padding: 16px;
+          box-shadow: 0 1px 0 rgba(0,0,0,.06);
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        .card-accent { background: #fff7ed; border-color: #fed7aa; }
+        .card-accent .muted { color: #ea580c; }
+        .card-invert { background: #0b0b0c; border-color: #0b0b0c; color: #fff; }
+        .card-invert .muted { color: #9ca3af; }
+        .value { font-size: 28px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-weight: 800; }
+        .value-accent { color: #ea580c; }
+        .stats {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+          gap: 14px;
+          margin-bottom: 22px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        thead { display: table-header-group; }
+        tr { break-inside: avoid; page-break-inside: avoid; }
+        @media (max-width: 520px) {
+          .container { padding: 16px; }
+          .brand { font-size: 30px; }
+          .header { padding-bottom: 16px; margin-bottom: 18px; }
+          .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
         @media print {
-          @page { size:auto; margin:0mm; }
-          body { -webkit-print-color-adjust:exact; margin:0; }
-          .no-print { display:none !important; }
+          @page { size: auto; margin: 12mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .container { max-width: none; padding: 0; }
+          .no-print { display: none !important; }
         }
       </style>
     </head>
@@ -252,12 +298,12 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
               ${previousSession ? `<span style="font-size:12px; font-weight:700; color:${parseFloat(volumeDelta) >= 0 ? '#16a34a' : '#dc2626'}">${parseFloat(volumeDelta) > 0 ? '+' : ''}${volumeDelta}%</span>` : ''}
             </div>
           </div>
-          <div class="card" style="background:#fff4e5; border-color:#fed7aa">
-            <div class="muted" style="color:#ea580c; margin-bottom:4px">Calorias</div>
-            <div style="font-size:28px; font-family: ui-monospace; font-weight:800; color:#ea580c">~${calories}</div>
+          <div class="card card-accent">
+            <div class="muted" style="margin-bottom:4px">Calorias</div>
+            <div class="value value-accent">~${calories}</div>
           </div>
-          <div style="background:#000; color:#fff; border-radius:12px; padding:16px">
-            <div class="muted" style="color:#9ca3af; margin-bottom:4px">Status</div>
+          <div class="card card-invert">
+            <div class="muted" style="margin-bottom:4px">Status</div>
             <div style="font-size:16px; font-weight:800; text-transform:uppercase; font-style:italic">Concluído</div>
           </div>
         </div>

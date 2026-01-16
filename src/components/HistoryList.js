@@ -592,18 +592,20 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         <>
         <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra"}>
             {!embedded && (
-                <div className="flex items-center gap-3 mb-4 flex-wrap">
-                    <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
-                    <div className="min-w-0">
-                        <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{rangeLabel}</div>
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
+                        <div className="min-w-0">
+                            <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
+                            <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{rangeLabel}</div>
+                        </div>
                     </div>
-                    <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+                    <div className="flex items-center gap-2 justify-end">
                         {!isReadOnly && historyItems.length > 0 && (
                             <button
                                 type="button"
                                 onClick={toggleSelectionMode}
-                                className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}
+                                className={`min-h-[44px] px-3 sm:px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}
                             >
                                 {isSelectionMode ? 'Cancelar' : 'Selecionar'}
                             </button>
@@ -612,7 +614,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                             <button
                                 type="button"
                                 onClick={() => setShowManual(true)}
-                                className="cursor-pointer relative z-10 min-h-[44px] px-4 py-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center gap-2 shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
+                                className="cursor-pointer relative z-10 min-h-[44px] px-3 sm:px-4 py-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center gap-2 shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
                             >
                                 <Plus size={16} />
                                 <span className="hidden sm:inline">Adicionar</span>
@@ -675,7 +677,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-3 mt-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
                             <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
                                 <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
                                 <div className="text-xl font-black tracking-tight text-white">{summary.count}</div>
@@ -684,7 +686,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                                 <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total</div>
                                 <div className="text-xl font-black tracking-tight text-white">{summary.totalMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
                             </div>
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 col-span-2 sm:col-span-1">
                                 <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
                                 <div className="text-xl font-black tracking-tight text-white">{summary.avgMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
                             </div>
@@ -694,23 +696,23 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
 
                 {!loading && historyItems.length > 0 && (
                     <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30">
-                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
                             <div>
                                 <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatórios rápidos</div>
                                 <div className="text-base font-black tracking-tight text-white">Compartilhe sua evolução</div>
                             </div>
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                                 <button
                                     type="button"
                                     onClick={() => openPeriodReport('week')}
-                                    className="min-h-[40px] px-4 rounded-xl bg-yellow-500 text-black text-xs font-black uppercase tracking-wide shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95"
+                                    className="min-h-[44px] px-4 rounded-xl bg-yellow-500 text-black text-xs font-black uppercase tracking-wide shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95 w-full sm:w-auto"
                                 >
                                     Relatório semanal
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => openPeriodReport('month')}
-                                    className="min-h-[40px] px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-black uppercase tracking-wide hover:bg-neutral-900 transition-all duration-300 active:scale-95"
+                                    className="min-h-[44px] px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-black uppercase tracking-wide hover:bg-neutral-900 transition-all duration-300 active:scale-95 w-full sm:w-auto"
                                 >
                                     Relatório mensal
                                 </button>
