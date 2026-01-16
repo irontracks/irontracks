@@ -610,7 +610,21 @@ export default function ActiveWorkout(props) {
   const renderRestPauseSet = (ex, exIdx, setIdx) => {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
-    const cfg = getPlanConfig(ex, setIdx);
+    const cfgRaw = getPlanConfig(ex, setIdx);
+    const method = String(ex?.method || '').trim();
+    const cfgMiniRaw = parseTrainingNumber(cfgRaw?.mini_sets);
+    const cfgRestRaw = parseTrainingNumber(cfgRaw?.rest_time_sec);
+    const shouldFillRestPauseDefaults =
+      method === 'Rest-Pause' &&
+      (!isRestPauseConfig(cfgRaw) || !(Number.isFinite(cfgMiniRaw) && cfgMiniRaw >= 1) || !(Number.isFinite(cfgRestRaw) && cfgRestRaw >= 1));
+
+    const cfg = shouldFillRestPauseDefaults
+      ? {
+          ...(isObject(cfgRaw) ? cfgRaw : {}),
+          mini_sets: Number.isFinite(cfgMiniRaw) && cfgMiniRaw >= 1 ? cfgMiniRaw : 2,
+          rest_time_sec: Number.isFinite(cfgRestRaw) && cfgRestRaw >= 1 ? cfgRestRaw : 15,
+        }
+      : cfgRaw;
     const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
     const pauseSec = parseTrainingNumber(cfg?.rest_time_sec) ?? 15;
@@ -662,6 +676,17 @@ export default function ActiveWorkout(props) {
     };
 
     const notesValue = String(log?.notes ?? '');
+    const hasNotes = notesValue.trim().length > 0;
+    const isNotesOpen = openNotesKeys.has(key);
+
+    const toggleNotes = () => {
+      setOpenNotesKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    };
 
     return (
       <div key={key} className="space-y-2">
@@ -679,8 +704,19 @@ export default function ActiveWorkout(props) {
           />
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Rest-P</span>
-            <span className="text-xs text-neutral-400 truncate">Total: {total || 0} reps</span>
+            <span className="text-xs text-neutral-400 truncate">Descanso {pauseSec || 0}s • Total: {total || 0} reps</span>
           </div>
+          <button
+            type="button"
+            onClick={toggleNotes}
+            className={
+              isNotesOpen || hasNotes
+                ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+            }
+          >
+            <MessageSquare size={14} />
+          </button>
           <button
             type="button"
             disabled={!canDone}
@@ -707,6 +743,12 @@ export default function ActiveWorkout(props) {
           </button>
         </div>
 
+        {!canDone && (
+          <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
+            {miniSets > 0 ? 'Preencha Ativação e Minis para concluir.' : 'Preencha Ativação para concluir.'}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
             <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Ativação</div>
@@ -717,6 +759,9 @@ export default function ActiveWorkout(props) {
                 const v = parseTrainingNumber(e?.target?.value);
                 const nextActivation = v != null && v > 0 ? v : null;
                 updateRp({ activation_reps: nextActivation });
+                if ((activation ?? 0) <= 0 && (nextActivation ?? 0) > 0 && miniSets > 0 && (minis?.[0] == null || minis?.[0] <= 0)) {
+                  maybeStartMicroRest(0, 'activation');
+                }
               }}
               onBlur={() => {
                 if ((activation ?? 0) > 0 && miniSets > 0 && (minis?.[0] == null || minis?.[0] <= 0)) {
@@ -746,6 +791,14 @@ export default function ActiveWorkout(props) {
                     const nextMiniReps = [...minis];
                     nextMiniReps[idx] = next;
                     updateRp({ mini_reps: nextMiniReps });
+                    if (
+                      idx < miniSets - 1
+                      && (current ?? 0) <= 0
+                      && (next ?? 0) > 0
+                      && (minis?.[idx + 1] == null || (minis?.[idx + 1] ?? 0) <= 0)
+                    ) {
+                      maybeStartMicroRest(idx + 1, 'mini');
+                    }
                   }}
                   onBlur={() => {
                     if (idx < miniSets - 1) {
@@ -763,16 +816,18 @@ export default function ActiveWorkout(props) {
             );
           })}
         </div>
-        <textarea
-          value={notesValue}
-          onChange={(e) => {
-            const v = e?.target?.value ?? '';
-            updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-          }}
-          placeholder="Observações da série"
-          rows={2}
-          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
+        {isNotesOpen && (
+          <textarea
+            value={notesValue}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+            }}
+            placeholder="Observações da série"
+            rows={2}
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+        )}
       </div>
     );
   };
@@ -832,6 +887,17 @@ export default function ActiveWorkout(props) {
 
     const notation = plannedBlocks.length ? plannedBlocks.join('+') : '';
     const notesValue = String(log?.notes ?? '');
+    const hasNotes = notesValue.trim().length > 0;
+    const isNotesOpen = openNotesKeys.has(key);
+
+    const toggleNotes = () => {
+      setOpenNotesKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    };
 
     return (
       <div key={key} className="space-y-2">
@@ -853,6 +919,17 @@ export default function ActiveWorkout(props) {
               {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
             </span>
           </div>
+          <button
+            type="button"
+            onClick={toggleNotes}
+            className={
+              isNotesOpen || hasNotes
+                ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+            }
+          >
+            <MessageSquare size={14} />
+          </button>
           <button
             type="button"
             disabled={!canDone}
@@ -883,6 +960,12 @@ export default function ActiveWorkout(props) {
           </button>
         </div>
 
+        {!canDone && plannedBlocks.length > 0 && (
+          <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
+            Preencha todos os blocos para concluir.
+          </div>
+        )}
+
         {plannedBlocks.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {plannedBlocks.map((planned, idx) => {
@@ -906,6 +989,9 @@ export default function ActiveWorkout(props) {
                       const nextBlocks = [...blocks];
                       nextBlocks[idx] = next;
                       updateCluster({ blocks: nextBlocks });
+                      if (idx < plannedBlocks.length - 1 && (current ?? 0) <= 0 && (next ?? 0) > 0 && ((blocks?.[idx + 1] ?? 0) <= 0)) {
+                        maybeStartIntraRest(idx);
+                      }
                     }}
                     onBlur={() => {
                       const cur = blocks?.[idx] ?? null;
@@ -922,16 +1008,18 @@ export default function ActiveWorkout(props) {
             })}
           </div>
         )}
-        <textarea
-          value={notesValue}
-          onChange={(e) => {
-            const v = e?.target?.value ?? '';
-            updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-          }}
-          placeholder="Observações da série"
-          rows={2}
-          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
+        {isNotesOpen && (
+          <textarea
+            value={notesValue}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { notes: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+            }}
+            placeholder="Observações da série"
+            rows={2}
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+        )}
       </div>
     );
   };
@@ -958,9 +1046,17 @@ export default function ActiveWorkout(props) {
 
     return (
       <div key={`ex-${exIdx}`} className="rounded-xl bg-neutral-800 border border-neutral-700 p-4">
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={!collapsedNow}
           onClick={() => toggleCollapse(exIdx)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleCollapse(exIdx);
+            }
+          }}
           className="w-full flex items-start justify-between gap-3"
         >
           <div className="min-w-0 text-left">
@@ -1004,7 +1100,7 @@ export default function ActiveWorkout(props) {
             ) : null}
             {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
           </div>
-        </button>
+        </div>
 
         {!collapsedNow && (
           <div className="mt-4 space-y-2">
