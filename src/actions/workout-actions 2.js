@@ -9,7 +9,6 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveRoleByUser } from '@/utils/auth/route'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
-import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf } from '@/lib/social/notifyFollowers'
 
 const SETS_INSERT_CHUNK_SIZE = 200;
 
@@ -1214,32 +1213,6 @@ export async function createWorkout(data) {
         sync = { error: e?.message ?? String(e) };
     }
 
-    try {
-        const { data: me } = await createAdminClient()
-            .from('profiles')
-            .select('display_name')
-            .eq('id', user.id)
-            .maybeSingle()
-        const name = String(me?.display_name || '').trim() || 'Seu amigo'
-        const followerIds = await listFollowerIdsOf(user.id)
-        const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendWorkoutEvents')
-        if (recipients.length) {
-            await insertNotifications(
-                recipients.map((rid) => ({
-                    user_id: rid,
-                    recipient_id: rid,
-                    sender_id: user.id,
-                    type: 'workout_create',
-                    title: 'Treino criado',
-                    message: `${name} adicionou um treino: ${String(workout?.name || 'Treino')}.`,
-                    read: false,
-                    is_read: false,
-                    metadata: { workout_id: workoutId, workout_title: String(workout?.name || ''), sender_id: user.id },
-                }))
-            )
-        }
-    } catch {}
-
     revalidatePath('/');
     return { ...workout, sync };
 }
@@ -1336,32 +1309,6 @@ export async function updateWorkout(id, data) {
     } catch (e) {
         sync = { error: e?.message ?? String(e) };
     }
-
-    try {
-        const { data: me } = await createAdminClient()
-            .from('profiles')
-            .select('display_name')
-            .eq('id', user.id)
-            .maybeSingle()
-        const name = String(me?.display_name || '').trim() || 'Seu amigo'
-        const followerIds = await listFollowerIdsOf(user.id)
-        const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendWorkoutEvents')
-        if (recipients.length) {
-            await insertNotifications(
-                recipients.map((rid) => ({
-                    user_id: rid,
-                    recipient_id: rid,
-                    sender_id: user.id,
-                    type: 'workout_edit',
-                    title: 'Treino editado',
-                    message: `${name} editou um treino.`,
-                    read: false,
-                    is_read: false,
-                    metadata: { workout_id: workoutId, sender_id: user.id },
-                }))
-            )
-        }
-    } catch {}
 
     revalidatePath('/');
     return { success: true, sync };

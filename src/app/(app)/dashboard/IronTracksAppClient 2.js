@@ -187,22 +187,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const isFetching = useRef(false);
 
     const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open';
-
-    useEffect(() => {
-        const uid = user?.id ? String(user.id) : '';
-        if (!uid) return;
-        const key = `irontracks.socialPresencePing.v1.${uid}`;
-        try {
-            if (typeof window !== 'undefined') {
-                const seen = window.sessionStorage.getItem(key) || '';
-                if (seen === '1') return;
-                window.sessionStorage.setItem(key, '1');
-            }
-        } catch {}
-        try {
-            fetch('/api/social/presence/ping', { method: 'POST' }).catch(() => {});
-        } catch {}
-    }, [user?.id]);
     const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
 
     const setUrlTabParam = useCallback((nextTab) => {
@@ -892,8 +876,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
     useEffect(() => {
         if (!user?.id) return;
-        const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
-        const allowNotifyDm = s ? s.notifyDirectMessages !== false : true
 
         const channel = supabase
             .channel(`direct-messages-badge:${user.id}`)
@@ -903,7 +885,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 table: 'direct_messages'
             }, async (payload) => {
                 try {
-                    if (!allowNotifyDm) return;
                     const msg = payload.new;
                     if (!msg || msg.sender_id === user.id) return;
 
@@ -940,7 +921,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, user?.id, userSettingsApi?.settings, view]);
+    }, [supabase, user?.id, view]);
 
     useEffect(() => {
         const meta = initialUser?.user_metadata || {}
@@ -1291,36 +1272,16 @@ function IronTracksApp({ initialUser, initialProfile }) {
             resolvedExercises = Array.isArray(resolved?.exercises) ? resolved.exercises : exercisesList;
             persistExerciseVideoUrls(resolved?.updates || []);
         } catch {}
-        {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
-            const enabled = s ? s.enableSounds !== false : true
-            const volumeRaw = Number(s?.soundVolume ?? 100)
-            const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1
-            playStartSound({ enabled, volume })
-        }
+        playStartSound();
         setActiveSession({
             workout: { ...workout, exercises: resolvedExercises },
             logs: {},
             startedAt: Date.now(),
-            timerTargetTime: null,
-            timerContext: null
+            timerTargetTime: null
         });
         setView('active');
-        try {
-            const wid = String(workout?.id || '').trim() || null;
-            const title = String(workout?.title || workout?.name || 'Treino').trim();
-            fetch('/api/social/workout-start', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ workout_id: wid, workout_title: title }),
-            }).catch(() => {});
-        } catch {}
-        {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
-            const allowPrompt = s ? s.notificationPermissionPrompt !== false : true
-            if (allowPrompt && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             Notification.requestPermission().catch(e => console.warn('Erro permissão notificação:', e));
-            }
         }
     };
 
@@ -1335,13 +1296,12 @@ function IronTracksApp({ initialUser, initialProfile }) {
         });
     };
 
-    const handleStartTimer = (duration, context) => {
+    const handleStartTimer = (duration) => {
         setActiveSession((prev) => {
             if (!prev) return prev;
             return {
                 ...prev,
-                timerTargetTime: Date.now() + (duration * 1000),
-                timerContext: context && typeof context === 'object' ? context : null
+                timerTargetTime: Date.now() + (duration * 1000)
             };
         });
     };
@@ -1349,7 +1309,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const handleCloseTimer = () => {
         setActiveSession((prev) => {
             if (!prev) return prev;
-            return { ...prev, timerTargetTime: null, timerContext: null };
+            return { ...prev, timerTargetTime: null };
         });
     };
 
@@ -1573,12 +1533,8 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
     // JSON IMPORT HANDLER
     const handleJsonUpload = (e) => {
-        const input = e?.target;
-        const file = input?.files?.[0];
+        const file = e.target.files[0];
         if (!file) return;
-        try {
-            setShowJsonImportModal(false);
-        } catch {}
 
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -1588,13 +1544,10 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     await importData(json);
                     await fetchWorkouts();
                     await alert("Dados importados com sucesso!", "Sucesso");
+                    setShowJsonImportModal(false);
                 }
 		} catch (err) {
 			await alert("Erro ao ler arquivo JSON: " + (err?.message ?? String(err)));
-		} finally {
-            try {
-                if (input) input.value = '';
-            } catch {}
 		}
 	};
         reader.readAsText(file);
@@ -1615,7 +1568,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
     return (
-        <TeamWorkoutProvider user={user} settings={userSettingsApi?.settings ?? null}>
+        <TeamWorkoutProvider user={user}>
             <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
                 <IncomingInviteModal onStartSession={handleStartSession} />
                 <InviteAcceptedModal />
@@ -1673,7 +1626,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                                     setHasUnreadNotification(false);
                                 }}
                                 onOpenSchedule={() => router.push('/dashboard/schedule')}
-                                onOpenCommunity={() => router.push('/community')}
                                 onOpenSettings={() => setSettingsOpen(true)}
                                 onLogout={handleLogout}
                             />
@@ -1687,7 +1639,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     </div>
                 )}
 
-                {user && <RealtimeNotificationBridge userId={user.id} setNotification={setNotification} />}
+                {user && <RealtimeNotificationBridge setNotification={setNotification} />}
 
                 {/* Main Content */}
                 <div
@@ -1743,7 +1695,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                         <ActiveWorkout
                             session={activeSession}
                             user={user}
-                            settings={userSettingsApi?.settings ?? null}
                             onUpdateLog={handleUpdateSessionLog}
                             onFinish={handleFinishSession}
                             onBack={() => setView('dashboard')}
@@ -1780,11 +1731,13 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     )}
 
                     {view === 'history' && (
-                        <HistoryList
-                            user={user}
-                            onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }}
-                            onBack={() => setView('dashboard')}
-                        />
+                        <div className="p-4 pb-24">
+                            <HistoryList
+                                user={user}
+                                onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }}
+                                onBack={() => setView('dashboard')}
+                            />
+                        </div>
                     )}
 
                     {/* Evolução removida conforme solicitação */}
@@ -2030,8 +1983,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 {activeSession?.timerTargetTime && (
                     <RestTimerOverlay
                         targetTime={activeSession.timerTargetTime}
-                        context={activeSession.timerContext}
-                        settings={userSettingsApi?.settings ?? null}
                         onClose={handleCloseTimer}
                         onFinish={handleCloseTimer}
                     />
@@ -2039,21 +1990,9 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
                 {notification && (
                     <NotificationToast
-                        settings={userSettingsApi?.settings ?? null}
-                        notification={notification}
-                        onClick={() => {
-                            try {
-                                const t = String(notification?.type || '').toLowerCase();
-                                if (t === 'message') {
-                                    setView('chat');
-                                } else {
-                                    setShowNotifCenter(true);
-                                }
-                            } catch {
-                                setShowNotifCenter(true);
-                            }
-                            setNotification(null);
-                        }}
+                        message={notification.text}
+                        sender={notification.senderName}
+                        onClick={() => { setView('chat'); setNotification(null); }}
                         onClose={() => setNotification(null)}
                     />
                 )}

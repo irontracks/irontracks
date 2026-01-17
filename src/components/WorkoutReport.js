@@ -22,6 +22,48 @@ const parseSessionNotes = (notes) => {
     }
 };
 
+const normalizeExerciseKey = (v) => {
+    try {
+        return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    } catch {
+        return '';
+    }
+};
+
+const extractExerciseLogsByIndex = (sessionObj, exIdx) => {
+    try {
+        const base = sessionObj && typeof sessionObj === 'object' ? sessionObj : null;
+        const logs = base?.logs && typeof base.logs === 'object' ? base.logs : {};
+        const out = [];
+        Object.keys(logs).forEach((key) => {
+            const parts = String(key || '').split('-');
+            const eIdx = Number(parts[0]);
+            const sIdx = Number(parts[1]);
+            if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx)) return;
+            if (eIdx !== exIdx) return;
+            out[sIdx] = logs[key];
+        });
+        return out;
+    } catch {
+        return [];
+    }
+};
+
+const hasAnyComparableLog = (logsArr) => {
+    try {
+        const arr = Array.isArray(logsArr) ? logsArr : [];
+        for (const l of arr) {
+            if (!l || typeof l !== 'object') continue;
+            const w = Number(String(l?.weight ?? '').replace(',', '.'));
+            const r = Number(String(l?.reps ?? '').replace(',', '.'));
+            if ((Number.isFinite(w) && w > 0) || (Number.isFinite(r) && r > 0)) return true;
+        }
+        return false;
+    } catch {
+        return false;
+    }
+};
+
 const toDateMs = (v) => {
     try {
         if (!v) return null;
@@ -67,6 +109,8 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const supabase = useMemo(() => createClient(), []);
     const previousFetchInFlightRef = useRef(false);
     const [resolvedPreviousSession, setResolvedPreviousSession] = useState(null);
+    const prevByExerciseFetchInFlightRef = useRef(false);
+    const [prevByExercise, setPrevByExercise] = useState({ logsByExercise: {}, baseMsByExercise: {} });
     const [aiState, setAiState] = useState(() => {
         const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
         return { status: existing ? 'ready' : 'idle', ai: existing, saved: false, error: '' };
@@ -166,6 +210,89 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         resolvePreviousFromHistory().catch(() => {});
     }, [resolvePreviousFromHistory]);
 
+    const resolvePrevByExerciseFromHistory = useCallback(async () => {
+        try {
+            if (!user?.id) return;
+            if (!session || typeof session !== 'object') return;
+            if (prevByExerciseFetchInFlightRef.current) return;
+
+            const exercisesArr = Array.isArray(session?.exercises) ? session.exercises : [];
+            if (!exercisesArr.length) return;
+
+            const wanted = new Map();
+            exercisesArr.forEach((ex) => {
+                const name = String(ex?.name || '').trim();
+                if (!name) return;
+                const key = normalizeExerciseKey(name);
+                if (!key) return;
+                if (!wanted.has(key)) wanted.set(key, name);
+            });
+            if (!wanted.size) return;
+
+            const currentMs =
+                toDateMs(session?.date) ?? toDateMs(session?.completed_at) ?? toDateMs(session?.completedAt) ?? Date.now();
+
+            prevByExerciseFetchInFlightRef.current = true;
+
+            let query = supabase
+                .from('workouts')
+                .select('id, date, created_at, notes')
+                .eq('user_id', user.id)
+                .eq('is_template', false)
+                .order('date', { ascending: false })
+                .limit(350);
+
+            const currentId = typeof session?.id === 'string' && session.id ? session.id : null;
+            if (currentId) query = query.neq('id', currentId);
+
+            const { data: rows, error } = await query;
+            if (error) throw error;
+
+            const candidates = Array.isArray(rows) ? rows : [];
+            const resolvedLogs = {};
+            const resolvedBaseMs = {};
+            const remaining = new Set(Array.from(wanted.keys()));
+
+            for (const r of candidates) {
+                if (!remaining.size) break;
+                if (!r || typeof r !== 'object') continue;
+                const parsed = parseSessionNotes(r.notes);
+                if (!parsed || typeof parsed !== 'object') continue;
+
+                const candidateMs = toDateMs(parsed?.date) ?? toDateMs(r?.date) ?? toDateMs(r?.created_at) ?? null;
+                if (!Number.isFinite(candidateMs)) continue;
+                if (Number.isFinite(currentMs) && candidateMs >= currentMs) continue;
+
+                const exArr = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
+                if (!exArr.length) continue;
+
+                exArr.forEach((ex, exIdx) => {
+                    if (!remaining.size) return;
+                    const name = String(ex?.name || '').trim();
+                    if (!name) return;
+                    const key = normalizeExerciseKey(name);
+                    if (!key) return;
+                    if (!remaining.has(key)) return;
+                    const logs = extractExerciseLogsByIndex(parsed, exIdx);
+                    if (!hasAnyComparableLog(logs)) return;
+                    resolvedLogs[key] = logs;
+                    resolvedBaseMs[key] = candidateMs;
+                    remaining.delete(key);
+                });
+            }
+
+            setPrevByExercise({ logsByExercise: resolvedLogs, baseMsByExercise: resolvedBaseMs });
+        } catch {
+            setPrevByExercise({ logsByExercise: {}, baseMsByExercise: {} });
+        } finally {
+            prevByExerciseFetchInFlightRef.current = false;
+        }
+    }, [session, supabase, user?.id]);
+
+    useEffect(() => {
+        resolvePrevByExerciseFromHistory().catch(() => {});
+    }, [resolvePrevByExerciseFromHistory]);
+
     const [kcalEstimate, setKcalEstimate] = useState(0);
 
     useEffect(() => {
@@ -250,28 +377,50 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         return `${v.toFixed(1)} km/h`;
     };
 
-    const prevLogsMap = {};
-    if (effectivePreviousSession && Array.isArray(effectivePreviousSession?.exercises)) {
-        const safePrevLogs = prevSessionLogs;
-        effectivePreviousSession.exercises.forEach((ex, exIdx) => {
-            if (!ex || typeof ex !== 'object') return;
-            const exName = String(ex?.name || '').trim();
-            if (!exName) return;
-            const exLogs = [];
-            Object.keys(safePrevLogs).forEach((key) => {
-                try {
-                    const parts = String(key || '').split('-');
-                    const eIdx = Number(parts[0]);
-                    if (!Number.isFinite(eIdx)) return;
-                    if (eIdx !== exIdx) return;
-                    exLogs.push(safePrevLogs[key]);
-                } catch {
-                    return;
-                }
+    const prevLogsMap = (() => {
+        try {
+            const fromPerExercise = prevByExercise?.logsByExercise && typeof prevByExercise.logsByExercise === 'object'
+                ? prevByExercise.logsByExercise
+                : null;
+            if (fromPerExercise && Object.keys(fromPerExercise).length) return fromPerExercise;
+        } catch {}
+
+        const out = {};
+        if (effectivePreviousSession && Array.isArray(effectivePreviousSession?.exercises)) {
+            const safePrevLogs = prevSessionLogs;
+            effectivePreviousSession.exercises.forEach((ex, exIdx) => {
+                if (!ex || typeof ex !== 'object') return;
+                const exName = String(ex?.name || '').trim();
+                const keyName = normalizeExerciseKey(exName);
+                if (!keyName) return;
+                const exLogs = [];
+                Object.keys(safePrevLogs).forEach((key) => {
+                    try {
+                        const parts = String(key || '').split('-');
+                        const eIdx = Number(parts[0]);
+                        const sIdx = Number(parts[1]);
+                        if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx)) return;
+                        if (eIdx !== exIdx) return;
+                        exLogs[sIdx] = safePrevLogs[key];
+                    } catch {
+                        return;
+                    }
+                });
+                out[keyName] = exLogs;
             });
-            prevLogsMap[exName] = exLogs;
-        });
-    }
+        }
+        return out;
+    })();
+
+    const prevBaseMsMap = (() => {
+        try {
+            const m = prevByExercise?.baseMsByExercise && typeof prevByExercise.baseMsByExercise === 'object'
+                ? prevByExercise.baseMsByExercise
+                : null;
+            if (m && Object.keys(m).length) return m;
+        } catch {}
+        return {};
+    })();
 
     const handleApplyProgression = async () => {
         if (!session) return;
@@ -300,7 +449,10 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         try {
             setIsGenerating(true);
             const prev = effectivePreviousSession ?? (await resolvePreviousFromHistory());
-            const html = buildReportHTML(session, prev, user?.displayName || user?.email || '', calories);
+            const html = buildReportHTML(session, prev, user?.displayName || user?.email || '', calories, {
+                prevLogsByExercise: prevLogsMap,
+                prevBaseMsByExercise: prevBaseMsMap,
+            });
             const blob = new Blob([html], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             setPdfBlob(blob);
@@ -810,7 +962,19 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 )}
                 {(Array.isArray(session?.exercises) ? session.exercises : []).map((ex, exIdx) => {
                     const exName = String(ex?.name || '').trim();
-                    const prevLogs = prevLogsMap[exName] || [];
+                    const exKey = normalizeExerciseKey(exName);
+                    const prevLogs = prevLogsMap[exKey] || [];
+                    const baseMs = prevBaseMsMap[exKey] ?? null;
+                    const baseText = (() => {
+                        try {
+                            if (!Number.isFinite(Number(baseMs))) return '';
+                            const d = new Date(Number(baseMs));
+                            if (Number.isNaN(d.getTime())) return '';
+                            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                        } catch {
+                            return '';
+                        }
+                    })();
                     return (
                         <div key={exIdx} className="break-inside-avoid">
                             <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-200 pb-2">
@@ -819,6 +983,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                     {exName || '—'}
                                 </h3>
                                 <div className="flex gap-3 text-xs font-mono text-neutral-500">
+                                    {baseText && <span>Base: <span className="font-bold text-black">{baseText}</span></span>}
                                     {ex?.method && ex.method !== 'Normal' && <span className="text-red-600 font-bold uppercase">{ex.method}</span>}
                                     {ex?.rpe && <span>RPE: <span className="font-bold text-black">{ex.rpe}</span></span>}
                                     <span>Cad: <span className="font-bold text-black">{ex?.cadence || '-'}</span></span>
@@ -845,24 +1010,43 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                             let progressionText = "-";
                                             let rowClass = "";
 
-                                            if (prevLog && prevLog.weight) {
-                                                const delta = parseFloat(log.weight) - parseFloat(prevLog.weight);
-                                                if (delta > 0) {
-                                                    progressionText = `+${delta}kg`;
-                                                    rowClass = "bg-green-50 text-green-900 font-bold";
-                                                } else if (delta < 0) {
-                                                    progressionText = `${delta}kg`;
-                                                    rowClass = "text-red-600 font-bold";
-                                                } else {
-                                                    progressionText = "=";
+                                            if (prevLog && typeof prevLog === 'object') {
+                                                const cw = Number(String(log?.weight ?? '').replace(',', '.'));
+                                                const pw = Number(String(prevLog?.weight ?? '').replace(',', '.'));
+                                                const cr = Number(String(log?.reps ?? '').replace(',', '.'));
+                                                const pr = Number(String(prevLog?.reps ?? '').replace(',', '.'));
+                                                const canWeight = Number.isFinite(cw) && cw > 0 && Number.isFinite(pw) && pw > 0;
+                                                const canReps = Number.isFinite(cr) && cr > 0 && Number.isFinite(pr) && pr > 0;
+                                                if (canWeight) {
+                                                    const delta = cw - pw;
+                                                    if (delta > 0) {
+                                                        progressionText = `+${String(delta).replace(/\\.0+$/, '')}kg`;
+                                                        rowClass = "bg-green-50 text-green-900 font-bold";
+                                                    } else if (delta < 0) {
+                                                        progressionText = `${String(delta).replace(/\\.0+$/, '')}kg`;
+                                                        rowClass = "text-red-600 font-bold";
+                                                    } else {
+                                                        progressionText = "=";
+                                                    }
+                                                } else if (canReps) {
+                                                    const delta = cr - pr;
+                                                    if (delta > 0) {
+                                                        progressionText = `+${delta} reps`;
+                                                        rowClass = "bg-green-50 text-green-900 font-bold";
+                                                    } else if (delta < 0) {
+                                                        progressionText = `${delta} reps`;
+                                                        rowClass = "text-red-600 font-bold";
+                                                    } else {
+                                                        progressionText = "=";
+                                                    }
                                                 }
                                             }
 
                                             return (
                                                 <tr key={sIdx} className="border-b border-neutral-100">
                                                     <td className="py-2 font-mono text-neutral-500 text-xs">#{sIdx + 1}</td>
-                                                    <td className="py-2 text-center font-semibold text-sm">{log.weight}</td>
-                                                    <td className="py-2 text-center font-mono text-sm">{log.reps}</td>
+                                                    <td className="py-2 text-center font-semibold text-sm">{log.weight || '-'}</td>
+                                                    <td className="py-2 text-center font-mono text-sm">{log.reps || '-'}</td>
                                                     <td className={`py-2 text-center text-[11px] uppercase ${rowClass}`}>{progressionText}</td>
                                                 </tr>
                                             );

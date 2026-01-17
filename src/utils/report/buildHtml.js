@@ -1,8 +1,22 @@
-export function buildReportHTML(session, previousSession, studentName = '', kcalOverride = null) {
+export function buildReportHTML(session, previousSession, studentName = '', kcalOverride = null, options = null) {
+  const opts = options && typeof options === 'object' ? options : {}
+  const prevLogsByExercise = opts?.prevLogsByExercise && typeof opts.prevLogsByExercise === 'object' ? opts.prevLogsByExercise : null
+  const prevBaseMsByExercise =
+    opts?.prevBaseMsByExercise && typeof opts.prevBaseMsByExercise === 'object' ? opts.prevBaseMsByExercise : null
+
   const formatDate = (ts) => {
     if (!ts) return ''
     const d = ts.toDate ? ts.toDate() : new Date(ts)
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+  }
+  const formatShortDate = (ts) => {
+    try {
+      if (!ts) return ''
+      const d = ts.toDate ? ts.toDate() : new Date(ts)
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    } catch {
+      return ''
+    }
   }
   const formatDuration = (s) => {
     const mins = Math.floor(s / 60)
@@ -75,21 +89,47 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
     `
   })()
 
+  const normalizeExerciseKey = (v) => {
+    try {
+      return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ')
+    } catch {
+      return ''
+    }
+  }
+
   const prevLogsMap = {}
-  const safePrevLogs = previousSession?.logs && typeof previousSession.logs === 'object' ? previousSession.logs : {}
-  if (previousSession && Array.isArray(previousSession?.exercises)) {
-    previousSession.exercises.forEach((ex, exIdx) => {
-      if (!ex || typeof ex !== 'object') return
-      const exName = String(ex?.name || '').trim()
-      if (!exName) return
-      const exLogs = []
-      Object.keys(safePrevLogs).forEach(key => {
-        const parts = String(key || '').split('-')
-        const eIdx = parseInt(parts[0] || '0', 10)
-        if (eIdx === exIdx) exLogs.push(safePrevLogs[key])
-      })
-      prevLogsMap[exName] = exLogs
+  const prevBaseMap = {}
+  if (prevLogsByExercise) {
+    Object.keys(prevLogsByExercise).forEach((k) => {
+      const key = normalizeExerciseKey(k)
+      if (!key) return
+      const logs = prevLogsByExercise[k]
+      if (!Array.isArray(logs)) return
+      prevLogsMap[key] = logs
+      if (prevBaseMsByExercise && prevBaseMsByExercise[k] != null) {
+        prevBaseMap[key] = prevBaseMsByExercise[k]
+      }
     })
+  } else {
+    const safePrevLogs = previousSession?.logs && typeof previousSession.logs === 'object' ? previousSession.logs : {}
+    if (previousSession && Array.isArray(previousSession?.exercises)) {
+      previousSession.exercises.forEach((ex, exIdx) => {
+        if (!ex || typeof ex !== 'object') return
+        const exName = String(ex?.name || '').trim()
+        const key = normalizeExerciseKey(exName)
+        if (!key) return
+        const exLogs = []
+        Object.keys(safePrevLogs).forEach((k) => {
+          const parts = String(k || '').split('-')
+          const eIdx = parseInt(parts[0] || '0', 10)
+          const sIdx = parseInt(parts[1] || '0', 10)
+          if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx)) return
+          if (eIdx !== exIdx) return
+          exLogs[sIdx] = safePrevLogs[k]
+        })
+        prevLogsMap[key] = exLogs
+      })
+    }
   }
 
   const getSetTag = (log) => {
@@ -109,18 +149,23 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
 
   const hasProgressionForExercise = (ex, exIdx) => {
     const sets = parseInt(ex?.sets || 0, 10)
-    const prevLogs = prevLogsMap[ex?.name] || []
+    const key = normalizeExerciseKey(ex?.name)
+    const prevLogs = prevLogsMap[key] || []
     if (!sets || !Array.isArray(prevLogs) || prevLogs.length === 0) return false
     for (let sIdx = 0; sIdx < sets; sIdx++) {
       const prevLog = prevLogs[sIdx]
-      if (prevLog && prevLog.weight) return true
+      if (!prevLog || typeof prevLog !== 'object') continue
+      const w = Number(String(prevLog.weight ?? '').replace(',', '.'))
+      const r = Number(String(prevLog.reps ?? '').replace(',', '.'))
+      if ((Number.isFinite(w) && w > 0) || (Number.isFinite(r) && r > 0)) return true
     }
     return false
   }
 
   const rowsHtml = (ex, exIdx, showProgression) => {
     const sets = parseInt(ex?.sets || 0, 10)
-    const prevLogs = prevLogsMap[ex?.name] || []
+    const exKey = normalizeExerciseKey(ex?.name)
+    const prevLogs = prevLogsMap[exKey] || []
     let rows = ''
     for (let sIdx = 0; sIdx < sets; sIdx++) {
       const key = `${exIdx}-${sIdx}`
@@ -131,11 +176,32 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
       if (!log.weight && !log.reps) continue
       let progressionText = '-'
       let progressionClass = ''
-      if (prevLog && prevLog.weight) {
-        const delta = parseFloat(log.weight) - parseFloat(prevLog.weight)
-        if (delta > 0) { progressionText = `+${delta}kg`; progressionClass = 'color: #065f46; font-weight: 700; background: #ecfdf5' }
-        else if (delta < 0) { progressionText = `${delta}kg`; progressionClass = 'color: #dc2626; font-weight: 700' }
-        else progressionText = '='
+      if (showProgression && prevLog && typeof prevLog === 'object') {
+        const cw = Number(String(log.weight ?? '').replace(',', '.'))
+        const pw = Number(String(prevLog.weight ?? '').replace(',', '.'))
+        const cr = Number(String(log.reps ?? '').replace(',', '.'))
+        const pr = Number(String(prevLog.reps ?? '').replace(',', '.'))
+        const canWeight = Number.isFinite(cw) && cw > 0 && Number.isFinite(pw) && pw > 0
+        const canReps = Number.isFinite(cr) && cr > 0 && Number.isFinite(pr) && pr > 0
+        if (canWeight) {
+          const delta = cw - pw
+          const fmt = (n) => (Number.isFinite(n) ? String(n).replace(/\.0+$/, '') : String(n))
+          if (delta > 0) { progressionText = `+${fmt(delta)}kg`; progressionClass = 'color: #065f46; font-weight: 700; background: #ecfdf5' }
+          else if (delta < 0) { progressionText = `${fmt(delta)}kg`; progressionClass = 'color: #dc2626; font-weight: 700' }
+          else progressionText = '='
+        } else if (canReps) {
+          const delta = cr - pr
+          if (delta > 0) { progressionText = `+${delta} reps`; progressionClass = 'color: #065f46; font-weight: 700; background: #ecfdf5' }
+          else if (delta < 0) { progressionText = `${delta} reps`; progressionClass = 'color: #dc2626; font-weight: 700' }
+          else progressionText = '='
+        } else if (Number.isFinite(cw) && cw > 0 && Number.isFinite(cr) && cr > 0 && Number.isFinite(pw) && pw > 0 && Number.isFinite(pr) && pr > 0) {
+          const curVol = cw * cr
+          const prevVol = pw * pr
+          const delta = curVol - prevVol
+          if (delta > 0) { progressionText = `+${Math.round(delta)}kg`; progressionClass = 'color: #065f46; font-weight: 700; background: #ecfdf5' }
+          else if (delta < 0) { progressionText = `${Math.round(delta)}kg`; progressionClass = 'color: #dc2626; font-weight: 700' }
+          else progressionText = '='
+        }
       }
       const tag = getSetTag(log)
       const tagHtml = tag ? `<span style="margin-left:4px; font-size:10px; color:#374151">(${tag})</span>` : ''
@@ -164,6 +230,9 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
 
   const exercisesHtml = exercisesArray.map((ex, exIdx) => {
     const showProgression = hasProgressionForExercise(ex, exIdx)
+    const exKey = normalizeExerciseKey(ex?.name)
+    const baseMs = prevBaseMap[exKey]
+    const baseText = baseMs ? `Base: ${formatShortDate(baseMs)}` : ''
     return `
     <div style="page-break-inside: avoid; margin-bottom:24px">
       <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px; border-bottom:2px solid #e5e7eb; padding-bottom:8px">
@@ -172,6 +241,7 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
           ${ex?.name || ''}
         </h3>
         <div style="display:flex; gap:12px; font-size:12px; font-family: ui-monospace; color:#6b7280">
+          ${baseText ? `<span>${baseText}</span>` : ''}
           ${ex && ex.method && ex.method !== 'Normal' ? `<span style="color:#dc2626; font-weight:700; text-transform:uppercase">${ex.method}</span>` : ''}
           ${ex && ex.rpe ? `<span>RPE: <span style="font-weight:700; color:#000">${ex.rpe}</span></span>` : ''}
         </div>
