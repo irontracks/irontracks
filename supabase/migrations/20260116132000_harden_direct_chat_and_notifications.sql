@@ -87,6 +87,7 @@ ALTER TABLE public.direct_messages ENABLE ROW LEVEL SECURITY;
 
 -- direct_channels
 DROP POLICY IF EXISTS "Users can view their own channels" ON public.direct_channels;
+DROP POLICY IF EXISTS direct_channels_select_participants ON public.direct_channels;
 CREATE POLICY direct_channels_select_participants
 ON public.direct_channels
 FOR SELECT
@@ -94,6 +95,7 @@ TO authenticated
 USING (auth.uid() = user1_id OR auth.uid() = user2_id);
 
 DROP POLICY IF EXISTS "Users can create channels" ON public.direct_channels;
+DROP POLICY IF EXISTS direct_channels_insert_participants ON public.direct_channels;
 CREATE POLICY direct_channels_insert_participants
 ON public.direct_channels
 FOR INSERT
@@ -106,6 +108,7 @@ WITH CHECK (
 
 -- direct_messages
 DROP POLICY IF EXISTS "Users can view messages from their channels" ON public.direct_messages;
+DROP POLICY IF EXISTS direct_messages_select_participants ON public.direct_messages;
 CREATE POLICY direct_messages_select_participants
 ON public.direct_messages
 FOR SELECT
@@ -120,6 +123,7 @@ USING (
 );
 
 DROP POLICY IF EXISTS "Users can send messages to their channels" ON public.direct_messages;
+DROP POLICY IF EXISTS direct_messages_insert_participants ON public.direct_messages;
 CREATE POLICY direct_messages_insert_participants
 ON public.direct_messages
 FOR INSERT
