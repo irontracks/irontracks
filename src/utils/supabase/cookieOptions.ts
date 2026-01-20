@@ -18,11 +18,19 @@ export function getSupabaseCookieOptions(): CookieOptions {
   const isIronTracksDomain = host === 'irontracks.com.br' || host.endsWith('.irontracks.com.br')
 
   const cookieDomain = forcedDomain ? forcedDomain : isProd && isIronTracksDomain ? '.irontracks.com.br' : undefined
+  const oneYearSeconds = 60 * 60 * 24 * 365
+  const oneYearFromNow = new Date(Date.now() + oneYearSeconds * 1000)
 
   return {
     domain: cookieDomain,
     path: '/',
     sameSite: 'lax',
     secure: isProd,
+    ...(isProd
+      ? {
+          expires: oneYearFromNow,
+          maxAge: oneYearSeconds,
+        }
+      : {}),
   }
 }
