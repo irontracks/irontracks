@@ -42,8 +42,9 @@ import ExerciseEditor from '@/components/ExerciseEditor';
 import IncomingInviteModal from '@/components/IncomingInviteModal';
 import InviteAcceptedModal from '@/components/InviteAcceptedModal';
 import NotificationCenter from '@/components/NotificationCenter';
-import HeaderActionsMenu from '@/components/HeaderActionsMenu.js';
+import HeaderActionsMenu from '@/components/HeaderActionsMenu';
 import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge';
+import FollowRequestModalGate from '@/components/FollowRequestModalGate'
 import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { DialogProvider, useDialog } from '@/contexts/DialogContext';
@@ -943,45 +944,16 @@ function IronTracksApp({ initialUser, initialProfile }) {
     }, [supabase, user?.id, userSettingsApi?.settings, view]);
 
     useEffect(() => {
-        const baseUser = initialUser && typeof initialUser === 'object' ? initialUser : null
-        if (!baseUser?.id) {
-            try {
-                if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
-            } catch {}
-            return
-        }
-        const meta = baseUser?.user_metadata || {}
-        const emailRaw = String(baseUser?.email || '').trim()
+        const meta = initialUser?.user_metadata || {}
+        const emailRaw = String(initialUser?.email || '').trim()
         const emailUser = emailRaw.includes('@') ? emailRaw.split('@')[0] : (emailRaw || 'Usuário')
         const displayName = meta?.full_name || meta?.name || emailUser
         const photoURL = meta?.avatar_url || meta?.picture || null
-        const nextUser = { ...baseUser, displayName, photoURL, role: initialProfile?.role || 'student' }
+        const nextUser = { ...initialUser, displayName, photoURL, role: initialProfile?.role || 'student' }
         setUser(nextUser)
         const role = String(initialProfile?.role || '').toLowerCase()
         setIsCoach(role === 'teacher' || role === 'admin')
     }, [initialUser, initialProfile])
-
-    useEffect(() => {
-        try {
-            const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-                try {
-                    if (!session || !session.user?.id) {
-                        clearClientSessionState()
-                        try {
-                            clearSupabaseCookiesBestEffort()
-                            clearSupabaseStorageBestEffort()
-                        } catch {}
-                        if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
-                    }
-                } catch {}
-            })
-            return () => {
-                try { sub?.subscription?.unsubscribe?.() } catch {}
-            }
-        } catch {
-            return
-        }
-    }, [supabase, clearClientSessionState, clearSupabaseCookiesBestEffort, clearSupabaseStorageBestEffort])
 
     useEffect(() => {
         restoreAdminPanelIfNeeded();
@@ -1602,12 +1574,8 @@ function IronTracksApp({ initialUser, initialProfile }) {
 
     // JSON IMPORT HANDLER
     const handleJsonUpload = (e) => {
-        const input = e?.target;
-        const file = input?.files?.[0];
+        const file = e.target.files[0];
         if (!file) return;
-        try {
-            setShowJsonImportModal(false);
-        } catch {}
 
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -1617,13 +1585,10 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     await importData(json);
                     await fetchWorkouts();
                     await alert("Dados importados com sucesso!", "Sucesso");
+                    setShowJsonImportModal(false);
                 }
 		} catch (err) {
 			await alert("Erro ao ler arquivo JSON: " + (err?.message ?? String(err)));
-		} finally {
-            try {
-                if (input) input.value = '';
-            } catch {}
 		}
 	};
         reader.readAsText(file);
@@ -1702,7 +1667,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                                     setHasUnreadNotification(false);
                                 }}
                                 onOpenSchedule={() => router.push('/dashboard/schedule')}
-                                onOpenCommunity={() => router.push('/community')}
                                 onOpenSettings={() => setSettingsOpen(true)}
                                 onLogout={handleLogout}
                             />
@@ -1716,7 +1680,8 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     </div>
                 )}
 
-                {user && <RealtimeNotificationBridge userId={user.id} setNotification={setNotification} />}
+                {user && <RealtimeNotificationBridge setNotification={setNotification} />}
+                {user && <FollowRequestModalGate user={user} />}
 
                 {/* Main Content */}
                 <div

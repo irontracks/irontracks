@@ -56,7 +56,7 @@ export default function RootLayout({ children }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(()=>{const ping=()=>{try{fetch('/api/auth/ping',{method:'GET',credentials:'include',cache:'no-store'}).catch(()=>{});}catch{}};document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ping();});window.addEventListener('focus',ping);})();",
+              "(()=>{const ping=()=>{try{fetch('/api/auth/ping',{method:'GET',credentials:'include',cache:'no-store'}).then((r)=>{try{if(r&&r.status===401){const p=location.pathname||'/';if(p!=='/'&&p!=='/auth/login'&&p!=='/auth/logout'){location.href='/?next='+encodeURIComponent(p+location.search+location.hash);}}}catch{}}).catch(()=>{});}catch{}};document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')ping();});window.addEventListener('focus',ping);})();",
           }}
         />
       </head>
