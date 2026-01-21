@@ -291,6 +291,45 @@ export default function ActiveWorkout(props) {
       showReport = true;
     }
 
+    const baseExerciseCount = Number(ui?.baseExerciseCount ?? 0) || 0;
+    const hasExtraExercise = !!ui?.pendingTemplateUpdate || (exercises.length > 0 && exercises.length > baseExerciseCount);
+    if (hasExtraExercise) {
+      let shouldSaveTemplate = false;
+      try {
+        shouldSaveTemplate =
+          typeof confirm === 'function'
+            ? await confirm(
+                'Você adicionou exercício(s) extra(s) durante o treino.\nDeseja salvar essa mudança no modelo do treino?',
+                'Salvar no treino?',
+                {
+                  confirmText: 'Sim',
+                  cancelText: 'Não',
+                },
+              )
+            : false;
+      } catch {
+        shouldSaveTemplate = false;
+      }
+      if (shouldSaveTemplate) {
+        try {
+          if (typeof props?.onPersistWorkoutTemplate === 'function') {
+            const res = await props.onPersistWorkoutTemplate(workout);
+            if (!res || res.ok === false) {
+              throw new Error(res?.error || 'Falha ao salvar treino');
+            }
+            try {
+              await alert('Treino atualizado com o(s) exercício(s) extra(s).', 'Treino salvo');
+            } catch {}
+          }
+        } catch (e) {
+          const msg = e?.message ? String(e.message) : String(e);
+          try {
+            await alert('Não foi possível salvar no modelo: ' + (msg || 'erro inesperado'), 'Aviso');
+          } catch {}
+        }
+      }
+    }
+
     setFinishing(true);
     try {
       const safeExercises = Array.isArray(workout?.exercises)

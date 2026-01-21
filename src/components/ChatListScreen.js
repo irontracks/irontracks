@@ -14,6 +14,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
     const [nowMs, setNowMs] = useState(0);
     const { alert } = useDialog();
     const supabase = useMemo(() => createClient(), []);
+    const safeUserId = user?.id ? String(user.id) : '';
 
     useEffect(() => {
         const tick = () => setNowMs(Date.now());
@@ -29,7 +30,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
         try {
             setLoading(true);
 
-            if (!user?.id) {
+            if (!safeUserId) {
                 setUsers([]);
                 return;
             }
@@ -37,7 +38,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, display_name, photo_url, last_seen')
-                .neq('id', user.id)
+                .neq('id', safeUserId)
                 .order('last_seen', { ascending: false })
                 .limit(200);
 
@@ -50,7 +51,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
         } finally {
             setLoading(false);
         }
-    }, [user?.id, alert, supabase]);
+    }, [safeUserId, alert, supabase]);
 
     useEffect(() => {
         loadUsers();
@@ -84,14 +85,19 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
 
     const isUserOnline = (lastSeen) => {
         if (!lastSeen || !nowMs) return false;
-        const diff = nowMs - new Date(lastSeen).getTime();
-        return diff < 5 * 60 * 1000;
+        const ts = new Date(lastSeen).getTime();
+        if (!Number.isFinite(ts)) return false;
+        const diff = nowMs - ts;
+        return Number.isFinite(diff) ? diff < 5 * 60 * 1000 : false;
     };
 
     const formatLastSeen = (lastSeen) => {
         if (!lastSeen) return 'Nunca';
         if (!nowMs) return '...';
-        const diff = nowMs - new Date(lastSeen).getTime();
+        const ts = new Date(lastSeen).getTime();
+        if (!Number.isFinite(ts)) return '...';
+        const diff = nowMs - ts;
+        if (!Number.isFinite(diff)) return '...';
         const minutes = Math.floor(diff / 60000);
         if (minutes < 1) return 'Agora';
         if (minutes < 60) return `${minutes} min`;
@@ -102,19 +108,20 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
 
     const handleOpenChat = async (targetUser) => {
         try {
-            if (!user?.id || !targetUser?.id) {
+            const safeTargetId = targetUser?.id ? String(targetUser.id) : '';
+            if (!safeUserId || !safeTargetId) {
                 await alert('Usuário inválido para iniciar conversa.', 'Erro');
                 return;
             }
             const { data: channelId, error } = await supabase
-                .rpc('get_or_create_direct_channel', { user1: user.id, user2: targetUser.id });
+                .rpc('get_or_create_direct_channel', { user1: safeUserId, user2: safeTargetId });
             if (error) throw error;
             if (onSelectChannel) {
                 onSelectChannel({
                     channel_id: channelId,
-                    other_user_id: targetUser.id,
-                    other_user_name: targetUser.display_name,
-                    other_user_photo: targetUser.photo_url
+                    other_user_id: safeTargetId,
+                    other_user_name: targetUser?.display_name ?? null,
+                    other_user_photo: targetUser?.photo_url ?? null
                 });
             }
         } catch (e) {

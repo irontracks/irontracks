@@ -24,7 +24,7 @@ import {
     X
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { createWorkout, updateWorkout, deleteWorkout, importData } from '@/actions/workout-actions';
+import { createWorkout, updateWorkout, deleteWorkout, importData, computeWorkoutStreakAndStats } from '@/actions/workout-actions';
 
 import LoginScreen from '@/components/LoginScreen';
 import AdminPanelV2 from '@/components/AdminPanelV2';
@@ -32,6 +32,7 @@ import ChatScreen from '@/components/ChatScreen';
 import ChatListScreen from '@/components/ChatListScreen';
 import ChatDirectScreen from '@/components/ChatDirectScreen';
 import HistoryList from '@/components/HistoryList';
+import CommunityClient from '@/app/(app)/community/CommunityClient';
 import StudentEvolution from '@/components/StudentEvolution';
 import WorkoutReport from '@/components/WorkoutReport';
 import ActiveWorkout from '@/components/ActiveWorkout';
@@ -56,6 +57,8 @@ import { BackButton } from '@/components/ui/BackButton';
 import StudentDashboard from '@/components/dashboard/StudentDashboard'
 import SettingsModal from '@/components/SettingsModal'
 import { useUserSettings } from '@/hooks/useUserSettings'
+import WhatsNewModal from '@/components/WhatsNewModal'
+import { getLatestWhatsNew } from '@/content/whatsNew'
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 
@@ -147,6 +150,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const [directChat, setDirectChat] = useState(null);
     const [workouts, setWorkouts] = useState([]);
     const [stats, setStats] = useState({ workouts: 0, exercises: 0, activeStreak: 0 });
+    const [streakStats, setStreakStats] = useState(null);
     const [currentWorkout, setCurrentWorkout] = useState(null);
     const [importCode, setImportCode] = useState('');
     const [shareCode, setShareCode] = useState(null);
@@ -156,6 +160,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const [notification, setNotification] = useState(null);
     const [settingsOpen, setSettingsOpen] = useState(false)
+    const [whatsNewOpen, setWhatsNewOpen] = useState(false)
     const [isCoach, setIsCoach] = useState(false);
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
     const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
@@ -179,8 +184,10 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const [editActiveOpen, setEditActiveOpen] = useState(false);
     const [editActiveDraft, setEditActiveDraft] = useState(null);
     const editActiveBaseRef = useRef(null);
+    const editActiveAddExerciseRef = useRef(false);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
     const userSettingsApi = useUserSettings(user?.id)
+    const whatsNewShownRef = useRef(false)
 
     const supabase = useRef(createClient()).current;
     const router = useRouter();
@@ -203,6 +210,39 @@ function IronTracksApp({ initialUser, initialProfile }) {
             fetch('/api/social/presence/ping', { method: 'POST' }).catch(() => {});
         } catch {}
     }, [user?.id]);
+
+    useEffect(() => {
+        if (whatsNewShownRef.current) return
+        const uid = user?.id ? String(user.id) : ''
+        if (!uid) return
+        if (!userSettingsApi?.loaded) return
+        const entry = getLatestWhatsNew()
+        if (!entry?.id) return
+        const prefs = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
+        if (prefs?.whatsNewAutoOpen === false) return
+        const lastSeenId = String(prefs?.whatsNewLastSeenId || '')
+        const lastSeenAt = Number(prefs?.whatsNewLastSeenAt || 0) || 0
+        const remind24h = prefs?.whatsNewRemind24h !== false
+        const within24h = lastSeenAt > 0 && Date.now() - lastSeenAt < 24 * 60 * 60 * 1000
+        if (lastSeenId === String(entry.id) && (!remind24h || !within24h)) return
+        whatsNewShownRef.current = true
+        setWhatsNewOpen(true)
+    }, [user?.id, userSettingsApi?.loaded, userSettingsApi?.settings])
+
+    const closeWhatsNew = useCallback(async () => {
+        try {
+            setWhatsNewOpen(false)
+            const entry = getLatestWhatsNew()
+            if (!entry?.id) return
+            const prev = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
+            const prevSeenId = String(prev?.whatsNewLastSeenId || '')
+            const prevSeenAt = Number(prev?.whatsNewLastSeenAt || 0) || 0
+            const nextSeenAt = prevSeenId === String(entry.id) && prevSeenAt > 0 ? prevSeenAt : Date.now()
+            const next = { ...(prev || {}), whatsNewLastSeenId: String(entry.id), whatsNewLastSeenAt: nextSeenAt }
+            try { userSettingsApi?.setSettings?.(next) } catch {}
+            try { await userSettingsApi?.save?.(next) } catch {}
+        } catch {}
+    }, [userSettingsApi])
     const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
 
     const setUrlTabParam = useCallback((nextTab) => {
@@ -965,13 +1005,22 @@ function IronTracksApp({ initialUser, initialProfile }) {
         try {
             const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
                 try {
-                    if (!session || !session.user?.id) {
+                    const ev = String(_event || '').toUpperCase()
+                    if (session && session.user?.id) return
+                    if (ev === 'SIGNED_OUT') {
                         clearClientSessionState()
-                        try {
-                            clearSupabaseCookiesBestEffort()
-                            clearSupabaseStorageBestEffort()
-                        } catch {}
                         if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+                        return
+                    }
+                    if (ev === 'INITIAL_SESSION') {
+                        fetch('/api/auth/ping', { method: 'GET', credentials: 'include', cache: 'no-store' })
+                            .then((r) => {
+                                if (r && r.status === 204) return
+                                clearClientSessionState()
+                                if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+                            })
+                            .catch(() => {})
+                        return
                     }
                 } catch {}
             })
@@ -1255,6 +1304,16 @@ function IronTracksApp({ initialUser, initialProfile }) {
         }
     }, [user, workouts.length]);
 
+    useEffect(() => {
+        if (!user?.id) return;
+        computeWorkoutStreakAndStats()
+            .then(res => {
+                if (res?.ok && res?.data) setStreakStats(res.data)
+            })
+            .catch(err => console.error('Erro ao calcular streak:', err));
+    }, [user?.id]);
+
+
 
     // Handlers de Sessão
     const handleLogout = async () => {
@@ -1330,6 +1389,10 @@ function IronTracksApp({ initialUser, initialProfile }) {
         setActiveSession({
             workout: { ...workout, exercises: resolvedExercises },
             logs: {},
+            ui: {
+                baseExerciseCount: resolvedExercises.length,
+                pendingTemplateUpdate: false,
+            },
             startedAt: Date.now(),
             timerTargetTime: null,
             timerContext: null
@@ -1433,9 +1496,9 @@ function IronTracksApp({ initialUser, initialProfile }) {
 		}
 	};
 
-    const handleSaveWorkout = async (workoutToSave) => {
+    const handleSaveWorkout = useCallback(async (workoutToSave) => {
         const w = workoutToSave || currentWorkout;
-        if (!user || !w || !w.title) return;
+        if (!user || !w || !w.title) return { ok: false, error: 'Treino inválido ou usuário ausente' };
         try {
             if (w.id) {
                 const res = await updateWorkout(w.id, w);
@@ -1448,15 +1511,42 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 return created;
             }
         } catch (e) {
-            throw e;
+            const msg = e?.message ? String(e.message) : String(e || 'Falha ao salvar treino');
+            return { ok: false, error: msg };
         }
-    };
+    }, [currentWorkout, user]);
+
+    const handlePersistWorkoutTemplateFromSession = useCallback(async (workoutFromSession) => {
+        try {
+            const normalized = normalizeWorkoutForEditor(workoutFromSession);
+            const cleaned = stripWorkoutInternalKeys(normalized);
+            if (!cleaned || !cleaned.title) return { ok: false, error: 'Treino inválido para salvar' };
+
+            if (cleaned.id) {
+                await updateWorkout(cleaned.id, cleaned);
+                try {
+                    await fetchWorkouts();
+                } catch {}
+                return { ok: true, mode: 'update' };
+            }
+
+            const created = await createWorkout(cleaned);
+            try {
+                await fetchWorkouts();
+            } catch {}
+            return { ok: true, mode: 'create', id: created?.id ?? null };
+        } catch (e) {
+            const msg = e?.message ? String(e.message) : String(e);
+            return { ok: false, error: msg || 'Falha ao salvar treino' };
+        }
+    }, [fetchWorkouts, normalizeWorkoutForEditor, stripWorkoutInternalKeys]);
 
     const handleOpenActiveWorkoutEditor = useCallback((options = {}) => {
         try {
             if (!activeSession?.workout) return;
             const base = normalizeWorkoutForEditor(activeSession.workout);
             const shouldAddExercise = options && typeof options === 'object' ? !!options.addExercise : false;
+            editActiveAddExerciseRef.current = shouldAddExercise;
             const nextBase = shouldAddExercise
                 ? {
                     ...base,
@@ -1487,18 +1577,22 @@ function IronTracksApp({ initialUser, initialProfile }) {
             setEditActiveOpen(false);
             setEditActiveDraft(null);
             editActiveBaseRef.current = null;
+            editActiveAddExerciseRef.current = false;
         } catch {}
     }, []);
 
     const handleSaveActiveWorkoutEditor = useCallback(async (workoutFromEditor) => {
         const normalized = normalizeWorkoutForEditor(workoutFromEditor);
         const cleaned = stripWorkoutInternalKeys(normalized);
-        const res = await handleSaveWorkout(cleaned);
+        const shouldDeferPersist = !!editActiveAddExerciseRef.current;
+        const res = shouldDeferPersist ? { deferred: true } : await handleSaveWorkout(cleaned);
         setActiveSession((prev) => {
             if (!prev) return prev;
             const oldWorkout = editActiveBaseRef.current || normalizeWorkoutForEditor(prev.workout);
             const nextLogs = reindexSessionLogsAfterWorkoutEdit(oldWorkout, normalized, prev.logs || {});
-            return { ...prev, workout: normalized, logs: nextLogs };
+            const baseUi = prev?.ui && typeof prev.ui === 'object' ? prev.ui : {};
+            const nextUi = shouldDeferPersist ? { ...baseUi, pendingTemplateUpdate: true } : baseUi;
+            return { ...prev, workout: normalized, logs: nextLogs, ui: nextUi };
         });
         editActiveBaseRef.current = normalized;
         setEditActiveDraft(normalized);
@@ -1702,7 +1796,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                                     setHasUnreadNotification(false);
                                 }}
                                 onOpenSchedule={() => router.push('/dashboard/schedule')}
-                                onOpenCommunity={() => router.push('/community')}
                                 onOpenSettings={() => setSettingsOpen(true)}
                                 onLogout={handleLogout}
                             />
@@ -1726,14 +1819,15 @@ function IronTracksApp({ initialUser, initialProfile }) {
                         paddingTop: isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : undefined,
                     }}
                 >
-                    {(view === 'dashboard' || view === 'assessments') && (
+                    {(view === 'dashboard' || view === 'assessments' || view === 'community') && (
                         <StudentDashboard
                             workouts={Array.isArray(workouts) ? workouts : []}
                             profileIncomplete={Boolean(profileIncomplete)}
                             onOpenCompleteProfile={() => setShowCompleteProfile(true)}
-                            view={view === 'assessments' ? 'assessments' : 'dashboard'}
+                            view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : 'dashboard'}
                             onChangeView={(next) => setView(next)}
                             assessmentsContent={user?.id ? <AssessmentHistory studentId={user.id} /> : null}
+                            communityContent={user?.id ? <CommunityClient embedded /> : null}
                             settings={userSettingsApi?.settings ?? null}
                             onCreateWorkout={handleCreateWorkout}
                             onQuickView={(w) => setQuickViewWorkout(w)}
@@ -1745,6 +1839,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                             currentUserId={user?.id}
                             exportingAll={Boolean(exportingAll)}
                             onExportAll={handleExportAllWorkouts}
+                            streakStats={streakStats}
                             onOpenJsonImport={() => setShowJsonImportModal(true)}
                             onOpenIronScanner={async () => {
                                 try {
@@ -1775,6 +1870,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                             settings={userSettingsApi?.settings ?? null}
                             onUpdateLog={handleUpdateSessionLog}
                             onFinish={handleFinishSession}
+                            onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
                             onBack={() => setView('dashboard')}
                             onStartTimer={handleStartTimer}
                             isCoach={isCoach}
@@ -2130,12 +2226,24 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     <AdminPanelV2 user={user} onClose={closeAdminPanel} />
                 )}
 
+                {whatsNewOpen && (
+                    <WhatsNewModal
+                        isOpen={whatsNewOpen}
+                        entry={getLatestWhatsNew()}
+                        onClose={closeWhatsNew}
+                    />
+                )}
+
                 {settingsOpen && (
                     <SettingsModal
                         isOpen={settingsOpen}
                         onClose={() => setSettingsOpen(false)}
                         settings={userSettingsApi?.settings ?? null}
                         saving={Boolean(userSettingsApi?.saving)}
+                        onOpenWhatsNew={() => {
+                            setSettingsOpen(false)
+                            setWhatsNewOpen(true)
+                        }}
                         onSave={async (next) => {
                             try {
                                 const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})

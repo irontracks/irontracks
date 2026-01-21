@@ -23,6 +23,11 @@ export default function SettingsModal(props) {
 
   const density = String(draft?.dashboardDensity || 'comfortable')
   const units = String(draft?.units || 'kg')
+  const showNewRecordsCard = Boolean(draft?.showNewRecordsCard ?? true)
+  const showIronRank = Boolean(draft?.showIronRank ?? true)
+  const showBadges = Boolean(draft?.showBadges ?? true)
+  const whatsNewAutoOpen = Boolean(draft?.whatsNewAutoOpen ?? true)
+  const whatsNewRemind24h = Boolean(draft?.whatsNewRemind24h ?? true)
   const enableSounds = Boolean(draft?.enableSounds ?? true)
   const allowTeamInvites = Boolean(draft?.allowTeamInvites ?? true)
   const allowDirectMessages = Boolean(draft?.allowDirectMessages ?? true)
@@ -97,6 +102,117 @@ export default function SettingsModal(props) {
                   <option value="comfortable">Confortável</option>
                   <option value="compact">Compacto</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
+            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Ferramentas</div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Novos Recordes</div>
+                  <div className="text-xs text-neutral-400">Mostra o card de PRs recentes no dashboard.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('showNewRecordsCard', !showNewRecordsCard)}
+                  className={
+                    showNewRecordsCard
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {showNewRecordsCard ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Iron Rank</div>
+                  <div className="text-xs text-neutral-400">Mostra o card de nível e ranking global.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('showIronRank', !showIronRank)}
+                  className={
+                    showIronRank
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {showIronRank ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Conquistas</div>
+                  <div className="text-xs text-neutral-400">Mostra os badges de progresso (streak/volume).</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('showBadges', !showBadges)}
+                  className={
+                    showBadges
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {showBadges ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+
+              {props?.onOpenWhatsNew ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-white">Últimas atualizações</div>
+                    <div className="text-xs text-neutral-400">Veja o que mudou na versão mais recente.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => props?.onOpenWhatsNew?.()}
+                    className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800"
+                  >
+                    Abrir
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Abrir novidades automaticamente</div>
+                  <div className="text-xs text-neutral-400">Mostra o aviso quando existirem novas atualizações.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('whatsNewAutoOpen', !whatsNewAutoOpen)}
+                  className={
+                    whatsNewAutoOpen
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {whatsNewAutoOpen ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Repetir por 24h</div>
+                  <div className="text-xs text-neutral-400">Mesmo após fechar, volta a aparecer por 24h.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('whatsNewRemind24h', !whatsNewRemind24h)}
+                  className={
+                    whatsNewRemind24h
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {whatsNewRemind24h ? 'Ativo' : 'Desligado'}
+                </button>
               </div>
             </div>
           </div>
@@ -513,7 +629,13 @@ export default function SettingsModal(props) {
                 type="button"
                 onClick={async () => {
                   try {
-                    const supabase = createClient()
+                    let supabase
+                    try {
+                      supabase = createClient()
+                    } catch {
+                      await alert('Falha ao sair: configuração ausente')
+                      return
+                    }
                     await supabase.auth.signOut({ scope: 'global' })
                     try { window.location.href = '/auth/login' } catch {}
                   } catch (e) {
@@ -545,8 +667,13 @@ export default function SettingsModal(props) {
                       return
                     }
                     try {
-                      const supabase = createClient()
-                      await supabase.auth.signOut({ scope: 'global' })
+                      let supabase
+                      try {
+                        supabase = createClient()
+                      } catch {
+                        supabase = null
+                      }
+                      if (supabase) await supabase.auth.signOut({ scope: 'global' })
                     } catch {}
                     try { window.location.href = '/auth/login' } catch {}
                   } catch (e) {

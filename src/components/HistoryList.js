@@ -3,13 +3,21 @@ import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCi
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import WorkoutReport from '@/components/WorkoutReport';
+import { generatePeriodReportInsights } from '@/actions/workout-actions';
 import { useDialog } from '@/contexts/DialogContext';
+
+const REPORT_DAYS_WEEK = 7;
+const REPORT_DAYS_MONTH = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const PERIOD_SESSIONS_LIMIT = 30;
+const TOP_EXERCISES_LIMIT = 5;
 
 const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false }) => {
     const { confirm, alert } = useDialog();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const supabase = useMemo(() => createClient(), []);
+    const safeUserId = user?.id ? String(user.id) : '';
     const isReadOnly = !!readOnly;
     const [range, setRange] = useState(() => (readOnly ? 'all' : '30'));
     const [showManual, setShowManual] = useState(false);
@@ -32,6 +40,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [periodReport, setPeriodReport] = useState(null);
+    const [periodAi, setPeriodAi] = useState({ status: 'idle', ai: null, error: '' });
 
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode);
@@ -76,6 +85,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
 
     const formatCompletedAt = (dateValue) => {
         try {
+            if (!dateValue) return 'Data desconhecida';
             const d = new Date(dateValue);
             if (isNaN(d.getTime())) return 'Data desconhecida';
             const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -97,15 +107,41 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         return Array.isArray(history) ? history : [];
     }, [history]);
 
+    const toDateMs = (value) => {
+        try {
+            if (!value) return null;
+            if (value?.toDate) {
+                const d = value.toDate();
+                const t = d instanceof Date ? d.getTime() : new Date(d).getTime();
+                return Number.isFinite(t) ? t : null;
+            }
+            if (value instanceof Date) {
+                const t = value.getTime();
+                return Number.isFinite(t) ? t : null;
+            }
+            if (typeof value === 'object') {
+                const seconds = Number(value?.seconds ?? value?._seconds ?? value?.sec ?? null);
+                const nanos = Number(value?.nanoseconds ?? value?._nanoseconds ?? 0);
+                if (Number.isFinite(seconds) && seconds > 0) {
+                    const t = seconds * 1000 + Math.floor(nanos / 1e6);
+                    return Number.isFinite(t) ? t : null;
+                }
+            }
+            const t = new Date(value).getTime();
+            return Number.isFinite(t) ? t : null;
+        } catch {
+            return null;
+        }
+    };
+
     const filteredHistory = useMemo(() => {
         if (range === 'all') return historyItems;
         const days = Number(range);
         if (!Number.isFinite(days) || days <= 0) return historyItems;
-        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        const cutoff = Date.now() - days * DAY_MS;
         return historyItems.filter((s) => {
-            const t = new Date(s?.date).getTime();
-            if (!Number.isFinite(t) || Number.isNaN(t)) return false;
-            return t >= cutoff;
+            const t = toDateMs(s?.dateMs) ?? toDateMs(s?.date);
+            return Number.isFinite(t) && t >= cutoff;
         });
     }, [historyItems, range]);
 
@@ -140,11 +176,10 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             const historyList = Array.isArray(historyItems) ? historyItems : [];
             const daysNumber = Number(days);
             if (!Number.isFinite(daysNumber) || daysNumber <= 0) return null;
-            const cutoff = Date.now() - daysNumber * 24 * 60 * 60 * 1000;
+            const cutoff = Date.now() - daysNumber * DAY_MS;
             const list = historyList.filter((s) => {
-                const t = new Date(s?.date).getTime();
-                if (!Number.isFinite(t) || Number.isNaN(t)) return false;
-                return t >= cutoff;
+                const t = toDateMs(s?.dateMs) ?? toDateMs(s?.date);
+                return Number.isFinite(t) && t >= cutoff;
             });
             if (!list.length) return null;
             const totalSeconds = list.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
@@ -152,15 +187,76 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             const count = list.length;
             const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
             let totalVolumeKg = 0;
+            let totalSets = 0;
+            let totalReps = 0;
+            const uniqueDays = new Set();
+            const exerciseMap = new Map();
+            const sessionSummaries = [];
             list.forEach((item) => {
                 const raw = item?.rawSession && typeof item.rawSession === 'object' ? item.rawSession : null;
                 const logs = raw?.logs && typeof raw.logs === 'object' ? raw.logs : {};
+                const exercises = Array.isArray(raw?.exercises) ? raw.exercises : [];
                 const v = calculateTotalVolumeFromLogs(logs);
-                if (!Number.isFinite(v) || v <= 0) return;
-                totalVolumeKg += v;
+                const safeVolume = Number.isFinite(v) && v > 0 ? v : 0;
+                if (safeVolume > 0) totalVolumeKg += safeVolume;
+                const dateValue = item?.date ?? raw?.date ?? item?.created_at ?? null;
+                let dayKey = '';
+                try {
+                    const t = toDateMs(dateValue);
+                    if (Number.isFinite(t)) {
+                        dayKey = new Date(t).toISOString().slice(0, 10);
+                        uniqueDays.add(dayKey);
+                    }
+                } catch {}
+                const sessionMinutes = Math.max(0, Math.round((Number(item?.totalTime ?? raw?.totalTime) || 0) / 60));
+                sessionSummaries.push({ date: dateValue, minutes: sessionMinutes, volumeKg: Math.max(0, Math.round(safeVolume || 0)) });
+                Object.entries(logs || {}).forEach(([key, log]) => {
+                    if (!log || typeof log !== 'object') return;
+                    const w = Number(String(log.weight ?? '').replace(',', '.'));
+                    const r = Number(String(log.reps ?? '').replace(',', '.'));
+                    if (!Number.isFinite(w) || !Number.isFinite(r)) return;
+                    if (w <= 0 || r <= 0) return;
+                    totalSets += 1;
+                    totalReps += r;
+                    const exIdx = Number.parseInt(String(key || '').split('-')[0] || '', 10);
+                    const rawName = Number.isFinite(exIdx) ? exercises?.[exIdx]?.name : null;
+                    const name = String(rawName || '').trim() || 'Exercício';
+                    const current = exerciseMap.get(name) || { name, sets: 0, reps: 0, volumeKg: 0, sessions: new Set() };
+                    current.sets += 1;
+                    current.reps += r;
+                    current.volumeKg += w * r;
+                    if (dayKey) current.sessions.add(dayKey);
+                    exerciseMap.set(name, current);
+                });
             });
             const avgVolumeKg = count > 0 ? Math.max(0, Math.round(totalVolumeKg / count)) : 0;
-            return { days: daysNumber, count, totalMinutes, avgMinutes, totalVolumeKg, avgVolumeKg };
+            const exercisesList = Array.from(exerciseMap.values()).map((item) => ({
+                name: String(item?.name || '').trim(),
+                sets: Number(item?.sets) || 0,
+                reps: Number(item?.reps) || 0,
+                volumeKg: Math.max(0, Math.round(Number(item?.volumeKg) || 0)),
+                sessionsCount: item?.sessions ? item.sessions.size : 0
+            })).filter((item) => item.name);
+            const topExercisesByVolume = [...exercisesList]
+                .sort((a, b) => (b.volumeKg || 0) - (a.volumeKg || 0))
+                .slice(0, TOP_EXERCISES_LIMIT);
+            const topExercisesByFrequency = [...exercisesList]
+                .sort((a, b) => (b.sessionsCount || 0) - (a.sessionsCount || 0) || (b.sets || 0) - (a.sets || 0))
+                .slice(0, TOP_EXERCISES_LIMIT);
+            return {
+                days: daysNumber,
+                count,
+                totalMinutes,
+                avgMinutes,
+                totalVolumeKg: Math.max(0, Math.round(totalVolumeKg)),
+                avgVolumeKg,
+                totalSets,
+                totalReps,
+                uniqueDaysCount: uniqueDays.size,
+                topExercisesByVolume,
+                topExercisesByFrequency,
+                sessionSummaries: sessionSummaries.slice(0, PERIOD_SESSIONS_LIMIT)
+            };
         } catch {
             return null;
         }
@@ -198,7 +294,12 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     const openSession = (session) => {
         const rawSession = session?.rawSession && typeof session.rawSession === 'object' ? session.rawSession : null;
         const payload = rawSession
-            ? { ...rawSession, id: rawSession.id ?? session?.id ?? null }
+            ? {
+                ...rawSession,
+                id: rawSession.id ?? session?.id ?? null,
+                user_id: session?.raw?.user_id ?? rawSession?.user_id ?? session?.user_id ?? null,
+                student_id: session?.raw?.student_id ?? rawSession?.student_id ?? session?.student_id ?? null
+            }
             : session;
         if (typeof onViewReport === 'function') {
             try {
@@ -258,10 +359,13 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                         console.error('Erro ao processar item:', w, err);
                         raw = null;
                     }
+                    const dateMs = toDateMs(raw?.date) ?? toDateMs(w?.date) ?? toDateMs(w?.completed_at) ?? toDateMs(w?.created_at) ?? null;
+                    const dateIso = dateMs ? new Date(dateMs).toISOString() : null;
                     return {
                         id: w.id,
                         workoutTitle: raw?.workoutTitle || w.name || 'Treino Recuperado',
-                        date: raw?.date || w.date || w.created_at || new Date().toISOString(),
+                        date: dateIso,
+                        dateMs,
                         totalTime: raw?.totalTime || 0,
                         rawSession: raw,
                         raw: w,
@@ -387,18 +491,18 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     useEffect(() => {
         const fetchAvailableWorkouts = async () => {
             try {
-                if (!user?.id) { setAvailableWorkouts([]); return; }
+                if (!safeUserId) { setAvailableWorkouts([]); return; }
                 const { data } = await supabase
                     .from('workouts')
                     .select('id, name')
-                    .eq('user_id', user.id)
+                    .eq('user_id', safeUserId)
                     .eq('is_template', false)
                     .order('created_at', { ascending: false });
-                setAvailableWorkouts(data || []);
+                setAvailableWorkouts(Array.isArray(data) ? data : []);
             } catch { setAvailableWorkouts([]); }
         };
         if (showManual && manualTab === 'existing') fetchAvailableWorkouts();
-    }, [manualTab, showManual, supabase, user?.id]);
+    }, [manualTab, showManual, supabase, safeUserId]);
 
     useEffect(() => {
         const buildManualFromTemplate = async () => {
@@ -549,7 +653,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
 
     const openPeriodReport = async (type) => {
         try {
-            const key = type === 'week' ? 7 : type === 'month' ? 30 : null;
+            const key = type === 'week' ? REPORT_DAYS_WEEK : type === 'month' ? REPORT_DAYS_MONTH : null;
             if (!key) return;
             const stats = buildPeriodStats(key);
             if (!stats) {
@@ -557,9 +661,25 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                 return;
             }
             setPeriodReport({ type, stats });
+            setPeriodAi({ status: 'loading', ai: null, error: '' });
+            try {
+                const res = await generatePeriodReportInsights({ type, stats });
+                if (!res?.ok) {
+                    setPeriodAi({ status: 'error', ai: null, error: String(res?.error || 'Falha ao gerar insights') });
+                    return;
+                }
+                setPeriodAi({ status: 'ready', ai: res.ai || null, error: '' });
+            } catch (err) {
+                setPeriodAi({ status: 'error', ai: null, error: String(err?.message || err || 'Falha ao gerar insights') });
+            }
         } catch (e) {
             await alert('Erro ao gerar relatório: ' + (e?.message ?? String(e)));
         }
+    };
+
+    const closePeriodReport = () => {
+        setPeriodReport(null);
+        setPeriodAi({ status: 'idle', ai: null, error: '' });
     };
 
     const handleShareReport = async () => {
@@ -943,7 +1063,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         )}
 
         {periodReport && (
-            <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPeriodReport(null)}>
+            <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={closePeriodReport}>
                 <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                     <div className="p-4 border-b border-neutral-800">
                         <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatório de evolução</div>
@@ -982,6 +1102,69 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                                 </div>
                             </div>
                         </div>
+                        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-3">
+                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">IA • Insights</div>
+                            {periodAi.status === 'loading' && (
+                                <div className="text-sm text-neutral-300 animate-pulse">Gerando insights com IA...</div>
+                            )}
+                            {periodAi.status === 'error' && (
+                                <div className="text-sm text-red-400">{periodAi.error || 'Falha ao gerar insights.'}</div>
+                            )}
+                            {periodAi.status === 'ready' && periodAi.ai && (
+                                <div className="space-y-3">
+                                    {Array.isArray(periodAi.ai.summary) && periodAi.ai.summary.length > 0 && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Resumo</div>
+                                            <ul className="space-y-1 text-sm text-neutral-100">
+                                                {(Array.isArray(periodAi.ai.summary) ? periodAi.ai.summary : []).map((item, idx) => (
+                                                    <li key={idx}>• {String(item || '').trim()}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {Array.isArray(periodAi.ai.highlights) && periodAi.ai.highlights.length > 0 && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Destaques</div>
+                                            <ul className="space-y-1 text-sm text-neutral-100">
+                                                {(Array.isArray(periodAi.ai.highlights) ? periodAi.ai.highlights : []).map((item, idx) => (
+                                                    <li key={idx}>• {String(item || '').trim()}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {Array.isArray(periodAi.ai.focus) && periodAi.ai.focus.length > 0 && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Foco</div>
+                                            <ul className="space-y-1 text-sm text-neutral-100">
+                                                {(Array.isArray(periodAi.ai.focus) ? periodAi.ai.focus : []).map((item, idx) => (
+                                                    <li key={idx}>• {String(item || '').trim()}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {Array.isArray(periodAi.ai.nextSteps) && periodAi.ai.nextSteps.length > 0 && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Próximos passos</div>
+                                            <ul className="space-y-1 text-sm text-neutral-100">
+                                                {(Array.isArray(periodAi.ai.nextSteps) ? periodAi.ai.nextSteps : []).map((item, idx) => (
+                                                    <li key={idx}>• {String(item || '').trim()}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    {Array.isArray(periodAi.ai.warnings) && periodAi.ai.warnings.length > 0 && (
+                                        <div>
+                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Atenções</div>
+                                            <ul className="space-y-1 text-sm text-yellow-400">
+                                                {(Array.isArray(periodAi.ai.warnings) ? periodAi.ai.warnings : []).map((item, idx) => (
+                                                    <li key={idx}>• {String(item || '').trim()}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         <div>
                             <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Texto para compartilhar</div>
                             <textarea
@@ -994,7 +1177,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                     <div className="p-4 bg-neutral-900/50 flex gap-2">
                         <button
                             type="button"
-                            onClick={() => setPeriodReport(null)}
+                            onClick={closePeriodReport}
                             className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
                         >
                             Fechar

@@ -76,6 +76,14 @@ const toDateMs = (v) => {
             const ms = v.getTime();
             return Number.isFinite(ms) ? ms : null;
         }
+        if (typeof v === 'object') {
+            const seconds = Number(v?.seconds ?? v?._seconds ?? v?.sec ?? null);
+            const nanos = Number(v?.nanoseconds ?? v?._nanoseconds ?? 0);
+            if (Number.isFinite(seconds) && seconds > 0) {
+                const ms = seconds * 1000 + Math.floor(nanos / 1e6);
+                return Number.isFinite(ms) ? ms : null;
+            }
+        }
         const ms = new Date(v).getTime();
         return Number.isFinite(ms) ? ms : null;
     } catch {
@@ -106,7 +114,13 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const [pdfUrl, setPdfUrl] = useState(null);
     const [pdfBlob, setPdfBlob] = useState(null);
     const pdfFrameRef = useRef(null);
-    const supabase = useMemo(() => createClient(), []);
+    const supabase = useMemo(() => {
+        try {
+            return createClient();
+        } catch {
+            return null;
+        }
+    }, []);
     const previousFetchInFlightRef = useRef(false);
     const [resolvedPreviousSession, setResolvedPreviousSession] = useState(null);
     const prevByExerciseFetchInFlightRef = useRef(false);
@@ -141,11 +155,27 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
     const [applyState, setApplyState] = useState({ status: 'idle', error: '', templateId: null });
 
+    const targetUserId = useMemo(() => {
+        const candidates = [
+            session?.user_id,
+            session?.userId,
+            session?.student_id,
+            session?.studentId,
+            session?.owner_id,
+            session?.ownerId,
+            user?.id,
+            user?.uid
+        ];
+        const found = candidates.find((v) => typeof v === 'string' && v.trim());
+        return found ? String(found) : null;
+    }, [session, user?.id, user?.uid]);
+
     const resolvePreviousFromHistory = useCallback(async () => {
         try {
+            if (!supabase) return null;
             if (previousSession) return previousSession;
             if (resolvedPreviousSession) return resolvedPreviousSession;
-            if (!user?.id) return null;
+            if (!targetUserId) return null;
             if (!session || typeof session !== 'object') return null;
             if (previousFetchInFlightRef.current) return null;
 
@@ -158,7 +188,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             let query = supabase
                 .from('workouts')
                 .select('id, date, created_at, notes, name')
-                .eq('user_id', user.id)
+                .eq('user_id', targetUserId)
                 .eq('is_template', false)
                 .order('date', { ascending: false })
                 .limit(200);
@@ -204,7 +234,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         } finally {
             previousFetchInFlightRef.current = false;
         }
-    }, [previousSession, resolvedPreviousSession, session, supabase, user?.id]);
+    }, [previousSession, resolvedPreviousSession, session, supabase, targetUserId]);
 
     useEffect(() => {
         resolvePreviousFromHistory().catch(() => {});
@@ -212,7 +242,8 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
     const resolvePrevByExerciseFromHistory = useCallback(async () => {
         try {
-            if (!user?.id) return;
+            if (!supabase) return;
+            if (!targetUserId) return;
             if (!session || typeof session !== 'object') return;
             if (prevByExerciseFetchInFlightRef.current) return;
 
@@ -237,7 +268,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             let query = supabase
                 .from('workouts')
                 .select('id, date, created_at, notes')
-                .eq('user_id', user.id)
+                .eq('user_id', targetUserId)
                 .eq('is_template', false)
                 .order('date', { ascending: false })
                 .limit(350);
@@ -287,7 +318,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         } finally {
             prevByExerciseFetchInFlightRef.current = false;
         }
-    }, [session, supabase, user?.id]);
+    }, [session, supabase, targetUserId]);
 
     useEffect(() => {
         resolvePrevByExerciseFromHistory().catch(() => {});
@@ -348,7 +379,12 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         }
     };
 
-    const effectivePreviousSession = previousSession ?? resolvedPreviousSession;
+    const effectivePreviousSession = (() => {
+        if (!previousSession) return resolvedPreviousSession;
+        const prevUserId = previousSession?.user_id ?? previousSession?.userId ?? previousSession?.student_id ?? previousSession?.studentId ?? null;
+        if (prevUserId && targetUserId && String(prevUserId) !== String(targetUserId)) return resolvedPreviousSession;
+        return previousSession;
+    })();
 
     const sessionLogs = session?.logs && typeof session.logs === 'object' ? session.logs : {};
     const prevSessionLogs = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? effectivePreviousSession.logs : {};
@@ -448,15 +484,55 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const handleDownloadPDF = async () => {
         try {
             setIsGenerating(true);
+            try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch {}
             const prev = effectivePreviousSession ?? (await resolvePreviousFromHistory());
+            let aiToUse = aiState?.ai || session?.ai || null;
+            if (!aiToUse) {
+                try {
+                    const res = await generatePostWorkoutInsights({
+                        workoutId: typeof session?.id === 'string' ? session.id : null,
+                        session
+                    });
+                    if (res?.ok && res?.ai) {
+                        aiToUse = res.ai;
+                        setAiState({ status: 'ready', ai: res.ai || null, saved: !!res.saved, error: '' });
+                    }
+                } catch {}
+            }
             const html = buildReportHTML(session, prev, user?.displayName || user?.email || '', calories, {
                 prevLogsByExercise: prevLogsMap,
                 prevBaseMsByExercise: prevBaseMsMap,
+                ai: aiToUse || null,
             });
-            const blob = new Blob([html], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            setPdfBlob(blob);
-            setPdfUrl(url);
+            try {
+                const baseName = String(session?.workoutTitle || 'Treino')
+                    .trim()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9]+/gi, '-')
+                    .replace(/-+/g, '-')
+                    .replace(/(^-)|(-$)/g, '') || 'Treino';
+                const fileName = `Relatorio_${baseName}_${new Date().toISOString().slice(0, 10)}`;
+                const res = await fetch('/api/report', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ html, fileName })
+                });
+                if (!res.ok) {
+                    const txt = await res.text().catch(() => '');
+                    throw new Error(txt || `Falha ao gerar PDF (${res.status})`);
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                setPdfBlob(blob);
+                setPdfUrl(url);
+            } catch (e) {
+                const blob = new Blob([html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                setPdfBlob(blob);
+                setPdfUrl(url);
+            }
         } catch (e) {
             alert('Não foi possível abrir impressão: ' + (e?.message ?? String(e)) + '\nPermita pop-ups para este site.');
         } finally {
@@ -543,8 +619,11 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             }
             const title = 'Relatório IronTracks';
             if (navigator.share) {
-                if (pdfBlob && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], 'relatorio-irontracks.html', { type: 'text/html' })] })) {
-                    const file = new File([pdfBlob], 'relatorio-irontracks.html', { type: 'text/html' });
+                const isPdf = String(pdfBlob?.type || '').toLowerCase() === 'application/pdf';
+                const fileName = isPdf ? 'relatorio-irontracks.pdf' : 'relatorio-irontracks.html';
+                const mime = isPdf ? 'application/pdf' : 'text/html';
+                if (pdfBlob && navigator.canShare && navigator.canShare({ files: [new File([pdfBlob], fileName, { type: mime })] })) {
+                    const file = new File([pdfBlob], fileName, { type: mime });
                     await navigator.share({ files: [file], title });
                     return;
                 }
@@ -557,7 +636,8 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             }
             const a = document.createElement('a');
             a.href = pdfUrl;
-            a.download = 'relatorio-irontracks.html';
+            const isPdf = String(pdfBlob?.type || '').toLowerCase() === 'application/pdf';
+            a.download = isPdf ? 'relatorio-irontracks.pdf' : 'relatorio-irontracks.html';
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -567,7 +647,8 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 if (!pdfUrl) return;
                 const a = document.createElement('a');
                 a.href = pdfUrl;
-                a.download = 'relatorio-irontracks.html';
+                const isPdf = String(pdfBlob?.type || '').toLowerCase() === 'application/pdf';
+                a.download = isPdf ? 'relatorio-irontracks.pdf' : 'relatorio-irontracks.html';
                 document.body.appendChild(a);
                 a.click();
                 a.remove();

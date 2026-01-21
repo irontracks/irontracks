@@ -6,6 +6,7 @@ import { useDialog } from '@/contexts/DialogContext';
 const InviteManager = ({ isOpen, onClose, onInvite }) => {
     const { alert } = useDialog();
     const alertRef = useRef(alert);
+    const safeOnInvite = typeof onInvite === 'function' ? onInvite : null;
     const [searchTerm, setSearchTerm] = useState('');
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -177,6 +178,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
     const handleInvite = async (user) => {
         const userId = user?.id ? String(user.id) : '';
         if (!userId) return;
+        if (!safeOnInvite) return;
         if (pendingIds.has(userId) || invitedIds.has(userId)) return;
         try {
             setPendingIds((prev) => {
@@ -184,7 +186,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                 next.add(userId);
                 return next;
             });
-            await onInvite(user);
+            await safeOnInvite(user);
             setInvitedIds((prev) => {
                 const next = new Set(prev);
                 next.add(userId);

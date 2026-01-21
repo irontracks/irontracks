@@ -2,8 +2,16 @@ import React, { useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
 const RealtimeNotificationBridge = ({ userId, setNotification }) => {
+  const safeSetNotification = typeof setNotification === 'function' ? setNotification : null
+
   useEffect(() => {
-    const supabase = createClient()
+    if (!safeSetNotification) return
+    let supabase
+    try {
+      supabase = createClient()
+    } catch {
+      return
+    }
     let channel
     let mounted = true
     ;(async () => {
@@ -42,7 +50,7 @@ const RealtimeNotificationBridge = ({ userId, setNotification }) => {
               const message = String(n?.message ?? '').trim()
               if (!title || !message) return
 
-              setNotification({
+              safeSetNotification({
                 text: message,
                 displayName: title,
                 photoURL: null,
@@ -67,7 +75,7 @@ const RealtimeNotificationBridge = ({ userId, setNotification }) => {
         return
       }
     }
-  }, [setNotification, userId])
+  }, [safeSetNotification, userId])
 
   return null
 }

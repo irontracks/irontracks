@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Bell, Calendar, Cog, Command, CreditCard, History, LogOut, MessageSquare, UserPlus, Users } from 'lucide-react'
+import { Bell, Calendar, Cog, Command, CreditCard, History, LogOut, MessageSquare, Users } from 'lucide-react'
 
 export default function HeaderActionsMenu({
   user,
@@ -18,7 +18,6 @@ export default function HeaderActionsMenu({
   onOpenSchedule,
   onOpenWallet,
   onOpenSettings,
-  onOpenCommunity,
 }) {
   const [open, setOpen] = useState(false)
 
@@ -154,18 +153,6 @@ export default function HeaderActionsMenu({
               <button
                 type="button"
                 onClick={() => {
-                  onOpenCommunity?.()
-                  close()
-                }}
-                className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors"
-              >
-                <UserPlus size={16} className="text-neutral-300" />
-                <span className="flex-1 text-neutral-200 group-hover:text-white">Comunidade</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
                   onOpenSettings?.()
                   close()
                 }}
@@ -195,4 +182,3 @@ export default function HeaderActionsMenu({
     </div>
   )
 }
-

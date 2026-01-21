@@ -41,6 +41,7 @@ export default function OpenGraphImage() {
           >
             <img
               src={iconUrl}
+              alt="IronTracks"
               width={84}
               height={84}
               style={{ width: 84, height: 84 }}

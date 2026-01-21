@@ -20,11 +20,11 @@ export default function NotificationToast(props) {
         }
       : null)
 
-  if (!notification || !allowToast) return null
-
   const durationMs = Number(props?.durationMs ?? 5000)
+  const shouldRender = !!notification && allowToast
 
   useEffect(() => {
+    if (!shouldRender) return
     if (!Number.isFinite(durationMs) || durationMs <= 0) return
     const id = setTimeout(() => {
       try {
@@ -32,7 +32,7 @@ export default function NotificationToast(props) {
       } catch {}
     }, durationMs)
     return () => clearTimeout(id)
-  }, [durationMs, props])
+  }, [durationMs, props, shouldRender])
 
   const handleRootClick = () => {
     try {
@@ -58,6 +58,7 @@ export default function NotificationToast(props) {
   const senderName = String(notification?.senderName || 'Aviso do Sistema')
   const text = String(notification?.text || '').trim()
 
+  if (!shouldRender) return null
   if (!text) return null
 
   return (
@@ -89,4 +90,3 @@ export default function NotificationToast(props) {
     </div>
   )
 }
-

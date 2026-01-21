@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation'
 
 type SP = Record<string, string | string[] | undefined>
 
-export default async function HomePage({ searchParams }: { searchParams?: SP | Promise<SP> }) {
-  const sp = await Promise.resolve(searchParams)
+export default async function HomePage({ searchParams }: { searchParams?: Promise<SP> }) {
+  const sp = await searchParams
   const code = typeof sp?.code === 'string' ? sp.code : ''
   const next = typeof sp?.next === 'string' ? sp.next : ''
   const error = typeof sp?.error === 'string' ? sp.error : ''
@@ -31,4 +31,3 @@ export default async function HomePage({ searchParams }: { searchParams?: SP | P
 
   return <LoginScreen />
 }
-

@@ -9,10 +9,18 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
     const [isOpen, setIsOpen] = useState(() => !!initialOpen);
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
     const [systemNotifications, setSystemNotifications] = useState([]);
-    const supabase = useMemo(() => createClient(), []);
+    const safeUserId = user?.id ? String(user.id) : '';
+    const supabase = useMemo(() => {
+        try {
+            return createClient();
+        } catch {
+            return null;
+        }
+    }, []);
 
     useEffect(() => {
-        if (!user?.id) return;
+        if (!supabase) return;
+        if (!safeUserId) return;
 
         let isMounted = true;
         let channel;
@@ -22,7 +30,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
                 const { data } = await supabase
                     .from('notifications')
                     .select('*')
-                    .eq('user_id', user.id)
+                    .eq('user_id', safeUserId)
                     .order('created_at', { ascending: false });
 
                 if (isMounted) {
@@ -38,12 +46,12 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         fetchNotifications();
 
         channel = supabase
-            .channel(`notifications:${user.id}`)
+            .channel(`notifications:${safeUserId}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
                 table: 'notifications',
-                filter: `user_id=eq.${user.id}`
+                filter: `user_id=eq.${safeUserId}`
             }, (payload) => {
                 setSystemNotifications((prev) => {
                     const safePrev = Array.isArray(prev) ? prev : [];
@@ -60,7 +68,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
                 supabase.removeChannel(channel);
             }
         };
-    }, [supabase, user?.id]);
+    }, [supabase, safeUserId]);
 
     const handleDelete = async (id, e) => {
         try {
@@ -68,6 +76,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         } catch {}
         const safeId = id ?? null;
         if (!safeId) return;
+        if (!supabase) return;
         setSystemNotifications((prev) => (Array.isArray(prev) ? prev.filter((n) => n?.id !== safeId) : []));
         try {
             await supabase.from('notifications').delete().eq('id', safeId);
@@ -202,6 +211,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         try {
             const confirmed = await confirm("Limpar todas as notificações?");
             if (!confirmed) return;
+            if (!supabase) return;
             const { data: { user: currentUser } } = await supabase.auth.getUser();
             if (!currentUser) return;
             await supabase.from('notifications').delete().eq('user_id', currentUser.id);
@@ -213,7 +223,8 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
 
     useEffect(() => {
         if (!isOpen) return;
-        if (!user?.id) return;
+        if (!safeUserId) return;
+        if (!supabase) return;
 
         let cancelled = false;
 
@@ -222,7 +233,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
                 await supabase
                     .from('notifications')
                     .update({ read: true })
-                    .eq('user_id', user.id)
+                    .eq('user_id', safeUserId)
                     .eq('read', false);
 
                 if (cancelled) return;
@@ -244,7 +255,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         return () => {
             cancelled = true;
         };
-    }, [isOpen, supabase, user?.id]);
+    }, [isOpen, supabase, safeUserId]);
 
     const renderList = () => (
         <div className="max-h-80 overflow-y-auto custom-scrollbar">

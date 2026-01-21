@@ -40,6 +40,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const resolvedOtherUserId = targetUser?.id ?? otherUserId;
     const resolvedOtherUserName = targetUser?.display_name ?? targetUser?.name ?? otherUserName;
     const resolvedOtherUserPhoto = targetUser?.photo_url ?? targetUser?.photoURL ?? otherUserPhoto;
+    const safeUserId = user?.id ? String(user.id) : '';
 
     useEffect(() => {
         const tick = () => setNowMs(Date.now());
@@ -74,13 +75,13 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
     const getOrCreateChannel = useCallback(async () => {
         try {
-            if (!user?.id || !resolvedOtherUserId) {
+            if (!safeUserId || !resolvedOtherUserId) {
                 const err = new Error('Usuário inválido para iniciar conversa.');
                 throw err;
             }
             const { data: channelId, error } = await supabase
                 .rpc('get_or_create_direct_channel', {
-                    user1: user.id,
+                    user1: safeUserId,
                     user2: resolvedOtherUserId
                 });
 
@@ -99,7 +100,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             }
             throw error;
         }
-    }, [alert, resolvedOtherUserId, supabase, user?.id]);
+    }, [alert, resolvedOtherUserId, safeUserId, supabase]);
 
     const markMessagesAsRead = useCallback(async (targetChannelId) => {
         const safeChannelId = String(targetChannelId || '').trim();
@@ -264,7 +265,10 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || !channelId) return;
+        if (!newMessage.trim() || !channelId || !safeUserId) {
+            if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
+            return;
+        }
 
         try {
             const message = newMessage.trim();
@@ -272,7 +276,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
             const { data: inserted, error: insertError } = await supabase
                 .from('direct_messages')
-                .insert({ channel_id: channelId, sender_id: user.id, content: message })
+                .insert({ channel_id: channelId, sender_id: safeUserId, content: message })
                 .select('*')
                 .single();
 
@@ -280,7 +284,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
             const optimistic = {
                 ...inserted,
-                sender: { display_name: user.displayName, photo_url: user.photoURL }
+                sender: { display_name: user?.displayName || null, photo_url: user?.photoURL || null }
             };
             setMessages(prev => {
                 if (prev.find(m => m.id === optimistic.id)) return prev;
@@ -304,7 +308,10 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
     const handleFileSelected = async (e) => {
         const files = Array.from(e.target.files || [])
-        if (!files.length || !channelId) return
+        if (!files.length || !channelId || !safeUserId) {
+            if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
+            return
+        }
         setUploading(true)
         try {
             for (const file of files) {
@@ -343,7 +350,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 if (payload) {
                     await supabase.from('direct_messages').insert({
                         channel_id: channelId,
-                        sender_id: user.id,
+                        sender_id: safeUserId,
                         content: JSON.stringify(payload)
                     });
                 }
@@ -356,11 +363,14 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
     const handleAddGif = async () => {
         const url = await prompt('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
-        if (!url || !channelId) return
+        if (!url || !channelId || !safeUserId) {
+            if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
+            return
+        }
         const payload = { type: 'gif', media_url: url }
         await supabase.from('direct_messages').insert({
             channel_id: channelId,
-            sender_id: user.id,
+            sender_id: safeUserId,
             content: JSON.stringify(payload)
         });
     }
@@ -458,8 +468,9 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 				) : (
 					<>
 						{messages.map((message, index) => {
-							const isMyMessage = message.sender_id === user.id;
-							const showAvatar = !isMyMessage && (index === 0 || messages[index-1].sender_id !== message.sender_id);
+							const isMyMessage = safeUserId ? message.sender_id === safeUserId : false;
+							const prevSenderId = messages?.[index - 1]?.sender_id;
+							const showAvatar = !isMyMessage && (index === 0 || prevSenderId !== message.sender_id);
 							
 							return (
 								<div

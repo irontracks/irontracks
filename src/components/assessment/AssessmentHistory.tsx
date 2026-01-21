@@ -209,9 +209,10 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   const [showHistory, setShowHistory] = useState(false);
   const [studentName, setStudentName] = useState<string>('Aluno');
   const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
-  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, { loading: boolean; error: string | null; plan: any | null; usedAi: boolean }>>({});
+  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, { loading: boolean; error: string | null; plan: any | null; usedAi: boolean; reason?: string }>>({});
   const [importing, setImporting] = useState(false);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const mergeImportedFormData = (base: any, incoming: any) => {
     const out: any = { ...(base && typeof base === 'object' ? base : {}) };
@@ -402,6 +403,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     try {
       const id = String(assessment?.id || '');
       if (!id) return;
+      setSelectedAssessment(id);
 
       setAiPlanByAssessmentId((prev) => ({
         ...prev,
@@ -410,6 +412,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           error: null,
           plan: prev[id]?.plan ?? null,
           usedAi: prev[id]?.usedAi ?? false,
+          reason: prev[id]?.reason,
         },
       }));
 
@@ -428,6 +431,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
             error: res?.error ? String(res.error) : 'Falha ao gerar plano tático',
             plan: prev[id]?.plan ?? null,
             usedAi: false,
+            reason: res?.reason ? String(res.reason) : 'ai_failed',
           },
         }));
         return;
@@ -440,8 +444,14 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           error: null,
           plan: res.plan ?? null,
           usedAi: !!res.usedAi,
+          reason: res?.reason ? String(res.reason) : (res?.usedAi ? 'ai' : 'fallback'),
         },
       }));
+      setTimeout(() => {
+        try {
+          planAnchorRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch {}
+      }, 50);
     } catch (e: any) {
       const id = String(assessment?.id || '');
       if (!id) return;
@@ -452,6 +462,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           error: e?.message ? String(e.message) : 'Erro inesperado ao gerar plano tático',
           plan: prev[id]?.plan ?? null,
           usedAi: false,
+          reason: 'ai_failed',
         },
       }));
     }
@@ -1256,6 +1267,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                   <button
                     type="button"
                     onClick={() => handleGenerateAssessmentPlan(assessment)}
+                    disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
                     className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95"
                   >
                     {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando plano…' : 'Plano Tático (AI)'}
@@ -1299,10 +1311,33 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                     if (!s) return null;
                     const plan = s.plan && typeof s.plan === 'object' ? s.plan : null;
                     if (!plan && !s.loading && !s.error) return null;
+                    const badge = (() => {
+                      if (s.loading) return null;
+                      if (s.error) return null;
+                      if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
+                      if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                      if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                      if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                      return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                    })();
                     return (
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4"
+                        ref={(el) => {
+                          try {
+                            planAnchorRefs.current[String(assessment.id)] = el;
+                          } catch {}
+                        }}
+                      >
                         <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
-                          <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2">Resumo Tático</div>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+                            {badge ? (
+                              <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
+                                {badge.text}
+                              </div>
+                            ) : null}
+                          </div>
                           {s.loading ? (
                             <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
                           ) : s.error ? (
