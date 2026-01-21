@@ -8,9 +8,6 @@ export const size = {
 export const contentType = 'image/png'
 
 export default function OpenGraphImage() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://irontracks.com.br'
-  const iconUrl = `${baseUrl.replace(/\/+$/, '')}/icone.png`
-
   return new ImageResponse(
     (
       <div
@@ -39,13 +36,21 @@ export default function OpenGraphImage() {
               overflow: 'hidden',
             }}
           >
-            <img
-              src={iconUrl}
-              alt="IronTracks"
-              width={84}
-              height={84}
-              style={{ width: 84, height: 84 }}
-            />
+            <div
+              style={{
+                width: 84,
+                height: 84,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 38,
+                fontWeight: 900,
+                color: '#111111',
+                letterSpacing: -2,
+              }}
+            >
+              IT
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ fontSize: 64, fontWeight: 900, lineHeight: 1 }}>
