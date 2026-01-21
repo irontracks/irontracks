@@ -18,6 +18,7 @@ type RecentAchievementsProps = {
 export default function RecentAchievements({ userId }: RecentAchievementsProps) {
   const [prs, setPrs] = useState<PrData[]>([])
   const [workoutTitle, setWorkoutTitle] = useState<string>('')
+  const [workoutDateIso, setWorkoutDateIso] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(true)
   const [expanded, setExpanded] = useState(false)
@@ -28,20 +29,15 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
     const load = async () => {
       try {
         const res = await getLatestWorkoutPrs()
-        if (res.ok && res.prs && res.prs.length > 0) {
-            const dateIso = res.workout?.date
-            if (dateIso) {
-                const d = new Date(dateIso)
-                const now = new Date()
-                const diffMs = now.getTime() - d.getTime()
-                const diffHours = diffMs / (1000 * 60 * 60)
-                
-                // Show only if within last 7 days
-                if (diffHours < 168) { 
-                    setPrs(res.prs)
-                    setWorkoutTitle(res.workout?.title || 'Treino Recente')
-                }
-            }
+        const dateIso = res?.workout?.date
+        const title = res?.workout?.title || 'Treino Recente'
+        if (dateIso) setWorkoutDateIso(String(dateIso))
+        setWorkoutTitle(String(title))
+
+        if (res?.ok && Array.isArray(res?.prs) && res.prs.length > 0) {
+          setPrs(res.prs)
+        } else {
+          setPrs([])
         }
       } catch (e) {
         console.error(e)
@@ -53,7 +49,20 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
     load()
   }, [userId])
 
-  if (loading || prs.length === 0) return null
+  if (loading) return null
+
+  const withinLast7Days = (() => {
+    if (!workoutDateIso) return false
+    const d = new Date(workoutDateIso)
+    if (Number.isNaN(d.getTime())) return false
+    const now = new Date()
+    const diffMs = now.getTime() - d.getTime()
+    const diffHours = diffMs / (1000 * 60 * 60)
+    return diffHours < 168
+  })()
+
+  const shouldShow = withinLast7Days
+  if (!shouldShow) return null
 
   return (
     <AnimatePresence>
@@ -128,23 +137,29 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
                 transition={{ duration: 0.2 }}
                 className="space-y-2 overflow-hidden"
               >
-                {prs.map((pr, idx) => (
-                  <div
-                    key={`${pr.exercise}-${idx}`}
-                    className="flex items-center justify-between bg-neutral-900/80 rounded-lg p-2 border border-neutral-800 hover:border-yellow-500/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <TrendingUp size={14} className="text-green-500 shrink-0" />
-                      <span className="text-xs font-bold text-neutral-200 truncate">{pr.exercise}</span>
+                {prs.length ? (
+                  prs.map((pr, idx) => (
+                    <div
+                      key={`${pr.exercise}-${idx}`}
+                      className="flex items-center justify-between bg-neutral-900/80 rounded-lg p-2 border border-neutral-800 hover:border-yellow-500/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <TrendingUp size={14} className="text-green-500 shrink-0" />
+                        <span className="text-xs font-bold text-neutral-200 truncate">{pr.exercise}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] uppercase font-bold text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
+                          {pr.label}
+                        </span>
+                        <span className="text-xs font-black text-yellow-500 tabular-nums">{pr.value}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] uppercase font-bold text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
-                        {pr.label}
-                      </span>
-                      <span className="text-xs font-black text-yellow-500 tabular-nums">{pr.value}</span>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-xs text-neutral-400 font-bold">
+                    Sem novos recordes detectados neste treino.
                   </div>
-                ))}
+                )}
               </motion.div>
             )}
           </AnimatePresence>

@@ -177,7 +177,6 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
   }
 
   if (!showIronRank && !showBadges) return null
-  if (showBadges && safeBadges.length === 0 && !showIronRank) return null
 
   return (
     <div className="space-y-3 mb-5">
@@ -225,28 +224,34 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
       ) : null}
 
       {/* Badges Grid */}
-      {showBadges && safeBadges.length ? (
+      {showBadges ? (
         <div>
           <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2 px-1">
             Conquistas ({safeBadges.length})
           </h3>
-          <div className="flex flex-wrap gap-2">
-            {safeBadges.map((badge) => (
-              <motion.div
-                key={badge.id}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-neutral-800 border border-neutral-700 px-2 py-1.5 rounded-xl flex items-center gap-2"
-              >
-                <div className="bg-neutral-900 p-1.5 rounded-full border border-neutral-800">
-                  {getBadgeIcon(badge.id, badge.kind)}
-                </div>
-                <span className="text-[11px] font-bold text-neutral-200 leading-tight">
-                  {badge.label}
-                </span>
-              </motion.div>
-            ))}
-          </div>
+          {safeBadges.length ? (
+            <div className="flex flex-wrap gap-2">
+              {safeBadges.map((badge) => (
+                <motion.div
+                  key={badge.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-neutral-800 border border-neutral-700 px-2 py-1.5 rounded-xl flex items-center gap-2"
+                >
+                  <div className="bg-neutral-900 p-1.5 rounded-full border border-neutral-800">
+                    {getBadgeIcon(badge.id, badge.kind)}
+                  </div>
+                  <span className="text-[11px] font-bold text-neutral-200 leading-tight">
+                    {badge.label}
+                  </span>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-xs text-neutral-400 font-bold">
+              Sem conquistas ainda. Complete treinos para desbloquear badges.
+            </div>
+          )}
         </div>
       ) : null}
 
