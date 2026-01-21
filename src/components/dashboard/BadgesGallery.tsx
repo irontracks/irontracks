@@ -73,6 +73,7 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
   const [rankOpen, setRankOpen] = useState(false)
   const [rankLoading, setRankLoading] = useState(false)
   const [rankError, setRankError] = useState('')
+  const [rankReloadKey, setRankReloadKey] = useState(0)
   const [leaderboard, setLeaderboard] = useState<
     { userId: string; displayName: string | null; photoUrl: string | null; role: string | null; totalVolumeKg: number }[]
   >([])
@@ -167,7 +168,7 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
     return () => {
       cancelled = true
     }
-  }, [rankOpen])
+  }, [rankOpen, rankReloadKey])
 
   const roleLabel = (roleRaw: string | null) => {
     const role = String(roleRaw || '').toLowerCase()
@@ -284,7 +285,20 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
                 </div>
               ) : leaderboard.length === 0 ? (
                 <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4 text-sm text-neutral-400">
-                  Ainda não há dados suficientes para o ranking. Se você acabou de aplicar o SQL, feche e abra o modal novamente. O Iron Rank soma apenas séries com peso e reps preenchidos.
+                  <div className="font-bold text-neutral-200">Ainda não há dados suficientes para o ranking.</div>
+                  <div className="mt-2 text-neutral-400">
+                    O Iron Rank soma apenas séries concluídas com peso e reps preenchidos.
+                  </div>
+                  <div className="mt-2 text-neutral-500">
+                    Seu volume atual: <span className="text-yellow-500 font-black">{Math.round(totalVolumeKg).toLocaleString('pt-BR')}kg</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRankReloadKey((v) => v + 1)}
+                    className="mt-3 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800"
+                  >
+                    Recarregar
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-2">
