@@ -30,9 +30,10 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
       try {
         const res = await getLatestWorkoutPrs()
         const dateIso = res?.workout?.date
-        const title = res?.workout?.title || 'Treino Recente'
+        const title = res?.workout?.title
         if (dateIso) setWorkoutDateIso(String(dateIso))
-        setWorkoutTitle(String(title))
+        else setWorkoutDateIso('')
+        setWorkoutTitle(title ? String(title) : 'Sem treinos recentes')
 
         if (res?.ok && Array.isArray(res?.prs) && res.prs.length > 0) {
           setPrs(res.prs)
@@ -61,9 +62,6 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
     return diffHours < 168
   })()
 
-  const shouldShow = withinLast7Days
-  if (!shouldShow) return null
-
   return (
     <AnimatePresence>
       {visible && (
@@ -91,7 +89,13 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
                 Novos Recordes
               </div>
               <div className="text-xs text-neutral-400 truncate">
-                No treino: <span className="text-yellow-500/80">{workoutTitle}</span>
+                {workoutDateIso ? (
+                  <>
+                    No treino: <span className="text-yellow-500/80">{workoutTitle}</span>
+                  </>
+                ) : (
+                  <>Faça um treino para ver seus recordes aqui.</>
+                )}
               </div>
             </div>
 
@@ -157,7 +161,11 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
                   ))
                 ) : (
                   <div className="text-xs text-neutral-400 font-bold">
-                    Sem novos recordes detectados neste treino.
+                    {!workoutDateIso
+                      ? 'Sem treinos concluídos ainda.'
+                      : !withinLast7Days
+                        ? 'Seu último treino foi há mais de 7 dias.'
+                        : 'Sem novos recordes detectados neste treino.'}
                   </div>
                 )}
               </motion.div>
