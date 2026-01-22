@@ -406,7 +406,17 @@ export async function getIronRankLeaderboard(limitCount = 100) {
     const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(200, Math.floor(limit)) : 50;
     const { data, error } = await supabase.rpc('iron_rank_leaderboard', { limit_count: safeLimit });
     if (error) return { ok: false, error: errMsg(error, 'Falha ao carregar ranking') };
-    return { ok: true, data: Array.isArray(data) ? data : [] };
+    const rows = Array.isArray(data) ? data : [];
+    return {
+      ok: true,
+      data: rows.map((r) => ({
+        userId: String(r?.userId ?? r?.user_id ?? '').trim(),
+        displayName: r?.displayName != null ? String(r.displayName) : r?.display_name != null ? String(r.display_name) : null,
+        photoUrl: r?.photoUrl != null ? String(r.photoUrl) : r?.photo_url != null ? String(r.photo_url) : null,
+        role: r?.role != null ? String(r.role) : null,
+        totalVolumeKg: Number(r?.totalVolumeKg ?? r?.total_volume_kg ?? 0) || 0,
+      })),
+    };
   } catch (e) {
     return { ok: false, error: errMsg(e, 'Falha ao carregar ranking') };
   }
