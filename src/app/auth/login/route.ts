@@ -9,6 +9,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const sp = url.searchParams
   const next = sp.get('next') ?? '/dashboard'
+  const nextCookieName = 'it.auth.next'
+  const nextCookieMaxAgeSeconds = 60 * 5
 
   const originFromUrl = url.origin
   const forwardedHost = (request.headers.get('x-forwarded-host') || '').trim()
@@ -33,6 +35,8 @@ export async function GET(request: Request) {
   const rawNext = String(next || '/dashboard')
   const safeNext = rawNext.startsWith('/') ? rawNext : '/dashboard'
   const redirectTo = `${safeOrigin}/auth/callback?next=${encodeURIComponent(safeNext)}`
+  const baseCookieOptions = getSupabaseCookieOptions()
+  const nextCookieExpires = new Date(Date.now() + nextCookieMaxAgeSeconds * 1000)
 
   let cookiesToApply: Array<{ name: string; value: string; options?: any }> = []
   const cookieStore = await cookies()
@@ -85,6 +89,17 @@ export async function GET(request: Request) {
       } catch {}
     }
   })
+  try {
+    redirectResp.cookies.set(nextCookieName, safeNext, {
+      ...(baseCookieOptions || {}),
+      expires: nextCookieExpires,
+      maxAge: nextCookieMaxAgeSeconds,
+    })
+  } catch {
+    try {
+      redirectResp.cookies.set(nextCookieName, safeNext)
+    } catch {}
+  }
 
   return redirectResp
 }

@@ -19,6 +19,8 @@ function AuthErrorInner() {
         errLower.includes('consent') ||
         errLower.includes('access_denied')
       ? 'Parece bloqueio do Google OAuth (app em modo Testing / test users).'
+      : errLower.includes('flow_state_not_found')
+      ? 'Falha no estado do OAuth. Normalmente isso acontece quando cookies são bloqueados ou o fluxo começa em um domínio e volta em outro.'
       : errLower.includes('pkce')
       ? 'Normalmente isso acontece quando o fluxo começou em um domínio e voltou em outro (www vs sem www), ou quando cookies foram bloqueados.'
       : ''

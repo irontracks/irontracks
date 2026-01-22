@@ -14,6 +14,7 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
     const [nowMs, setNowMs] = useState(0);
     const { alert } = useDialog();
     const supabase = useMemo(() => createClient(), []);
+    const safeUserId = user?.id ? String(user.id) : '';
 
     useEffect(() => {
         const tick = () => setNowMs(Date.now());
@@ -26,7 +27,7 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
     }, []);
 
     const fetchAllUsers = useCallback(async () => {
-        if (!user?.id) {
+        if (!safeUserId) {
             setUsers([]);
             return;
         }
@@ -35,11 +36,11 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, display_name, photo_url, last_seen')
-                .neq('id', user.id)
+                .neq('id', safeUserId)
                 .order('last_seen', { ascending: false })
                 .limit(200);
             if (error) throw error;
-            setUsers(data || []);
+            setUsers(Array.isArray(data) ? data : []);
         } catch (error) {
             console.error('Erro ao carregar usuários:', error);
             const msg = error?.message || String(error || '');
@@ -47,7 +48,7 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
         } finally {
             setLoading(false);
         }
-    }, [user?.id, alert, supabase]);
+    }, [safeUserId, alert, supabase]);
 
     useEffect(() => {
         fetchAllUsers();
@@ -81,12 +82,18 @@ const ChatUserSearch = ({ user, onClose, onSelectUser }) => {
 
     const isUserOnline = (lastSeen) => {
         if (!lastSeen || !nowMs) return false;
-        const diff = nowMs - new Date(lastSeen).getTime();
-        return diff < 5 * 60 * 1000;
+        const ts = new Date(lastSeen).getTime();
+        if (!Number.isFinite(ts)) return false;
+        const diff = nowMs - ts;
+        return Number.isFinite(diff) ? diff < 5 * 60 * 1000 : false;
     };
 
     const handleSelectUser = (selectedUser) => {
-        onSelectUser(selectedUser);
+        try {
+            if (typeof onSelectUser === 'function') onSelectUser(selectedUser);
+        } catch {
+            return;
+        }
     };
 
     return (

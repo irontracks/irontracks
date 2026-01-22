@@ -35,18 +35,48 @@ export async function POST(req) {
     }
 
     const puppeteer = await import('puppeteer')
-    const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox','--disable-setuid-sandbox'] })
-    const page = await browser.newPage()
-    await page.setContent(htmlText, { waitUntil: 'networkidle0' })
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' } })
-    await browser.close()
+    let browser = null
+    try {
+      browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+      const page = await browser.newPage()
+      await page.emulateMediaType('screen')
+      await page.setContent(htmlText, { waitUntil: 'networkidle0' })
 
-    return new Response(pdfBuffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${fileName || 'IronTracks_Report'}.pdf"`
-      }
-    })
+      const footerTemplate = `
+        <div style="width:100%; font-size:9px; padding: 0 10mm; color:#a3a3a3;">
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+            <span style="letter-spacing:.16em; font-weight:700;">IRONTRACKS</span>
+            <span style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+              <span class="pageNumber"></span>/<span class="totalPages"></span>
+            </span>
+          </div>
+        </div>
+      `
+
+      const pdfBuffer = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate,
+        margin: { top: '10mm', bottom: '14mm', left: '10mm', right: '10mm' },
+      })
+
+      const safeName = String(fileName || 'IronTracks_Report')
+        .trim()
+        .replaceAll(/[\r\n"]/g, '')
+        .slice(0, 80) || 'IronTracks_Report'
+
+      return new Response(pdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${safeName}.pdf"`,
+        },
+      })
+    } finally {
+      try { await browser?.close() } catch {}
+    }
   } catch (e) {
     return new Response(JSON.stringify({ error: e?.message ?? String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }

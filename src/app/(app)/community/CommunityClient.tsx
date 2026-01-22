@@ -39,7 +39,7 @@ const formatRoleLabel = (raw: any) => {
   return r ? r.toUpperCase() : 'ALUNO'
 }
 
-export default function CommunityClient() {
+export default function CommunityClient({ embedded }: { embedded?: boolean }) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [userId, setUserId] = useState<string>('')
@@ -548,8 +548,8 @@ export default function CommunityClient() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white p-4">
-      <div className="max-w-4xl mx-auto space-y-4">
+    <div className={embedded ? '' : "min-h-screen bg-neutral-900 text-white p-4"}>
+      <div className={embedded ? "space-y-4" : "max-w-4xl mx-auto space-y-4"}>
         {userId ? <RealtimeNotificationBridge userId={userId} setNotification={setToastNotification} /> : null}
         {toastNotification && (
           <NotificationToast
@@ -563,22 +563,24 @@ export default function CommunityClient() {
         <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    if (typeof window !== 'undefined' && window.history.length > 1) router.back()
-                    else router.push('/dashboard')
-                  } catch {
-                    router.push('/dashboard')
-                  }
-                }}
-                className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 transition-colors inline-flex items-center justify-center text-neutral-200"
-                aria-label="Voltar"
-                title="Voltar"
-              >
-                <ArrowLeft size={18} />
-              </button>
+              {!embedded && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      if (typeof window !== 'undefined' && window.history.length > 1) router.back()
+                      else router.push('/dashboard')
+                    } catch {
+                      router.push('/dashboard')
+                    }
+                  }}
+                  className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 transition-colors inline-flex items-center justify-center text-neutral-200"
+                  aria-label="Voltar"
+                  title="Voltar"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+              )}
               <div className="min-w-0">
               <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Comunidade</div>
               <div className="text-white font-black text-xl truncate">Seguir Amigos</div>

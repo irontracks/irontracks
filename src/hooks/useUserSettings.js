@@ -6,6 +6,13 @@ import { createClient } from '@/utils/supabase/client'
 export const DEFAULT_SETTINGS = {
   units: 'kg',
   dashboardDensity: 'comfortable',
+  showNewRecordsCard: true,
+  showIronRank: true,
+  showBadges: true,
+  whatsNewLastSeenId: '',
+  whatsNewLastSeenAt: 0,
+  whatsNewAutoOpen: true,
+  whatsNewRemind24h: true,
   enableSounds: true,
   allowTeamInvites: true,
   allowSocialFollows: true,
@@ -42,7 +49,13 @@ const safeJsonParse = (raw) => {
 }
 
 export function useUserSettings(userId) {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => {
+    try {
+      return createClient()
+    } catch {
+      return null
+    }
+  }, [])
   const safeUserId = userId ? String(userId) : ''
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -52,6 +65,10 @@ export function useUserSettings(userId) {
 
   useEffect(() => {
     if (!safeUserId) return
+    if (!supabase) {
+      setLoaded(true)
+      return
+    }
     let cancelled = false
 
     try {
@@ -115,6 +132,7 @@ export function useUserSettings(userId) {
   const save = useCallback(async (overrideSettings) => {
     if (!safeUserId) return { ok: false, error: 'missing_user' }
     if (saving) return { ok: false, error: 'saving' }
+    if (!supabase) return { ok: false, error: 'missing_supabase' }
     setSaving(true)
     try {
       const nextSettings = overrideSettings && typeof overrideSettings === 'object' ? overrideSettings : settings

@@ -3,6 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2 } from 'lucide-react'
+import RecentAchievements from './RecentAchievements'
+import BadgesGallery from './BadgesGallery'
 
 export type DashboardWorkout = {
   id?: string
@@ -19,11 +21,15 @@ type Props = {
   workouts: DashboardWorkout[]
   profileIncomplete: boolean
   onOpenCompleteProfile: () => void
-  view: 'dashboard' | 'assessments'
-  onChangeView: (next: 'dashboard' | 'assessments') => void
+  view: 'dashboard' | 'assessments' | 'community'
+  onChangeView: (next: 'dashboard' | 'assessments' | 'community') => void
   assessmentsContent?: React.ReactNode
+  communityContent?: React.ReactNode
   settings?: {
     dashboardDensity?: 'compact' | 'comfortable'
+    showNewRecordsCard?: boolean
+    showIronRank?: boolean
+    showBadges?: boolean
   } | null
   onCreateWorkout: () => MaybePromise<void>
   onQuickView: (w: DashboardWorkout) => void
@@ -50,6 +56,10 @@ type Props = {
 export default function StudentDashboard(props: Props) {
   const workouts = Array.isArray(props.workouts) ? props.workouts : []
   const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
+  const showNewRecordsCard = props.settings?.showNewRecordsCard ?? true
+  const showIronRank = props.settings?.showIronRank ?? true
+  const showBadges = props.settings?.showBadges ?? true
+  const [isMounted, setIsMounted] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [creatingWorkout, setCreatingWorkout] = useState(false)
   const [pendingAction, setPendingAction] = useState<
@@ -64,6 +74,7 @@ export default function StudentDashboard(props: Props) {
   const isMountedRef = useRef(true)
 
   useEffect(() => {
+    setIsMounted(true)
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
@@ -126,38 +137,77 @@ export default function StudentDashboard(props: Props) {
       )}
 
       <div style={{ minHeight: `${TABS_BAR_MIN_HEIGHT_PX}px` }}>
-        <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
-          <div className="bg-neutral-900/70 backdrop-blur-md border border-neutral-800/70 rounded-2xl p-1 shadow-lg shadow-black/30">
-            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 flex gap-1">
-              <button
-                onClick={() => props.onChangeView('dashboard')}
-                className={`flex-1 min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
-                  props.view === 'dashboard'
-                    ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
-                    : 'bg-transparent text-neutral-400 hover:text-white'
-                }`}
-              >
-                Treinos
-              </button>
-              <button
-                onClick={() => props.onChangeView('assessments')}
-                className={`flex-1 min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
-                  props.view === 'assessments'
-                    ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
-                    : 'bg-transparent text-neutral-400 hover:text-white'
-                }`}
-              >
-                Avaliações
-              </button>
+        {isMounted ? (
+          <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
+            <div className="bg-neutral-900/70 backdrop-blur-md border border-neutral-800/70 rounded-2xl p-1 shadow-lg shadow-black/30">
+              <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  onClick={() => props.onChangeView('dashboard')}
+                  className={`w-full min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
+                    props.view === 'dashboard'
+                      ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
+                      : 'bg-neutral-900/30 text-neutral-300 border border-neutral-700 hover:bg-neutral-900/50 hover:border-neutral-600 hover:text-white'
+                  }`}
+                >
+                  Treinos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => props.onChangeView('assessments')}
+                  className={`w-full min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
+                    props.view === 'assessments'
+                      ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
+                      : 'bg-neutral-900/30 text-neutral-300 border border-neutral-700 hover:bg-neutral-900/50 hover:border-neutral-600 hover:text-white'
+                  }`}
+                >
+                  Avaliações
+                </button>
+                <button
+                  type="button"
+                  onClick={() => props.onChangeView('community')}
+                  className={`w-full min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
+                    props.view === 'community'
+                      ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
+                      : 'bg-neutral-900/30 text-neutral-300 border border-neutral-700 hover:bg-neutral-900/50 hover:border-neutral-600 hover:text-white'
+                  }`}
+                >
+                  Comunidade
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
+            <div className="bg-neutral-900/70 backdrop-blur-md border border-neutral-800/70 rounded-2xl p-1 shadow-lg shadow-black/30">
+              <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 grid grid-cols-3 gap-1">
+                <div className="min-h-[44px] rounded-lg bg-neutral-900/40" />
+                <div className="min-h-[44px] rounded-lg bg-neutral-900/40" />
+                <div className="min-h-[44px] rounded-lg bg-neutral-900/40" />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {props.view === 'assessments' ? <div className="pt-2">{props.assessmentsContent ?? null}</div> : null}
+      {props.view === 'community' ? <div className="pt-2">{props.communityContent ?? null}</div> : null}
 
       {props.view === 'dashboard' && (
         <>
+          {showNewRecordsCard ? <RecentAchievements userId={props.currentUserId} /> : null}
+          
+          {props.streakStats && (showIronRank || showBadges) ? (
+            <BadgesGallery
+              badges={props.streakStats.badges}
+              currentStreak={props.streakStats.currentStreak}
+              totalVolumeKg={props.streakStats.totalVolumeKg}
+              currentUserId={props.currentUserId}
+              showIronRank={showIronRank}
+              showBadges={showBadges}
+            />
+          ) : null}
+
           <button
             onClick={() => {
               setCreatingWorkout(true)

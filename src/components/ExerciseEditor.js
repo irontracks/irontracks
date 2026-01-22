@@ -16,13 +16,54 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
     const fileInputRef = React.useRef(null);
     const scannerFileInputRef = React.useRef(null);
 
+    const normalizeMethod = React.useCallback((method) => {
+        const raw = String(method || '').trim();
+        const lower = raw.toLowerCase();
+        if (!raw) return 'Normal';
+        if (lower === 'warm-up' || lower === 'warm_up' || lower === 'warmup') return 'Normal';
+        if (lower === 'drop-set' || lower === 'drop set' || lower === 'dropset') return 'Drop-set';
+        if (lower === 'rest-pause' || lower === 'rest pause' || lower === 'restpause') return 'Rest-Pause';
+        if (lower === 'bi-set' || lower === 'bi set' || lower === 'biset') return 'Bi-Set';
+        if (lower === 'cluster' || lower === 'cluster set' || lower === 'clusterset') return 'Cluster';
+        if (lower === 'cardio') return 'Cardio';
+        return raw;
+    }, []);
+
+    const buildDefaultSetDetail = React.useCallback((exercise, setNumber) => {
+        const reps = (exercise?.reps ?? '')
+        const rpeNum = Number(exercise?.rpe)
+        return {
+            set_number: setNumber,
+            reps: reps === '' ? null : String(reps),
+            rpe: Number.isFinite(rpeNum) ? rpeNum : null,
+            weight: null,
+            is_warmup: false,
+            advanced_config: null
+        };
+    }, []);
+
+    const ensureSetDetails = React.useCallback((exercise, desiredCount) => {
+        const existing = Array.isArray(exercise?.setDetails) ? exercise.setDetails : [];
+        const next = [];
+        for (let i = 0; i < desiredCount; i++) {
+            const setNumber = i + 1;
+            const current = existing[i];
+            next.push({
+                ...buildDefaultSetDetail(exercise, setNumber),
+                ...(current && typeof current === 'object' ? current : null),
+                set_number: (current?.set_number ?? setNumber)
+            });
+        }
+        return next;
+    }, [buildDefaultSetDetail]);
+
 	React.useEffect(() => {
 		if (!Array.isArray(workout?.exercises)) return;
 		const validExercises = workout.exercises.filter(e => e && typeof e === 'object');
 		if (validExercises.length !== workout.exercises.length) {
 			onChange?.({ ...workout, exercises: validExercises });
 		}
-	}, [workout, onChange]);
+    }, [workout, onChange]);
     React.useEffect(() => {
         if (!Array.isArray(workout?.exercises)) return;
         let changed = false;
@@ -99,21 +140,9 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
         if (!changed) return;
         onChange?.({ ...workout, exercises: nextExercises });
-    }, [workout, onChange]);
+    }, [ensureSetDetails, normalizeMethod, workout, onChange]);
 	if (!workout) return null;
 
-    const normalizeMethod = (method) => {
-        const raw = String(method || '').trim();
-        const lower = raw.toLowerCase();
-        if (!raw) return 'Normal';
-        if (lower === 'warm-up' || lower === 'warm_up' || lower === 'warmup') return 'Normal';
-        if (lower === 'drop-set' || lower === 'drop set' || lower === 'dropset') return 'Drop-set';
-        if (lower === 'rest-pause' || lower === 'rest pause' || lower === 'restpause') return 'Rest-Pause';
-        if (lower === 'bi-set' || lower === 'bi set' || lower === 'biset') return 'Bi-Set';
-        if (lower === 'cluster' || lower === 'cluster set' || lower === 'clusterset') return 'Cluster';
-        if (lower === 'cardio') return 'Cardio';
-        return raw;
-    };
 
     const detectRestPauseConfig = (name, reps, notes) => {
         const text = `${String(name || '')} ${String(reps || '')} ${String(notes || '')}`.toLowerCase();
@@ -222,34 +251,6 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         }
 
         return targets;
-    };
-
-    const buildDefaultSetDetail = (exercise, setNumber) => {
-        const reps = (exercise?.reps ?? '')
-        const rpeNum = Number(exercise?.rpe)
-        return {
-            set_number: setNumber,
-            reps: reps === '' ? null : String(reps),
-            rpe: Number.isFinite(rpeNum) ? rpeNum : null,
-            weight: null,
-            is_warmup: false,
-            advanced_config: null
-        };
-    };
-
-    const ensureSetDetails = (exercise, desiredCount) => {
-        const existing = Array.isArray(exercise?.setDetails) ? exercise.setDetails : [];
-        const next = [];
-        for (let i = 0; i < desiredCount; i++) {
-            const setNumber = i + 1;
-            const current = existing[i];
-            next.push({
-                ...buildDefaultSetDetail(exercise, setNumber),
-                ...(current && typeof current === 'object' ? current : null),
-                set_number: (current?.set_number ?? setNumber)
-            });
-        }
-        return next;
     };
 
     const updateSetDetail = (exerciseIndex, setIndex, patch) => {
@@ -695,7 +696,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             const imported = { title, exercises: mapped };
             onChange?.(imported);
             if (await confirm('Importar e salvar este treino agora?', 'Salvar')) {
-                await onSave?.(imported);
+                const res = await onSave?.(imported);
+                if (res && typeof res === 'object' && res.ok === false) {
+                    await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
+                }
             }
         } catch (err) {
             const msg = (err && typeof err === 'object' && 'message' in err) ? err.message : String(err || '');
@@ -725,6 +729,15 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
 			if (onSave) {
 				 const res = await onSave({ ...workout, created_by: user.id, user_id: user.id });
+                 if (res && typeof res === 'object' && res.ok === false) {
+                    await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
+                    return;
+                 }
+                 if (res && typeof res === 'object' && res.deferred === true) {
+                    await alert('Exercício adicionado ao treino ativo.\nAo finalizar o treino, você poderá escolher se deseja salvar essa mudança no modelo.', 'Exercício adicionado');
+                    if (typeof onSaved === 'function') onSaved();
+                    return;
+                 }
 				 const sync = res?.sync || null;
 				 if (sync) {
 					const created = Number(sync?.created || 0);
