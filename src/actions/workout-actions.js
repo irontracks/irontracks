@@ -300,6 +300,26 @@ export async function computeWorkoutStreakAndStats() {
     const auth = await getAuthedUserId();
     if (!auth.ok) return { ok: false, error: auth.error };
 
+    let volumeFromRpc = null;
+    try {
+      const { data, error } = await supabase.rpc('iron_rank_my_total_volume');
+      if (!error) {
+        const n = typeof data === 'number' ? data : Number(String(data ?? '').replace(',', '.'));
+        if (Number.isFinite(n)) volumeFromRpc = n;
+      }
+    } catch {}
+
+    if (!Number.isFinite(volumeFromRpc)) {
+      try {
+        const { data, error } = await supabase.rpc('iron_rank_leaderboard', { limit_count: 200 });
+        if (!error && Array.isArray(data)) {
+          const me = data.find((r) => String(r?.userId ?? r?.user_id ?? '').trim() === auth.userId);
+          const n = typeof me?.totalVolumeKg === 'number' ? me.totalVolumeKg : Number(me?.total_volume_kg ?? me?.totalVolumeKg ?? 0);
+          if (Number.isFinite(n)) volumeFromRpc = n;
+        }
+      } catch {}
+    }
+
     const { data: rows, error } = await supabase
       .from('workouts')
       .select('id, name, date, created_at, notes')
@@ -311,17 +331,20 @@ export async function computeWorkoutStreakAndStats() {
 
     const arr = Array.isArray(rows) ? rows : [];
     const daySet = new Set();
-    let totalVolumeKg = 0;
+    let totalVolumeKg = Number.isFinite(volumeFromRpc) ? Number(volumeFromRpc) : 0;
+    const shouldComputeLocalVolume = !Number.isFinite(volumeFromRpc);
     for (const r of arr) {
       try {
         const raw = r?.date ?? r?.created_at;
         const ms = raw ? new Date(raw).getTime() : Number.NaN;
         if (Number.isFinite(ms)) daySet.add(new Date(ms).toISOString().slice(0, 10));
       } catch {}
-      try {
-        const session = safeParseSession(r?.notes);
-        totalVolumeKg += sumVolumeFromLogs(session);
-      } catch {}
+      if (shouldComputeLocalVolume) {
+        try {
+          const session = safeParseSession(r?.notes);
+          totalVolumeKg += sumVolumeFromLogs(session);
+        } catch {}
+      }
     }
 
     const days = Array.from(daySet)
