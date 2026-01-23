@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 export const DEFAULT_SETTINGS = {
   units: 'kg',
   dashboardDensity: 'comfortable',
+  showStoriesBar: true,
   showNewRecordsCard: true,
   showIronRank: true,
   showBadges: true,
