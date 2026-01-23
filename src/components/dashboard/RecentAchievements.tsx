@@ -7,8 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 
 type PrData = {
   exercise: string
-  label: string
-  value: string
+  weight: number
+  reps: number
+  volume: number
+  improved?: {
+    weight?: boolean
+    reps?: boolean
+    volume?: boolean
+  }
 }
 
 type RecentAchievementsProps = {
@@ -145,17 +151,31 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
                   prs.map((pr, idx) => (
                     <div
                       key={`${pr.exercise}-${idx}`}
-                      className="flex items-center justify-between bg-neutral-900/80 rounded-lg p-2 border border-neutral-800 hover:border-yellow-500/30 transition-colors"
+                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 bg-neutral-900/80 rounded-lg p-2 border border-neutral-800 hover:border-yellow-500/30 transition-colors"
                     >
-                      <div className="flex items-center gap-2 overflow-hidden">
+                      <div className="flex items-center gap-2 min-w-0">
                         <TrendingUp size={14} className="text-green-500 shrink-0" />
                         <span className="text-xs font-bold text-neutral-200 truncate">{pr.exercise}</span>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] uppercase font-bold text-neutral-500 bg-neutral-800 px-1.5 py-0.5 rounded border border-neutral-700">
-                          {pr.label}
-                        </span>
-                        <span className="text-xs font-black text-yellow-500 tabular-nums">{pr.value}</span>
+                      <div className="flex items-center gap-3 shrink-0 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] uppercase font-bold text-neutral-500">PESO</span>
+                          <span className={`text-xs font-black tabular-nums ${pr?.improved?.weight ? 'text-yellow-500' : 'text-neutral-200'}`}>
+                            {Number(pr.weight || 0).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}kg
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] uppercase font-bold text-neutral-500">REPS</span>
+                          <span className={`text-xs font-black tabular-nums ${pr?.improved?.reps ? 'text-yellow-500' : 'text-neutral-200'}`}>
+                            {Number(pr.reps || 0).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] uppercase font-bold text-neutral-500">VOLUME</span>
+                          <span className={`text-xs font-black tabular-nums ${pr?.improved?.volume ? 'text-yellow-500' : 'text-neutral-200'}`}>
+                            {Math.round(Number(pr.volume || 0)).toLocaleString('pt-BR')}kg
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))

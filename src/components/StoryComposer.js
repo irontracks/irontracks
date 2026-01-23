@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Share2, X } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 
 const CANVAS_W = 1080
@@ -436,6 +437,7 @@ export default function StoryComposer({ open, session, onClose }) {
   const [backgroundImage, setBackgroundImage] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [info, setInfo] = useState('')
   const [showSafeGuide, setShowSafeGuide] = useState(true)
   const [layout, setLayout] = useState('bottom-row')
   const [livePositions, setLivePositions] = useState(defaultLivePositions)
@@ -713,6 +715,7 @@ export default function StoryComposer({ open, session, onClose }) {
   const shareImage = async () => {
     setBusy(true)
     setError('')
+    setInfo('')
     try {
       const result = await createImageBlob({ type: 'jpg' })
       const file = new File([result.blob], result.filename, { type: result.mime })
@@ -726,6 +729,67 @@ export default function StoryComposer({ open, session, onClose }) {
     }
   }
 
+  const postToIronTracks = async () => {
+    setBusy(true)
+    setError('')
+    setInfo('')
+    try {
+      const supabase = createClient()
+      const { data: authData } = await supabase.auth.getUser()
+      const uid = String(authData?.user?.id || '').trim()
+      if (!uid) throw new Error('unauthorized')
+      const result = await createImageBlob({ type: 'jpg' })
+      const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
+      const path = `${uid}/stories/${storyId}.jpg`
+      const signResp = await fetch('/api/storage/social-stories/signed-upload', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ path }),
+      })
+      const signJson = await signResp.json().catch(() => null)
+      if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
+      const { error: upErr } = await supabase.storage
+        .from('social-stories')
+        .uploadToSignedUrl(path, String(signJson.token), result.blob, { contentType: result.mime })
+      if (upErr) throw upErr
+      const meta = {
+        title: String(metrics?.title || ''),
+        dateText: String(metrics?.date || ''),
+        durationSeconds: Number(metrics?.totalTime || 0),
+        totalVolumeKg: Number(metrics?.volume || 0),
+        kcal: Number(metrics?.kcal || 0),
+        layout: String(layout || ''),
+      }
+      const createResp = await fetch('/api/social/stories/create', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ mediaPath: path, caption: String(metrics?.title || ''), meta }),
+      })
+      const createJson = await createResp.json().catch(() => null)
+      if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
+      setInfo('Publicado no IronTracks. Veja em Dashboard → Stories → Você.')
+      try {
+        window.dispatchEvent(new Event('irontracks:stories:refresh'))
+      } catch {
+      }
+      try {
+        window.setTimeout(() => onClose?.(), 350)
+      } catch {
+        onClose?.()
+      }
+    } catch (e) {
+      const msg = String(e?.message || e)
+      if (msg === 'unauthorized') {
+        setError('Faça login novamente para publicar.')
+      } else if (msg && msg.length <= 140) {
+        setError(msg)
+      } else {
+        setError('Não foi possível publicar no IronTracks.')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
   if (!open) return null
 
   return (
@@ -850,11 +914,6 @@ export default function StoryComposer({ open, session, onClose }) {
                 </button>
               </div>
 
-              {error ? (
-                <div className="w-full max-w-[380px] rounded-2xl border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-200">
-                  {error}
-                </div>
-              ) : null}
             </div>
 
             <div className="flex flex-col gap-3">
@@ -895,10 +954,29 @@ export default function StoryComposer({ open, session, onClose }) {
                 ) : null}
               </div>
 
+              {info ? (
+                <div className="mt-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-200 font-bold">
+                  {info}
+                </div>
+              ) : null}
+              {error ? (
+                <div className="mt-3 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-xs text-red-200 font-bold">
+                  {error}
+                </div>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={postToIronTracks}
+                className="h-12 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest text-xs hover:bg-yellow-400 inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                disabled={busy}
+              >
+                Postar no IronTracks (24h)
+              </button>
               <button
                 type="button"
                 onClick={shareImage}
-                className="h-12 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest text-xs hover:bg-yellow-400 inline-flex items-center justify-center gap-2 disabled:opacity-60"
+                className="mt-2 h-12 rounded-2xl bg-neutral-900 text-white font-black uppercase tracking-widest text-xs hover:bg-neutral-800 border border-neutral-800 inline-flex items-center justify-center gap-2 disabled:opacity-60"
                 disabled={busy}
               >
                 <Share2 size={16} /> Compartilhar (JPG)

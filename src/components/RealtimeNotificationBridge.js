@@ -50,6 +50,12 @@ const RealtimeNotificationBridge = ({ userId, setNotification }) => {
               const message = String(n?.message ?? '').trim()
               if (!title || !message) return
 
+              if (rawType === 'story_posted') {
+                try {
+                  window.dispatchEvent(new Event('irontracks:stories:refresh'))
+                } catch {}
+              }
+
               safeSetNotification({
                 text: message,
                 displayName: title,

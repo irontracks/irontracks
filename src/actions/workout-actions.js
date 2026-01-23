@@ -502,36 +502,29 @@ export async function getLatestWorkoutPrs() {
       });
     });
 
-    const prs = [];
+    const prs = []
     bestNow.forEach((val, exercise) => {
-      const prev = bestPrev.get(exercise) || { weight: 0, reps: 0, volume: 0 };
-      if ((val.weight || 0) > (prev.weight || 0) && val.weight > 0) {
-        prs.push({
-          exercise,
-          label: 'Peso',
-          value: `${Number(val.weight).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}kg`,
-          _sort: val.volume || val.weight,
-        });
+      const prev = bestPrev.get(exercise) || { weight: 0, reps: 0, volume: 0 }
+      const weight = Number(val.weight || 0) || 0
+      const reps = Number(val.reps || 0) || 0
+      const volume = Number(val.volume || 0) || 0
+      const improved = {
+        weight: weight > 0 && weight > (Number(prev.weight || 0) || 0),
+        reps: reps > 0 && reps > (Number(prev.reps || 0) || 0),
+        volume: volume > 0 && volume > (Number(prev.volume || 0) || 0),
       }
-      if ((val.reps || 0) > (prev.reps || 0) && val.reps > 0) {
-        prs.push({
-          exercise,
-          label: 'Reps',
-          value: `${Number(val.reps).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`,
-          _sort: val.volume || val.reps,
-        });
-      }
-      if ((val.volume || 0) > (prev.volume || 0) && val.volume > 0) {
-        prs.push({
-          exercise,
-          label: 'Volume',
-          value: `${Math.round(Number(val.volume)).toLocaleString('pt-BR')}kg`,
-          _sort: val.volume,
-        });
-      }
-    });
+      if (!improved.weight && !improved.reps && !improved.volume) return
+      prs.push({
+        exercise,
+        weight,
+        reps,
+        volume,
+        improved,
+        _sort: volume || weight || reps,
+      })
+    })
 
-    prs.sort((a, b) => (b?._sort || 0) - (a?._sort || 0));
+    prs.sort((a, b) => (b?._sort || 0) - (a?._sort || 0))
 
     return {
       ok: true,
@@ -548,11 +541,40 @@ export async function getLatestWorkoutPrs() {
 // -------------------------------
 
 export async function generatePostWorkoutInsights(_) {
-  return { ok: false, error: 'IA em manutenção (insights pós-treino indisponíveis).' };
+  try {
+    const input = _ && typeof _ === 'object' ? _ : {};
+    const workoutId = input?.workoutId ?? input?.workout_id ?? input?.id ?? null;
+    const session = input?.session && typeof input.session === 'object' ? input.session : null;
+    const res = await fetch('/api/ai/post-workout-insights', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ workoutId, session }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.ok) return { ok: false, error: String(json?.error || 'Falha ao gerar insights') };
+    return { ok: true, ai: json.ai || null, saved: !!json.saved };
+  } catch (e) {
+    return { ok: false, error: errMsg(e, 'Falha ao gerar insights') };
+  }
 }
 
 export async function applyProgressionToNextTemplate(_) {
-  return { ok: false, error: 'IA em manutenção (progressão automática indisponível).' };
+  try {
+    const input = _ && typeof _ === 'object' ? _ : {};
+    const session = input?.session && typeof input.session === 'object' ? input.session : null;
+    const progression = Array.isArray(input?.progression) ? input.progression : [];
+    const historyId = input?.historyId ?? input?.history_id ?? null;
+    const res = await fetch('/api/ai/apply-progression-next', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ session, progression, historyId }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.ok) return { ok: false, error: String(json?.error || 'Falha ao aplicar progressão') };
+    return { ok: true, templateId: json.templateId || null, applied: Number(json.applied || 0) || 0 };
+  } catch (e) {
+    return { ok: false, error: errMsg(e, 'Falha ao aplicar progressão') };
+  }
 }
 
 export async function generatePeriodReportInsights(_) {

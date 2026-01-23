@@ -690,7 +690,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     })();
 
     return (
-        <div className="fixed inset-0 z-[1000] bg-neutral-900 text-black flex flex-col">
+        <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white flex flex-col">
             <div className={`sticky top-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800 px-4 md:px-6 pt-safe pb-3 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="max-w-4xl mx-auto flex items-center justify-end gap-2">
                     <div className="relative">
@@ -728,47 +728,47 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-            <div ref={reportRef} className="min-h-screen bg-white text-black p-6 md:p-8 max-w-4xl mx-auto">
+            <div className="flex-1 overflow-y-auto bg-neutral-950">
+            <div ref={reportRef} className="min-h-screen bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto">
                 <div className="pb-8 mb-8">
                     <div className="flex items-start justify-between gap-6">
                         <div className="min-w-0">
                             <div className="flex flex-col">
                                 <div className="text-xl font-black tracking-tight leading-none">
-                                    <span className="text-neutral-900">IRON</span>
+                                    <span className="text-neutral-100">IRON</span>
                                     <span className="text-yellow-500">TRACKS</span>
                                 </div>
-                                <div className="mt-1 text-[9px] font-black uppercase tracking-[0.24em] text-neutral-500 leading-none">
+                                <div className="mt-1 text-[9px] font-black uppercase tracking-[0.24em] text-neutral-400 leading-none">
                                     Relatório de Performance
                                 </div>
                             </div>
 
                             <div className="mt-4 min-w-0">
-                                <h1 className="text-4xl sm:text-5xl font-black uppercase leading-tight tracking-tight text-neutral-900 text-balance break-normal hyphens-none">
+                                <h1 className="text-4xl sm:text-5xl font-black uppercase leading-tight tracking-tight text-white text-balance break-normal hyphens-none">
                                     {workoutTitleMain}
                                 </h1>
                             </div>
                         </div>
 
                         <div className="shrink-0 text-right">
-                            <div className="font-mono text-xs font-semibold text-neutral-700">
+                            <div className="font-mono text-xs font-semibold text-neutral-300">
                                 {formatDate(session.date)}
                             </div>
                         </div>
                     </div>
 
                     <div className="relative mt-6">
-                        <div className="h-px bg-neutral-200" />
+                        <div className="h-px bg-neutral-800" />
                         <div className="absolute left-0 top-0 h-px w-28 bg-yellow-500" />
                     </div>
                 </div>
 
-                <div className="mb-8 p-4 rounded-xl border border-neutral-200 bg-neutral-50">
+                <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0">
-                            <div className="text-xs font-black uppercase tracking-widest text-neutral-500">IA</div>
-                            <div className="text-lg font-black text-neutral-900">Insights pós-treino</div>
-                            <div className="text-xs text-neutral-600">Resumo + progressão + motivação com IA IronTracks</div>
+                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">IA</div>
+                            <div className="text-lg font-black text-white">Insights pós-treino</div>
+                            <div className="text-xs text-neutral-300">Resumo + progressão + motivação com IA IronTracks</div>
                         </div>
                         <button
                             type="button"
@@ -782,16 +782,16 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                     </div>
 
                     {aiState?.status === 'error' && (
-                        <div className="mt-3 text-sm font-semibold text-red-600">{aiState?.error || 'Falha ao gerar insights.'}</div>
+                        <div className="mt-3 text-sm font-semibold text-red-300">{aiState?.error || 'Falha ao gerar insights.'}</div>
                     )}
 
                     {aiState?.ai && (
                         <div className="mt-4 space-y-3">
                             {aiState.ai.metrics && typeof aiState.ai.metrics === 'object' && (
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    <div className="bg-white rounded-xl border border-neutral-200 p-3">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Volume total</div>
-                                        <div className="text-lg font-mono font-bold text-neutral-900">
+                                    <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Volume total</div>
+                                        <div className="text-lg font-mono font-bold text-white">
                                             {(() => {
                                                 const v = Number(aiState.ai.metrics.totalVolumeKg || 0);
                                                 if (!Number.isFinite(v) || v <= 0) return '—';
@@ -799,9 +799,9 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                             })()}
                                         </div>
                                     </div>
-                                    <div className="bg-white rounded-xl border border-neutral-200 p-3">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Séries concluídas</div>
-                                        <div className="text-lg font-mono font-bold text-neutral-900">
+                                    <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Séries concluídas</div>
+                                        <div className="text-lg font-mono font-bold text-white">
                                             {(() => {
                                                 const v = Number(aiState.ai.metrics.totalSetsDone || 0);
                                                 if (!Number.isFinite(v) || v <= 0) return '—';
@@ -809,9 +809,9 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                             })()}
                                         </div>
                                     </div>
-                                    <div className="bg-white rounded-xl border border-neutral-200 p-3">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Exercícios</div>
-                                        <div className="text-lg font-mono font-bold text-neutral-900">
+                                    <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Exercícios</div>
+                                        <div className="text-lg font-mono font-bold text-white">
                                             {(() => {
                                                 const v = Number(aiState.ai.metrics.totalExercises || 0);
                                                 if (!Number.isFinite(v) || v <= 0) return '—';
@@ -819,9 +819,9 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                             })()}
                                         </div>
                                     </div>
-                                    <div className="bg-white rounded-xl border border-neutral-200 p-3">
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Top exercício</div>
-                                        <div className="text-xs font-semibold text-neutral-900">
+                                    <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Top exercício</div>
+                                        <div className="text-xs font-semibold text-neutral-100">
                                             {(() => {
                                                 const list = Array.isArray(aiState.ai.metrics.topExercises) ? aiState.ai.metrics.topExercises : [];
                                                 if (!list.length) return '—';
@@ -838,20 +838,20 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                             )}
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <div className="md:col-span-2 bg-white rounded-xl border border-neutral-200 p-4">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-2">Resumo</div>
+                                <div className="md:col-span-2 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
+                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Resumo</div>
                                     <ul className="space-y-2">
                                         {(Array.isArray(aiState.ai.summary) ? aiState.ai.summary : []).map((item, idx) => (
-                                            <li key={idx} className="text-sm text-neutral-900">• {String(item || '')}</li>
+                                            <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                     ))}
                                 </ul>
 
                                 {Array.isArray(aiState.ai.highlights) && aiState.ai.highlights.length > 0 && (
                                     <div className="mt-4">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-2">Destaques</div>
+                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Destaques</div>
                                         <ul className="space-y-2">
                                             {aiState.ai.highlights.map((item, idx) => (
-                                                <li key={idx} className="text-sm text-neutral-900">• {String(item || '')}</li>
+                                                <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                             ))}
                                         </ul>
                                     </div>
@@ -859,10 +859,10 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
                                 {Array.isArray(aiState.ai.warnings) && aiState.ai.warnings.length > 0 && (
                                     <div className="mt-4">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-2">Atenção</div>
+                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Atenção</div>
                                         <ul className="space-y-2">
                                             {aiState.ai.warnings.map((item, idx) => (
-                                                <li key={idx} className="text-sm text-neutral-900">• {String(item || '')}</li>
+                                                <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                             ))}
                                         </ul>
                                     </div>
@@ -900,9 +900,9 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                 </div>
 
                                 {Array.isArray(aiState.ai.progression) && aiState.ai.progression.length > 0 && (
-                                    <div className="md:col-span-3 bg-white rounded-xl border border-neutral-200 p-4">
+                                    <div className="md:col-span-3 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
                                         <div className="flex items-center justify-between gap-3 mb-3">
-                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-500">Progressão sugerida (próximo treino)</div>
+                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Progressão sugerida (próximo treino)</div>
                                             <button
                                                 type="button"
                                                 onClick={handleApplyProgression}
@@ -918,21 +918,21 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                             </button>
                                         </div>
                                         {applyState.status === 'error' && (
-                                            <div className="mb-2 text-[11px] font-semibold text-red-600">{applyState.error}</div>
+                                            <div className="mb-2 text-[11px] font-semibold text-red-300">{applyState.error}</div>
                                         )}
                                         {applyState.status === 'success' && (
-                                            <div className="mb-2 text-[11px] font-semibold text-green-700 flex items-center gap-1">
+                                            <div className="mb-2 text-[11px] font-semibold text-green-300 flex items-center gap-1">
                                                 <Check size={12} />
-                                                <span>Template criado para o próximo treino.</span>
+                                                <span>Sugestões aplicadas no próximo treino.</span>
                                             </div>
                                         )}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {aiState.ai.progression.map((rec, idx) => (
-                                                <div key={idx} className="rounded-xl border border-neutral-200 p-3">
-                                                    <div className="text-sm font-black text-neutral-900">{String(rec.exercise || '').trim() || '—'}</div>
-                                                    <div className="text-sm text-neutral-900 mt-1">{String(rec.recommendation || '').trim()}</div>
+                                                <div key={idx} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
+                                                    <div className="text-sm font-black text-neutral-100">{String(rec.exercise || '').trim() || '—'}</div>
+                                                    <div className="text-sm text-neutral-100 mt-1">{String(rec.recommendation || '').trim()}</div>
                                                     {String(rec.reason || '').trim() && (
-                                                        <div className="text-xs text-neutral-600 mt-2">{String(rec.reason || '').trim()}</div>
+                                                        <div className="text-xs text-neutral-400 mt-2">{String(rec.reason || '').trim()}</div>
                                                     )}
                                                 </div>
                                             ))}
@@ -945,14 +945,14 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 </div>
 
                 {isTeamSession && (
-                    <div className="mb-8 p-4 rounded-lg border border-neutral-200 bg-neutral-50 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="mb-8 p-4 rounded-lg border border-neutral-800 bg-neutral-900/60 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                         <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center">
                                 <Users size={18} />
                             </div>
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-widest text-neutral-500">Treino em Equipe</p>
-                                <p className="text-sm font-semibold text-neutral-900">
+                                <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">Treino em Equipe</p>
+                                <p className="text-sm font-semibold text-neutral-100">
                                     {partners.length === 1 ? '1 parceiro treinando com você' : `${partners.length} parceiros treinando com você`}
                                 </p>
                             </div>
@@ -972,25 +972,25 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 )}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200 flex flex-col justify-between">
-                        <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Total</p>
+                    <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800 flex flex-col justify-between">
+                        <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Tempo Total</p>
                         <p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p>
                     </div>
-                    <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200 flex flex-col justify-between">
-                        <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Volume (Kg)</p>
+                    <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800 flex flex-col justify-between">
+                        <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Volume (Kg)</p>
                         <div className="flex flex-col gap-1">
                             <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 min-w-0">
                                 <span className="text-2xl sm:text-3xl font-mono font-bold leading-none min-w-0">
                                     {currentVolume.toLocaleString('pt-BR')}
                                 </span>
-                                <span className="text-sm font-black text-neutral-500">kg</span>
+                                <span className="text-sm font-black text-neutral-400">kg</span>
                             </div>
                             {effectivePreviousSession && Number.isFinite(volumeDelta) && (
                                 <span
                                     className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold w-fit ${
                                         volumeDelta >= 0
-                                            ? 'bg-green-50 text-green-700'
-                                            : 'bg-red-50 text-red-700'
+                                            ? 'bg-green-500/15 text-green-200 border border-green-500/30'
+                                            : 'bg-red-500/15 text-red-200 border border-red-500/30'
                                     }`}
                                 >
                                     {volumeDelta >= 0 ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
@@ -999,11 +999,11 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                             )}
                         </div>
                     </div>
-                    <div className="bg-orange-50 p-4 rounded-lg border border-orange-200 flex flex-col justify-between">
-                        <p className="text-xs font-bold uppercase text-orange-500 mb-1 flex items-center gap-1">
+                    <div className="bg-orange-500/10 p-4 rounded-lg border border-orange-500/30 flex flex-col justify-between">
+                        <p className="text-xs font-bold uppercase text-orange-300 mb-1 flex items-center gap-1">
                             <Flame size={12} /> Calorias
                         </p>
-                        <p className="text-3xl font-mono font-bold text-orange-600">~{calories}</p>
+                        <p className="text-3xl font-mono font-bold text-orange-200">~{calories}</p>
                     </div>
                     <div className="bg-black text-white p-4 rounded-lg flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p>
@@ -1013,22 +1013,22 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
                 {outdoorBike && (Number(outdoorBike?.distanceMeters) > 0 || Number(outdoorBike?.durationSeconds) > 0) && (
                     <div className="mb-8">
-                        <div className="text-xs font-black uppercase tracking-widest text-neutral-500 mb-3">Bike Outdoor</div>
+                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Bike Outdoor</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
-                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Distância</p>
+                            <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
+                                <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Distância</p>
                                 <p className="text-2xl font-mono font-bold">{formatKm(outdoorBike.distanceMeters)}</p>
                             </div>
-                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
-                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Vel. Média</p>
+                            <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
+                                <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Vel. Média</p>
                                 <p className="text-2xl font-mono font-bold">{formatKmh(outdoorBike.avgSpeedKmh)}</p>
                             </div>
-                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
-                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Vel. Máx</p>
+                            <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
+                                <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Vel. Máx</p>
                                 <p className="text-2xl font-mono font-bold">{formatKmh(outdoorBike.maxSpeedKmh)}</p>
                             </div>
-                            <div className="bg-neutral-100 p-4 rounded-lg border border-neutral-200">
-                                <p className="text-xs font-bold uppercase text-neutral-500 mb-1">Tempo Bike</p>
+                            <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
+                                <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Tempo Bike</p>
                                 <p className="text-2xl font-mono font-bold">{formatDuration(Number(outdoorBike.durationSeconds) || 0)}</p>
                             </div>
                         </div>
@@ -1037,7 +1037,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
                 <div className="space-y-8">
                 {(!Array.isArray(session?.exercises) || session.exercises.length === 0) && (
-                    <div className="text-neutral-500 p-4 bg-neutral-100 rounded-lg border border-neutral-200">
+                    <div className="text-neutral-300 p-4 bg-neutral-900/60 rounded-lg border border-neutral-800">
                         Nenhum dado de exercício registrado para este treino.
                     </div>
                 )}
@@ -1058,21 +1058,21 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                     })();
                     return (
                         <div key={exIdx} className="break-inside-avoid">
-                            <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-200 pb-2">
+                            <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-800 pb-2">
                                 <h3 className="text-xl font-bold uppercase flex items-center gap-2">
                                     <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>
                                     {exName || '—'}
                                 </h3>
-                                <div className="flex gap-3 text-xs font-mono text-neutral-500">
-                                    {baseText && <span>Base: <span className="font-bold text-black">{baseText}</span></span>}
-                                    {ex?.method && ex.method !== 'Normal' && <span className="text-red-600 font-bold uppercase">{ex.method}</span>}
-                                    {ex?.rpe && <span>RPE: <span className="font-bold text-black">{ex.rpe}</span></span>}
-                                    <span>Cad: <span className="font-bold text-black">{ex?.cadence || '-'}</span></span>
+                                <div className="flex gap-3 text-xs font-mono text-neutral-400">
+                                    {baseText && <span>Base: <span className="font-bold text-neutral-100">{baseText}</span></span>}
+                                    {ex?.method && ex.method !== 'Normal' && <span className="text-red-300 font-bold uppercase">{ex.method}</span>}
+                                    {ex?.rpe && <span>RPE: <span className="font-bold text-neutral-100">{ex.rpe}</span></span>}
+                                    <span>Cad: <span className="font-bold text-neutral-100">{ex?.cadence || '-'}</span></span>
                                 </div>
                             </div>
                             <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="text-[10px] uppercase tracking-widest text-neutral-500 border-b border-neutral-100">
+                                        <tr className="text-[10px] uppercase tracking-widest text-neutral-400 border-b border-neutral-800">
                                             <th className="py-2 text-left w-16 font-black">Série</th>
                                             <th className="py-2 text-center w-24 font-black">Carga</th>
                                             <th className="py-2 text-center w-24 font-black">Reps</th>
@@ -1102,10 +1102,10 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                                     const delta = cw - pw;
                                                     if (delta > 0) {
                                                         progressionText = `+${String(delta).replace(/\\.0+$/, '')}kg`;
-                                                        rowClass = "bg-green-50 text-green-900 font-bold";
+                                                        rowClass = "bg-green-500/15 text-green-200 font-bold";
                                                     } else if (delta < 0) {
                                                         progressionText = `${String(delta).replace(/\\.0+$/, '')}kg`;
-                                                        rowClass = "text-red-600 font-bold";
+                                                        rowClass = "text-red-300 font-bold";
                                                     } else {
                                                         progressionText = "=";
                                                     }
@@ -1113,10 +1113,10 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                                     const delta = cr - pr;
                                                     if (delta > 0) {
                                                         progressionText = `+${delta} reps`;
-                                                        rowClass = "bg-green-50 text-green-900 font-bold";
+                                                        rowClass = "bg-green-500/15 text-green-200 font-bold";
                                                     } else if (delta < 0) {
                                                         progressionText = `${delta} reps`;
-                                                        rowClass = "text-red-600 font-bold";
+                                                        rowClass = "text-red-300 font-bold";
                                                     } else {
                                                         progressionText = "=";
                                                     }
@@ -1124,8 +1124,8 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                                             }
 
                                             return (
-                                                <tr key={sIdx} className="border-b border-neutral-100">
-                                                    <td className="py-2 font-mono text-neutral-500 text-xs">#{sIdx + 1}</td>
+                                                <tr key={sIdx} className="border-b border-neutral-800">
+                                                    <td className="py-2 font-mono text-neutral-400 text-xs">#{sIdx + 1}</td>
                                                     <td className="py-2 text-center font-semibold text-sm">{log.weight || '-'}</td>
                                                     <td className="py-2 text-center font-mono text-sm">{log.reps || '-'}</td>
                                                     <td className={`py-2 text-center text-[11px] uppercase ${rowClass}`}>{progressionText}</td>
@@ -1138,7 +1138,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                         );
                     })}
                 </div>
-                <div className="mt-12 pt-6 border-t border-neutral-200 text-center text-xs text-neutral-400 uppercase tracking-widest">
+                <div className="mt-12 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-400 uppercase tracking-widest">
                     IronTracks System • {getCurrentDate()}
                 </div>
             </div>
@@ -1148,7 +1148,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                 <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur flex flex-col">
                     <div className="p-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between h-16 pt-safe">
                         <h3 className="text-white font-bold">Pré-visualização</h3>
-                        <button onClick={closePreview} className="bg-white text-black px-4 py-2 rounded-lg font-bold">Fechar</button>
+                        <button onClick={closePreview} className="bg-neutral-800 text-white px-4 py-2 rounded-lg font-bold border border-neutral-700 hover:bg-neutral-700">Fechar</button>
                     </div>
                     <div className="flex-1 bg-white">
                         <iframe ref={pdfFrameRef} src={pdfUrl} className="w-full h-full" />

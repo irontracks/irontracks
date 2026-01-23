@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Pencil, Play, Plus, Save, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Pencil, Play, Plus, Save, Sparkles, UserPlus, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { BackButton } from '@/components/ui/BackButton';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
@@ -68,6 +68,7 @@ export default function ActiveWorkout(props) {
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [finishing, setFinishing] = useState(false);
   const [openNotesKeys, setOpenNotesKeys] = useState(() => new Set());
+  const [openAiHints, setOpenAiHints] = useState(() => new Set());
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const restPauseRefs = useRef({});
@@ -1057,6 +1058,18 @@ export default function ActiveWorkout(props) {
     const collapsedNow = collapsed.has(exIdx);
     const restTime = resolveRestTimeSeconds(ex);
     const videoUrl = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
+    const aiSuggestion = (() => {
+      const first = Array.isArray(sdArr) && sdArr.length > 0 ? sdArr[0] : null;
+      const cfg = first && typeof first === 'object' ? (first.advanced_config ?? first.advancedConfig ?? null) : null;
+      const sug = cfg && typeof cfg === 'object' ? (cfg.ai_suggestion ?? cfg.aiSuggestion ?? null) : null;
+      if (!sug || typeof sug !== 'object') return null;
+      const rec = String(sug?.recommendation || '').trim();
+      const reason = String(sug?.reason || '').trim();
+      if (!rec) return null;
+      return { recommendation: rec, reason };
+    })();
+    const aiKey = `ai-${exIdx}`;
+    const aiOpen = openAiHints.has(aiKey);
 
     return (
       <div key={`ex-${exIdx}`} className="rounded-xl bg-neutral-800 border border-neutral-700 p-4">
@@ -1084,7 +1097,40 @@ export default function ActiveWorkout(props) {
               <span className="font-mono">{restTime ? `${restTime}s` : '-'}</span>
               <span className="opacity-30">•</span>
               <span className="truncate">{String(ex?.method || 'Normal')}</span>
+              {aiSuggestion ? (
+                <>
+                  <span className="opacity-30">•</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      try {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      } catch {}
+                      setOpenAiHints((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(aiKey)) next.delete(aiKey);
+                        else next.add(aiKey);
+                        return next;
+                      });
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-900/40 border border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-900 transition-colors max-w-[260px]"
+                    aria-label="Sugestão da IA"
+                  >
+                    <Sparkles size={12} className="text-yellow-500" />
+                    <span className="truncate">IA: {aiSuggestion.recommendation}</span>
+                  </button>
+                </>
+              ) : null}
             </div>
+            {aiSuggestion && aiOpen ? (
+              <div className="mt-2 rounded-xl bg-neutral-950/40 border border-neutral-800 px-3 py-2">
+                <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-snug">
+                  {aiSuggestion.recommendation}
+                  {aiSuggestion.reason ? `\n${aiSuggestion.reason}` : ''}
+                </div>
+              </div>
+            ) : null}
             {observation ? (
               <div className="mt-2 rounded-xl bg-neutral-900/50 border border-yellow-500/20 px-3 py-2">
                 <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>

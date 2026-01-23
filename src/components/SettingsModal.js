@@ -23,6 +23,7 @@ export default function SettingsModal(props) {
 
   const density = String(draft?.dashboardDensity || 'comfortable')
   const units = String(draft?.units || 'kg')
+  const showStoriesBar = Boolean(draft?.showStoriesBar ?? true)
   const showNewRecordsCard = Boolean(draft?.showNewRecordsCard ?? true)
   const showIronRank = Boolean(draft?.showIronRank ?? true)
   const showBadges = Boolean(draft?.showBadges ?? true)
@@ -160,6 +161,24 @@ export default function SettingsModal(props) {
                   }
                 >
                   {showBadges ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Stories no Dashboard</div>
+                  <div className="text-xs text-neutral-400">Mostra a barra de stories no topo do dashboard.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('showStoriesBar', !showStoriesBar)}
+                  className={
+                    showStoriesBar
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {showStoriesBar ? 'Ativo' : 'Desligado'}
                 </button>
               </div>
 

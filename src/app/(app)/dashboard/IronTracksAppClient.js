@@ -224,7 +224,10 @@ function IronTracksApp({ initialUser, initialProfile }) {
         const lastSeenAt = Number(prefs?.whatsNewLastSeenAt || 0) || 0
         const remind24h = prefs?.whatsNewRemind24h !== false
         const within24h = lastSeenAt > 0 && Date.now() - lastSeenAt < 24 * 60 * 60 * 1000
-        if (lastSeenId === String(entry.id) && (!remind24h || !within24h)) return
+        if (lastSeenId === String(entry.id)) {
+            if (!remind24h) return
+            if (within24h) return
+        }
         whatsNewShownRef.current = true
         setWhatsNewOpen(true)
     }, [user?.id, userSettingsApi?.loaded, userSettingsApi?.settings])
@@ -236,8 +239,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
             if (!entry?.id) return
             const prev = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
             const prevSeenId = String(prev?.whatsNewLastSeenId || '')
-            const prevSeenAt = Number(prev?.whatsNewLastSeenAt || 0) || 0
-            const nextSeenAt = prevSeenId === String(entry.id) && prevSeenAt > 0 ? prevSeenAt : Date.now()
+            const nextSeenAt = Date.now()
             const next = { ...(prev || {}), whatsNewLastSeenId: String(entry.id), whatsNewLastSeenAt: nextSeenAt }
             try { userSettingsApi?.setSettings?.(next) } catch {}
             try { await userSettingsApi?.save?.(next) } catch {}
