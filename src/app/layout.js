@@ -48,7 +48,7 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
-  const inlineScript = `(() => {
+  const inlineScript = process.env.NODE_ENV === "production" ? `(() => {
   const now = () => Date.now();
   const ss = () => {
     try {
@@ -291,17 +291,19 @@ export default function RootLayout({ children }) {
   });
   window.addEventListener("focus", onVisible);
   setTimeout(onVisible, 200);
-})();`;
+})();` : "";
   return (
     <html lang="pt-BR">
       <head>
         <link rel="icon" href="/icone.png" type="image/png" />
         <link rel="apple-touch-icon" href="/icone.png" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: inlineScript,
-          }}
-        />
+        {inlineScript ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: inlineScript,
+            }}
+          />
+        ) : null}
       </head>
       <body className="antialiased bg-neutral-950 text-white">
         {children}

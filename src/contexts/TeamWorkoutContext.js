@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { playStartSound } from '@/lib/sounds';
+import { useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 
 const TeamWorkoutContext = createContext({
     incomingInvites: [],
@@ -29,6 +30,7 @@ export const TeamWorkoutProvider = ({ children, user, settings }) => {
     const [loading, setLoading] = useState(false);
     const supabase = useMemo(() => createClient(), []);
     const seenAcceptedInviteIdsRef = useRef(new Set());
+    const { notify } = useInAppNotifications();
 
     const canReceiveInvites = useMemo(() => {
         const s = settings && typeof settings === 'object' ? settings : null;
@@ -128,6 +130,17 @@ export const TeamWorkoutProvider = ({ children, user, settings }) => {
                                 workout: newInvite.workout_data
                             }, ...current];
                         });
+                        try {
+                            const fromName = String(profile?.display_name || 'Alguém').trim() || 'Alguém';
+                            notify({
+                                id: newInvite.id,
+                                type: 'invite',
+                                senderName: fromName,
+                                displayName: 'Convite',
+                                photoURL: profile?.photo_url || null,
+                                text: `${fromName} te convidou para treinar junto.`,
+                            });
+                        } catch {}
                         try { playStartSound(soundOpts); } catch {}
                     } catch {
                         return;
@@ -167,7 +180,7 @@ export const TeamWorkoutProvider = ({ children, user, settings }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, user?.id, refetchInvites, canReceiveInvites, soundOpts]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites, soundOpts, notify]);
 
     // Fallback: if invites realtime isn't enabled, notifications will still fire
     useEffect(() => {

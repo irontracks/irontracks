@@ -57,6 +57,7 @@ const RealtimeNotificationBridge = ({ userId, setNotification }) => {
               }
 
               safeSetNotification({
+                id: n?.id ?? null,
                 text: message,
                 displayName: title,
                 photoURL: null,

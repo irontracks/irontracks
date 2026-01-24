@@ -4,9 +4,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import NotificationToast from '@/components/NotificationToast'
-import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge'
 import { useUserSettings } from '@/hooks/useUserSettings'
+import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext'
 import { ArrowLeft, Search, Settings, UserPlus, UserMinus } from 'lucide-react'
 
 type ProfileRow = {
@@ -40,8 +39,18 @@ const formatRoleLabel = (raw: any) => {
 }
 
 export default function CommunityClient({ embedded }: { embedded?: boolean }) {
+  if (embedded) return <CommunityClientInner embedded />
+  return (
+    <InAppNotificationsProvider>
+      <CommunityClientInner />
+    </InAppNotificationsProvider>
+  )
+}
+
+function CommunityClientInner({ embedded }: { embedded?: boolean }) {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
+  const { notify } = useInAppNotifications()
   const [userId, setUserId] = useState<string>('')
   const userSettingsApi = useUserSettings(userId)
   const [communitySettingsOpen, setCommunitySettingsOpen] = useState(false)
@@ -49,7 +58,6 @@ export default function CommunityClient({ embedded }: { embedded?: boolean }) {
   const [profiles, setProfiles] = useState<ProfileRow[]>([])
   const [follows, setFollows] = useState<Map<string, FollowRow>>(new Map())
   const [followRequests, setFollowRequests] = useState<FollowRequestItem[]>([])
-  const [toastNotification, setToastNotification] = useState<any>(null)
   const [loadError, setLoadError] = useState<string>('')
   const [query, setQuery] = useState('')
   const [busyId, setBusyId] = useState<string>('')
@@ -61,7 +69,7 @@ export default function CommunityClient({ embedded }: { embedded?: boolean }) {
       if (!msg) return
       const allowToasts = Boolean(userSettingsApi?.settings?.inAppToasts ?? true)
       if (allowToasts) {
-        setToastNotification({
+        notify({
           text: msg,
           senderName: 'Comunidade',
           displayName: 'Comunidade',
@@ -74,7 +82,7 @@ export default function CommunityClient({ embedded }: { embedded?: boolean }) {
         if (typeof window !== 'undefined') window.alert(msg)
       } catch {}
     },
-    [userSettingsApi?.settings?.inAppToasts]
+    [notify, userSettingsApi?.settings?.inAppToasts]
   )
 
   useEffect(() => {
@@ -550,16 +558,6 @@ export default function CommunityClient({ embedded }: { embedded?: boolean }) {
   return (
     <div className={embedded ? '' : "min-h-screen bg-neutral-900 text-white p-4"}>
       <div className={embedded ? "space-y-4" : "max-w-4xl mx-auto space-y-4"}>
-        {userId ? <RealtimeNotificationBridge userId={userId} setNotification={setToastNotification} /> : null}
-        {toastNotification && (
-          <NotificationToast
-            settings={userSettingsApi?.settings ?? null}
-            notification={toastNotification}
-            durationMs={5000}
-            onClick={() => setToastNotification(null)}
-            onClose={() => setToastNotification(null)}
-          />
-        )}
         <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
