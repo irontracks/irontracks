@@ -27,6 +27,14 @@ import { normalizeWorkoutTitle, workoutTitleKey } from '@/utils/workoutTitle';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
+const COACH_INBOX_DEFAULTS = {
+    churnDays: 7,
+    volumeDropPct: 30,
+    loadSpikePct: 60,
+    minPrev7Volume: 500,
+    minCurrent7VolumeSpike: 800,
+    snoozeDefaultMinutes: 1440,
+};
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -107,6 +115,19 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [videoExerciseName, setVideoExerciseName] = useState('');
     const [videoQueue, setVideoQueue] = useState([]);
     const [videoLoading, setVideoLoading] = useState(false);
+
+    const [prioritiesItems, setPrioritiesItems] = useState([]);
+    const [prioritiesLoading, setPrioritiesLoading] = useState(false);
+    const [prioritiesError, setPrioritiesError] = useState('');
+    const [prioritiesSettingsOpen, setPrioritiesSettingsOpen] = useState(false);
+    const [prioritiesSettingsLoading, setPrioritiesSettingsLoading] = useState(false);
+    const [prioritiesSettingsError, setPrioritiesSettingsError] = useState('');
+    const [prioritiesSettings, setPrioritiesSettings] = useState(() => ({ ...COACH_INBOX_DEFAULTS }));
+    const prioritiesSettingsPrefRef = useRef(null);
+    const [prioritiesComposeOpen, setPrioritiesComposeOpen] = useState(false);
+    const [prioritiesComposeStudentId, setPrioritiesComposeStudentId] = useState('');
+    const [prioritiesComposeKind, setPrioritiesComposeKind] = useState('');
+    const [prioritiesComposeText, setPrioritiesComposeText] = useState('');
     const [videoBackfillLimit, setVideoBackfillLimit] = useState('20');
     const [videoMissingCount, setVideoMissingCount] = useState(null);
     const [videoMissingLoading, setVideoMissingLoading] = useState(false);
@@ -943,6 +964,113 @@ const AdminPanelV2 = ({ user, onClose }) => {
         if (tab === 'dashboard') fetchMyWorkoutsCount();
     }, [tab, isAdmin, supabase]);
 
+    const fetchPriorities = useCallback(async () => {
+        try {
+            setPrioritiesLoading(true);
+            setPrioritiesError('');
+            const res = await fetch('/api/teacher/inbox/feed?limit=80', { cache: 'no-store', credentials: 'include' });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.ok) {
+                setPrioritiesItems([]);
+                setPrioritiesError(String(json?.error || `Falha ao carregar (${res.status})`));
+                return;
+            }
+            setPrioritiesItems(Array.isArray(json.items) ? json.items : []);
+        } catch (e) {
+            setPrioritiesItems([]);
+            setPrioritiesError(e?.message ? String(e.message) : 'Erro ao carregar');
+        } finally {
+            setPrioritiesLoading(false);
+        }
+    }, []);
+
+    const normalizeCoachInboxSettings = useCallback((raw) => {
+        const s = raw && typeof raw === 'object' ? raw : {};
+        const toInt = (v, min, max, fallback) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return fallback;
+            const x = Math.floor(n);
+            return Math.max(min, Math.min(max, x));
+        };
+        return {
+            churnDays: toInt(s?.churnDays, 1, 60, COACH_INBOX_DEFAULTS.churnDays),
+            volumeDropPct: toInt(s?.volumeDropPct, 5, 90, COACH_INBOX_DEFAULTS.volumeDropPct),
+            loadSpikePct: toInt(s?.loadSpikePct, 10, 300, COACH_INBOX_DEFAULTS.loadSpikePct),
+            minPrev7Volume: toInt(s?.minPrev7Volume, 0, 1000000, COACH_INBOX_DEFAULTS.minPrev7Volume),
+            minCurrent7VolumeSpike: toInt(s?.minCurrent7VolumeSpike, 0, 1000000, COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike),
+            snoozeDefaultMinutes: toInt(s?.snoozeDefaultMinutes, 5, 10080, COACH_INBOX_DEFAULTS.snoozeDefaultMinutes),
+        };
+    }, []);
+
+    const loadPrioritiesSettings = useCallback(async () => {
+        try {
+            setPrioritiesSettingsLoading(true);
+            setPrioritiesSettingsError('');
+            const uid = user?.id ? String(user.id) : '';
+            if (!uid) return;
+            const { data, error } = await supabase
+                .from('user_settings')
+                .select('preferences')
+                .eq('user_id', uid)
+                .maybeSingle();
+            if (error) {
+                const msg = String(error?.message || '');
+                const code = String(error?.code || '');
+                const missing = code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg);
+                if (missing) {
+                    prioritiesSettingsPrefRef.current = null;
+                    setPrioritiesSettings({ ...COACH_INBOX_DEFAULTS });
+                    setPrioritiesSettingsError('Tabela user_settings não disponível (migrations pendentes).');
+                    return;
+                }
+                setPrioritiesSettingsError(msg || 'Falha ao carregar configurações.');
+                return;
+            }
+            const prefs = data?.preferences && typeof data.preferences === 'object' ? data.preferences : {};
+            prioritiesSettingsPrefRef.current = prefs;
+            const next = normalizeCoachInboxSettings(prefs?.coachInbox);
+            setPrioritiesSettings(next);
+        } catch (e) {
+            setPrioritiesSettingsError(e?.message ? String(e.message) : 'Falha ao carregar configurações.');
+        } finally {
+            setPrioritiesSettingsLoading(false);
+        }
+    }, [normalizeCoachInboxSettings, supabase, user?.id]);
+
+    const savePrioritiesSettings = useCallback(async () => {
+        try {
+            const uid = user?.id ? String(user.id) : '';
+            if (!uid) return false;
+            setPrioritiesSettingsLoading(true);
+            setPrioritiesSettingsError('');
+            const basePrefs = prioritiesSettingsPrefRef.current && typeof prioritiesSettingsPrefRef.current === 'object'
+                ? prioritiesSettingsPrefRef.current
+                : {};
+            const payload = {
+                user_id: uid,
+                preferences: { ...basePrefs, coachInbox: normalizeCoachInboxSettings(prioritiesSettings) },
+                updated_at: new Date().toISOString(),
+            };
+            const { error } = await supabase.from('user_settings').upsert(payload, { onConflict: 'user_id' });
+            if (error) {
+                setPrioritiesSettingsError(String(error?.message || 'Falha ao salvar.'));
+                return false;
+            }
+            prioritiesSettingsPrefRef.current = payload.preferences;
+            return true;
+        } catch (e) {
+            setPrioritiesSettingsError(e?.message ? String(e.message) : 'Falha ao salvar.');
+            return false;
+        } finally {
+            setPrioritiesSettingsLoading(false);
+        }
+    }, [normalizeCoachInboxSettings, prioritiesSettings, supabase, user?.id]);
+
+    useEffect(() => {
+        if (tab !== 'priorities') return;
+        fetchPriorities();
+    }, [tab, fetchPriorities]);
+
     useEffect(() => {
         if (!selectedStudent) return;
         const fetchDetails = async () => {
@@ -1383,6 +1511,12 @@ const AdminPanelV2 = ({ user, onClose }) => {
 	if (isAdmin) {
 		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', system: 'SISTEMA' };
 	}
+	if (isTeacher && !isAdmin) {
+		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
+	}
+	if (isAdmin) {
+		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
+	}
 
 	const tabKeys = Object.keys(TAB_LABELS);
 	const currentTabLabel = TAB_LABELS[tab] || 'VISÃO GERAL';
@@ -1676,6 +1810,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     else if (key === 'templates') subtitle = 'Biblioteca de treinos-base';
                                     else if (key === 'teachers') subtitle = 'Gestão de professores e convites';
                                     else if (key === 'videos') subtitle = 'Fila de vídeos por exercício';
+                                    else if (key === 'priorities') subtitle = 'Triagem inteligente do coach';
                                     else if (key === 'errors') subtitle = 'Erros reportados pelos usuários';
                                     else if (key === 'system') subtitle = 'Backup, broadcasts e operações críticas';
 
@@ -1713,6 +1848,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     {key === 'templates' && <Dumbbell size={16} className={iconColor} />}
                                                     {key === 'teachers' && <UserCog size={16} className={iconColor} />}
                                                     {key === 'videos' && <Play size={16} className={iconColor} />}
+                                                    {key === 'priorities' && <AlertCircle size={16} className={iconColor} />}
                                                     {key === 'errors' && <AlertTriangle size={16} className={iconColor} />}
                                                     {key === 'system' && <ShieldAlert size={16} className={iconColor} />}
                                                 </div>
@@ -1876,6 +2012,174 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         )}
                     </div>
                 )}
+
+				{tab === 'priorities' && !selectedStudent && (
+					<div className="w-full space-y-4">
+						<div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+							<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+								<div className="min-w-0">
+									<div className="flex items-center gap-2">
+										<AlertCircle size={18} className="text-yellow-500" />
+										<h2 className="text-base md:text-lg font-black tracking-tight">Prioridades</h2>
+									</div>
+									<div className="mt-1 text-xs text-neutral-400 font-semibold">
+										{prioritiesLoading ? 'Carregando...' : `${Array.isArray(prioritiesItems) ? prioritiesItems.length : 0} item(ns)`}
+									</div>
+								</div>
+								<div className="flex flex-col sm:flex-row gap-2">
+									<button
+										type="button"
+										onClick={async () => {
+											try {
+												setPrioritiesSettingsOpen(true);
+												await loadPrioritiesSettings();
+											} catch {}
+										}}
+										className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+									>
+										Configurar
+									</button>
+									<button
+										type="button"
+										onClick={() => fetchPriorities()}
+										disabled={prioritiesLoading}
+										className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 disabled:opacity-60"
+									>
+										Atualizar
+									</button>
+								</div>
+							</div>
+						</div>
+
+						{prioritiesError ? (
+							<div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+								{prioritiesError}
+							</div>
+						) : null}
+
+						{prioritiesLoading ? (
+							<div className="text-center animate-pulse text-neutral-400 font-semibold">Carregando prioridades...</div>
+						) : !Array.isArray(prioritiesItems) || prioritiesItems.length === 0 ? (
+							<div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 text-neutral-400 font-semibold">
+								Nenhuma prioridade no momento.
+							</div>
+						) : (
+							<div className="space-y-3">
+								{prioritiesItems.map((it) => {
+									const itemId = String(it?.id || '').trim();
+									const studentId = String(it?.student_user_id || '').trim();
+									const studentName = String(it?.student_name || '').trim();
+									const kind = String(it?.kind || '').trim();
+									const title = String(it?.title || '').trim();
+									const reason = String(it?.reason || '').trim();
+									const msg = String(it?.suggested_message || '').trim();
+									const badgeTone =
+										kind === 'load_spike'
+											? 'border-red-500/30 text-red-300'
+											: kind === 'volume_drop'
+												? 'border-yellow-500/30 text-yellow-300'
+												: 'border-neutral-500/30 text-neutral-200';
+									return (
+										<div key={itemId || `${studentId}:${kind}`} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+											<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+												<div className="min-w-0">
+													<div className="flex flex-wrap items-center gap-2">
+														<div className="text-base font-black text-white truncate">{studentName || 'Aluno'}</div>
+														<span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${badgeTone}`}>{title || kind}</span>
+													</div>
+													{reason ? (
+														<div className="mt-1 text-xs text-neutral-400 font-semibold">{reason}</div>
+													) : null}
+												</div>
+												<div className="flex flex-col sm:flex-row gap-2">
+													<button
+														type="button"
+														onClick={() => {
+															try {
+																const found = (Array.isArray(usersList) ? usersList : []).find((s) => String(s?.user_id || '').trim() === studentId);
+																setTab('students');
+																setSelectedStudent(found || null);
+																if (!found) setStudentQuery(studentName || '');
+															} catch {}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Ver aluno
+													</button>
+													<button
+														type="button"
+														onClick={() => {
+															setPrioritiesComposeStudentId(studentId);
+															setPrioritiesComposeKind(kind);
+															setPrioritiesComposeText(msg);
+															setPrioritiesComposeOpen(true);
+														}}
+														className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Enviar mensagem
+													</button>
+													<button
+														type="button"
+														onClick={async () => {
+															try {
+																const v = await prompt('Sonecar (minutos)', String(prioritiesSettings?.snoozeDefaultMinutes ?? COACH_INBOX_DEFAULTS.snoozeDefaultMinutes));
+																const minutes = Number(String(v || '').trim());
+																if (!Number.isFinite(minutes) || minutes <= 0) return;
+																const res = await fetch('/api/teacher/inbox/action', {
+																	method: 'POST',
+																	credentials: 'include',
+																	headers: { 'content-type': 'application/json' },
+																	body: JSON.stringify({ student_user_id: studentId, kind, action: 'snooze', snooze_minutes: minutes }),
+																});
+																const json = await res.json().catch(() => null);
+																if (!res.ok || !json?.ok) {
+																	await alert(String(json?.error || `Falha ao sonecar (${res.status})`));
+																	return;
+																}
+																setPrioritiesItems((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== itemId) : prev));
+															} catch (e) {
+																await alert('Erro: ' + (e?.message ?? String(e)));
+															}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Sonecar
+													</button>
+													<button
+														type="button"
+														onClick={async () => {
+															try {
+																const ok = await confirm('Concluir este item?', 'Prioridades');
+																if (!ok) return;
+																const res = await fetch('/api/teacher/inbox/action', {
+																	method: 'POST',
+																	credentials: 'include',
+																	headers: { 'content-type': 'application/json' },
+																	body: JSON.stringify({ student_user_id: studentId, kind, action: 'done' }),
+																});
+																const json = await res.json().catch(() => null);
+																if (!res.ok || !json?.ok) {
+																	await alert(String(json?.error || `Falha ao concluir (${res.status})`));
+																	return;
+																}
+																setPrioritiesItems((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== itemId) : prev));
+															} catch (e) {
+																await alert('Erro: ' + (e?.message ?? String(e)));
+															}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Concluir
+													</button>
+												</div>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						)}
+					</div>
+				)}
 
 				{tab === 'students' && !selectedStudent && (
 					<div className="w-full space-y-4">
@@ -3688,6 +3992,189 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 )}
             </div>
         )}
+
+                {prioritiesComposeOpen ? (
+                    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPrioritiesComposeOpen(false)}>
+                        <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Enviar mensagem</div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPrioritiesComposeOpen(false)}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4 space-y-3">
+                                <textarea
+                                    value={prioritiesComposeText}
+                                    onChange={(e) => setPrioritiesComposeText(e.target.value)}
+                                    rows={5}
+                                    className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                    placeholder="Escreva sua mensagem..."
+                                />
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPrioritiesComposeOpen(false)}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                const content = String(prioritiesComposeText || '').trim();
+                                                const studentId = String(prioritiesComposeStudentId || '').trim();
+                                                const kind = String(prioritiesComposeKind || '').trim();
+                                                if (!content || !studentId || !kind) return;
+                                                const res = await fetch('/api/teacher/inbox/send-message', {
+                                                    method: 'POST',
+                                                    credentials: 'include',
+                                                    headers: { 'content-type': 'application/json' },
+                                                    body: JSON.stringify({ student_user_id: studentId, content }),
+                                                });
+                                                const json = await res.json().catch(() => null);
+                                                if (!res.ok || !json?.ok) {
+                                                    await alert(String(json?.error || `Falha ao enviar (${res.status})`));
+                                                    return;
+                                                }
+                                                try {
+                                                    await fetch('/api/teacher/inbox/action', {
+                                                        method: 'POST',
+                                                        credentials: 'include',
+                                                        headers: { 'content-type': 'application/json' },
+                                                        body: JSON.stringify({ student_user_id: studentId, kind, action: 'done' }),
+                                                    });
+                                                } catch {}
+                                                setPrioritiesComposeOpen(false);
+                                                setPrioritiesComposeStudentId('');
+                                                setPrioritiesComposeKind('');
+                                                setPrioritiesComposeText('');
+                                                fetchPriorities();
+                                            } catch (e) {
+                                                await alert('Erro: ' + (e?.message ?? String(e)));
+                                            }
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95"
+                                    >
+                                        Enviar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {prioritiesSettingsOpen ? (
+                    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPrioritiesSettingsOpen(false)}>
+                        <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Configurar Prioridades</div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPrioritiesSettingsOpen(false)}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4 space-y-4">
+                                {prioritiesSettingsError ? (
+                                    <div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+                                        {prioritiesSettingsError}
+                                    </div>
+                                ) : null}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Churn (dias sem treino)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.churnDays ?? COACH_INBOX_DEFAULTS.churnDays)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), churnDays: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Queda de volume (%)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.volumeDropPct ?? COACH_INBOX_DEFAULTS.volumeDropPct)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), volumeDropPct: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Aumento de carga (%)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.loadSpikePct ?? COACH_INBOX_DEFAULTS.loadSpikePct)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), loadSpikePct: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Volume mínimo (7d anterior)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.minPrev7Volume ?? COACH_INBOX_DEFAULTS.minPrev7Volume)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), minPrev7Volume: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Volume mínimo (7d atual p/ spike)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.minCurrent7VolumeSpike ?? COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), minCurrent7VolumeSpike: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Soneca padrão (min)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.snoozeDefaultMinutes ?? COACH_INBOX_DEFAULTS.snoozeDefaultMinutes)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), snoozeDefaultMinutes: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={prioritiesSettingsLoading}
+                                        onClick={() => {
+                                            setPrioritiesSettings({ ...COACH_INBOX_DEFAULTS });
+                                            setPrioritiesSettingsError('');
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
+                                    >
+                                        Resetar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={prioritiesSettingsLoading}
+                                        onClick={async () => {
+                                            const ok = await savePrioritiesSettings();
+                                            if (!ok) return;
+                                            setPrioritiesSettingsOpen(false);
+                                            fetchPriorities();
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
+                                    >
+                                        {prioritiesSettingsLoading ? 'Salvando...' : 'Salvar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
 
                 {executionVideoModalOpen && executionVideoModalUrl ? (
                     <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
