@@ -7,6 +7,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import InviteManager from '@/components/InviteManager';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
+import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
@@ -1158,12 +1159,25 @@ export default function ActiveWorkout(props) {
                 <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">Vídeo</span>
               </button>
             ) : null}
+            <ExecutionVideoCapture
+              exerciseName={name}
+              workoutId={workout?.id || null}
+              exerciseId={ex?.id || ex?.exercise_id || null}
+              exerciseLibraryId={ex?.exercise_library_id || null}
+            />
             {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
           </div>
         </div>
 
         {!collapsedNow && (
           <div className="mt-4 space-y-2">
+            <ExecutionVideoCapture
+              variant="wide"
+              exerciseName={name}
+              workoutId={workout?.id || null}
+              exerciseId={ex?.id || ex?.exercise_id || null}
+              exerciseLibraryId={ex?.exercise_library_id || null}
+            />
             {Array.from({ length: setsCount }).map((_, setIdx) => renderSet(ex, exIdx, setIdx))}
             <button
               type="button"

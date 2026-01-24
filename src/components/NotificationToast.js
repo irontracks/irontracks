@@ -20,7 +20,7 @@ export default function NotificationToast(props) {
         }
       : null)
 
-  const durationMs = Number(props?.durationMs ?? 5000)
+  const durationMs = Number(props?.durationMs ?? 7000)
   const shouldRender = !!notification && allowToast
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function NotificationToast(props) {
   return (
     <div
       onClick={handleRootClick}
-      className="fixed top-4 right-4 z-[2000] w-[360px] max-w-[calc(100vw-2rem)] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer"
+      className="fixed top-4 right-4 z-[999999] w-[360px] max-w-[calc(100vw-2rem)] bg-neutral-800 border-l-4 border-yellow-500 rounded-r-lg shadow-2xl p-4 flex items-center gap-3 animate-slide-down cursor-pointer"
     >
       {photoURL ? (
         <Image

@@ -30,7 +30,10 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId) {
+      setLoading(false)
+      return
+    }
 
     const load = async () => {
       try {

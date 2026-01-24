@@ -7,6 +7,7 @@ import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/a
 import { createClient } from '@/utils/supabase/client';
 import StoryComposer from '@/components/StoryComposer';
 import { getKcalEstimate } from '@/utils/calories/kcalClient';
+import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 
 const parseSessionNotes = (notes) => {
     try {
@@ -27,6 +28,81 @@ const normalizeExerciseKey = (v) => {
         return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
     } catch {
         return '';
+    }
+};
+
+const remapPrevLogsByCanonical = (prevLogsByExercise, canonicalMap) => {
+    try {
+        const src = prevLogsByExercise && typeof prevLogsByExercise === 'object' ? prevLogsByExercise : {};
+        const map = canonicalMap && typeof canonicalMap === 'object' ? canonicalMap : {};
+        const out = {};
+        Object.keys(src).forEach((k) => {
+            const baseKey = String(k || '').trim();
+            if (!baseKey) return;
+            const aliasNorm = normalizeExerciseName(baseKey);
+            const canonicalName = String(map?.[aliasNorm] || baseKey).trim() || baseKey;
+            const nextKey = normalizeExerciseKey(canonicalName);
+            if (!nextKey) return;
+            const logsArr = Array.isArray(src[k]) ? src[k] : [];
+            if (!out[nextKey]) {
+                out[nextKey] = logsArr;
+                return;
+            }
+            const merged = Array.isArray(out[nextKey]) ? out[nextKey].slice() : [];
+            const maxLen = Math.max(merged.length, logsArr.length);
+            for (let i = 0; i < maxLen; i += 1) {
+                if (merged[i] == null && logsArr[i] != null) merged[i] = logsArr[i];
+            }
+            out[nextKey] = merged;
+        });
+        return out;
+    } catch {
+        return prevLogsByExercise || {};
+    }
+};
+
+const remapPrevBaseMsByCanonical = (prevBaseMsByExercise, canonicalMap) => {
+    try {
+        const src = prevBaseMsByExercise && typeof prevBaseMsByExercise === 'object' ? prevBaseMsByExercise : {};
+        const map = canonicalMap && typeof canonicalMap === 'object' ? canonicalMap : {};
+        const out = {};
+        Object.keys(src).forEach((k) => {
+            const baseKey = String(k || '').trim();
+            if (!baseKey) return;
+            const aliasNorm = normalizeExerciseName(baseKey);
+            const canonicalName = String(map?.[aliasNorm] || baseKey).trim() || baseKey;
+            const nextKey = normalizeExerciseKey(canonicalName);
+            if (!nextKey) return;
+            if (out[nextKey] == null) out[nextKey] = src[k];
+        });
+        return out;
+    } catch {
+        return prevBaseMsByExercise || {};
+    }
+};
+
+const applyCanonicalNamesToSession = (sessionObj, canonicalMap) => {
+    try {
+        const base = sessionObj && typeof sessionObj === 'object' ? sessionObj : null;
+        if (!base) return sessionObj;
+        const map = canonicalMap && typeof canonicalMap === 'object' ? canonicalMap : {};
+        const exs = Array.isArray(base?.exercises) ? base.exercises : [];
+        if (!exs.length) return sessionObj;
+        const nextExercises = exs.map((ex) => {
+            try {
+                const rawName = String(ex?.name || '').trim();
+                if (!rawName) return ex;
+                const aliasNorm = normalizeExerciseName(rawName);
+                const canonicalName = String(map?.[aliasNorm] || rawName).trim();
+                if (!canonicalName || canonicalName === rawName) return ex;
+                return { ...ex, name: canonicalName };
+            } catch {
+                return ex;
+            }
+        });
+        return { ...base, exercises: nextExercises };
+    } catch {
+        return sessionObj;
     }
 };
 
@@ -486,6 +562,29 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
             setIsGenerating(true);
             try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch {}
             const prev = effectivePreviousSession ?? (await resolvePreviousFromHistory());
+            let canonicalMap = {};
+            try {
+                const currentNames = (Array.isArray(session?.exercises) ? session.exercises : []).map((e) => e?.name).filter(Boolean);
+                const prevNames = (Array.isArray(prev?.exercises) ? prev.exercises : []).map((e) => e?.name).filter(Boolean);
+                const allNames = Array.from(new Set([...currentNames, ...prevNames].map((v) => String(v || '').trim()).filter(Boolean))).slice(0, 120);
+                if (allNames.length) {
+                    const resp = await fetch('/api/exercises/canonicalize', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ names: allNames, mode: 'prefetch' }),
+                    });
+                    const json = await resp.json().catch(() => null);
+                    if (resp.ok && json?.ok && json?.map && typeof json.map === 'object') {
+                        canonicalMap = json.map;
+                    }
+                }
+            } catch {}
+
+            const sessionForReport = applyCanonicalNamesToSession(session, canonicalMap);
+            const prevForReport = applyCanonicalNamesToSession(prev, canonicalMap);
+            const prevLogsForReport = remapPrevLogsByCanonical(prevLogsMap, canonicalMap);
+            const prevBaseForReport = remapPrevBaseMsByCanonical(prevBaseMsMap, canonicalMap);
             let aiToUse = aiState?.ai || session?.ai || null;
             if (!aiToUse) {
                 try {
@@ -499,9 +598,9 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                     }
                 } catch {}
             }
-            const html = buildReportHTML(session, prev, user?.displayName || user?.email || '', calories, {
-                prevLogsByExercise: prevLogsMap,
-                prevBaseMsByExercise: prevBaseMsMap,
+            const html = buildReportHTML(sessionForReport, prevForReport, user?.displayName || user?.email || '', calories, {
+                prevLogsByExercise: prevLogsForReport,
+                prevBaseMsByExercise: prevBaseForReport,
                 ai: aiToUse || null,
             });
             try {

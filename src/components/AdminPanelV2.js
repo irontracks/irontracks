@@ -4,7 +4,7 @@ import Image from 'next/image';
 import {
 	Crown, X, UserCog, AlertCircle, Trash2, Megaphone, Plus, Copy, ArrowLeft,
 	MessageSquare, Send, RefreshCw, Dumbbell, Share2, UserPlus, AlertTriangle, Edit3, ShieldAlert,
-		ChevronDown, FileText, Download, History, Search, Play
+		ChevronDown, FileText, Download, History, Search, Play, Video
 } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -24,13 +24,22 @@ import { updateWorkout, deleteWorkout } from '@/actions/workout-actions';
 import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
 import { normalizeWorkoutTitle, workoutTitleKey } from '@/utils/workoutTitle';
+import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
+const COACH_INBOX_DEFAULTS = {
+    churnDays: 7,
+    volumeDropPct: 30,
+    loadSpikePct: 60,
+    minPrev7Volume: 500,
+    minCurrent7VolumeSpike: 800,
+    snoozeDefaultMinutes: 1440,
+};
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const AdminPanelV2 = ({ user, onClose }) => {
-    const { alert, confirm } = useDialog();
+    const { alert, confirm, prompt } = useDialog();
     const supabaseRef = useRef(null);
     if (!supabaseRef.current) supabaseRef.current = createClient();
     const supabase = supabaseRef.current;
@@ -51,6 +60,16 @@ const AdminPanelV2 = ({ user, onClose }) => {
     };
 
     const router = useRouter();
+    const executionVideoEnabled = (() => {
+        try {
+            const raw = String(process.env.NEXT_PUBLIC_ENABLE_EXECUTION_VIDEO ?? '').trim().toLowerCase();
+            if (raw === 'false') return false;
+            if (raw === 'true') return true;
+            return true;
+        } catch {
+            return true;
+        }
+    })();
 
     const [tab, setTab] = useState('dashboard');
     const [usersList, setUsersList] = useState([]);
@@ -70,6 +89,12 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [viewWorkout, setViewWorkout] = useState(null);
     const [exportOpen, setExportOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [executionVideos, setExecutionVideos] = useState([]);
+    const [executionVideosLoading, setExecutionVideosLoading] = useState(false);
+    const [executionVideosError, setExecutionVideosError] = useState('');
+    const [executionVideoModalOpen, setExecutionVideoModalOpen] = useState(false);
+    const [executionVideoModalUrl, setExecutionVideoModalUrl] = useState('');
+    const [executionVideoFeedbackDraft, setExecutionVideoFeedbackDraft] = useState({});
     const loadedStudentInfo = useRef(new Set());
     const [systemExporting, setSystemExporting] = useState(false);
     const [systemImporting, setSystemImporting] = useState(false);
@@ -90,12 +115,36 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [videoExerciseName, setVideoExerciseName] = useState('');
     const [videoQueue, setVideoQueue] = useState([]);
     const [videoLoading, setVideoLoading] = useState(false);
+
+    const [prioritiesItems, setPrioritiesItems] = useState([]);
+    const [prioritiesLoading, setPrioritiesLoading] = useState(false);
+    const [prioritiesError, setPrioritiesError] = useState('');
+    const [prioritiesSettingsOpen, setPrioritiesSettingsOpen] = useState(false);
+    const [prioritiesSettingsLoading, setPrioritiesSettingsLoading] = useState(false);
+    const [prioritiesSettingsError, setPrioritiesSettingsError] = useState('');
+    const [prioritiesSettings, setPrioritiesSettings] = useState(() => ({ ...COACH_INBOX_DEFAULTS }));
+    const prioritiesSettingsPrefRef = useRef(null);
+    const [prioritiesComposeOpen, setPrioritiesComposeOpen] = useState(false);
+    const [prioritiesComposeStudentId, setPrioritiesComposeStudentId] = useState('');
+    const [prioritiesComposeKind, setPrioritiesComposeKind] = useState('');
+    const [prioritiesComposeText, setPrioritiesComposeText] = useState('');
     const [videoBackfillLimit, setVideoBackfillLimit] = useState('20');
     const [videoMissingCount, setVideoMissingCount] = useState(null);
     const [videoMissingLoading, setVideoMissingLoading] = useState(false);
     const [videoCycleRunning, setVideoCycleRunning] = useState(false);
     const [videoCycleStats, setVideoCycleStats] = useState({ processed: 0, created: 0, skipped: 0 });
     const videoCycleStopRef = useRef(false);
+
+    const [errorReports, setErrorReports] = useState([]);
+    const [errorsLoading, setErrorsLoading] = useState(false);
+    const [errorsQuery, setErrorsQuery] = useState('');
+    const [errorsStatusFilter, setErrorsStatusFilter] = useState('all');
+
+    const [exerciseAliasesReview, setExerciseAliasesReview] = useState([]);
+    const [exerciseAliasesLoading, setExerciseAliasesLoading] = useState(false);
+    const [exerciseAliasesError, setExerciseAliasesError] = useState('');
+    const [exerciseAliasesBackfillLoading, setExerciseAliasesBackfillLoading] = useState(false);
+    const [exerciseAliasesNotice, setExerciseAliasesNotice] = useState('');
 
     useEffect(() => {
         if (unauthorized) onClose && onClose();
@@ -162,6 +211,23 @@ const AdminPanelV2 = ({ user, onClose }) => {
 		const list = Array.isArray(templates) ? templates : [];
 		return list.filter(templateMatchesQuery);
 	}, [templateMatchesQuery, templates]);
+
+    const errorsFiltered = useMemo(() => {
+        const list = Array.isArray(errorReports) ? errorReports : [];
+        const q = normalizeText(errorsQuery).trim();
+        return list
+            .filter((r) => {
+                if (!errorsStatusFilter || errorsStatusFilter === 'all') return true;
+                return normalizeText(r?.status || '') === normalizeText(errorsStatusFilter);
+            })
+            .filter((r) => {
+                if (!q) return true;
+                const msg = normalizeText(r?.message || '');
+                const email = normalizeText(r?.user_email || r?.userEmail || '');
+                const path = normalizeText(r?.pathname || '');
+                return msg.includes(q) || email.includes(q) || path.includes(q);
+            });
+    }, [errorReports, errorsQuery, errorsStatusFilter, normalizeText]);
 
 	const coachInboxItems = useMemo(() => {
 		if (!isTeacher) return [];
@@ -783,6 +849,72 @@ const AdminPanelV2 = ({ user, onClose }) => {
     }, [tab, isAdmin, supabase]);
 
     useEffect(() => {
+        if (tab !== 'errors' || !isAdmin) return;
+        let cancelled = false;
+        const fetchErrors = async () => {
+            setErrorsLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('error_reports')
+                    .select('id, user_id, user_email, message, stack, pathname, url, user_agent, app_version, source, meta, status, created_at, updated_at, resolved_at, resolved_by')
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (cancelled) return;
+                if (error) {
+                    setErrorReports([]);
+                    return;
+                }
+                setErrorReports(Array.isArray(data) ? data : []);
+            } catch {
+                if (!cancelled) setErrorReports([]);
+            } finally {
+                if (!cancelled) setErrorsLoading(false);
+            }
+        };
+        fetchErrors();
+        return () => {
+            cancelled = true;
+        };
+    }, [tab, isAdmin, supabase]);
+
+    useEffect(() => {
+        if (tab !== 'system' || !isAdmin) return;
+        let cancelled = false;
+        const fetchAliases = async () => {
+            setExerciseAliasesLoading(true);
+            setExerciseAliasesError('');
+            try {
+                const { data, error } = await supabase
+                    .from('exercise_aliases')
+                    .select('id, user_id, canonical_id, alias, normalized_alias, confidence, source, needs_review, created_at, updated_at')
+                    .eq('needs_review', true)
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (cancelled) return;
+                if (error) {
+                    setExerciseAliasesReview([]);
+                    const msg = String(error?.message || '');
+                    if (msg) setExerciseAliasesError(msg);
+                    return;
+                }
+                setExerciseAliasesReview(Array.isArray(data) ? data : []);
+            } catch (e) {
+                if (!cancelled) {
+                    setExerciseAliasesReview([]);
+                    const msg = e?.message ? String(e.message) : '';
+                    if (msg) setExerciseAliasesError(msg);
+                }
+            } finally {
+                if (!cancelled) setExerciseAliasesLoading(false);
+            }
+        };
+        fetchAliases();
+        return () => {
+            cancelled = true;
+        };
+    }, [tab, isAdmin, supabase]);
+
+    useEffect(() => {
         const fetchMyWorkoutsCount = async () => {
             const { data: { user: currentUser } } = await supabase.auth.getUser();
             if (!currentUser) { setMyWorkoutsCount(0); return; }
@@ -831,6 +963,113 @@ const AdminPanelV2 = ({ user, onClose }) => {
         };
         if (tab === 'dashboard') fetchMyWorkoutsCount();
     }, [tab, isAdmin, supabase]);
+
+    const fetchPriorities = useCallback(async () => {
+        try {
+            setPrioritiesLoading(true);
+            setPrioritiesError('');
+            const res = await fetch('/api/teacher/inbox/feed?limit=80', { cache: 'no-store', credentials: 'include' });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.ok) {
+                setPrioritiesItems([]);
+                setPrioritiesError(String(json?.error || `Falha ao carregar (${res.status})`));
+                return;
+            }
+            setPrioritiesItems(Array.isArray(json.items) ? json.items : []);
+        } catch (e) {
+            setPrioritiesItems([]);
+            setPrioritiesError(e?.message ? String(e.message) : 'Erro ao carregar');
+        } finally {
+            setPrioritiesLoading(false);
+        }
+    }, []);
+
+    const normalizeCoachInboxSettings = useCallback((raw) => {
+        const s = raw && typeof raw === 'object' ? raw : {};
+        const toInt = (v, min, max, fallback) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return fallback;
+            const x = Math.floor(n);
+            return Math.max(min, Math.min(max, x));
+        };
+        return {
+            churnDays: toInt(s?.churnDays, 1, 60, COACH_INBOX_DEFAULTS.churnDays),
+            volumeDropPct: toInt(s?.volumeDropPct, 5, 90, COACH_INBOX_DEFAULTS.volumeDropPct),
+            loadSpikePct: toInt(s?.loadSpikePct, 10, 300, COACH_INBOX_DEFAULTS.loadSpikePct),
+            minPrev7Volume: toInt(s?.minPrev7Volume, 0, 1000000, COACH_INBOX_DEFAULTS.minPrev7Volume),
+            minCurrent7VolumeSpike: toInt(s?.minCurrent7VolumeSpike, 0, 1000000, COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike),
+            snoozeDefaultMinutes: toInt(s?.snoozeDefaultMinutes, 5, 10080, COACH_INBOX_DEFAULTS.snoozeDefaultMinutes),
+        };
+    }, []);
+
+    const loadPrioritiesSettings = useCallback(async () => {
+        try {
+            setPrioritiesSettingsLoading(true);
+            setPrioritiesSettingsError('');
+            const uid = user?.id ? String(user.id) : '';
+            if (!uid) return;
+            const { data, error } = await supabase
+                .from('user_settings')
+                .select('preferences')
+                .eq('user_id', uid)
+                .maybeSingle();
+            if (error) {
+                const msg = String(error?.message || '');
+                const code = String(error?.code || '');
+                const missing = code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg);
+                if (missing) {
+                    prioritiesSettingsPrefRef.current = null;
+                    setPrioritiesSettings({ ...COACH_INBOX_DEFAULTS });
+                    setPrioritiesSettingsError('Tabela user_settings não disponível (migrations pendentes).');
+                    return;
+                }
+                setPrioritiesSettingsError(msg || 'Falha ao carregar configurações.');
+                return;
+            }
+            const prefs = data?.preferences && typeof data.preferences === 'object' ? data.preferences : {};
+            prioritiesSettingsPrefRef.current = prefs;
+            const next = normalizeCoachInboxSettings(prefs?.coachInbox);
+            setPrioritiesSettings(next);
+        } catch (e) {
+            setPrioritiesSettingsError(e?.message ? String(e.message) : 'Falha ao carregar configurações.');
+        } finally {
+            setPrioritiesSettingsLoading(false);
+        }
+    }, [normalizeCoachInboxSettings, supabase, user?.id]);
+
+    const savePrioritiesSettings = useCallback(async () => {
+        try {
+            const uid = user?.id ? String(user.id) : '';
+            if (!uid) return false;
+            setPrioritiesSettingsLoading(true);
+            setPrioritiesSettingsError('');
+            const basePrefs = prioritiesSettingsPrefRef.current && typeof prioritiesSettingsPrefRef.current === 'object'
+                ? prioritiesSettingsPrefRef.current
+                : {};
+            const payload = {
+                user_id: uid,
+                preferences: { ...basePrefs, coachInbox: normalizeCoachInboxSettings(prioritiesSettings) },
+                updated_at: new Date().toISOString(),
+            };
+            const { error } = await supabase.from('user_settings').upsert(payload, { onConflict: 'user_id' });
+            if (error) {
+                setPrioritiesSettingsError(String(error?.message || 'Falha ao salvar.'));
+                return false;
+            }
+            prioritiesSettingsPrefRef.current = payload.preferences;
+            return true;
+        } catch (e) {
+            setPrioritiesSettingsError(e?.message ? String(e.message) : 'Falha ao salvar.');
+            return false;
+        } finally {
+            setPrioritiesSettingsLoading(false);
+        }
+    }, [normalizeCoachInboxSettings, prioritiesSettings, supabase, user?.id]);
+
+    useEffect(() => {
+        if (tab !== 'priorities') return;
+        fetchPriorities();
+    }, [tab, fetchPriorities]);
 
     useEffect(() => {
         if (!selectedStudent) return;
@@ -983,6 +1222,41 @@ const AdminPanelV2 = ({ user, onClose }) => {
         };
         fetchDetails();
     }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher]);
+
+    useEffect(() => {
+        if (!executionVideoEnabled) return;
+        if (!selectedStudent) return;
+        if (subTab !== 'videos') return;
+        let cancelled = false;
+        const run = async () => {
+            const studentUserId = selectedStudent?.user_id ? String(selectedStudent.user_id) : '';
+            if (!studentUserId) return;
+            setExecutionVideosLoading(true);
+            setExecutionVideosError('');
+            try {
+                const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(studentUserId)}`, { cache: 'no-store', credentials: 'include' });
+                const json = await res.json().catch(() => null);
+                if (cancelled) return;
+                if (!res.ok || !json?.ok) {
+                    setExecutionVideos([]);
+                    setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
+                    return;
+                }
+                setExecutionVideos(Array.isArray(json.items) ? json.items : []);
+            } catch (e) {
+                if (!cancelled) {
+                    setExecutionVideos([]);
+                    setExecutionVideosError(e?.message ? String(e.message) : 'Erro ao carregar');
+                }
+            } finally {
+                if (!cancelled) setExecutionVideosLoading(false);
+            }
+        };
+        run();
+        return () => {
+            cancelled = true;
+        };
+    }, [executionVideoEnabled, selectedStudent, subTab]);
 
     // Ensure teachers list available when viewing a student (for assignment)
     useEffect(() => {
@@ -1235,7 +1509,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
 	let TAB_LABELS = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
 	if (isAdmin) {
-		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', videos: 'VÍDEOS', system: 'SISTEMA' };
+		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', system: 'SISTEMA' };
+	}
+	if (isTeacher && !isAdmin) {
+		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
+	}
+	if (isAdmin) {
+		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
 	}
 
 	const tabKeys = Object.keys(TAB_LABELS);
@@ -1530,6 +1810,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     else if (key === 'templates') subtitle = 'Biblioteca de treinos-base';
                                     else if (key === 'teachers') subtitle = 'Gestão de professores e convites';
                                     else if (key === 'videos') subtitle = 'Fila de vídeos por exercício';
+                                    else if (key === 'priorities') subtitle = 'Triagem inteligente do coach';
+                                    else if (key === 'errors') subtitle = 'Erros reportados pelos usuários';
                                     else if (key === 'system') subtitle = 'Backup, broadcasts e operações críticas';
 
                                     let iconColor = isActive ? 'text-yellow-400' : 'text-neutral-400';
@@ -1566,6 +1848,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     {key === 'templates' && <Dumbbell size={16} className={iconColor} />}
                                                     {key === 'teachers' && <UserCog size={16} className={iconColor} />}
                                                     {key === 'videos' && <Play size={16} className={iconColor} />}
+                                                    {key === 'priorities' && <AlertCircle size={16} className={iconColor} />}
+                                                    {key === 'errors' && <AlertTriangle size={16} className={iconColor} />}
                                                     {key === 'system' && <ShieldAlert size={16} className={iconColor} />}
                                                 </div>
                                                 <div className="min-w-0 text-left">
@@ -1728,6 +2012,174 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         )}
                     </div>
                 )}
+
+				{tab === 'priorities' && !selectedStudent && (
+					<div className="w-full space-y-4">
+						<div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+							<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+								<div className="min-w-0">
+									<div className="flex items-center gap-2">
+										<AlertCircle size={18} className="text-yellow-500" />
+										<h2 className="text-base md:text-lg font-black tracking-tight">Prioridades</h2>
+									</div>
+									<div className="mt-1 text-xs text-neutral-400 font-semibold">
+										{prioritiesLoading ? 'Carregando...' : `${Array.isArray(prioritiesItems) ? prioritiesItems.length : 0} item(ns)`}
+									</div>
+								</div>
+								<div className="flex flex-col sm:flex-row gap-2">
+									<button
+										type="button"
+										onClick={async () => {
+											try {
+												setPrioritiesSettingsOpen(true);
+												await loadPrioritiesSettings();
+											} catch {}
+										}}
+										className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+									>
+										Configurar
+									</button>
+									<button
+										type="button"
+										onClick={() => fetchPriorities()}
+										disabled={prioritiesLoading}
+										className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 disabled:opacity-60"
+									>
+										Atualizar
+									</button>
+								</div>
+							</div>
+						</div>
+
+						{prioritiesError ? (
+							<div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+								{prioritiesError}
+							</div>
+						) : null}
+
+						{prioritiesLoading ? (
+							<div className="text-center animate-pulse text-neutral-400 font-semibold">Carregando prioridades...</div>
+						) : !Array.isArray(prioritiesItems) || prioritiesItems.length === 0 ? (
+							<div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 text-neutral-400 font-semibold">
+								Nenhuma prioridade no momento.
+							</div>
+						) : (
+							<div className="space-y-3">
+								{prioritiesItems.map((it) => {
+									const itemId = String(it?.id || '').trim();
+									const studentId = String(it?.student_user_id || '').trim();
+									const studentName = String(it?.student_name || '').trim();
+									const kind = String(it?.kind || '').trim();
+									const title = String(it?.title || '').trim();
+									const reason = String(it?.reason || '').trim();
+									const msg = String(it?.suggested_message || '').trim();
+									const badgeTone =
+										kind === 'load_spike'
+											? 'border-red-500/30 text-red-300'
+											: kind === 'volume_drop'
+												? 'border-yellow-500/30 text-yellow-300'
+												: 'border-neutral-500/30 text-neutral-200';
+									return (
+										<div key={itemId || `${studentId}:${kind}`} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+											<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+												<div className="min-w-0">
+													<div className="flex flex-wrap items-center gap-2">
+														<div className="text-base font-black text-white truncate">{studentName || 'Aluno'}</div>
+														<span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${badgeTone}`}>{title || kind}</span>
+													</div>
+													{reason ? (
+														<div className="mt-1 text-xs text-neutral-400 font-semibold">{reason}</div>
+													) : null}
+												</div>
+												<div className="flex flex-col sm:flex-row gap-2">
+													<button
+														type="button"
+														onClick={() => {
+															try {
+																const found = (Array.isArray(usersList) ? usersList : []).find((s) => String(s?.user_id || '').trim() === studentId);
+																setTab('students');
+																setSelectedStudent(found || null);
+																if (!found) setStudentQuery(studentName || '');
+															} catch {}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Ver aluno
+													</button>
+													<button
+														type="button"
+														onClick={() => {
+															setPrioritiesComposeStudentId(studentId);
+															setPrioritiesComposeKind(kind);
+															setPrioritiesComposeText(msg);
+															setPrioritiesComposeOpen(true);
+														}}
+														className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Enviar mensagem
+													</button>
+													<button
+														type="button"
+														onClick={async () => {
+															try {
+																const v = await prompt('Sonecar (minutos)', String(prioritiesSettings?.snoozeDefaultMinutes ?? COACH_INBOX_DEFAULTS.snoozeDefaultMinutes));
+																const minutes = Number(String(v || '').trim());
+																if (!Number.isFinite(minutes) || minutes <= 0) return;
+																const res = await fetch('/api/teacher/inbox/action', {
+																	method: 'POST',
+																	credentials: 'include',
+																	headers: { 'content-type': 'application/json' },
+																	body: JSON.stringify({ student_user_id: studentId, kind, action: 'snooze', snooze_minutes: minutes }),
+																});
+																const json = await res.json().catch(() => null);
+																if (!res.ok || !json?.ok) {
+																	await alert(String(json?.error || `Falha ao sonecar (${res.status})`));
+																	return;
+																}
+																setPrioritiesItems((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== itemId) : prev));
+															} catch (e) {
+																await alert('Erro: ' + (e?.message ?? String(e)));
+															}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Sonecar
+													</button>
+													<button
+														type="button"
+														onClick={async () => {
+															try {
+																const ok = await confirm('Concluir este item?', 'Prioridades');
+																if (!ok) return;
+																const res = await fetch('/api/teacher/inbox/action', {
+																	method: 'POST',
+																	credentials: 'include',
+																	headers: { 'content-type': 'application/json' },
+																	body: JSON.stringify({ student_user_id: studentId, kind, action: 'done' }),
+																});
+																const json = await res.json().catch(() => null);
+																if (!res.ok || !json?.ok) {
+																	await alert(String(json?.error || `Falha ao concluir (${res.status})`));
+																	return;
+																}
+																setPrioritiesItems((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== itemId) : prev));
+															} catch (e) {
+																await alert('Erro: ' + (e?.message ?? String(e)));
+															}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Concluir
+													</button>
+												</div>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						)}
+					</div>
+				)}
 
 				{tab === 'students' && !selectedStudent && (
 					<div className="w-full space-y-4">
@@ -2291,6 +2743,202 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
+                {tab === 'errors' && !selectedStudent && isAdmin && (
+                    <div className="w-full space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle size={18} className="text-yellow-500" />
+                                        <h2 className="text-base md:text-lg font-black tracking-tight">Erros reportados</h2>
+                                    </div>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">{errorsFiltered.length} visíveis</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setErrorsLoading(true);
+                                        try {
+                                            const { data, error } = await supabase
+                                                .from('error_reports')
+                                                .select('id, user_id, user_email, message, stack, pathname, url, user_agent, app_version, source, meta, status, created_at, updated_at, resolved_at, resolved_by')
+                                                .order('created_at', { ascending: false })
+                                                .limit(200);
+                                            if (!error) setErrorReports(Array.isArray(data) ? data : []);
+                                        } catch {} finally {
+                                            setErrorsLoading(false);
+                                        }
+                                    }}
+                                    disabled={errorsLoading}
+                                    className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                                >
+                                    {errorsLoading ? 'Atualizando...' : 'Atualizar'}
+                                </button>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="md:col-span-2 relative">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <input
+                                        value={errorsQuery}
+                                        onChange={(e) => setErrorsQuery(e.target.value)}
+                                        placeholder="Buscar por mensagem, usuário ou rota"
+                                        className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl pl-10 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
+                                    />
+                                </div>
+                                <select
+                                    value={errorsStatusFilter}
+                                    onChange={(e) => setErrorsStatusFilter(e.target.value)}
+                                    className="min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500"
+                                >
+                                    <option value="all">Todos</option>
+                                    <option value="new">Novos</option>
+                                    <option value="triaged">Triados</option>
+                                    <option value="resolved">Resolvidos</option>
+                                    <option value="ignored">Ignorados</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {errorsLoading ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center text-neutral-400 font-semibold">
+                                Carregando erros...
+                            </div>
+                        ) : errorsFiltered.length === 0 ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center">
+                                <p className="text-neutral-500">Nenhum erro reportado encontrado.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {errorsFiltered.map((r) => {
+                                    const status = String(r?.status || 'new');
+                                    const statusTone =
+                                        status === 'resolved'
+                                            ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                                            : status === 'ignored'
+                                                ? 'bg-neutral-500/10 text-neutral-300 border-neutral-500/25'
+                                                : status === 'triaged'
+                                                    ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                                                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+                                    const createdAt = (() => {
+                                        try {
+                                            const raw = r?.created_at || r?.createdAt;
+                                            if (!raw) return '';
+                                            const d = raw?.toDate ? raw.toDate() : new Date(raw);
+                                            const t = d?.toLocaleString ? d.toLocaleString('pt-BR') : String(raw);
+                                            return t || '';
+                                        } catch {
+                                            return '';
+                                        }
+                                    })();
+                                    const email = String(r?.user_email || r?.userEmail || '').trim();
+                                    const message = String(r?.message || '').trim();
+                                    const pathname = String(r?.pathname || '').trim();
+                                    const stack = String(r?.stack || '').trim();
+
+                                    return (
+                                        <div key={r.id} className="bg-neutral-800 border border-neutral-700 rounded-2xl p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${statusTone}`}>
+                                                            {status}
+                                                        </div>
+                                                        {createdAt ? (
+                                                            <div className="text-[11px] text-neutral-500 font-semibold">{createdAt}</div>
+                                                        ) : null}
+                                                        {email ? (
+                                                            <div className="text-[11px] text-neutral-400 font-semibold truncate">• {email}</div>
+                                                        ) : null}
+                                                        {pathname ? (
+                                                            <div className="text-[11px] text-neutral-500 font-semibold truncate">• {pathname}</div>
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="mt-2 text-sm text-neutral-100 font-semibold whitespace-pre-wrap break-words">
+                                                        {message || '—'}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const nextStatus = status === 'resolved' ? 'new' : 'resolved';
+                                                                const patch = nextStatus === 'resolved'
+                                                                    ? { status: nextStatus, resolved_at: new Date().toISOString(), resolved_by: user?.id ?? null }
+                                                                    : { status: nextStatus, resolved_at: null, resolved_by: null };
+                                                                const { error } = await supabase.from('error_reports').update(patch).eq('id', r.id);
+                                                                if (error) throw error;
+                                                                setErrorReports((prev) => {
+                                                                    const list = Array.isArray(prev) ? prev : [];
+                                                                    return list.map((x) => (x?.id === r.id ? { ...x, ...patch } : x));
+                                                                });
+                                                            } catch (e) {
+                                                                await alert('Erro ao atualizar status: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
+                                                    >
+                                                        {status === 'resolved' ? 'Reabrir' : 'Resolver'}
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const { error } = await supabase.from('error_reports').update({ status: 'ignored' }).eq('id', r.id);
+                                                                if (error) throw error;
+                                                                setErrorReports((prev) => {
+                                                                    const list = Array.isArray(prev) ? prev : [];
+                                                                    return list.map((x) => (x?.id === r.id ? { ...x, status: 'ignored' } : x));
+                                                                });
+                                                            } catch (e) {
+                                                                await alert('Erro ao ignorar: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
+                                                    >
+                                                        Ignorar
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {(stack || r?.url) ? (
+                                                <details className="mt-3">
+                                                    <summary className="cursor-pointer text-[11px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">
+                                                        Detalhes
+                                                    </summary>
+                                                    <div className="mt-2 grid gap-2">
+                                                        {String(r?.url || '').trim() ? (
+                                                            <div className="text-[11px] text-neutral-400 break-all">
+                                                                <span className="font-black text-neutral-300">URL:</span> {String(r.url)}
+                                                            </div>
+                                                        ) : null}
+                                                        {String(r?.source || '').trim() ? (
+                                                            <div className="text-[11px] text-neutral-400 break-all">
+                                                                <span className="font-black text-neutral-300">Fonte:</span> {String(r.source)}
+                                                            </div>
+                                                        ) : null}
+                                                        {String(r?.app_version || r?.appVersion || '').trim() ? (
+                                                            <div className="text-[11px] text-neutral-400 break-all">
+                                                                <span className="font-black text-neutral-300">Versão:</span> {String(r.app_version || r.appVersion)}
+                                                            </div>
+                                                        ) : null}
+                                                        {stack ? (
+                                                            <pre className="text-[11px] text-neutral-300 whitespace-pre-wrap break-words bg-neutral-950/60 border border-neutral-800 rounded-xl p-3 overflow-auto max-h-[260px]">
+                                                                {stack}
+                                                            </pre>
+                                                        ) : null}
+                                                    </div>
+                                                </details>
+                                            ) : null}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {tab === 'system' && !selectedStudent && (
                     <div className="space-y-8">
                         <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 space-y-4">
@@ -2315,6 +2963,188 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             <button onClick={handleSendBroadcast} disabled={sendingBroadcast} className="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
                                 {sendingBroadcast ? 'Enviando...' : 'ENVIAR AVISO'}
                             </button>
+                        </div>
+
+                        <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-white flex items-center gap-2"><Dumbbell size={20} className="text-yellow-500"/> REVISAR EXERCÍCIOS (ALIASES)</h3>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                        {exerciseAliasesLoading ? 'Carregando...' : `${Array.isArray(exerciseAliasesReview) ? exerciseAliasesReview.length : 0} pendentes`}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!isAdmin) return;
+                                            if (exerciseAliasesBackfillLoading) return;
+                                            setExerciseAliasesBackfillLoading(true);
+                                            setExerciseAliasesNotice('');
+                                            try {
+                                                const res = await fetch('/api/admin/exercises/canonicalize/backfill', {
+                                                    method: 'POST',
+                                                    headers: { 'content-type': 'application/json' },
+                                                    body: JSON.stringify({ limit: 30 }),
+                                                });
+                                                const json = await res.json().catch(() => null);
+                                                if (!res.ok || !json?.ok) {
+                                                    const msg = String(json?.error || `Falha ao processar (${res.status})`);
+                                                    setExerciseAliasesNotice(msg);
+                                                    return;
+                                                }
+                                                const msg = `Processados: ${json.processed || 0} · Atualizados: ${json.updated || 0} · Falhas: ${json.failed || 0}`;
+                                                setExerciseAliasesNotice(msg);
+                                            } catch (e) {
+                                                const msg = e?.message ? String(e.message) : '';
+                                                if (msg) setExerciseAliasesNotice(msg);
+                                            } finally {
+                                                setExerciseAliasesBackfillLoading(false);
+                                            }
+                                        }}
+                                        disabled={exerciseAliasesBackfillLoading}
+                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-yellow-500 hover:bg-yellow-400 text-black disabled:opacity-50"
+                                    >
+                                        {exerciseAliasesBackfillLoading ? 'Processando...' : 'Processar (Gemini)'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!isAdmin) return;
+                                            setExerciseAliasesLoading(true);
+                                            setExerciseAliasesError('');
+                                            setExerciseAliasesNotice('');
+                                            try {
+                                                const { data, error } = await supabase
+                                                    .from('exercise_aliases')
+                                                    .select('id, user_id, canonical_id, alias, normalized_alias, confidence, source, needs_review, created_at, updated_at')
+                                                    .eq('needs_review', true)
+                                                    .order('created_at', { ascending: false })
+                                                    .limit(200);
+                                                if (error) {
+                                                    setExerciseAliasesReview([]);
+                                                    const msg = String(error?.message || '');
+                                                    if (msg) setExerciseAliasesError(msg);
+                                                    return;
+                                                }
+                                                setExerciseAliasesReview(Array.isArray(data) ? data : []);
+                                            } catch (e) {
+                                                setExerciseAliasesReview([]);
+                                                const msg = e?.message ? String(e.message) : '';
+                                                if (msg) setExerciseAliasesError(msg);
+                                            } finally {
+                                                setExerciseAliasesLoading(false);
+                                            }
+                                        }}
+                                        disabled={exerciseAliasesLoading}
+                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+                                    >
+                                        {exerciseAliasesLoading ? 'Atualizando...' : 'Atualizar'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {exerciseAliasesNotice ? (
+                                <div className="text-xs text-neutral-200 font-bold bg-neutral-900 border border-neutral-700 rounded-xl p-3">
+                                    {exerciseAliasesNotice}
+                                </div>
+                            ) : null}
+
+                            {exerciseAliasesError ? (
+                                <div className="text-xs text-red-300 font-bold bg-neutral-900 border border-neutral-700 rounded-xl p-3">
+                                    {exerciseAliasesError}
+                                </div>
+                            ) : null}
+
+                            {exerciseAliasesLoading ? (
+                                <div className="text-xs text-neutral-400 font-semibold">Carregando aliases pendentes...</div>
+                            ) : !Array.isArray(exerciseAliasesReview) || exerciseAliasesReview.length === 0 ? (
+                                <div className="text-xs text-neutral-400 font-semibold">Nenhum alias pendente de revisão.</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {exerciseAliasesReview.slice(0, 30).map((row) => {
+                                        const id = row?.id ? String(row.id) : '';
+                                        const userId = row?.user_id ? String(row.user_id) : '';
+                                        const alias = row?.alias ? String(row.alias) : '';
+                                        const conf = Number(row?.confidence);
+                                        const src = row?.source ? String(row.source) : '';
+                                        return (
+                                            <div key={id || `${userId}-${alias}`} className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-black text-white truncate">{alias || '—'}</div>
+                                                    <div className="text-[11px] text-neutral-400 break-all">
+                                                        <span className="font-black text-neutral-300">User:</span> {userId ? `${userId.slice(0, 8)}...` : '—'}{' '}
+                                                        <span className="mx-2">·</span>
+                                                        <span className="font-black text-neutral-300">Fonte:</span> {src || '—'}{' '}
+                                                        <span className="mx-2">·</span>
+                                                        <span className="font-black text-neutral-300">Conf:</span> {Number.isFinite(conf) ? conf.toFixed(2) : '—'}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const name = await prompt('Defina o nome canônico', 'Resolver alias', alias);
+                                                                const canon = String(name || '').trim();
+                                                                if (!canon) return;
+                                                                const norm = normalizeExerciseName(canon);
+                                                                if (!norm) return;
+                                                                const { data: canonRow, error: canonErr } = await supabase
+                                                                    .from('exercise_canonical')
+                                                                    .upsert(
+                                                                        { user_id: userId, display_name: canon, normalized_name: norm },
+                                                                        { onConflict: 'user_id,normalized_name' }
+                                                                    )
+                                                                    .select('id')
+                                                                    .maybeSingle();
+                                                                if (canonErr || !canonRow?.id) {
+                                                                    await alert('Falha ao salvar canônico: ' + String(canonErr?.message || ''));
+                                                                    return;
+                                                                }
+                                                                const canonicalId = String(canonRow.id);
+                                                                const { error: upErr } = await supabase
+                                                                    .from('exercise_aliases')
+                                                                    .update({ canonical_id: canonicalId, confidence: 1, source: 'human', needs_review: false })
+                                                                    .eq('id', id);
+                                                                if (upErr) {
+                                                                    await alert('Falha ao atualizar alias: ' + String(upErr?.message || ''));
+                                                                    return;
+                                                                }
+                                                                setExerciseAliasesReview((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== id) : prev));
+                                                            } catch (e) {
+                                                                await alert('Falha ao resolver: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-yellow-500 hover:bg-yellow-400 text-black active:scale-95 transition-transform"
+                                                    >
+                                                        Resolver
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                if (!(await confirm('Ignorar este alias? (não aparecerá mais para revisão)', 'Ignorar'))) return;
+                                                                const { error: upErr } = await supabase.from('exercise_aliases').update({ needs_review: false }).eq('id', id);
+                                                                if (upErr) {
+                                                                    await alert('Falha ao ignorar: ' + String(upErr?.message || ''));
+                                                                    return;
+                                                                }
+                                                                setExerciseAliasesReview((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== id) : prev));
+                                                            } catch (e) {
+                                                                await alert('Falha ao ignorar: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform"
+                                                    >
+                                                        Ignorar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-red-950/40 p-4 rounded-2xl border border-red-500/40 shadow-[0_16px_40px_rgba(0,0,0,0.75)]">
@@ -2776,6 +3606,19 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 >
                                     Evolução
                                 </button>
+                                {executionVideoEnabled ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSubTab('videos')}
+                                        className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${
+                                            subTab === 'videos'
+                                                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                                : 'text-neutral-200'
+                                        }`}
+                                    >
+                                        Vídeos
+                                    </button>
+                                ) : null}
                             </div>
                         </div>
 
@@ -2946,6 +3789,188 @@ const AdminPanelV2 = ({ user, onClose }) => {
             </div>
         )}
 
+        {!loading && executionVideoEnabled && subTab === 'videos' && (
+            <div className="space-y-4">
+                <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <Video size={18} className="text-yellow-500" />
+                                <h3 className="text-base font-black text-white tracking-tight">Vídeos de execução</h3>
+                            </div>
+                            <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                {executionVideosLoading ? 'Carregando...' : `${Array.isArray(executionVideos) ? executionVideos.length : 0} enviado(s)`}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    if (!selectedStudent?.user_id) return;
+                                    setExecutionVideosLoading(true);
+                                    setExecutionVideosError('');
+                                    const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(String(selectedStudent.user_id))}`, { cache: 'no-store', credentials: 'include' });
+                                    const json = await res.json().catch(() => null);
+                                    if (!res.ok || !json?.ok) {
+                                        setExecutionVideos([]);
+                                        setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
+                                        return;
+                                    }
+                                    setExecutionVideos(Array.isArray(json.items) ? json.items : []);
+                                } catch (e) {
+                                    setExecutionVideos([]);
+                                    setExecutionVideosError(e?.message ? String(e.message) : 'Erro ao carregar');
+                                } finally {
+                                    setExecutionVideosLoading(false);
+                                }
+                            }}
+                            disabled={executionVideosLoading}
+                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 disabled:opacity-60"
+                        >
+                            Atualizar
+                        </button>
+                    </div>
+                </div>
+
+                {executionVideosError ? (
+                    <div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+                        {executionVideosError}
+                    </div>
+                ) : null}
+
+                {executionVideosLoading ? (
+                    <div className="text-center animate-pulse text-neutral-400 font-semibold">Carregando vídeos...</div>
+                ) : !Array.isArray(executionVideos) || executionVideos.length === 0 ? (
+                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 text-neutral-400 font-semibold">
+                        Nenhum vídeo enviado ainda.
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {executionVideos.map((it) => {
+                            const id = it?.id ? String(it.id) : '';
+                            const when = it?.created_at ? new Date(it.created_at) : null;
+                            const title = String(it?.exercise_name || 'Execução').trim();
+                            const status = String(it?.status || 'pending').toLowerCase();
+                            const draft = executionVideoFeedbackDraft && typeof executionVideoFeedbackDraft === 'object' ? executionVideoFeedbackDraft[id] : '';
+                            const statusLabel = status === 'approved' ? 'Aprovado' : status === 'rejected' ? 'Reprovado' : 'Pendente';
+                            const statusTone =
+                                status === 'approved'
+                                    ? 'border-green-500/30 text-green-300'
+                                    : status === 'rejected'
+                                      ? 'border-red-500/30 text-red-300'
+                                      : 'border-yellow-500/30 text-yellow-300';
+                            return (
+                                <div key={id || Math.random().toString(36).slice(2)} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <div className="text-base font-black text-white truncate">{title}</div>
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${statusTone}`}>{statusLabel}</span>
+                                            </div>
+                                            <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                                {when ? when.toLocaleString() : ''}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const res = await fetch('/api/execution-videos/media', {
+                                                            method: 'POST',
+                                                            credentials: 'include',
+                                                            headers: { 'content-type': 'application/json' },
+                                                            body: JSON.stringify({ submission_id: id }),
+                                                        });
+                                                        const json = await res.json().catch(() => null);
+                                                        if (!res.ok || !json?.ok || !json?.url) {
+                                                            await alert(String(json?.error || `Falha ao abrir (${res.status})`));
+                                                            return;
+                                                        }
+                                                        setExecutionVideoModalUrl(String(json.url));
+                                                        setExecutionVideoModalOpen(true);
+                                                    } catch (e) {
+                                                        await alert('Erro: ' + (e?.message ?? String(e)));
+                                                    }
+                                                }}
+                                                className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                            >
+                                                Assistir
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const feedback = String(draft || '').trim();
+                                                        const res = await fetch('/api/teacher/execution-videos/review', {
+                                                            method: 'POST',
+                                                            credentials: 'include',
+                                                            headers: { 'content-type': 'application/json' },
+                                                            body: JSON.stringify({ submission_id: id, status: 'approved', feedback, send_message: true }),
+                                                        });
+                                                        const json = await res.json().catch(() => null);
+                                                        if (!res.ok || !json?.ok) {
+                                                            await alert(String(json?.error || `Falha ao aprovar (${res.status})`));
+                                                            return;
+                                                        }
+                                                        setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'approved', teacher_feedback: feedback } : x)) : prev));
+                                                    } catch (e) {
+                                                        await alert('Erro: ' + (e?.message ?? String(e)));
+                                                    }
+                                                }}
+                                                className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+                                            >
+                                                Aprovar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const feedback = String(draft || '').trim();
+                                                        const res = await fetch('/api/teacher/execution-videos/review', {
+                                                            method: 'POST',
+                                                            credentials: 'include',
+                                                            headers: { 'content-type': 'application/json' },
+                                                            body: JSON.stringify({ submission_id: id, status: 'rejected', feedback, send_message: true }),
+                                                        });
+                                                        const json = await res.json().catch(() => null);
+                                                        if (!res.ok || !json?.ok) {
+                                                            await alert(String(json?.error || `Falha ao reprovar (${res.status})`));
+                                                            return;
+                                                        }
+                                                        setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'rejected', teacher_feedback: feedback } : x)) : prev));
+                                                    } catch (e) {
+                                                        await alert('Erro: ' + (e?.message ?? String(e)));
+                                                    }
+                                                }}
+                                                className="min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+                                            >
+                                                Reprovar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2">Mensagem para o aluno</label>
+                                        <textarea
+                                            value={String(draft || '')}
+                                            onChange={(e) => {
+                                                const v = e?.target?.value ?? '';
+                                                setExecutionVideoFeedbackDraft((prev) => ({ ...(prev && typeof prev === 'object' ? prev : {}), [id]: v }));
+                                            }}
+                                            rows={3}
+                                            className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                            placeholder="Escreva seu feedback..."
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        )}
+
         {!loading && subTab === 'evolution' && (
                             <div className="space-y-4">
                                 <AssessmentButton studentId={selectedStudent.user_id || selectedStudent.id} studentName={selectedStudent.name} variant="card" />
@@ -2967,6 +3992,210 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 )}
             </div>
         )}
+
+                {prioritiesComposeOpen ? (
+                    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPrioritiesComposeOpen(false)}>
+                        <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Enviar mensagem</div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPrioritiesComposeOpen(false)}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4 space-y-3">
+                                <textarea
+                                    value={prioritiesComposeText}
+                                    onChange={(e) => setPrioritiesComposeText(e.target.value)}
+                                    rows={5}
+                                    className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                    placeholder="Escreva sua mensagem..."
+                                />
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPrioritiesComposeOpen(false)}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                const content = String(prioritiesComposeText || '').trim();
+                                                const studentId = String(prioritiesComposeStudentId || '').trim();
+                                                const kind = String(prioritiesComposeKind || '').trim();
+                                                if (!content || !studentId || !kind) return;
+                                                const res = await fetch('/api/teacher/inbox/send-message', {
+                                                    method: 'POST',
+                                                    credentials: 'include',
+                                                    headers: { 'content-type': 'application/json' },
+                                                    body: JSON.stringify({ student_user_id: studentId, content }),
+                                                });
+                                                const json = await res.json().catch(() => null);
+                                                if (!res.ok || !json?.ok) {
+                                                    await alert(String(json?.error || `Falha ao enviar (${res.status})`));
+                                                    return;
+                                                }
+                                                try {
+                                                    await fetch('/api/teacher/inbox/action', {
+                                                        method: 'POST',
+                                                        credentials: 'include',
+                                                        headers: { 'content-type': 'application/json' },
+                                                        body: JSON.stringify({ student_user_id: studentId, kind, action: 'done' }),
+                                                    });
+                                                } catch {}
+                                                setPrioritiesComposeOpen(false);
+                                                setPrioritiesComposeStudentId('');
+                                                setPrioritiesComposeKind('');
+                                                setPrioritiesComposeText('');
+                                                fetchPriorities();
+                                            } catch (e) {
+                                                await alert('Erro: ' + (e?.message ?? String(e)));
+                                            }
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95"
+                                    >
+                                        Enviar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {prioritiesSettingsOpen ? (
+                    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPrioritiesSettingsOpen(false)}>
+                        <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Configurar Prioridades</div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPrioritiesSettingsOpen(false)}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4 space-y-4">
+                                {prioritiesSettingsError ? (
+                                    <div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+                                        {prioritiesSettingsError}
+                                    </div>
+                                ) : null}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Churn (dias sem treino)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.churnDays ?? COACH_INBOX_DEFAULTS.churnDays)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), churnDays: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Queda de volume (%)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.volumeDropPct ?? COACH_INBOX_DEFAULTS.volumeDropPct)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), volumeDropPct: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Aumento de carga (%)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.loadSpikePct ?? COACH_INBOX_DEFAULTS.loadSpikePct)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), loadSpikePct: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Volume mínimo (7d anterior)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.minPrev7Volume ?? COACH_INBOX_DEFAULTS.minPrev7Volume)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), minPrev7Volume: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Volume mínimo (7d atual p/ spike)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.minCurrent7VolumeSpike ?? COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), minCurrent7VolumeSpike: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Soneca padrão (min)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.snoozeDefaultMinutes ?? COACH_INBOX_DEFAULTS.snoozeDefaultMinutes)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), snoozeDefaultMinutes: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={prioritiesSettingsLoading}
+                                        onClick={() => {
+                                            setPrioritiesSettings({ ...COACH_INBOX_DEFAULTS });
+                                            setPrioritiesSettingsError('');
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
+                                    >
+                                        Resetar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={prioritiesSettingsLoading}
+                                        onClick={async () => {
+                                            const ok = await savePrioritiesSettings();
+                                            if (!ok) return;
+                                            setPrioritiesSettingsOpen(false);
+                                            fetchPriorities();
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
+                                    >
+                                        {prioritiesSettingsLoading ? 'Salvando...' : 'Salvar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {executionVideoModalOpen && executionVideoModalUrl ? (
+                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
+                        <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Vídeo de execução</div>
+                                <button
+                                    type="button"
+                                    onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4">
+                                <video src={executionVideoModalUrl} controls className="w-full rounded-xl bg-black" />
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
 
                 {editingTemplate && (
                     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingTemplate(null)}>

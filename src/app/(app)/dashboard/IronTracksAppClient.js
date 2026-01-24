@@ -37,16 +37,16 @@ import StudentEvolution from '@/components/StudentEvolution';
 import WorkoutReport from '@/components/WorkoutReport';
 import ActiveWorkout from '@/components/ActiveWorkout';
 import RestTimerOverlay from '@/components/RestTimerOverlay';
-import NotificationToast from '@/components/NotificationToast';
 import LoadingScreen from '@/components/LoadingScreen';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import IncomingInviteModal from '@/components/IncomingInviteModal';
 import InviteAcceptedModal from '@/components/InviteAcceptedModal';
 import NotificationCenter from '@/components/NotificationCenter';
 import HeaderActionsMenu from '@/components/HeaderActionsMenu.js';
-import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge';
 import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext';
+import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ErrorReporterProvider from '@/components/ErrorReporterProvider';
 import { DialogProvider, useDialog } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { playStartSound, unlockAudio } from '@/lib/sounds';
@@ -63,6 +63,19 @@ import { getLatestWhatsNew } from '@/content/whatsNew'
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 
 const appId = 'irontracks-production';
+
+function InAppNotifyBinder({ bind }) {
+    const { notify } = useInAppNotifications();
+    const safeBind = typeof bind === 'function' ? bind : null;
+    useEffect(() => {
+        if (!safeBind) return;
+        safeBind(notify);
+        return () => {
+            try { safeBind(null); } catch {}
+        };
+    }, [notify, safeBind]);
+    return null;
+}
 
 const mapWorkoutRow = (w) => {
 	const rawExercises = Array.isArray(w?.exercises) ? w.exercises : [];
@@ -142,13 +155,24 @@ const mapWorkoutRow = (w) => {
 	};
 };
 
-function IronTracksApp({ initialUser, initialProfile }) {
+function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const { confirm, alert } = useDialog();
     const [user, setUser] = useState(initialUser ?? null);
     const [authLoading, setAuthLoading] = useState(false);
     const [view, setView] = useState('dashboard');
     const [directChat, setDirectChat] = useState(null);
-    const [workouts, setWorkouts] = useState([]);
+    const [workouts, setWorkouts] = useState(() => {
+        try {
+            const list = Array.isArray(initialWorkouts) ? initialWorkouts : [];
+            const mapped = list
+                .map((row) => mapWorkoutRow(row))
+                .filter(Boolean)
+                .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            return mapped;
+        } catch {
+            return [];
+        }
+    });
     const [stats, setStats] = useState({ workouts: 0, exercises: 0, activeStreak: 0 });
     const [streakStats, setStreakStats] = useState(null);
     const [currentWorkout, setCurrentWorkout] = useState(null);
@@ -158,7 +182,14 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const [showImportModal, setShowImportModal] = useState(false);
     const [showJsonImportModal, setShowJsonImportModal] = useState(false);
     const [reportData, setReportData] = useState({ current: null, previous: null });
-    const [notification, setNotification] = useState(null);
+    const inAppNotifyRef = useRef(null);
+    const bindInAppNotify = useCallback((fn) => {
+        inAppNotifyRef.current = typeof fn === 'function' ? fn : null;
+    }, []);
+    const inAppNotify = useCallback((payload) => {
+        const fn = inAppNotifyRef.current;
+        if (typeof fn === 'function') fn(payload);
+    }, []);
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [whatsNewOpen, setWhatsNewOpen] = useState(false)
     const [isCoach, setIsCoach] = useState(false);
@@ -208,6 +239,9 @@ function IronTracksApp({ initialUser, initialProfile }) {
         } catch {}
         try {
             fetch('/api/social/presence/ping', { method: 'POST' }).catch(() => {});
+        } catch {}
+        try {
+            fetch('/api/profiles/ping', { method: 'POST' }).catch(() => {});
         } catch {}
     }, [user?.id]);
 
@@ -587,7 +621,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     if (isMissing && !serverSessionSyncWarnedRef.current) {
                         serverSessionSyncWarnedRef.current = true;
                         try {
-                            setNotification({
+                            inAppNotify({
                                 text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
                                 senderName: 'Aviso do Sistema',
                                 displayName: 'Sistema',
@@ -623,7 +657,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
         return () => {
             cancelled = true;
         };
-    }, [supabase, user?.id]);
+    }, [supabase, user?.id, inAppNotify]);
 
     useEffect(() => {
         const userId = user?.id ? String(user.id) : '';
@@ -658,7 +692,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
 								localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
 							} catch {}
                                 try {
-                                    setNotification({
+                                    inAppNotify({
                                         text: 'Treino finalizado em outro dispositivo.',
                                         senderName: 'Aviso do Sistema',
                                         displayName: 'Sistema',
@@ -694,7 +728,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 } catch {}
             }
         };
-    }, [supabase, user?.id]);
+    }, [supabase, user?.id, inAppNotify]);
 
     useEffect(() => {
         const handler = () => { try { unlockAudio(); } catch {} };
@@ -803,7 +837,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                         if (isMissing && !serverSessionSyncWarnedRef.current) {
                             serverSessionSyncWarnedRef.current = true;
                             try {
-                                setNotification({
+                                inAppNotify({
                                     text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
                                     senderName: 'Aviso do Sistema',
                                     displayName: 'Sistema',
@@ -840,7 +874,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     if (isMissing && !serverSessionSyncWarnedRef.current) {
                         serverSessionSyncWarnedRef.current = true;
                         try {
-                            setNotification({
+                            inAppNotify({
                                 text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
                                 senderName: 'Aviso do Sistema',
                                 displayName: 'Sistema',
@@ -868,7 +902,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 if (timerId) clearTimeout(timerId);
             } catch {}
         };
-    }, [activeSession, supabase, user?.id]);
+    }, [activeSession, supabase, user?.id, inAppNotify]);
 
     useEffect(() => {
         if (!activeSession) return;
@@ -995,9 +1029,12 @@ function IronTracksApp({ initialUser, initialProfile }) {
         const meta = baseUser?.user_metadata || {}
         const emailRaw = String(baseUser?.email || '').trim()
         const emailUser = emailRaw.includes('@') ? emailRaw.split('@')[0] : (emailRaw || 'Usuário')
-        const displayName = meta?.full_name || meta?.name || emailUser
-        const photoURL = meta?.avatar_url || meta?.picture || null
-        const nextUser = { ...baseUser, displayName, photoURL, role: initialProfile?.role || 'student' }
+        const profileDisplayName = String(initialProfile?.display_name || initialProfile?.displayName || '').trim()
+        const profilePhotoURL = String(initialProfile?.photo_url || initialProfile?.photoURL || initialProfile?.photoUrl || '').trim()
+        const metaDisplayName = String(meta?.full_name || meta?.name || '').trim()
+        const displayName = profileDisplayName || metaDisplayName || emailUser
+        const photoURL = profilePhotoURL || meta?.avatar_url || meta?.picture || null
+        const nextUser = { ...baseUser, displayName, photoURL, role: initialProfile?.role || 'user' }
         setUser(nextUser)
         const role = String(initialProfile?.role || '').toLowerCase()
         setIsCoach(role === 'teacher' || role === 'admin')
@@ -1058,10 +1095,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
         if (user?.id) {
              const syncProfile = async () => {
                  try {
-                    await supabase
-                        .from('profiles')
-                        .update({ last_seen: new Date().toISOString() })
-                        .eq('id', user.id);
+                    return
                  } catch (e) {
                     console.error('Erro ao sincronizar perfil:', e);
                  }
@@ -1082,23 +1116,11 @@ function IronTracksApp({ initialUser, initialProfile }) {
             }
 
             try {
-                const { data, error } = await supabase
-                    .from('profiles')
-                    .select('id, display_name')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                if (cancelled) return;
-
-                if (error) {
-                    setProfileIncomplete(true);
-                    setProfileDraftName(String(user?.displayName || '').trim());
-                    return;
+                const seedName = String(initialProfile?.display_name || '').trim() || String(user?.displayName || '').trim();
+                if (!cancelled) {
+                    setProfileIncomplete(!seedName);
+                    setProfileDraftName(seedName);
                 }
-
-                const displayName = String(data?.display_name || '').trim();
-                setProfileIncomplete(!displayName);
-                setProfileDraftName(displayName || String(user?.displayName || '').trim());
             } catch {
                 if (!cancelled) {
                     setProfileIncomplete(true);
@@ -1111,11 +1133,52 @@ function IronTracksApp({ initialUser, initialProfile }) {
         return () => {
             cancelled = true;
         };
-    }, [supabase, user?.id, user?.displayName]);
+    }, [initialProfile?.display_name, user?.id, user?.displayName]);
+
+    useEffect(() => {
+        if (!user?.id) return;
+        let cancelled = false;
+        const run = async () => {
+            try {
+                const res = await fetch('/api/dashboard/bootstrap', { cache: 'no-store', credentials: 'include' });
+                const json = await res.json().catch(() => null);
+                if (cancelled) return;
+                if (!json?.ok) return;
+
+                const prof = json?.profile && typeof json.profile === 'object' ? json.profile : null;
+                const displayName = String(prof?.display_name || '').trim();
+                const photoURL = String(prof?.photo_url || '').trim();
+                const role = String(prof?.role || '').toLowerCase();
+
+                setUser((prev) => {
+                    const current = prev && typeof prev === 'object' ? prev : null;
+                    if (!current) return prev;
+                    const patch = {};
+                    if (displayName && displayName !== current.displayName) patch.displayName = displayName;
+                    if (photoURL && photoURL !== current.photoURL) patch.photoURL = photoURL;
+                    if (role && role !== String(current.role || '').toLowerCase()) patch.role = role;
+                    return Object.keys(patch).length ? { ...current, ...patch } : prev;
+                });
+                if (role) setIsCoach(role === 'teacher' || role === 'admin');
+
+                if (Array.isArray(json.workouts) && json.workouts.length) {
+                    const mapped = json.workouts
+                        .map((row) => mapWorkoutRow(row))
+                        .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                    setWorkouts(mapped);
+                    const totalEx = mapped.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0);
+                    setStats({ workouts: mapped.length, exercises: totalEx, activeStreak: 0 });
+                }
+            } catch {}
+        };
+        run();
+        return () => {
+            cancelled = true;
+        };
+    }, [user?.id]);
 
 	// Fetch Workouts
 	const fetchWorkouts = useCallback(async (specificUser = user) => {
-		const supabase = createClient();
         if (isFetching.current) return;
         isFetching.current = true;
         
@@ -1133,6 +1196,62 @@ function IronTracksApp({ initialUser, initialProfile }) {
             let studentData = []
             let studentsList = []
 
+            const hydrateWorkouts = async (rows) => {
+                const base = Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : [];
+                const workoutIds = base.map((w) => w.id).filter(Boolean);
+                if (workoutIds.length === 0) return base.map((w) => ({ ...w, exercises: [] }));
+
+                let exercises = [];
+                try {
+                    const { data: exRows } = await supabase
+                        .from('exercises')
+                        .select('*')
+                        .in('workout_id', workoutIds)
+                        .order('order', { ascending: true })
+                        .limit(5000);
+                    exercises = Array.isArray(exRows) ? exRows : [];
+                } catch {
+                    exercises = [];
+                }
+
+                const exIds = exercises.map((e) => e.id).filter(Boolean);
+                let sets = [];
+                if (exIds.length > 0) {
+                    try {
+                        const { data: setRows } = await supabase
+                            .from('sets')
+                            .select('*')
+                            .in('exercise_id', exIds)
+                            .order('set_number', { ascending: true })
+                            .limit(20000);
+                        sets = Array.isArray(setRows) ? setRows : [];
+                    } catch {
+                        sets = [];
+                    }
+                }
+
+                const setsByExercise = new Map();
+                for (const s of sets) {
+                    const eid = s?.exercise_id;
+                    if (!eid) continue;
+                    const list = setsByExercise.get(eid) || [];
+                    list.push(s);
+                    setsByExercise.set(eid, list);
+                }
+
+                const exByWorkout = new Map();
+                for (const ex of exercises) {
+                    const wid = ex?.workout_id;
+                    if (!wid) continue;
+                    const exWithSets = { ...ex, sets: setsByExercise.get(ex.id) || [] };
+                    const list = exByWorkout.get(wid) || [];
+                    list.push(exWithSets);
+                    exByWorkout.set(wid, list);
+                }
+
+                return base.map((w) => ({ ...w, exercises: exByWorkout.get(w.id) || [] }));
+            };
+
             if (role === 'admin' || role === 'teacher') {
                 // 1. Fetch Students
                 try {
@@ -1145,20 +1264,14 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 } catch (e) { console.error('Erro fetching students', e); }
 
                 // 2. Fetch My Workouts
-                const { data: myD, error: myErr } = await supabase
+                const { data: myBase, error: myErr } = await supabase
                     .from('workouts')
-                    .select(`
-                        *,
-                        exercises (
-                            *,
-                            sets (*)
-                        )
-                    `)
+                    .select('*')
                     .eq('is_template', true)
                     .eq('user_id', currentUser.id)
                     .order('name', { ascending: true })
                 if (myErr) throw myErr
-                data = myD || []
+                data = await hydrateWorkouts(myBase || [])
 
                 // 3. Fetch Student Workouts
                 const ids = studentsList.map(s => s.user_id || s.id).filter(Boolean)
@@ -1166,49 +1279,107 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     const seen = new Set()
                     const combined = []
                     try {
-                        const { data: swByUser } = await supabase
+                        const { data: swByUserBase } = await supabase
                             .from('workouts')
-                            .select('*, exercises(*, sets(*))')
+                            .select('*')
                             .eq('is_template', true)
                             .in('user_id', ids)
                             .order('name')
                             .limit(500)
+                        const swByUser = await hydrateWorkouts(swByUserBase || [])
                         for (const w of (swByUser || [])) { if (!seen.has(w.id)) { seen.add(w.id); combined.push(w) } }
                     } catch {}
                     try {
-                        const { data: swByStudent } = await supabase
+                        const { data: swByStudentBase } = await supabase
                             .from('workouts')
-                            .select('*, exercises(*, sets(*))')
+                            .select('*')
                             .eq('is_template', true)
                             .in('student_id', ids)
                             .order('name')
                             .limit(500)
+                        const swByStudent = await hydrateWorkouts(swByStudentBase || [])
                         for (const w of (swByStudent || [])) { if (!seen.has(w.id)) { seen.add(w.id); combined.push(w) } }
                     } catch {}
                     studentData = combined
                 }
             } else {
-                const { data: d, error } = await supabase
+                const { data: baseRows, error } = await supabase
                     .from('workouts')
-                    .select(`
-                        *,
-                        exercises (
-                            *,
-                            sets (*)
-                        )
-                    `)
+                    .select('*')
                     .eq('is_template', true)
                     .eq('user_id', currentUser.id)
                     .order('name', { ascending: true })
                 if (error) throw error
-                data = d || []
+                data = await hydrateWorkouts(baseRows || [])
+
+                if (!data.length) {
+                    try {
+                        const { data: anyRows, error: anyErr } = await supabase
+                            .from('workouts')
+                            .select('*')
+                            .eq('user_id', currentUser.id)
+                            .order('name', { ascending: true })
+                            .limit(500);
+                        if (!anyErr && Array.isArray(anyRows) && anyRows.length) {
+                            data = await hydrateWorkouts(anyRows);
+                        }
+                    } catch {}
+                }
+
+                if (!data.length) {
+                    try {
+                        const { data: studentRow } = await supabase
+                            .from('students')
+                            .select('id')
+                            .eq('user_id', currentUser.id)
+                            .maybeSingle();
+                        const studentId = studentRow?.id ? String(studentRow.id) : '';
+                        if (studentId) {
+                            const { data: legacyBase } = await supabase
+                                .from('workouts')
+                                .select('*')
+                                .eq('is_template', true)
+                                .or(`user_id.eq.${studentId},student_id.eq.${studentId}`)
+                                .order('name', { ascending: true })
+                                .limit(500);
+                            const legacyHydrated = await hydrateWorkouts(legacyBase || []);
+                            const seen = new Set();
+                            const merged = [];
+                            for (const w of legacyHydrated) {
+                                if (!w?.id) continue;
+                                if (seen.has(w.id)) continue;
+                                seen.add(w.id);
+                                merged.push(w);
+                            }
+                            data = merged;
+                        }
+                    } catch {}
+                }
+
+                if (!data.length) {
+                    try {
+                        const resLegacy = await fetch('/api/workouts/list', { cache: 'no-store' });
+                        const jsonLegacy = await resLegacy.json().catch(() => null);
+                        if (jsonLegacy?.ok && Array.isArray(jsonLegacy.rows) && jsonLegacy.rows.length) {
+                            data = (jsonLegacy.rows || []).map((w) => ({
+                                id: w?.id,
+                                name: w?.name,
+                                notes: null,
+                                is_template: true,
+                                user_id: currentUser.id,
+                                created_by: null,
+                                exercises: [],
+                            }));
+                        }
+                    } catch {}
+                }
             }
 
 			if (Array.isArray(data)) {
 				const mappedRaw = data
 					.map((row) => mapWorkoutRow(row))
 					.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                const mapped = mappedRaw.filter(w => Array.isArray(w.exercises) && w.exercises.length > 0);
+                const mapped = mappedRaw;
 
                 if (role === 'admin' || role === 'teacher') {
                     setWorkouts(mapped)
@@ -1285,7 +1456,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
 			}
 			console.error("Erro ao buscar:", { message: msg, error: e });
 		} finally { isFetching.current = false; }
-	}, [user]); // Depende apenas do usuário para evitar loops de busca
+	}, [supabase, user]); // Depende apenas do usuário para evitar loops de busca
 
     useEffect(() => {
         if (user) {
@@ -1740,6 +1911,16 @@ function IronTracksApp({ initialUser, initialProfile }) {
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
     return (
+        <InAppNotificationsProvider
+            userId={user?.id || null}
+            settings={userSettingsApi?.settings ?? null}
+            onOpenMessages={() => setView('chat')}
+            onOpenNotifications={() => {
+                setShowNotifCenter(true);
+                setHasUnreadNotification(false);
+            }}
+        >
+        <InAppNotifyBinder bind={bindInAppNotify} />
         <TeamWorkoutProvider user={user} settings={userSettingsApi?.settings ?? null}>
             <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
                 <IncomingInviteModal onStartSession={handleStartSession} />
@@ -1811,8 +1992,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     </div>
                 )}
 
-                {user && <RealtimeNotificationBridge userId={user.id} setNotification={setNotification} />}
-
                 {/* Main Content */}
                 <div
                     className="flex-1 overflow-y-auto custom-scrollbar relative"
@@ -1828,8 +2007,8 @@ function IronTracksApp({ initialUser, initialProfile }) {
                             onOpenCompleteProfile={() => setShowCompleteProfile(true)}
                             view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : 'dashboard'}
                             onChangeView={(next) => setView(next)}
-                            assessmentsContent={user?.id ? <AssessmentHistory studentId={user.id} /> : null}
-                            communityContent={user?.id ? <CommunityClient embedded /> : null}
+                            assessmentsContent={(user?.id || initialUser?.id) ? <AssessmentHistory studentId={user?.id || initialUser?.id} /> : null}
+                            communityContent={(user?.id || initialUser?.id) ? <CommunityClient embedded /> : null}
                             settings={userSettingsApi?.settings ?? null}
                             onCreateWorkout={handleCreateWorkout}
                             onQuickView={(w) => setQuickViewWorkout(w)}
@@ -1838,7 +2017,7 @@ function IronTracksApp({ initialUser, initialProfile }) {
                             onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
                             onEditWorkout={(w) => handleEditWorkout(w)}
                             onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
-                            currentUserId={user?.id}
+                            currentUserId={user?.id || initialUser?.id}
                             exportingAll={Boolean(exportingAll)}
                             onExportAll={handleExportAllWorkouts}
                             streakStats={streakStats}
@@ -2164,27 +2343,6 @@ function IronTracksApp({ initialUser, initialProfile }) {
                     />
                 )}
 
-                {notification && (
-                    <NotificationToast
-                        settings={userSettingsApi?.settings ?? null}
-                        notification={notification}
-                        onClick={() => {
-                            try {
-                                const t = String(notification?.type || '').toLowerCase();
-                                if (t === 'message') {
-                                    setView('chat');
-                                } else {
-                                    setShowNotifCenter(true);
-                                }
-                            } catch {
-                                setShowNotifCenter(true);
-                            }
-                            setNotification(null);
-                        }}
-                        onClose={() => setNotification(null)}
-                    />
-                )}
-
                 {activeSession && view !== 'active' && (
                     <div className="fixed bottom-0 left-0 right-0 z-[1100]">
                         <div className="bg-neutral-900/95 backdrop-blur border-t border-neutral-800 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
@@ -2264,16 +2422,19 @@ function IronTracksApp({ initialUser, initialProfile }) {
                 )}
             </div>
         </TeamWorkoutProvider>
+        </InAppNotificationsProvider>
     );
 }
 
-export default function IronTracksAppClient({ initialUser, initialProfile }) {
+export default function IronTracksAppClient({ initialUser, initialProfile, initialWorkouts }) {
     return (
-        <ErrorBoundary>
-            <DialogProvider>
-                <IronTracksApp initialUser={initialUser} initialProfile={initialProfile} />
+        <DialogProvider>
+            <ErrorReporterProvider>
+                <ErrorBoundary>
+                    <IronTracksApp initialUser={initialUser} initialProfile={initialProfile} initialWorkouts={initialWorkouts} />
+                </ErrorBoundary>
                 <GlobalDialog />
-            </DialogProvider>
-        </ErrorBoundary>
+            </ErrorReporterProvider>
+        </DialogProvider>
     );
 }
