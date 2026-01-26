@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useEffect, useRef } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
 import { AlertCircle, HelpCircle, X, MessageSquare } from 'lucide-react';

@@ -58,6 +58,43 @@ const parseTrainingNumberOrZero = (v) => {
   }
 };
 
+const parseTrainingNumberOrNull = (v) => {
+  try {
+    if (v == null) return null;
+    const raw = String(v ?? '').trim();
+    if (!raw) return null;
+    const n = parseTrainingNumberOrZero(raw);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+};
+
+const parseRpeOrNull = (v) => {
+  try {
+    if (v == null) return null;
+    if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+    const raw = String(v ?? '').trim();
+    if (!raw) return null;
+    const cleaned = raw.replace(/[–—]/g, '-').replace(',', '.');
+    const parts = cleaned
+      .split('-')
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (parts.length === 2) {
+      const a = parseTrainingNumberOrNull(parts[0]);
+      const b = parseTrainingNumberOrNull(parts[1]);
+      if (a == null || b == null) return null;
+      const avg = (a + b) / 2;
+      return Number.isFinite(avg) ? avg : null;
+    }
+    const n = parseTrainingNumberOrNull(cleaned);
+    return n == null ? null : n;
+  } catch {
+    return null;
+  }
+};
+
 const safeParseSession = (notes) => {
   try {
     if (!notes) return null;
@@ -156,9 +193,9 @@ const buildExercisesPayload = (workout) => {
       for (let i = 0; i < numSets; i += 1) {
         const s = Array.isArray(setDetails) ? setDetails[i] : null;
         sets.push({
-          weight: s?.weight ?? null,
+          weight: parseTrainingNumberOrNull(s?.weight),
           reps: s?.reps ?? ex?.reps ?? null,
-          rpe: s?.rpe ?? ex?.rpe ?? null,
+          rpe: parseRpeOrNull(s?.rpe ?? ex?.rpe),
           set_number: s?.set_number ?? i + 1,
           completed: false,
           is_warmup: !!(s?.is_warmup ?? s?.isWarmup),

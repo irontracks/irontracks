@@ -5,7 +5,7 @@ import { requireRole, jsonError } from '@/utils/auth/route'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const isKind = (v: string) => v === 'churn_risk' || v === 'volume_drop' || v === 'load_spike'
+const isKind = (v: string) => v === 'churn_risk' || v === 'volume_drop' || v === 'load_spike' || v === 'checkins_alert'
 
 export async function POST(req: Request) {
   const auth = await requireRole(['admin', 'teacher'])
@@ -53,4 +53,3 @@ export async function POST(req: Request) {
     return jsonError(500, e?.message ?? String(e))
   }
 }
-

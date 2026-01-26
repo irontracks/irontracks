@@ -77,6 +77,8 @@ export default function MarketplacePage() {
   const supabase = useMemo(() => createClient(), [])
   const [role, setRole] = useState<Role>('user')
   const [userId, setUserId] = useState<string>('')
+  const [marketplaceEnabled, setMarketplaceEnabled] = useState(true)
+  const [marketplaceGateChecked, setMarketplaceGateChecked] = useState(false)
 
   const [plans, setPlans] = useState<TeacherPlan[]>([])
   const [loadingPlans, setLoadingPlans] = useState(false)
@@ -145,7 +147,11 @@ export default function MarketplacePage() {
 
   const loadMe = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user?.id) return
+    if (!user?.id) {
+      setMarketplaceEnabled(true)
+      setMarketplaceGateChecked(true)
+      return
+    }
     setUserId(user.id)
 
     const { data: profile } = await supabase
@@ -156,6 +162,21 @@ export default function MarketplacePage() {
 
     const r = (profile?.role || 'user') as Role
     setRole(r)
+
+    try {
+      const { data: prefRow } = await supabase
+        .from('user_settings')
+        .select('preferences')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      const prefs = prefRow?.preferences && typeof prefRow.preferences === 'object' ? prefRow.preferences : null
+      const enabled = prefs ? (prefs as any).moduleMarketplace !== false : true
+      setMarketplaceEnabled(Boolean(enabled))
+    } catch {
+      setMarketplaceEnabled(true)
+    } finally {
+      setMarketplaceGateChecked(true)
+    }
   }, [supabase])
 
   const loadHealth = useCallback(async () => {
@@ -429,6 +450,26 @@ export default function MarketplacePage() {
     loadHealth().catch(() => {})
     loadTeachers().catch(() => {})
   }, [adminOpen, isAdmin, loadHealth, loadTeachers])
+
+  if (marketplaceGateChecked && userId && !marketplaceEnabled) {
+    return (
+      <div className="min-h-screen bg-neutral-900 text-white p-4">
+        <div className="max-w-2xl mx-auto space-y-4">
+          <div className="bg-neutral-800 rounded-2xl border border-neutral-700 p-4">
+            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Marketplace</div>
+            <div className="text-lg font-black text-white mt-1">Módulo desativado</div>
+            <div className="text-sm text-neutral-300 mt-2">Ative em Configurações → Módulos opcionais.</div>
+            <a
+              href="/dashboard"
+              className={`${minButtonClass} mt-4 inline-flex items-center justify-center px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400`}
+            >
+              Voltar ao Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-neutral-900 text-white p-4">

@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect } from 'react';
 import { Users } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';

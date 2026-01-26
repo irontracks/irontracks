@@ -201,6 +201,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     const [resolvedPreviousSession, setResolvedPreviousSession] = useState(null);
     const prevByExerciseFetchInFlightRef = useRef(false);
     const [prevByExercise, setPrevByExercise] = useState({ logsByExercise: {}, baseMsByExercise: {} });
+    const [checkinsByKind, setCheckinsByKind] = useState({ pre: null, post: null });
     const [aiState, setAiState] = useState(() => {
         const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
         return { status: existing ? 'ready' : 'idle', ai: existing, saved: false, error: '' };
@@ -245,6 +246,63 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         const found = candidates.find((v) => typeof v === 'string' && v.trim());
         return found ? String(found) : null;
     }, [session, user?.id, user?.uid]);
+
+    useEffect(() => {
+        const id = session?.id ? String(session.id) : '';
+        if (!id || !supabase) {
+            setCheckinsByKind({ pre: null, post: null });
+            return;
+        }
+        const originWorkoutId = session?.originWorkoutId ? String(session.originWorkoutId) : '';
+        const baseMs =
+            toDateMs(session?.date) ?? toDateMs(session?.completed_at) ?? toDateMs(session?.completedAt) ?? (id ? Date.now() : null);
+        const windowStartIso = Number.isFinite(baseMs) ? new Date(baseMs - 12 * 60 * 60 * 1000).toISOString() : null;
+        const windowEndIso = Number.isFinite(baseMs) ? new Date(baseMs + 2 * 60 * 60 * 1000).toISOString() : null;
+        let cancelled = false;
+        (async () => {
+            try {
+                const { data } = await supabase
+                    .from('workout_checkins')
+                    .select('kind, energy, mood, soreness, notes, answers, created_at')
+                    .eq('workout_id', id)
+                    .order('created_at', { ascending: true })
+                    .limit(10);
+                if (cancelled) return;
+                const rows = Array.isArray(data) ? data : [];
+                const next = { pre: null, post: null };
+                rows.forEach((r) => {
+                    const kind = String(r?.kind || '').trim();
+                    if (kind === 'pre') next.pre = r;
+                    if (kind === 'post') next.post = r;
+                });
+
+                if (!next.pre && originWorkoutId && targetUserId && windowStartIso && windowEndIso) {
+                    try {
+                        const { data: preRow } = await supabase
+                            .from('workout_checkins')
+                            .select('kind, energy, mood, soreness, notes, answers, created_at')
+                            .eq('user_id', targetUserId)
+                            .eq('kind', 'pre')
+                            .eq('planned_workout_id', originWorkoutId)
+                            .gte('created_at', windowStartIso)
+                            .lte('created_at', windowEndIso)
+                            .order('created_at', { ascending: false })
+                            .limit(1)
+                            .maybeSingle();
+                        if (!cancelled && preRow) next.pre = preRow;
+                    } catch {}
+                }
+
+                setCheckinsByKind(next);
+            } catch {
+                if (cancelled) return;
+                setCheckinsByKind({ pre: null, post: null });
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [session?.id, session?.originWorkoutId, session?.date, session?.completed_at, session?.completedAt, supabase, targetUserId]);
 
     const resolvePreviousFromHistory = useCallback(async () => {
         try {
@@ -781,6 +839,70 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
     });
 
     const isTeamSession = partners.length > 0;
+    const preCheckin = (() => {
+        const local = session?.preCheckin && typeof session.preCheckin === 'object' ? session.preCheckin : null;
+        const db = checkinsByKind?.pre && typeof checkinsByKind.pre === 'object' ? checkinsByKind.pre : null;
+        if (db) {
+            const answers = db?.answers && typeof db.answers === 'object' ? db.answers : {};
+            const timeMinutes = answers?.time_minutes ?? answers?.timeMinutes ?? null;
+            const base = local && typeof local === 'object' ? { ...local } : {};
+            if (db?.energy != null) base.energy = db.energy;
+            if (db?.soreness != null) base.soreness = db.soreness;
+            if (timeMinutes != null && String(timeMinutes) !== '') base.timeMinutes = timeMinutes;
+            if (db?.notes != null && String(db.notes).trim()) base.notes = db.notes;
+            return base;
+        }
+        return local;
+    })();
+    const postCheckin = (() => {
+        const local = session?.postCheckin && typeof session.postCheckin === 'object' ? session.postCheckin : null;
+        const db = checkinsByKind?.post && typeof checkinsByKind.post === 'object' ? checkinsByKind.post : null;
+        if (db) {
+            const answers = db?.answers && typeof db.answers === 'object' ? db.answers : {};
+            const rpe = answers?.rpe ?? null;
+            const base = local && typeof local === 'object' ? { ...local } : {};
+            if (rpe != null && String(rpe) !== '') base.rpe = rpe;
+            if (db?.mood != null) base.satisfaction = db.mood;
+            if (db?.soreness != null) base.soreness = db.soreness;
+            if (db?.notes != null && String(db.notes).trim()) base.notes = db.notes;
+            return base;
+        }
+        return local;
+    })();
+    const checkinRecommendations = (() => {
+        const toNumberOrNull = (v) => {
+            try {
+                const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'));
+                return Number.isFinite(n) ? n : null;
+            } catch {
+                return null;
+            }
+        };
+        const recs = [];
+        const preEnergy = toNumberOrNull(preCheckin?.energy);
+        const preSoreness = toNumberOrNull(preCheckin?.soreness);
+        const preTime = toNumberOrNull(preCheckin?.timeMinutes);
+        const postRpe = toNumberOrNull(postCheckin?.rpe);
+        const postSatisfaction = toNumberOrNull(postCheckin?.satisfaction);
+        const postSoreness = toNumberOrNull(postCheckin?.soreness);
+
+        if ((preSoreness != null && preSoreness >= 7) || (postSoreness != null && postSoreness >= 7)) {
+            recs.push('Dor alta: reduzir volume/carga 20–30% e priorizar técnica + mobilidade.');
+        }
+        if (preEnergy != null && preEnergy <= 2) {
+            recs.push('Energia baixa: mantenha o treino mais curto, evite falha e foque em recuperação (sono/estresse).');
+        }
+        if (postRpe != null && postRpe >= 9) {
+            recs.push('RPE alto: reduza um pouco a intensidade e aumente descanso entre séries.');
+        }
+        if (postSatisfaction != null && postSatisfaction <= 2) {
+            recs.push('Satisfação baixa: revise seleção de exercícios e meta da sessão para manter consistência.');
+        }
+        if (preTime != null && preTime > 0 && preTime < 45) {
+            recs.push('Pouco tempo: use um treino “mínimo efetivo” (menos exercícios e mais foco).');
+        }
+        return recs;
+    })();
     const workoutTitleRaw = String(session?.workoutTitle || '').trim();
     const workoutTitleMain = (() => {
         const m = workoutTitleRaw.match(/^\s*.+?\s*-\s*(.+)$/);
@@ -861,6 +983,81 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                         <div className="absolute left-0 top-0 h-px w-28 bg-yellow-500" />
                     </div>
                 </div>
+
+                {(preCheckin || postCheckin) && (
+                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Check-in</div>
+                                <div className="text-lg font-black text-white">Pré e Pós-treino</div>
+                                <div className="text-xs text-neutral-300">Contexto rápido para evolução e ajustes.</div>
+                            </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pré</div>
+                                <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Energia</div>
+                                        <div className="font-black text-white">{preCheckin?.energy != null && String(preCheckin.energy) !== '' ? String(preCheckin.energy) : '—'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                                        <div className="font-black text-white">
+                                            {preCheckin?.soreness != null && String(preCheckin.soreness) !== '' ? String(preCheckin.soreness) : '—'}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo disponível</div>
+                                        <div className="font-black text-white">
+                                            {preCheckin?.timeMinutes != null && String(preCheckin.timeMinutes) !== '' ? `${String(preCheckin.timeMinutes)} min` : '—'}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Observações</div>
+                                        <div className="text-neutral-200">{preCheckin?.notes ? String(preCheckin.notes) : '—'}</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pós</div>
+                                <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">RPE</div>
+                                        <div className="font-black text-white">{postCheckin?.rpe != null && String(postCheckin.rpe) !== '' ? String(postCheckin.rpe) : '—'}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Satisfação</div>
+                                        <div className="font-black text-white">
+                                            {postCheckin?.satisfaction != null && String(postCheckin.satisfaction) !== '' ? String(postCheckin.satisfaction) : '—'}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                                        <div className="font-black text-white">
+                                            {postCheckin?.soreness != null && String(postCheckin.soreness) !== '' ? String(postCheckin.soreness) : '—'}
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2">
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Observações</div>
+                                        <div className="text-neutral-200">{postCheckin?.notes ? String(postCheckin.notes) : '—'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {checkinRecommendations.length ? (
+                            <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-300">Recomendações</div>
+                                <div className="mt-2 space-y-1 text-sm text-neutral-200">
+                                    {checkinRecommendations.map((r) => (
+                                        <div key={r}>{r}</div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                )}
 
                 <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">

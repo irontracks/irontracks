@@ -65,12 +65,26 @@ export default function ActiveWorkout(props) {
     return defaultRestSeconds;
   };
 
+  const requestPostWorkoutCheckin = async () => {
+    if (postCheckinOpen) return null;
+    return await new Promise((resolve) => {
+      postCheckinResolveRef.current = (value) => {
+        resolve(value ?? null);
+      };
+      setPostCheckinDraft({ rpe: '', satisfaction: '', soreness: '', notes: '' });
+      setPostCheckinOpen(true);
+    });
+  };
+
   const [ticker, setTicker] = useState(Date.now());
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [finishing, setFinishing] = useState(false);
   const [openNotesKeys, setOpenNotesKeys] = useState(() => new Set());
   const [openAiHints, setOpenAiHints] = useState(() => new Set());
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [postCheckinOpen, setPostCheckinOpen] = useState(false);
+  const [postCheckinDraft, setPostCheckinDraft] = useState({ rpe: '', satisfaction: '', soreness: '', notes: '' });
+  const postCheckinResolveRef = useRef(null);
 
   const restPauseRefs = useRef({});
   const clusterRefs = useRef({});
@@ -332,6 +346,16 @@ export default function ActiveWorkout(props) {
       }
     }
 
+    let postCheckin = null;
+    if (shouldSaveHistory) {
+      try {
+        const prompt = settings ? settings.promptPostWorkoutCheckin !== false : true;
+        if (prompt) postCheckin = await requestPostWorkoutCheckin();
+      } catch {
+        postCheckin = null;
+      }
+    }
+
     setFinishing(true);
     try {
       const safeExercises = Array.isArray(workout?.exercises)
@@ -360,6 +384,8 @@ export default function ActiveWorkout(props) {
         logs: logs && typeof logs === 'object' ? logs : {},
         exercises: safeExercises.filter((x) => x && typeof x === 'object' && String(x.name || '').length > 0),
         originWorkoutId: workout?.id ?? null,
+        preCheckin: ui?.preCheckin ?? null,
+        postCheckin,
       };
 
       let savedId = null;
@@ -1281,6 +1307,130 @@ export default function ActiveWorkout(props) {
           }
         }}
       />
+
+      {postCheckinOpen && (
+        <div
+          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          onClick={() => {
+            setPostCheckinOpen(false);
+            const r = postCheckinResolveRef.current;
+            postCheckinResolveRef.current = null;
+            if (typeof r === 'function') r(null);
+          }}
+        >
+          <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                <div className="text-white font-black text-lg truncate">Pós-treino</div>
+                <div className="text-xs text-neutral-400 truncate">{String(workout?.title || 'Treino')}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPostCheckinOpen(false);
+                  const r = postCheckinResolveRef.current;
+                  postCheckinResolveRef.current = null;
+                  if (typeof r === 'function') r(null);
+                }}
+                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Esforço (RPE 1–10)</div>
+                <select
+                  value={String(postCheckinDraft?.rpe ?? '')}
+                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, rpe: String(e.target.value || '') }))}
+                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Não informar</option>
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <option key={i + 1} value={String(i + 1)}>
+                      {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Satisfação (1–5)</div>
+                <div className="grid grid-cols-5 gap-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setPostCheckinDraft((prev) => ({ ...prev, satisfaction: String(n) }))}
+                      className={
+                        String(postCheckinDraft?.satisfaction || '') === String(n)
+                          ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
+                          : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
+                      }
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
+                <select
+                  value={String(postCheckinDraft?.soreness ?? '')}
+                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
+                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Não informar</option>
+                  {Array.from({ length: 11 }).map((_, i) => (
+                    <option key={i} value={String(i)}>
+                      {i}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
+                <textarea
+                  value={String(postCheckinDraft?.notes || '')}
+                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
+                  className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
+                  placeholder="Ex.: treino pesado, boa técnica, ajustar carga na próxima…"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPostCheckinOpen(false);
+                  const r = postCheckinResolveRef.current;
+                  postCheckinResolveRef.current = null;
+                  if (typeof r === 'function') r(null);
+                }}
+                className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+              >
+                Pular
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPostCheckinOpen(false);
+                  const r = postCheckinResolveRef.current;
+                  postCheckinResolveRef.current = null;
+                  if (typeof r === 'function') r(postCheckinDraft);
+                }}
+                className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-6 py-4 pb-28 space-y-4">
         {exercises.length === 0 ? (
