@@ -186,6 +186,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [showImportModal, setShowImportModal] = useState(false);
     const [showJsonImportModal, setShowJsonImportModal] = useState(false);
     const [reportData, setReportData] = useState({ current: null, previous: null });
+    const [reportBackView, setReportBackView] = useState('dashboard');
     const inAppNotifyRef = useRef(null);
     const bindInAppNotify = useCallback((fn) => {
         inAppNotifyRef.current = typeof fn === 'function' ? fn : null;
@@ -270,6 +271,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             fetch('/api/profiles/ping', { method: 'POST' }).catch(() => {});
         } catch {}
     }, [user?.id]);
+
+    useEffect(() => {
+        if (authLoading) return;
+        if (user) return;
+        const t = setTimeout(() => {
+            try {
+                router.replace('/?next=/dashboard');
+            } catch {}
+        }, 150);
+        return () => {
+            clearTimeout(t);
+        };
+    }, [authLoading, user, router]);
 
     useEffect(() => {
         if (whatsNewShownRef.current) return
@@ -1686,6 +1700,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 			setView('dashboard');
 			return;
 		}
+        setReportBackView('dashboard');
         setReportData({ current: sessionData, previous: null });
         setView('report');
     };
@@ -1956,7 +1971,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     };
 
     if (authLoading) return <LoadingScreen />;
-    if (!user) return null;
+    if (!user) return <LoadingScreen />;
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;
@@ -2228,7 +2243,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     {view === 'history' && (
                         <HistoryList
                             user={user}
-                            onViewReport={(s) => { setReportData({ current: s, previous: null }); setView('report'); }}
+                            onViewReport={(s) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
                             onBack={() => setView('dashboard')}
                         />
                     )}
@@ -2241,7 +2256,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 session={reportData.current}
                                 previousSession={reportData.previous}
                                 user={user}
-                                onClose={() => setView('dashboard')}
+                                onClose={() => setView(reportBackView || 'dashboard')}
                             />
                         </div>
                     )}

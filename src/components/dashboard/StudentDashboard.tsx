@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import BadgesGallery from './BadgesGallery'
 import RecentAchievements from './RecentAchievements'
 import WorkoutCalendarModal from './WorkoutCalendarModal'
+import StoriesBar from './StoriesBar'
 
 export type DashboardWorkout = {
   id?: string
@@ -84,6 +85,7 @@ export default function StudentDashboard(props: Props) {
   const showNewRecordsCard = props.settings?.showNewRecordsCard !== false
   const showIronRank = props.settings?.showIronRank !== false
   const showBadges = props.settings?.showBadges !== false
+  const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
 
   useEffect(() => {
     isMountedRef.current = true
@@ -187,6 +189,8 @@ export default function StudentDashboard(props: Props) {
           </button>
         </div>
       )}
+
+      {props.view === 'dashboard' && showStoriesBar ? <StoriesBar currentUserId={props.currentUserId} /> : null}
 
       <div style={{ minHeight: `${TABS_BAR_MIN_HEIGHT_PX}px` }}>
         <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
