@@ -132,12 +132,12 @@ export default function ExecutionVideoCapture(props) {
             pickFile();
           }}
           disabled={uploading}
-          className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 active:scale-95 transition-transform disabled:opacity-60"
+          className="w-full min-h-[38px] inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 active:scale-95 transition-transform disabled:opacity-60"
           title={uploading ? 'Enviando...' : 'Enviar vídeo ao professor'}
           aria-label={uploading ? 'Enviando vídeo' : 'Enviar vídeo ao professor'}
         >
-          <Video size={18} />
-          <span className="text-sm">{uploading ? 'Enviando...' : label}</span>
+          <Video size={16} />
+          <span className="text-xs">{uploading ? 'Enviando...' : label}</span>
         </button>
       ) : (
         <button

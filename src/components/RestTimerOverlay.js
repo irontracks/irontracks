@@ -123,7 +123,7 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
     if (isFinished) {
         return (
             <div
-                className="fixed inset-0 z-[100] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer"
+                className="fixed inset-0 z-[2200] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer"
                 onClick={() => {
                     try {
                         if (typeof onFinish === 'function') onFinish(context);
@@ -142,7 +142,7 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
     }
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-50 animate-slide-up pb-safe">
+        <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-[2100] animate-slide-up pb-safe">
             <div className="flex items-center justify-between max-w-md mx-auto">
                 <div className="flex items-center gap-4">
                     <div className="relative">

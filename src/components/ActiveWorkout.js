@@ -43,6 +43,49 @@ const buildPlannedBlocks = (totalReps, clusterSize) => {
   return blocks;
 };
 
+const buildBlocksByCount = (totalReps, blocksCount) => {
+  const t = Number(totalReps);
+  const c = Number(blocksCount);
+  if (!Number.isFinite(t) || t <= 0) return [];
+  if (!Number.isFinite(c) || c <= 0) return [];
+  const count = Math.min(50, Math.round(c));
+  const base = Math.floor(t / count);
+  const remainder = t - base * count;
+  if (base <= 0) return [];
+  const blocks = Array.from({ length: count }).map((_, idx) => base + (idx < remainder ? 1 : 0));
+  return blocks.filter((n) => Number.isFinite(n) && n > 0);
+};
+
+const parseClusterPrescription = (raw) => {
+  const text = String(raw || '')
+    .toLowerCase()
+    .replace(/[()]/g, ' ')
+    .replace(/[–—]/g, '-')
+    .replace(/[›»→]/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return { blocks: [], rests: [] };
+  const parts = text
+    .split('>')
+    .map((p) => String(p || '').trim())
+    .filter(Boolean);
+  if (!parts.length) return { blocks: [], rests: [] };
+  const blocks = [];
+  const rests = [];
+  parts.forEach((p) => {
+    const n = parseTrainingNumber(p);
+    if (!n || n <= 0) return;
+    if (p.includes('rep')) blocks.push(n);
+    else if (p.includes('seg') || p.includes('sec') || p.includes('s')) rests.push(n);
+  });
+  if (blocks.length >= 2 && rests.length === blocks.length - 1) return { blocks, rests };
+  if (blocks.length >= 2 && rests.length >= 1) {
+    const base = rests[0];
+    return { blocks, rests: Array.from({ length: blocks.length - 1 }).map(() => base) };
+  }
+  return { blocks: [], rests: [] };
+};
+
 export default function ActiveWorkout(props) {
   const { alert, confirm } = useDialog();
   const { sendInvite } = useTeamWorkout();
@@ -81,6 +124,8 @@ export default function ActiveWorkout(props) {
   const [finishing, setFinishing] = useState(false);
   const [openNotesKeys, setOpenNotesKeys] = useState(() => new Set());
   const [openAiHints, setOpenAiHints] = useState(() => new Set());
+  const [clusterModal, setClusterModal] = useState(null);
+  const [restPauseModal, setRestPauseModal] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [postCheckinOpen, setPostCheckinOpen] = useState(false);
   const [postCheckinDraft, setPostCheckinDraft] = useState({ rpe: '', satisfaction: '', soreness: '', notes: '' });
@@ -669,14 +714,16 @@ export default function ActiveWorkout(props) {
       : cfgRaw;
     const restTime = resolveRestTimeSeconds(ex);
 
-    const pauseSec = parseTrainingNumber(cfg?.rest_time_sec) ?? 15;
-    const miniSets = Math.max(0, Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0));
-
     const rp = isObject(log?.rest_pause) ? log.rest_pause : {};
+    const pauseSec = parseTrainingNumber(cfg?.rest_time_sec) ?? parseTrainingNumber(rp?.rest_time_sec) ?? 15;
+    const plannedMiniSets = Math.max(0, Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0));
+    const savedMiniSets = Math.max(0, Math.floor(parseTrainingNumber(rp?.planned_mini_sets) ?? 0));
+    const miniRepsArrRaw = Array.isArray(rp?.mini_reps) ? rp.mini_reps : [];
+    const miniSets = plannedMiniSets || savedMiniSets || (Array.isArray(miniRepsArrRaw) ? miniRepsArrRaw.length : 0);
+
     const activation = parseTrainingNumber(rp?.activation_reps) ?? null;
-    const minisArrRaw = Array.isArray(rp?.mini_reps) ? rp.mini_reps : [];
     const minis = Array.from({ length: miniSets }).map((_, idx) => {
-      const v = minisArrRaw?.[idx];
+      const v = miniRepsArrRaw?.[idx];
       const n = parseTrainingNumber(v);
       return n;
     });
@@ -684,38 +731,6 @@ export default function ActiveWorkout(props) {
     const total = (activation ?? 0) + minis.reduce((acc, v) => acc + (v ?? 0), 0);
     const done = !!log?.done;
     const canDone = (activation ?? 0) > 0 && (miniSets === 0 || minis.every((v) => Number.isFinite(v) && v > 0));
-
-    const lastAfterActivation = Number(rp?.last_rest_after_activation);
-    const lastAfterMini = Number(rp?.last_rest_after_mini);
-
-    const updateRp = (patch) => {
-      const nextRp = { ...rp, ...(patch && typeof patch === 'object' ? patch : {}) };
-      updateLog(key, {
-        rest_pause: nextRp,
-        reps: String(total || ''),
-        done: !!log?.done,
-        weight: String(log?.weight ?? cfg?.weight ?? ''),
-        advanced_config: cfg ?? log?.advanced_config ?? null,
-      });
-    };
-
-    const maybeStartMicroRest = (contextMiniIndex, guardKey) => {
-      try {
-        if (!pauseSec || pauseSec <= 0) return;
-        const idx = Number(contextMiniIndex);
-        if (!Number.isFinite(idx) || idx < 0) return;
-        if (guardKey === 'activation') {
-          if (Number.isFinite(lastAfterActivation) && lastAfterActivation >= 1) return;
-          startTimer(pauseSec, { kind: 'rest_pause', key, miniIndex: idx });
-          updateRp({ last_rest_after_activation: 1 });
-          return;
-        }
-        const last = Number.isFinite(lastAfterMini) ? lastAfterMini : -1;
-        if (idx <= last) return;
-        startTimer(pauseSec, { kind: 'rest_pause', key, miniIndex: idx });
-        updateRp({ last_rest_after_mini: idx });
-      } catch {}
-    };
 
     const notesValue = String(log?.notes ?? '');
     const hasNotes = notesValue.trim().length > 0;
@@ -744,6 +759,34 @@ export default function ActiveWorkout(props) {
             placeholder="kg"
             className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
           />
+          <button
+            type="button"
+            onClick={() => {
+              const baseWeight = String(log?.weight ?? cfg?.weight ?? '');
+              const baseRpe = String(log?.rpe ?? '').trim();
+              const nextMiniCount = Math.max(0, Math.floor(miniSets));
+              const minis = Array.from({ length: nextMiniCount }).map((_, idx) => {
+                const v = miniRepsArrRaw?.[idx];
+                const n = parseTrainingNumber(v);
+                return n != null && n > 0 ? n : null;
+              });
+              setRestPauseModal({
+                key,
+                pauseSec,
+                miniSets: nextMiniCount,
+                weight: baseWeight,
+                activationReps: activation != null && activation > 0 ? activation : null,
+                minis,
+                rpe: baseRpe,
+                cfg: cfg ?? null,
+                error: '',
+              });
+            }}
+            className="bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+          >
+            <Pencil size={14} />
+            <span className="text-xs font-black">Abrir</span>
+          </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Rest-P</span>
             <span className="text-xs text-neutral-400 truncate">Descanso {pauseSec || 0}s • Total: {total || 0} reps</span>
@@ -791,73 +834,7 @@ export default function ActiveWorkout(props) {
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-            <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Ativação</div>
-            <input
-              inputMode="decimal"
-              value={activation == null ? '' : String(activation)}
-              onChange={(e) => {
-                const v = parseTrainingNumber(e?.target?.value);
-                const nextActivation = v != null && v > 0 ? v : null;
-                updateRp({ activation_reps: nextActivation });
-                if ((activation ?? 0) <= 0 && (nextActivation ?? 0) > 0 && miniSets > 0 && (minis?.[0] == null || minis?.[0] <= 0)) {
-                  maybeStartMicroRest(0, 'activation');
-                }
-              }}
-              onBlur={() => {
-                if ((activation ?? 0) > 0 && miniSets > 0 && (minis?.[0] == null || minis?.[0] <= 0)) {
-                  maybeStartMicroRest(0, 'activation');
-                }
-              }}
-              placeholder="reps"
-              className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-            />
-          </div>
-
-          {Array.from({ length: miniSets }).map((_, idx) => {
-            const current = minis?.[idx] ?? null;
-            return (
-              <div key={`${key}-mini-${idx}`} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Mini {idx + 1}</div>
-                <input
-                  inputMode="decimal"
-                  value={current == null ? '' : String(current)}
-                  ref={(el) => {
-                    if (!restPauseRefs.current[key]) restPauseRefs.current[key] = {};
-                    restPauseRefs.current[key][idx] = el;
-                  }}
-                  onChange={(e) => {
-                    const v = parseTrainingNumber(e?.target?.value);
-                    const next = v != null && v > 0 ? v : null;
-                    const nextMiniReps = [...minis];
-                    nextMiniReps[idx] = next;
-                    updateRp({ mini_reps: nextMiniReps });
-                    if (
-                      idx < miniSets - 1
-                      && (current ?? 0) <= 0
-                      && (next ?? 0) > 0
-                      && (minis?.[idx + 1] == null || (minis?.[idx + 1] ?? 0) <= 0)
-                    ) {
-                      maybeStartMicroRest(idx + 1, 'mini');
-                    }
-                  }}
-                  onBlur={() => {
-                    if (idx < miniSets - 1) {
-                      const currentVal = minis?.[idx] ?? null;
-                      const nextVal = minis?.[idx + 1] ?? null;
-                      if ((currentVal ?? 0) > 0 && (nextVal ?? 0) <= 0) {
-                        maybeStartMicroRest(idx + 1, 'mini');
-                      }
-                    }
-                  }}
-                  placeholder="reps"
-                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                />
-              </div>
-            );
-          })}
-        </div>
+        <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha Ativação e Minis no modal para registrar e usar o timer.</div>
         {isNotesOpen && (
           <textarea
             value={notesValue}
@@ -878,17 +855,52 @@ export default function ActiveWorkout(props) {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
+    const plannedSet = getPlannedSet(ex, setIdx);
     const restTime = resolveRestTimeSeconds(ex);
+    const cluster = isObject(log?.cluster) ? log.cluster : {};
 
     const totalRepsPlanned = parseTrainingNumber(cfg?.total_reps);
     const clusterSize = parseTrainingNumber(cfg?.cluster_size);
     const intra = parseTrainingNumber(cfg?.intra_rest_sec) ?? 15;
-    const plannedBlocks = buildPlannedBlocks(totalRepsPlanned, clusterSize);
-
-    const cluster = isObject(log?.cluster) ? log.cluster : {};
+    let plannedBlocks = buildPlannedBlocks(totalRepsPlanned, clusterSize);
+    let restsByGap = plannedBlocks.length > 1 ? Array.from({ length: plannedBlocks.length - 1 }).map(() => intra) : [];
+    if (!plannedBlocks.length) {
+      const candidates = [
+        plannedSet?.reps,
+        plannedSet?.notes,
+        ex?.reps,
+        ex?.notes,
+      ]
+        .map((v) => String(v ?? '').trim())
+        .filter(Boolean);
+      let parsed = null;
+      for (const c of candidates) {
+        const p = parseClusterPrescription(c);
+        if (p.blocks.length) {
+          parsed = p;
+          break;
+        }
+      }
+      if (!parsed) parsed = { blocks: [], rests: [] };
+      if (parsed.blocks.length) {
+        plannedBlocks = parsed.blocks;
+        restsByGap = parsed.rests;
+      }
+      if (!plannedBlocks.length) {
+        const savedPlannedBlocks = Array.isArray(cluster?.plannedBlocks) ? cluster.plannedBlocks : [];
+        const safe = savedPlannedBlocks.map((n) => parseTrainingNumber(n)).filter((n) => Number.isFinite(n) && n > 0);
+        if (safe.length) {
+          plannedBlocks = safe;
+          restsByGap = safe.length > 1 ? Array.from({ length: safe.length - 1 }).map(() => intra) : [];
+        }
+      }
+    }
     const blocksRaw = Array.isArray(cluster?.blocks) ? cluster.blocks : [];
+    const blocksDetailedRaw = Array.isArray(cluster?.blocksDetailed) ? cluster.blocksDetailed : [];
     const blocks = plannedBlocks.map((_, idx) => {
-      const v = blocksRaw?.[idx];
+      const d = blocksDetailedRaw?.[idx];
+      const fromDetailed = isObject(d) ? parseTrainingNumber(d?.reps) : null;
+      const v = fromDetailed != null ? fromDetailed : blocksRaw?.[idx];
       const n = parseTrainingNumber(v);
       return n;
     });
@@ -896,36 +908,6 @@ export default function ActiveWorkout(props) {
     const total = blocks.reduce((acc, v) => acc + (v ?? 0), 0);
     const done = !!log?.done;
     const canDone = plannedBlocks.length > 0 && blocks.every((v) => Number.isFinite(v) && v > 0);
-
-    const lastRestAfterBlock = Number(cluster?.last_rest_after_block);
-    const lastRest = Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : -1;
-
-    const updateCluster = (patch) => {
-      const nextCluster = {
-        planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
-        ...cluster,
-        ...(patch && typeof patch === 'object' ? patch : {}),
-      };
-      updateLog(key, {
-        cluster: nextCluster,
-        reps: String(total || ''),
-        done: !!log?.done,
-        weight: String(log?.weight ?? cfg?.weight ?? ''),
-        advanced_config: cfg ?? log?.advanced_config ?? null,
-      });
-    };
-
-    const maybeStartIntraRest = (afterBlockIndex) => {
-      try {
-        const idx = Number(afterBlockIndex);
-        if (!Number.isFinite(idx) || idx < 0) return;
-        if (idx >= plannedBlocks.length - 1) return;
-        if (idx <= lastRest) return;
-        if (!intra || intra <= 0) return;
-        startTimer(intra, { kind: 'cluster', key, blockIndex: idx });
-        updateCluster({ last_rest_after_block: idx });
-      } catch {}
-    };
 
     const notation = plannedBlocks.length ? plannedBlocks.join('+') : '';
     const notesValue = String(log?.notes ?? '');
@@ -945,20 +927,41 @@ export default function ActiveWorkout(props) {
       <div key={key} className="space-y-2">
         <div className="flex items-center gap-2">
           <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          <input
-            inputMode="decimal"
-            value={String(log?.weight ?? cfg?.weight ?? '')}
-            onChange={(e) => {
-              const v = e?.target?.value ?? '';
-              updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+          <button
+            type="button"
+            onClick={() => {
+              const baseWeight = String(log?.weight ?? cfg?.weight ?? '');
+              const baseRpe = String(log?.rpe ?? '').trim();
+              const planned = { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null };
+              const blocksDetailed = Array.isArray(cluster?.blocksDetailed) ? cluster.blocksDetailed : [];
+              const initialBlocks = plannedBlocks.map((p, idx) => {
+                const existing = blocksDetailed?.[idx];
+                const w = isObject(existing) && existing?.weight != null ? String(existing.weight) : baseWeight;
+                const r = isObject(existing) ? parseTrainingNumber(existing?.reps) : parseTrainingNumber(blocksRaw?.[idx]);
+                return { planned: p, weight: w, reps: r != null && r > 0 ? r : null };
+              });
+              setClusterModal({
+                key,
+                planned,
+                plannedBlocks,
+                intra,
+                restsByGap,
+                restTime,
+                cfg: cfg ?? null,
+                baseWeight,
+                blocks: initialBlocks,
+                rpe: baseRpe,
+              });
             }}
-            placeholder="kg"
-            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-          />
+            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+          >
+            <Pencil size={14} />
+            <span className="text-xs font-black">Abrir</span>
+          </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Cluster</span>
             <span className="text-xs text-neutral-400 truncate">
-              {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
+              {notation ? `(${notation})` : ''} • Intra {restsByGap?.[0] || intra || 0}s • Total: {total || 0} reps
             </span>
           </div>
           <button
@@ -983,8 +986,9 @@ export default function ActiveWorkout(props) {
                 cluster: {
                   planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
                   blocks,
-                  last_rest_after_block: Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : null,
+                  blocksDetailed: Array.isArray(cluster?.blocksDetailed) ? cluster.blocksDetailed : null,
                 },
+                rpe: log?.rpe ?? null,
                 advanced_config: cfg ?? log?.advanced_config ?? null,
               });
               if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key });
@@ -1008,48 +1012,11 @@ export default function ActiveWorkout(props) {
           </div>
         )}
 
-        {plannedBlocks.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {plannedBlocks.map((planned, idx) => {
-              const current = blocks?.[idx] ?? null;
-              return (
-                <div key={`${key}-block-${idx}`} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
-                    <div className="text-[10px] font-mono text-neutral-500">plan {planned}</div>
-                  </div>
-                  <input
-                    inputMode="decimal"
-                    value={current == null ? '' : String(current)}
-                    ref={(el) => {
-                      if (!clusterRefs.current[key]) clusterRefs.current[key] = {};
-                      clusterRefs.current[key][idx] = el;
-                    }}
-                    onChange={(e) => {
-                      const v = parseTrainingNumber(e?.target?.value);
-                      const next = v != null && v > 0 ? v : null;
-                      const nextBlocks = [...blocks];
-                      nextBlocks[idx] = next;
-                      updateCluster({ blocks: nextBlocks });
-                      if (idx < plannedBlocks.length - 1 && (current ?? 0) <= 0 && (next ?? 0) > 0 && ((blocks?.[idx + 1] ?? 0) <= 0)) {
-                        maybeStartIntraRest(idx);
-                      }
-                    }}
-                    onBlur={() => {
-                      const cur = blocks?.[idx] ?? null;
-                      const next = blocks?.[idx + 1] ?? null;
-                      if (idx < plannedBlocks.length - 1 && (cur ?? 0) > 0 && (next ?? 0) <= 0) {
-                        maybeStartIntraRest(idx);
-                      }
-                    }}
-                    placeholder="reps"
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                  />
-                </div>
-              );
-            })}
+        {plannedBlocks.length > 0 ? (
+          <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
+            Preencha os blocos no modal para registrar kg, reps e descanso.
           </div>
-        )}
+        ) : null}
         {isNotesOpen && (
           <textarea
             value={notesValue}
@@ -1185,12 +1152,6 @@ export default function ActiveWorkout(props) {
                 <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">Vídeo</span>
               </button>
             ) : null}
-            <ExecutionVideoCapture
-              exerciseName={name}
-              workoutId={workout?.id || null}
-              exerciseId={ex?.id || ex?.exercise_id || null}
-              exerciseLibraryId={ex?.exercise_library_id || null}
-            />
             {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
           </div>
         </div>
@@ -1217,6 +1178,125 @@ export default function ActiveWorkout(props) {
         )}
       </div>
     );
+  };
+
+  const saveClusterModal = async () => {
+    const m = clusterModal && typeof clusterModal === 'object' ? clusterModal : null;
+    const key = String(m?.key || '').trim();
+    if (!key) {
+      setClusterModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+      return;
+    }
+    const blocks = Array.isArray(m?.blocks) ? m.blocks : [];
+    if (!blocks.length) {
+      setClusterModal((prev) =>
+        prev && typeof prev === 'object'
+          ? { ...prev, error: 'Nenhum bloco encontrado. Verifique a configuração (total reps, cluster size e descanso).' }
+          : prev,
+      );
+      return;
+    }
+    const planned = m?.planned && typeof m.planned === 'object' ? m.planned : {};
+    const intra = Number(m?.intra);
+    const restsByGap = Array.isArray(m?.restsByGap) ? m.restsByGap : [];
+    const done = !!getLog(key)?.done;
+    const baseAdvanced = m?.cfg ?? getLog(key)?.advanced_config ?? null;
+
+    const blocksDetailed = [];
+    const repsBlocks = [];
+    let total = 0;
+    for (let i = 0; i < blocks.length; i += 1) {
+      const b = blocks[i] && typeof blocks[i] === 'object' ? blocks[i] : {};
+      const weight = String(b.weight ?? '').trim();
+      const reps = parseTrainingNumber(b.reps);
+      if (!weight) {
+        setClusterModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg) em todos os blocos.' } : prev));
+        return;
+      }
+      if (!reps || reps <= 0) {
+        setClusterModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps em todos os blocos.' } : prev));
+        return;
+      }
+      const gapRest = restsByGap?.[i];
+      const restSecAfter = i < blocks.length - 1 ? (Number.isFinite(Number(gapRest)) ? Number(gapRest) : Number.isFinite(intra) ? intra : null) : null;
+      blocksDetailed.push({ weight, reps, restSecAfter });
+      repsBlocks.push(reps);
+      total += reps;
+    }
+
+    const lastWeight = String(blocksDetailed[blocksDetailed.length - 1]?.weight ?? '').trim();
+    const rpe = String(m?.rpe ?? '').trim();
+
+    updateLog(key, {
+      done,
+      weight: lastWeight,
+      reps: String(total || ''),
+      rpe: rpe || '',
+      cluster: {
+        planned: {
+          total_reps: planned?.total_reps ?? null,
+          cluster_size: planned?.cluster_size ?? null,
+          cluster_blocks_count: planned?.cluster_blocks_count ?? null,
+          intra_rest_sec: planned?.intra_rest_sec ?? null,
+        },
+        plannedBlocks: Array.isArray(m?.plannedBlocks) ? m.plannedBlocks : null,
+        blocks: repsBlocks,
+        blocksDetailed,
+      },
+      advanced_config: baseAdvanced,
+    });
+    setClusterModal(null);
+  };
+
+  const saveRestPauseModal = async () => {
+    const m = restPauseModal && typeof restPauseModal === 'object' ? restPauseModal : null;
+    const key = String(m?.key || '').trim();
+    if (!key) {
+      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+      return;
+    }
+
+    const weight = String(m?.weight ?? '').trim();
+    if (!weight) {
+      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+      return;
+    }
+
+    const activationReps = parseTrainingNumber(m?.activationReps);
+    if (!activationReps || activationReps <= 0) {
+      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps de ativação.' } : prev));
+      return;
+    }
+
+    const minis = Array.isArray(m?.minis) ? m.minis : [];
+    const miniReps = minis.map((v) => {
+      const n = parseTrainingNumber(v);
+      return n != null && n > 0 ? n : null;
+    });
+    if (miniReps.some((v) => v == null)) {
+      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps de todos os minis.' } : prev));
+      return;
+    }
+
+    const pauseSec = parseTrainingNumber(m?.pauseSec) ?? 15;
+    const rpe = String(m?.rpe ?? '').trim();
+    const cfg = m?.cfg ?? getLog(key)?.advanced_config ?? null;
+
+    const total = (activationReps ?? 0) + miniReps.reduce((acc, v) => acc + (v ?? 0), 0);
+    updateLog(key, {
+      done: !!getLog(key)?.done,
+      weight,
+      reps: String(total || ''),
+      rpe: rpe || '',
+      rest_pause: {
+        activation_reps: activationReps,
+        mini_reps: miniReps,
+        rest_time_sec: pauseSec,
+        planned_mini_sets: miniReps.length,
+      },
+      advanced_config: cfg,
+    });
+    setRestPauseModal(null);
   };
 
   if (!session || !workout) {
@@ -1307,6 +1387,469 @@ export default function ActiveWorkout(props) {
           }
         }}
       />
+
+      {clusterModal && (
+        <div
+          className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          onClick={() => setClusterModal(null)}
+        >
+          <div
+            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Cluster</div>
+                <div className="text-white font-black text-lg truncate">Preencher blocos</div>
+                <div className="text-xs text-neutral-400 truncate">
+                  {Array.isArray(clusterModal?.plannedBlocks) ? `${clusterModal.plannedBlocks.length} blocos` : 'Blocos'}
+                  {Array.isArray(clusterModal?.restsByGap) && clusterModal.restsByGap.length
+                    ? ` • descanso ${clusterModal.restsByGap[0]}s`
+                    : clusterModal?.intra
+                      ? ` • descanso ${clusterModal.intra}s`
+                      : ''}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setClusterModal(null)}
+                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {clusterModal?.error ? (
+                <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">
+                  {String(clusterModal.error)}
+                </div>
+              ) : null}
+              {Array.isArray(clusterModal?.blocks) && clusterModal.blocks.length === 0 ? (
+                <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Configurar Cluster</div>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input
+                      inputMode="decimal"
+                      value={String(clusterModal?.planned?.total_reps ?? '')}
+                      onChange={(e) => {
+                        const v = parseTrainingNumber(e?.target?.value);
+                        setClusterModal((prev) => {
+                          if (!prev || typeof prev !== 'object') return prev;
+                          const planned = prev.planned && typeof prev.planned === 'object' ? prev.planned : {};
+                          return { ...prev, planned: { ...planned, total_reps: v ?? null }, error: '' };
+                        });
+                      }}
+                      placeholder="Total reps (ex.: 12)"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                    />
+                    <input
+                      inputMode="decimal"
+                      value={String(clusterModal?.planned?.cluster_blocks_count ?? '')}
+                      onChange={(e) => {
+                        const v = parseTrainingNumber(e?.target?.value);
+                        setClusterModal((prev) => {
+                          if (!prev || typeof prev !== 'object') return prev;
+                          const planned = prev.planned && typeof prev.planned === 'object' ? prev.planned : {};
+                          return { ...prev, planned: { ...planned, cluster_blocks_count: v ?? null }, error: '' };
+                        });
+                      }}
+                      placeholder="Blocos (ex.: 3)"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                    />
+                    <input
+                      inputMode="decimal"
+                      value={String(clusterModal?.planned?.intra_rest_sec ?? clusterModal?.intra ?? '')}
+                      onChange={(e) => {
+                        const v = parseTrainingNumber(e?.target?.value);
+                        setClusterModal((prev) => {
+                          if (!prev || typeof prev !== 'object') return prev;
+                          const planned = prev.planned && typeof prev.planned === 'object' ? prev.planned : {};
+                          return { ...prev, planned: { ...planned, intra_rest_sec: v ?? null }, intra: v ?? prev.intra ?? 15, error: '' };
+                        });
+                      }}
+                      placeholder="Descanso (s) (ex.: 15)"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = parseTrainingNumber(clusterModal?.planned?.total_reps);
+                        const blocksCount = parseTrainingNumber(clusterModal?.planned?.cluster_blocks_count);
+                        const intra = parseTrainingNumber(clusterModal?.planned?.intra_rest_sec) ?? parseTrainingNumber(clusterModal?.intra) ?? 15;
+                        const plannedBlocks = buildBlocksByCount(total, blocksCount);
+                        if (!plannedBlocks.length) {
+                          setClusterModal((prev) =>
+                            prev && typeof prev === 'object'
+                              ? { ...prev, error: 'Configuração inválida. Preencha total reps e quantidade de blocos.' }
+                              : prev,
+                          );
+                          return;
+                        }
+                        const restsByGap = plannedBlocks.length > 1 ? Array.from({ length: plannedBlocks.length - 1 }).map(() => intra) : [];
+                        const baseWeight = String(clusterModal?.baseWeight ?? '').trim();
+                        const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: null }));
+                        setClusterModal((prev) => {
+                          if (!prev || typeof prev !== 'object') return prev;
+                          const planned = prev.planned && typeof prev.planned === 'object' ? prev.planned : {};
+                          return {
+                            ...prev,
+                            intra,
+                            planned: { ...planned, total_reps: total ?? null, cluster_blocks_count: blocksCount ?? null, intra_rest_sec: intra ?? null },
+                            plannedBlocks,
+                            restsByGap,
+                            blocks,
+                            error: '',
+                          };
+                        });
+                      }}
+                      className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                    >
+                      Gerar blocos
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              {Array.isArray(clusterModal?.blocks) &&
+                clusterModal.blocks.map((b, idx) => {
+                  const planned = b?.planned ?? null;
+                  const repsValue = b?.reps == null ? '' : String(b.reps);
+                  const weightValue = String(b?.weight ?? '');
+                  const isLast = idx >= clusterModal.blocks.length - 1;
+                  const restSec = Array.isArray(clusterModal?.restsByGap) ? Number(clusterModal.restsByGap?.[idx]) : Number(clusterModal?.intra);
+                  const safeRestSec = Number.isFinite(restSec) && restSec > 0 ? restSec : 0;
+                  return (
+                    <div key={`cluster-block-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
+                        {planned ? <div className="text-[10px] font-mono text-neutral-500">plan {planned}</div> : <div />}
+                      </div>
+                      {!isLast && safeRestSec ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            startTimer(safeRestSec, { kind: 'cluster', key: clusterModal?.key, blockIndex: idx });
+                          }}
+                          className="absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10"
+                          aria-label={`Iniciar descanso ${safeRestSec}s`}
+                        >
+                          <Clock size={14} className="text-yellow-500" />
+                          <span className="text-xs font-black">{safeRestSec}s</span>
+                        </button>
+                      ) : null}
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <input
+                          inputMode="decimal"
+                          value={weightValue}
+                          onChange={(e) => {
+                            const v = e?.target?.value ?? '';
+                            setClusterModal((prev) => {
+                              if (!prev || typeof prev !== 'object') return prev;
+                              const nextBlocks = Array.isArray(prev.blocks) ? [...prev.blocks] : [];
+                              const cur = nextBlocks[idx] && typeof nextBlocks[idx] === 'object' ? nextBlocks[idx] : {};
+                              nextBlocks[idx] = { ...cur, weight: v };
+                              return { ...prev, blocks: nextBlocks, error: '' };
+                            });
+                          }}
+                          placeholder="kg"
+                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        />
+                        <input
+                          inputMode="decimal"
+                          value={repsValue}
+                          onChange={(e) => {
+                            const v = parseTrainingNumber(e?.target?.value);
+                            const next = v != null && v > 0 ? v : null;
+                            setClusterModal((prev) => {
+                              if (!prev || typeof prev !== 'object') return prev;
+                              const nextBlocks = Array.isArray(prev.blocks) ? [...prev.blocks] : [];
+                              const cur = nextBlocks[idx] && typeof nextBlocks[idx] === 'object' ? nextBlocks[idx] : {};
+                              nextBlocks[idx] = { ...cur, reps: next };
+                              return { ...prev, blocks: nextBlocks, error: '' };
+                            });
+                          }}
+                          placeholder="reps"
+                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        />
+                      </div>
+                      {!isLast ? <div className="mt-2 text-xs text-neutral-500">Descanso: {safeRestSec}s</div> : null}
+                    </div>
+                  );
+                })}
+
+              <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE da série</div>
+                <input
+                  inputMode="decimal"
+                  value={String(clusterModal?.rpe ?? '')}
+                  onChange={(e) => {
+                    const v = e?.target?.value ?? '';
+                    setClusterModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v, error: '' } : prev));
+                  }}
+                  placeholder="RPE (0-10)"
+                  className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setClusterModal(null)}
+                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveClusterModal}
+                disabled={!Array.isArray(clusterModal?.blocks) || clusterModal.blocks.length === 0}
+                className={
+                  !Array.isArray(clusterModal?.blocks) || clusterModal.blocks.length === 0
+                    ? 'min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500/40 text-black/60 font-black text-xs uppercase tracking-widest inline-flex items-center gap-2 cursor-not-allowed'
+                    : 'min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2'
+                }
+              >
+                <Save size={16} />
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {restPauseModal && (
+        <div
+          className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          onClick={() => setRestPauseModal(null)}
+        >
+          <div
+            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Rest-P</div>
+                <div className="text-white font-black text-lg truncate">Preencher minis</div>
+                <div className="text-xs text-neutral-400 truncate">
+                  {Number(restPauseModal?.miniSets || 0)} minis • descanso {Number(restPauseModal?.pauseSec || 0)}s
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRestPauseModal(null)}
+                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {restPauseModal?.error ? (
+                <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">
+                  {String(restPauseModal.error)}
+                </div>
+              ) : null}
+
+              {Number(restPauseModal?.miniSets || 0) <= 0 ? (
+                <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Configurar Rest-P</div>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input
+                      inputMode="decimal"
+                      value={String(restPauseModal?.miniSets ?? '')}
+                      onChange={(e) => {
+                        const v = parseTrainingNumber(e?.target?.value);
+                        setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, miniSets: v ?? 0, error: '' } : prev));
+                      }}
+                      placeholder="Minis (ex.: 2)"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                    />
+                    <input
+                      inputMode="decimal"
+                      value={String(restPauseModal?.pauseSec ?? '')}
+                      onChange={(e) => {
+                        const v = parseTrainingNumber(e?.target?.value);
+                        setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, pauseSec: v ?? 15, error: '' } : prev));
+                      }}
+                      placeholder="Descanso (s) (ex.: 15)"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                    />
+                    <input
+                      inputMode="decimal"
+                      value={String(restPauseModal?.weight ?? '')}
+                      onChange={(e) => {
+                        const v = e?.target?.value ?? '';
+                        setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, weight: v, error: '' } : prev));
+                      }}
+                      placeholder="kg"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const minisCount = Math.max(0, Math.floor(parseTrainingNumber(restPauseModal?.miniSets) ?? 0));
+                        if (!minisCount) {
+                          setRestPauseModal((prev) =>
+                            prev && typeof prev === 'object' ? { ...prev, error: 'Defina a quantidade de minis.' } : prev,
+                          );
+                          return;
+                        }
+                        setRestPauseModal((prev) => {
+                          if (!prev || typeof prev !== 'object') return prev;
+                          return { ...prev, miniSets: minisCount, minis: Array.from({ length: minisCount }).map(() => null), error: '' };
+                        });
+                      }}
+                      className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+                    >
+                      Gerar minis
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Ativação</div>
+                  <div />
+                </div>
+                {Number(restPauseModal?.miniSets || 0) > 0 && Number(restPauseModal?.pauseSec || 0) > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sec = Number(restPauseModal?.pauseSec || 0);
+                      if (!sec) return;
+                      startTimer(sec, { kind: 'rest_pause', key: restPauseModal?.key, phase: 'activation' });
+                    }}
+                    className="absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10"
+                    aria-label={`Iniciar descanso ${Number(restPauseModal?.pauseSec || 0)}s`}
+                  >
+                    <Clock size={14} className="text-yellow-500" />
+                    <span className="text-xs font-black">{Number(restPauseModal?.pauseSec || 0)}s</span>
+                  </button>
+                ) : null}
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input
+                    inputMode="decimal"
+                    value={String(restPauseModal?.weight ?? '')}
+                    onChange={(e) => {
+                      const v = e?.target?.value ?? '';
+                      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, weight: v, error: '' } : prev));
+                    }}
+                    placeholder="kg"
+                    className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                  />
+                  <input
+                    inputMode="decimal"
+                    value={restPauseModal?.activationReps == null ? '' : String(restPauseModal.activationReps)}
+                    onChange={(e) => {
+                      const v = parseTrainingNumber(e?.target?.value);
+                      const next = v != null && v > 0 ? v : null;
+                      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, activationReps: next, error: '' } : prev));
+                    }}
+                    placeholder="reps"
+                    className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                  />
+                </div>
+              </div>
+
+              {Array.isArray(restPauseModal?.minis) &&
+                restPauseModal.minis.map((v, idx) => {
+                  const repsValue = v == null ? '' : String(v);
+                  const isLast = idx >= restPauseModal.minis.length - 1;
+                  const safeRest = Number(restPauseModal?.pauseSec || 0);
+                  return (
+                    <div key={`rp-mini-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Mini {idx + 1}</div>
+                        <div />
+                      </div>
+                      {!isLast && safeRest ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            startTimer(safeRest, { kind: 'rest_pause', key: restPauseModal?.key, miniIndex: idx + 1 });
+                          }}
+                          className="absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10"
+                          aria-label={`Iniciar descanso ${safeRest}s`}
+                        >
+                          <Clock size={14} className="text-yellow-500" />
+                          <span className="text-xs font-black">{safeRest}s</span>
+                        </button>
+                      ) : null}
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <input
+                          inputMode="decimal"
+                          value={String(restPauseModal?.weight ?? '')}
+                          onChange={(e) => {
+                            const w = e?.target?.value ?? '';
+                            setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, weight: w, error: '' } : prev));
+                          }}
+                          placeholder="kg"
+                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        />
+                        <input
+                          inputMode="decimal"
+                          value={repsValue}
+                          onChange={(e) => {
+                            const n = parseTrainingNumber(e?.target?.value);
+                            const next = n != null && n > 0 ? n : null;
+                            setRestPauseModal((prev) => {
+                              if (!prev || typeof prev !== 'object') return prev;
+                              const minis = Array.isArray(prev.minis) ? [...prev.minis] : [];
+                              minis[idx] = next;
+                              return { ...prev, minis, error: '' };
+                            });
+                          }}
+                          placeholder="reps"
+                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+              <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE da série</div>
+                <input
+                  inputMode="decimal"
+                  value={String(restPauseModal?.rpe ?? '')}
+                  onChange={(e) => {
+                    const v = e?.target?.value ?? '';
+                    setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v, error: '' } : prev));
+                  }}
+                  placeholder="RPE (0-10)"
+                  className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setRestPauseModal(null)}
+                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveRestPauseModal}
+                className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2"
+              >
+                <Save size={16} />
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {postCheckinOpen && (
         <div
