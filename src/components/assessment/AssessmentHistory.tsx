@@ -210,6 +210,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   const [studentName, setStudentName] = useState<string>('Aluno');
   const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
   const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, { loading: boolean; error: string | null; plan: any | null; usedAi: boolean; reason?: string }>>({});
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [planModalAssessment, setPlanModalAssessment] = useState<any | null>(null);
   const [importing, setImporting] = useState(false);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
   const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -399,11 +401,11 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     };
   }, [studentId, getStudentAssessments, supabase]);
 
-  const handleGenerateAssessmentPlan = async (assessment: any) => {
+  const handleGenerateAssessmentPlan = async (assessment: any, opts?: { openDetails?: boolean }) => {
     try {
       const id = String(assessment?.id || '');
       if (!id) return;
-      setSelectedAssessment(id);
+      if (opts?.openDetails) setSelectedAssessment(id);
 
       setAiPlanByAssessmentId((prev) => ({
         ...prev,
@@ -466,6 +468,16 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
         },
       }));
     }
+  };
+
+  const handleOpenAssessmentPlanModal = async (assessment: any) => {
+    try {
+      const id = String(assessment?.id || '');
+      if (!id) return;
+      setPlanModalAssessment(assessment);
+      setPlanModalOpen(true);
+      await handleGenerateAssessmentPlan(assessment, { openDetails: false });
+    } catch {}
   };
 
   const sortedAssessments = useMemo(() => {
@@ -1266,7 +1278,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                   />
                   <button
                     type="button"
-                    onClick={() => handleGenerateAssessmentPlan(assessment)}
+                    onClick={() => handleOpenAssessmentPlanModal(assessment)}
                     disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
                     className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95"
                   >
@@ -1405,6 +1417,140 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           ))}
         </div>
       </div>
+
+      {planModalOpen && planModalAssessment ? (
+        <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPlanModalOpen(false)}>
+          <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold truncate">Plano Tático</div>
+                <div className="text-white font-black truncate">
+                  {formatDateCompact(planModalAssessment?.date || planModalAssessment?.assessment_date)}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlanModalOpen(false)}
+                className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
+              {(() => {
+                const id = String(planModalAssessment?.id || '');
+                const s = id ? aiPlanByAssessmentId[id] : null;
+                const plan = s?.plan && typeof s.plan === 'object' ? s.plan : null;
+                const badge = (() => {
+                  if (!s || s.loading) return null;
+                  if (s.error) return null;
+                  if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
+                  if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                  if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                  if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                  return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                })();
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+                      {badge ? (
+                        <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
+                          {badge.text}
+                        </div>
+                      ) : null}
+                    </div>
+                    {s?.loading ? (
+                      <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
+                    ) : s?.error ? (
+                      <div className="text-sm text-red-400">{s.error}</div>
+                    ) : plan ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
+                          <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                            {Array.isArray(plan.summary) && plan.summary.length > 0
+                              ? plan.summary.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))
+                              : null}
+                          </ul>
+                        </div>
+                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
+                          {Array.isArray(plan.training) && plan.training.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
+                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                {plan.training.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {Array.isArray(plan.nutrition) && plan.nutrition.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
+                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                {plan.nutrition.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {Array.isArray(plan.habits) && plan.habits.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
+                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                {plan.habits.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {Array.isArray(plan.warnings) && plan.warnings.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
+                              <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
+                                {plan.warnings.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-neutral-400">Nenhum plano disponível.</div>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await handleGenerateAssessmentPlan(planModalAssessment, { openDetails: false });
+                          } catch {}
+                        }}
+                        disabled={!!s?.loading}
+                        className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95 disabled:opacity-60"
+                      >
+                        {s?.loading ? 'Gerando…' : 'Gerar novamente'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlanModalOpen(false)}
+                        className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Modal do Formulário */}
       {showForm && (

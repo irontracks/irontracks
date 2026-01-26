@@ -85,6 +85,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
     [notify, userSettingsApi?.settings?.inAppToasts]
   )
 
+  const communityEnabled = Boolean(userSettingsApi?.settings?.moduleCommunity ?? true)
+
   useEffect(() => {
     let mounted = true
     ;(async () => {
@@ -553,6 +555,29 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
     } finally {
       setBusyId('')
     }
+  }
+
+  if (userId && userSettingsApi?.loaded && !communityEnabled) {
+    return (
+      <div className={embedded ? '' : 'min-h-screen bg-neutral-950 text-white p-4'}>
+        <div className={embedded ? 'space-y-4' : 'max-w-3xl mx-auto space-y-4'}>
+          {!embedded ? (
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard')}
+              className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-800 active:scale-95 transition-all"
+            >
+              Voltar ao Dashboard
+            </button>
+          ) : null}
+          <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4">
+            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Comunidade</div>
+            <div className="text-lg font-black text-white mt-1">Módulo desativado</div>
+            <div className="text-sm text-neutral-400 mt-2">Ative em Configurações → Módulos opcionais.</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

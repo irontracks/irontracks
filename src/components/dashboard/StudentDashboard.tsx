@@ -2,10 +2,11 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 
-import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2 } from 'lucide-react'
-import RecentAchievements from './RecentAchievements'
+import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 import BadgesGallery from './BadgesGallery'
-import StoriesBar from './StoriesBar'
+import RecentAchievements from './RecentAchievements'
+import WorkoutCalendarModal from './WorkoutCalendarModal'
 
 export type DashboardWorkout = {
   id?: string
@@ -28,6 +29,10 @@ type Props = {
   communityContent?: React.ReactNode
   settings?: {
     dashboardDensity?: 'compact' | 'comfortable'
+    uiMode?: string
+    moduleSocial?: boolean
+    moduleCommunity?: boolean
+    moduleMarketplace?: boolean
     showStoriesBar?: boolean
     showNewRecordsCard?: boolean
     showIronRank?: boolean
@@ -58,11 +63,13 @@ type Props = {
 export default function StudentDashboard(props: Props) {
   const workouts = Array.isArray(props.workouts) ? props.workouts : []
   const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
-  const showStoriesBar = props.settings?.showStoriesBar ?? true
-  const showNewRecordsCard = props.settings?.showNewRecordsCard ?? true
-  const showIronRank = props.settings?.showIronRank ?? true
-  const showBadges = props.settings?.showBadges ?? true
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [checkinsOpen, setCheckinsOpen] = useState(false)
+  const [checkinsLoading, setCheckinsLoading] = useState(false)
+  const [checkinsRows, setCheckinsRows] = useState<any[]>([])
+  const [checkinsFilter, setCheckinsFilter] = useState<'all' | 'pre' | 'post'>('all')
+  const [checkinsRange, setCheckinsRange] = useState<'7d' | '30d'>('7d')
   const [creatingWorkout, setCreatingWorkout] = useState(false)
   const [pendingAction, setPendingAction] = useState<
     | {
@@ -74,6 +81,9 @@ export default function StudentDashboard(props: Props) {
   const TABS_BAR_MIN_HEIGHT_PX = 60
   const CREATE_WORKOUT_LOADING_TIMEOUT_MS = 900
   const isMountedRef = useRef(true)
+  const showNewRecordsCard = props.settings?.showNewRecordsCard !== false
+  const showIronRank = props.settings?.showIronRank !== false
+  const showBadges = props.settings?.showBadges !== false
 
   useEffect(() => {
     isMountedRef.current = true
@@ -119,6 +129,48 @@ export default function StudentDashboard(props: Props) {
     }
   }, [toolsOpen])
 
+  useEffect(() => {
+    if (!checkinsOpen) return
+    const uid = String(props.currentUserId || '').trim()
+    if (!uid) {
+      setCheckinsRows([])
+      return
+    }
+    const supabase = createClient()
+    let cancelled = false
+    ;(async () => {
+      try {
+        setCheckinsLoading(true)
+        const days = checkinsRange === '30d' ? 30 : 7
+        const startIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+        const { data, error } = await supabase
+          .from('workout_checkins')
+          .select('id, kind, created_at, energy, mood, soreness, notes, answers, workout_id, planned_workout_id')
+          .eq('user_id', uid)
+          .gte('created_at', startIso)
+          .order('created_at', { ascending: false })
+          .limit(400)
+        if (error) throw error
+        if (cancelled) return
+        setCheckinsRows(Array.isArray(data) ? data : [])
+      } catch {
+        if (cancelled) return
+        setCheckinsRows([])
+      } finally {
+        if (!cancelled) setCheckinsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [checkinsOpen, checkinsRange, props.currentUserId])
+
+  const [showCommunityTab, setShowCommunityTab] = useState(false)
+
+  useEffect(() => {
+    setShowCommunityTab(!!props.communityContent)
+  }, [props.communityContent])
+
   return (
     <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
       {props.profileIncomplete && (
@@ -128,7 +180,6 @@ export default function StudentDashboard(props: Props) {
             <div className="text-sm text-neutral-300 mt-1">Complete seu nome de exibição para personalizar sua conta.</div>
           </div>
           <button
-            type="button"
             onClick={props.onOpenCompleteProfile}
             className="shrink-0 bg-yellow-500 text-black font-black px-4 py-2 rounded-xl active:scale-95 transition-transform"
           >
@@ -140,40 +191,39 @@ export default function StudentDashboard(props: Props) {
       <div style={{ minHeight: `${TABS_BAR_MIN_HEIGHT_PX}px` }}>
         <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
           <div className="bg-neutral-900/70 backdrop-blur-md border border-neutral-800/70 rounded-2xl p-1 shadow-lg shadow-black/30">
-            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 grid grid-cols-3 gap-1">
+            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 flex gap-1">
               <button
-                type="button"
                 onClick={() => props.onChangeView('dashboard')}
-                className={`w-full min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
+                className={`flex-1 min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
                   props.view === 'dashboard'
                     ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
-                    : 'bg-neutral-900/30 text-neutral-300 border border-neutral-700 hover:bg-neutral-900/50 hover:border-neutral-600 hover:text-white'
+                    : 'bg-transparent text-neutral-400 hover:text-white'
                 }`}
               >
                 Treinos
               </button>
               <button
-                type="button"
                 onClick={() => props.onChangeView('assessments')}
-                className={`w-full min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
+                className={`flex-1 min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
                   props.view === 'assessments'
                     ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
-                    : 'bg-neutral-900/30 text-neutral-300 border border-neutral-700 hover:bg-neutral-900/50 hover:border-neutral-600 hover:text-white'
+                    : 'bg-transparent text-neutral-400 hover:text-white'
                 }`}
               >
                 Avaliações
               </button>
-              <button
-                type="button"
-                onClick={() => props.onChangeView('community')}
-                className={`w-full min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
-                  props.view === 'community'
-                    ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
-                    : 'bg-neutral-900/30 text-neutral-300 border border-neutral-700 hover:bg-neutral-900/50 hover:border-neutral-600 hover:text-white'
-                }`}
-              >
-                Comunidade
-              </button>
+              {showCommunityTab ? (
+                <button
+                  onClick={() => props.onChangeView('community')}
+                  className={`flex-1 min-h-[44px] px-3 rounded-lg font-black text-xs uppercase tracking-wider transition-colors ${
+                    props.view === 'community'
+                      ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30'
+                      : 'bg-transparent text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Comunidade
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -184,19 +234,250 @@ export default function StudentDashboard(props: Props) {
 
       {props.view === 'dashboard' && (
         <>
-          {showStoriesBar ? <StoriesBar currentUserId={props.currentUserId} /> : null}
+          <WorkoutCalendarModal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} userId={props.currentUserId} />
+
+          {checkinsOpen && (
+            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe">
+              <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
+                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-ins</div>
+                    <div className="text-white font-black text-lg truncate">Histórico</div>
+                    <div className="text-xs text-neutral-400">Tendências, alertas e sugestões.</div>
+                  </div>
+                  <button
+                    onClick={() => setCheckinsOpen(false)}
+                    className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                    aria-label="Fechar"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-4 border-b border-neutral-800 flex flex-col gap-3">
+                  <div className="flex items-center gap-2">
+                    {(['7d', '30d'] as const).map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => setCheckinsRange(k)}
+                        className={
+                          checkinsRange === k
+                            ? 'min-h-[36px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
+                            : 'min-h-[36px] px-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800'
+                        }
+                      >
+                        {k === '7d' ? '7 dias' : '30 dias'}
+                      </button>
+                    ))}
+                    <div className="ml-auto text-xs text-neutral-500">{checkinsLoading ? 'Carregando…' : `${checkinsRows.length} item(s)`}</div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {(['all', 'pre', 'post'] as const).map((k) => (
+                      <button
+                        key={k}
+                        onClick={() => setCheckinsFilter(k)}
+                        className={
+                          checkinsFilter === k
+                            ? 'min-h-[36px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
+                            : 'min-h-[36px] px-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800'
+                        }
+                      >
+                        {k === 'all' ? 'Todos' : k === 'pre' ? 'Pré' : 'Pós'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="p-4 max-h-[65vh] overflow-y-auto custom-scrollbar">
+                  {(() => {
+                    const rows = Array.isArray(checkinsRows) ? checkinsRows : []
+                    const filtered = checkinsFilter === 'all' ? rows : rows.filter((r) => String(r?.kind || '').trim() === checkinsFilter)
+
+                    const toNumberOrNull = (v: any) => {
+                      const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
+                      return Number.isFinite(n) ? n : null
+                    }
+                    const avg = (vals: Array<number | null>) => {
+                      const list = vals.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+                      if (!list.length) return null
+                      return list.reduce((a, b) => a + b, 0) / list.length
+                    }
+                    const preRows = rows.filter((r) => String(r?.kind || '').trim() === 'pre')
+                    const postRows = rows.filter((r) => String(r?.kind || '').trim() === 'post')
+                    const preAvgEnergy = avg(preRows.map((r) => toNumberOrNull(r?.energy)))
+                    const preAvgSoreness = avg(preRows.map((r) => toNumberOrNull(r?.soreness)))
+                    const preAvgTime = avg(
+                      preRows.map((r) => {
+                        const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {}
+                        return toNumberOrNull(answers?.time_minutes ?? answers?.timeMinutes)
+                      }),
+                    )
+                    const postAvgSoreness = avg(postRows.map((r) => toNumberOrNull(r?.soreness)))
+                    const postAvgSatisfaction = avg(postRows.map((r) => toNumberOrNull(r?.mood)))
+                    const postAvgRpe = avg(
+                      postRows.map((r) => {
+                        const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {}
+                        return toNumberOrNull(answers?.rpe)
+                      }),
+                    )
+
+                    const highSorenessCount = rows.filter((r) => {
+                      const s = toNumberOrNull(r?.soreness)
+                      return s != null && s >= 7
+                    }).length
+                    const lowEnergyCount = preRows.filter((r) => {
+                      const e = toNumberOrNull(r?.energy)
+                      return e != null && e <= 2
+                    }).length
+
+                    const alerts: string[] = []
+                    if (highSorenessCount >= 3) alerts.push('Dor alta (≥ 7) apareceu 3+ vezes no período.')
+                    if (preAvgSoreness != null && preAvgSoreness >= 7) alerts.push('Média de dor no pré está alta (≥ 7).')
+                    if (lowEnergyCount >= 3) alerts.push('Energia baixa (≤ 2) apareceu 3+ vezes no período.')
+                    if (postAvgSatisfaction != null && postAvgSatisfaction <= 2) alerts.push('Satisfação média no pós está baixa (≤ 2).')
+
+                    const suggestions: string[] = []
+                    if (highSorenessCount >= 3 || (preAvgSoreness != null && preAvgSoreness >= 7) || (postAvgSoreness != null && postAvgSoreness >= 7)) {
+                      suggestions.push('Dor alta: considere reduzir volume/carga 20–30% e priorizar técnica + mobilidade.')
+                    }
+                    if (lowEnergyCount >= 3 || (preAvgEnergy != null && preAvgEnergy <= 2.2)) {
+                      suggestions.push('Energia baixa: mantenha um treino mais curto, evite falha, e foque em recuperação (sono/estresse).')
+                    }
+                    if (postAvgRpe != null && postAvgRpe >= 9) {
+                      suggestions.push('RPE médio alto: reduza um pouco a intensidade e aumente descanso entre séries.')
+                    }
+                    if (postAvgSatisfaction != null && postAvgSatisfaction <= 2) {
+                      suggestions.push('Satisfação baixa: revise seleção de exercícios e meta da sessão para manter consistência.')
+                    }
+                    if (preAvgTime != null && preAvgTime > 0 && preAvgTime < 45) {
+                      suggestions.push('Pouco tempo disponível: use treinos “mínimo efetivo” (menos exercícios e mais foco).')
+                    }
+
+                    return (
+                      <>
+                        <div className="mb-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pré</div>
+                            <div className="mt-2 grid grid-cols-3 gap-3">
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Energia</div>
+                                <div className="font-black text-white">{preAvgEnergy == null ? '—' : preAvgEnergy.toFixed(1)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                                <div className="font-black text-white">{preAvgSoreness == null ? '—' : preAvgSoreness.toFixed(1)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo</div>
+                                <div className="font-black text-white">{preAvgTime == null ? '—' : `${Math.round(preAvgTime)}m`}</div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pós</div>
+                            <div className="mt-2 grid grid-cols-3 gap-3">
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">RPE</div>
+                                <div className="font-black text-white">{postAvgRpe == null ? '—' : postAvgRpe.toFixed(1)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Satisf.</div>
+                                <div className="font-black text-white">{postAvgSatisfaction == null ? '—' : postAvgSatisfaction.toFixed(1)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                                <div className="font-black text-white">{postAvgSoreness == null ? '—' : postAvgSoreness.toFixed(1)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {alerts.length ? (
+                          <div className="mb-4 rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Alertas</div>
+                            <div className="mt-2 space-y-1 text-sm text-neutral-200">
+                              {alerts.map((a) => (
+                                <div key={a}>{a}</div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {suggestions.length ? (
+                          <div className="mb-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
+                            <div className="text-xs font-black uppercase tracking-widest text-neutral-300">Sugestões</div>
+                            <div className="mt-2 space-y-1 text-sm text-neutral-200">
+                              {suggestions.map((s) => (
+                                <div key={s}>{s}</div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {filtered.length === 0 ? (
+                          <div className="text-sm text-neutral-400">Nenhum check-in encontrado.</div>
+                        ) : (
+                          <div className="space-y-2">
+                            {filtered.map((r) => {
+                              const kind = String(r?.kind || '').trim()
+                              const createdAt = r?.created_at ? new Date(String(r.created_at)) : null
+                              const dateLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString('pt-BR') : '—'
+                              const energy = r?.energy != null ? String(r.energy) : '—'
+                              const soreness = r?.soreness != null ? String(r.soreness) : '—'
+                              const mood = r?.mood != null ? String(r.mood) : '—'
+                              const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {}
+                              const rpe = answers?.rpe != null ? String(answers.rpe) : '—'
+                              const timeMinutes =
+                                answers?.time_minutes != null ? String(answers.time_minutes) : answers?.timeMinutes != null ? String(answers.timeMinutes) : '—'
+                              const notes = r?.notes ? String(r.notes) : ''
+
+                              return (
+                                <div key={String(r?.id || dateLabel)} className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{kind === 'pre' ? 'Pré' : 'Pós'}</div>
+                                      <div className="text-xs text-neutral-500">{dateLabel}</div>
+                                    </div>
+                                    <div className="text-xs text-neutral-300 font-mono">
+                                      {kind === 'pre' ? `E:${energy} D:${soreness} T:${timeMinutes}` : `RPE:${rpe} Sat:${mood} D:${soreness}`}
+                                    </div>
+                                  </div>
+                                  {notes ? <div className="mt-2 text-sm text-neutral-200">{notes}</div> : null}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
+                </div>
+
+                <div className="p-4 border-t border-neutral-800 flex items-center justify-end">
+                  <button
+                    onClick={() => setCheckinsOpen(false)}
+                    className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showNewRecordsCard ? <RecentAchievements userId={props.currentUserId} /> : null}
-          
-          {props.streakStats && (showIronRank || showBadges) ? (
+
+          {(showIronRank || showBadges) && (
             <BadgesGallery
-              badges={props.streakStats.badges}
-              currentStreak={props.streakStats.currentStreak}
-              totalVolumeKg={props.streakStats.totalVolumeKg}
+              badges={props.streakStats?.badges ?? []}
+              currentStreak={props.streakStats?.currentStreak ?? 0}
+              totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
               currentUserId={props.currentUserId}
               showIronRank={showIronRank}
               showBadges={showBadges}
             />
-          ) : null}
+          )}
 
           <button
             onClick={() => {
@@ -222,7 +503,6 @@ export default function StudentDashboard(props: Props) {
               <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Meus Treinos</h3>
               <div className="relative">
                 <button
-                  type="button"
                   onClick={() => setToolsOpen((v) => !v)}
                   className="min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
                   aria-expanded={toolsOpen}
@@ -235,7 +515,36 @@ export default function StudentDashboard(props: Props) {
                     <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden text-neutral-300">
                       <div className="p-2 space-y-1">
                         <button
-                          type="button"
+                          onClick={() => {
+                            setToolsOpen(false)
+                            props.onCreateWorkout()
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Criar automaticamente</span>
+                          <Sparkles size={16} className="text-yellow-500" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            setCalendarOpen(true)
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Calendário</span>
+                          <CalendarDays size={16} className="text-yellow-500" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            setCheckinsOpen(true)
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Check-ins</span>
+                          <Activity size={16} className="text-yellow-500" />
+                        </button>
+                        <button
                           onClick={() => {
                             setToolsOpen(false)
                             props.onOpenIronScanner()
@@ -246,7 +555,6 @@ export default function StudentDashboard(props: Props) {
                           <span className="text-yellow-500">📷</span>
                         </button>
                         <button
-                          type="button"
                           onClick={() => {
                             setToolsOpen(false)
                             props.onOpenJsonImport()
@@ -257,7 +565,6 @@ export default function StudentDashboard(props: Props) {
                           <span className="text-yellow-500">↵</span>
                         </button>
                         <button
-                          type="button"
                           onClick={() => {
                             setToolsOpen(false)
                             props.onExportAll()
@@ -359,7 +666,7 @@ export default function StudentDashboard(props: Props) {
                   >
                     {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
                   </button>
-                  {w?.user_id && props.currentUserId && w.user_id === props.currentUserId && (
+                  {w?.user_id && props.currentUserId && w.user_id === props.currentUserId ? (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation()
@@ -371,7 +678,7 @@ export default function StudentDashboard(props: Props) {
                     >
                       {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}

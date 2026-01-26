@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bell, Check, X, Users, MessageSquare, AlertTriangle, Trash2 } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';

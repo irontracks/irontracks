@@ -15,6 +15,7 @@ export default function SettingsModal(props) {
   const rawSettings = props?.settings
   const base = useMemo(() => (isObject(rawSettings) ? rawSettings : {}), [rawSettings])
   const [draft, setDraft] = useState(() => base)
+  const [modulesModalOpen, setModulesModalOpen] = useState(false)
 
   const setValue = (key, value) => {
     if (!key) return
@@ -44,6 +45,12 @@ export default function SettingsModal(props) {
   const restTimerTickCountdown = Boolean(draft?.restTimerTickCountdown ?? true)
   const restTimerDefaultSeconds = Math.max(15, Math.min(600, Number(draft?.restTimerDefaultSeconds ?? 90) || 90))
   const autoRestTimerWhenMissing = Boolean(draft?.autoRestTimerWhenMissing ?? false)
+  const uiMode = String(draft?.uiMode || 'beginner')
+  const moduleSocial = Boolean(draft?.moduleSocial ?? true)
+  const moduleCommunity = Boolean(draft?.moduleCommunity ?? true)
+  const moduleMarketplace = Boolean(draft?.moduleMarketplace ?? true)
+  const promptPreWorkoutCheckin = Boolean(draft?.promptPreWorkoutCheckin ?? true)
+  const promptPostWorkoutCheckin = Boolean(draft?.promptPostWorkoutCheckin ?? true)
 
   const canSave = isOpen && !saving
 
@@ -103,6 +110,91 @@ export default function SettingsModal(props) {
                   <option value="comfortable">Confortável</option>
                   <option value="compact">Compacto</option>
                 </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
+            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Modo do App</div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Experiência</div>
+                  <div className="text-xs text-neutral-400">Ajusta o quanto de recurso aparece por padrão.</div>
+                </div>
+                <select
+                  value={uiMode}
+                  onChange={(e) => {
+                    const next = String(e.target.value || 'beginner')
+                    setValue('uiMode', next)
+                    if (next === 'beginner') {
+                      setValue('moduleSocial', true)
+                      setValue('moduleCommunity', true)
+                      setValue('moduleMarketplace', true)
+                    } else if (next === 'intermediate') {
+                      setValue('moduleSocial', true)
+                      setValue('moduleCommunity', false)
+                      setValue('moduleMarketplace', false)
+                    }
+                  }}
+                  className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="beginner">Iniciante</option>
+                  <option value="intermediate">Intermediário</option>
+                  <option value="advanced">Avançado</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Módulos opcionais</div>
+                  <div className="text-xs text-neutral-400">Ative/desative Social, Comunidade e Marketplace.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModulesModalOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800"
+                >
+                  Gerenciar
+                </button>
+              </div>
+
+              <div className="pt-3 border-t border-neutral-700/60 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-white">Check-in pré-treino</div>
+                    <div className="text-xs text-neutral-400">Pergunta energia/dor/tempo antes de iniciar.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setValue('promptPreWorkoutCheckin', !promptPreWorkoutCheckin)}
+                    className={
+                      promptPreWorkoutCheckin
+                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                    }
+                  >
+                    {promptPreWorkoutCheckin ? 'Ativo' : 'Desligado'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-white">Check-in pós-treino</div>
+                    <div className="text-xs text-neutral-400">Pergunta RPE/satisfação ao finalizar.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setValue('promptPostWorkoutCheckin', !promptPostWorkoutCheckin)}
+                    className={
+                      promptPostWorkoutCheckin
+                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                    }
+                  >
+                    {promptPostWorkoutCheckin ? 'Ativo' : 'Desligado'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -710,6 +802,103 @@ export default function SettingsModal(props) {
             </div>
           </div>
         </div>
+
+        {modulesModalOpen && (
+          <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setModulesModalOpen(false)}>
+            <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Módulos</div>
+                  <div className="text-white font-black text-lg truncate">Personalizar</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModulesModalOpen(false)}
+                  className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                  aria-label="Fechar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-white">Social</div>
+                    <div className="text-xs text-neutral-400">Stories e recursos sociais.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setValue('moduleSocial', !moduleSocial)}
+                    className={
+                      moduleSocial
+                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                    }
+                  >
+                    {moduleSocial ? 'Ativo' : 'Desligado'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-white">Comunidade</div>
+                    <div className="text-xs text-neutral-400">Lista e interações de comunidade.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setValue('moduleCommunity', !moduleCommunity)}
+                    className={
+                      moduleCommunity
+                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                    }
+                  >
+                    {moduleCommunity ? 'Ativo' : 'Desligado'}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-white">Marketplace</div>
+                    <div className="text-xs text-neutral-400">Planos e assinaturas de professores.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setValue('moduleMarketplace', !moduleMarketplace)}
+                    className={
+                      moduleMarketplace
+                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                    }
+                  >
+                    {moduleMarketplace ? 'Ativo' : 'Desligado'}
+                  </button>
+                </div>
+              </div>
+              <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValue('moduleSocial', true)
+                    setValue('moduleCommunity', true)
+                    setValue('moduleMarketplace', true)
+                  }}
+                  className="px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 inline-flex items-center gap-2"
+                >
+                  <RotateCcw size={16} className="text-yellow-500" />
+                  Restaurar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setModulesModalOpen(false)}
+                  className="px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center gap-2"
+                >
+                  Ok
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="p-4 border-t border-neutral-800 flex items-center justify-end gap-2">
           <button

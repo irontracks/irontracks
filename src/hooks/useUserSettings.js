@@ -6,6 +6,12 @@ import { createClient } from '@/utils/supabase/client'
 export const DEFAULT_SETTINGS = {
   units: 'kg',
   dashboardDensity: 'comfortable',
+  uiMode: 'beginner',
+  moduleSocial: true,
+  moduleCommunity: true,
+  moduleMarketplace: true,
+  promptPreWorkoutCheckin: true,
+  promptPostWorkoutCheckin: true,
   showStoriesBar: true,
   showNewRecordsCard: true,
   showIronRank: true,

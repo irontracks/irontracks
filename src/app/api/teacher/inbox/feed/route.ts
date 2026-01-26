@@ -55,6 +55,9 @@ const messageTemplate = (kind: string, studentName: string) => {
   if (kind === 'load_spike') {
     return `Oi ${name}! Vi um aumento grande de carga/volume recentemente. Só confirmando: está tudo ok (técnica, dores, recuperação)? Se quiser, ajusto pra manter a evolução com segurança.`
   }
+  if (kind === 'checkins_alert') {
+    return `Oi ${name}! Vi alguns sinais no seu check-in (energia/dor/recuperação). Está tudo certo? Quer que eu ajuste o treino pra ficar mais confortável e sustentável?`
+  }
   return `Oi ${name}! Tudo certo por aí?`
 }
 
@@ -155,6 +158,70 @@ export async function GET(req: Request) {
       else volumeByUser.set(uid, { ...prev, vPrev7: prev.vPrev7 + vol })
     }
 
+    const checkinsAggByUser = new Map<
+      string,
+      { preEnergySum: number; preEnergyCount: number; preSorenessSum: number; preSorenessCount: number; preLowEnergyCount: number; postSatisfactionSum: number; postSatisfactionCount: number; postRpeSum: number; postRpeCount: number; highSorenessCount: number }
+    >()
+    try {
+      const { data: checkins7, error: cErr } = await admin
+        .from('workout_checkins')
+        .select('user_id, kind, energy, mood, soreness, answers, created_at')
+        .in('user_id', studentUserIds)
+        .gte('created_at', since7.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(20000)
+      if (cErr) throw cErr
+      for (const r of Array.isArray(checkins7) ? checkins7 : []) {
+        const uid = String((r as any)?.user_id || '').trim()
+        if (!uid) continue
+        const kind = String((r as any)?.kind || '').trim()
+        const prev = checkinsAggByUser.get(uid) || {
+          preEnergySum: 0,
+          preEnergyCount: 0,
+          preSorenessSum: 0,
+          preSorenessCount: 0,
+          preLowEnergyCount: 0,
+          postSatisfactionSum: 0,
+          postSatisfactionCount: 0,
+          postRpeSum: 0,
+          postRpeCount: 0,
+          highSorenessCount: 0,
+        }
+
+        const soreness = toNumeric((r as any)?.soreness)
+        if (Number.isFinite(soreness) && soreness >= 7) prev.highSorenessCount += 1
+
+        if (kind === 'pre') {
+          const energy = toNumeric((r as any)?.energy)
+          if (Number.isFinite(energy) && energy > 0) {
+            prev.preEnergySum += energy
+            prev.preEnergyCount += 1
+            if (energy <= 2) prev.preLowEnergyCount += 1
+          }
+          if (Number.isFinite(soreness) && soreness >= 0) {
+            prev.preSorenessSum += soreness
+            prev.preSorenessCount += 1
+          }
+        }
+
+        if (kind === 'post') {
+          const satisfaction = toNumeric((r as any)?.mood)
+          if (Number.isFinite(satisfaction) && satisfaction > 0) {
+            prev.postSatisfactionSum += satisfaction
+            prev.postSatisfactionCount += 1
+          }
+          const answers = (r as any)?.answers && typeof (r as any).answers === 'object' ? (r as any).answers : {}
+          const rpe = toNumeric((answers as any)?.rpe)
+          if (Number.isFinite(rpe) && rpe > 0) {
+            prev.postRpeSum += rpe
+            prev.postRpeCount += 1
+          }
+        }
+
+        checkinsAggByUser.set(uid, prev)
+      }
+    } catch {}
+
     const { data: states, error: stStateErr } = await admin
       .from('coach_inbox_states')
       .select('coach_id, student_user_id, kind, status, snooze_until')
@@ -215,6 +282,41 @@ export async function GET(req: Request) {
           reason: `Volume 7d subiu ${pct}% (de ${Math.round(v.vPrev7)} → ${Math.round(v.v7)})`,
           score: 600 + pct,
         })
+      }
+
+      const ca = checkinsAggByUser.get(uid) || null
+      if (ca) {
+        const preAvgEnergy = ca.preEnergyCount > 0 ? ca.preEnergySum / ca.preEnergyCount : 0
+        const preAvgSoreness = ca.preSorenessCount > 0 ? ca.preSorenessSum / ca.preSorenessCount : 0
+        const postAvgSatisfaction = ca.postSatisfactionCount > 0 ? ca.postSatisfactionSum / ca.postSatisfactionCount : 0
+        const reasons: string[] = []
+        let score = 0
+        if (ca.highSorenessCount >= 3) {
+          reasons.push(`Dor alta (≥ 7) ${ca.highSorenessCount}x nos últimos 7 dias`)
+          score += 300 + ca.highSorenessCount * 30
+        } else if (preAvgSoreness >= 7) {
+          reasons.push(`Média de dor no pré alta (${preAvgSoreness.toFixed(1)})`)
+          score += 260
+        }
+        if (ca.preLowEnergyCount >= 3) {
+          reasons.push(`Energia baixa (≤ 2) ${ca.preLowEnergyCount}x`)
+          score += 220 + ca.preLowEnergyCount * 20
+        } else if (preAvgEnergy > 0 && preAvgEnergy <= 2.2) {
+          reasons.push(`Energia média baixa (${preAvgEnergy.toFixed(1)})`)
+          score += 160
+        }
+        if (postAvgSatisfaction > 0 && postAvgSatisfaction <= 2) {
+          reasons.push(`Satisfação média baixa (${postAvgSatisfaction.toFixed(1)})`)
+          score += 180
+        }
+        if (reasons.length) {
+          candidates.push({
+            kind: 'checkins_alert',
+            title: 'Alerta de check-in',
+            reason: reasons.join(' • '),
+            score: 650 + score,
+          })
+        }
       }
 
       for (const c of candidates) {

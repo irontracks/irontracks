@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
