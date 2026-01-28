@@ -3,6 +3,7 @@ import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Play, X, Image as ImageIc
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
+import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
@@ -447,6 +448,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             setScannerLoading(true);
 
             const allRawExercises = [];
+            let detectedTitle = '';
 
             for (let i = 0; i < selectedFiles.length; i += 1) {
                 const file = selectedFiles[i];
@@ -466,6 +468,8 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     return;
                 }
 
+                const titleCandidate = String(json?.workoutTitle ?? '').trim();
+                if (!detectedTitle && titleCandidate) detectedTitle = titleCandidate;
                 const list = Array.isArray(json.exercises) ? json.exercises : [];
                 if (list.length === 0) {
                     const msg = 'Não encontramos exercícios válidos em uma das imagens.';
@@ -486,7 +490,9 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
             const mappedExercises = allRawExercises
                 .map((item) => {
-                    const name = String(item?.name || '').trim();
+                    const rawName = String(item?.name || '').trim();
+                    const canonical = resolveCanonicalExerciseName(rawName);
+                    const name = String(canonical?.canonical || rawName).trim();
                     const setsRaw = item?.sets;
                     const setsNum = typeof setsRaw === 'number' ? setsRaw : parseInt(String(setsRaw || '0')) || 0;
                     const repsRaw = String(item?.reps ?? '').trim();
@@ -566,8 +572,26 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                 return;
             }
 
+            let titleToApply = '';
+            if (detectedTitle) {
+                try {
+                    const ok = await confirm(`Definir título como "${detectedTitle}"?`, 'Scanner');
+                    if (ok) titleToApply = detectedTitle;
+                } catch {}
+            }
+
+            try {
+                const preview = mappedExercises.slice(0, 10).map((x) => `• ${String(x?.name || '').trim()}`).join('\n');
+                const ok = await confirm(
+                    `Importar ${mappedExercises.length} exercício(s)?\n\n${preview}${mappedExercises.length > 10 ? '\n…' : ''}`,
+                    'Scanner'
+                );
+                if (!ok) return;
+            } catch {}
+
             const nextWorkout = {
                 ...(workout || {}),
+                ...(titleToApply ? { title: titleToApply } : {}),
                 exercises: mappedExercises
             };
 
@@ -979,12 +1003,27 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                             </select>
                                         </div>
                                     ) : (
-                                        <input
-                                            value={exercise.name || ''}
-                                            onChange={e => updateExercise(index, 'name', e.target.value)}
-                                            className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
-                                            placeholder="Nome do exercício"
-                                        />
+                                        <div>
+                                            <input
+                                                value={exercise.name || ''}
+                                                onChange={e => updateExercise(index, 'name', e.target.value)}
+                                                className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
+                                                placeholder="Nome do exercício"
+                                            />
+                                            {(() => {
+                                                const info = resolveCanonicalExerciseName(exercise.name || '')
+                                                if (!info?.changed || !info?.canonical) return null
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateExercise(index, 'name', info.canonical)}
+                                                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-bold text-xs hover:bg-yellow-500/15"
+                                                    >
+                                                        Padronizar: {info.canonical}
+                                                    </button>
+                                                )
+                                            })()}
+                                        </div>
                                     )}
 
 									{exerciseType === 'cardio' ? (

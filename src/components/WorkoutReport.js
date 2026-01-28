@@ -895,6 +895,17 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         if (postRpe != null && postRpe >= 9) {
             recs.push('RPE alto: reduza um pouco a intensidade e aumente descanso entre séries.');
         }
+        if (
+            postRpe != null
+            && postRpe >= 9
+            && (
+                (preSoreness != null && preSoreness >= 7)
+                || (postSoreness != null && postSoreness >= 7)
+                || (postSatisfaction != null && postSatisfaction <= 3)
+            )
+        ) {
+            recs.push('Sinais de fadiga: considere 5–7 dias de deload (−10–20% carga ou −1 série por exercício).');
+        }
         if (postSatisfaction != null && postSatisfaction <= 2) {
             recs.push('Satisfação baixa: revise seleção de exercícios e meta da sessão para manter consistência.');
         }

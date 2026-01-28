@@ -47,3 +47,40 @@ export const workoutTitleKey = (value) => {
   return normalized
 }
 
+const stripTrailingDayHint = (value) => {
+  const s = normalizeDash(value)
+  if (!s) return ''
+  return normalizeSpaces(
+    s
+      .replace(/\(\s*dia\s*\d+\s*\)/gi, '')
+      .replace(/\(\s*(segunda|terca|terça|quarta|quinta|sexta|sabado|sábado|domingo)\s*\)/gi, '')
+      .trim(),
+  )
+}
+
+export const formatProgramWorkoutTitle = (draftTitle, index, options) => {
+  const idx = Number(index)
+  const safeIndex = Number.isFinite(idx) && idx >= 0 ? Math.floor(idx) : 0
+  const letter = String.fromCharCode(65 + Math.min(25, safeIndex))
+  const weekday = (() => {
+    const days = ['SEGUNDA', 'TERÇA', 'QUARTA', 'QUINTA', 'SEXTA', 'SÁBADO', 'DOMINGO']
+    const start = String(options?.startDay || 'monday').toLowerCase()
+    const map = {
+      monday: 0,
+      tuesday: 1,
+      wednesday: 2,
+      thursday: 3,
+      friday: 4,
+      saturday: 5,
+      sunday: 6,
+    }
+    const startIndex = Number.isFinite(map[start]) ? map[start] : 0
+    const idx = (startIndex + safeIndex) % 7
+    return days[idx] || `DIA ${safeIndex + 1}`
+  })()
+
+  const raw = String(draftTitle || '').trim()
+  const extracted = extractLeadingLetter(raw)
+  const base = stripTrailingDayHint(extracted?.rest || raw) || 'Treino'
+  return `${letter} - ${base.toUpperCase()} (${weekday})`
+}
