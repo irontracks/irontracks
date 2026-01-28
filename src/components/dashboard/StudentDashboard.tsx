@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 
-import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X } from 'lucide-react'
+import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import BadgesGallery from './BadgesGallery'
 import RecentAchievements from './RecentAchievements'
@@ -16,6 +16,9 @@ export type DashboardWorkout = {
   title?: string
   notes?: string | null
   exercises?: any[]
+  archived_at?: string | null
+  sort_order?: number
+  created_at?: string | null
 }
 
 type MaybePromise<T> = T | Promise<T>
@@ -42,14 +45,20 @@ type Props = {
   onCreateWorkout: () => MaybePromise<void>
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
+  onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
   onShareWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onDuplicateWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onEditWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onDeleteWorkout: (id?: string, title?: string) => MaybePromise<void>
+  onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
   currentUserId?: string
   exportingAll?: boolean
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
+  onNormalizeExercises?: () => MaybePromise<void>
+  onNormalizeAiWorkoutTitles?: () => MaybePromise<void>
+  onOpenDuplicates?: () => MaybePromise<void>
+  onApplyTitleRule?: () => MaybePromise<void>
   onOpenIronScanner: () => void
   streakStats?: {
     currentStreak: number
@@ -65,6 +74,7 @@ export default function StudentDashboard(props: Props) {
   const workouts = Array.isArray(props.workouts) ? props.workouts : []
   const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [showArchived, setShowArchived] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [checkinsOpen, setCheckinsOpen] = useState(false)
   const [checkinsLoading, setCheckinsLoading] = useState(false)
@@ -72,10 +82,18 @@ export default function StudentDashboard(props: Props) {
   const [checkinsFilter, setCheckinsFilter] = useState<'all' | 'pre' | 'post'>('all')
   const [checkinsRange, setCheckinsRange] = useState<'7d' | '30d'>('7d')
   const [creatingWorkout, setCreatingWorkout] = useState(false)
+  const [normalizingAiTitles, setNormalizingAiTitles] = useState(false)
+  const [normalizingExercises, setNormalizingExercises] = useState(false)
+  const [findingDuplicates, setFindingDuplicates] = useState(false)
+  const [applyingTitleRule, setApplyingTitleRule] = useState(false)
+  const [editListOpen, setEditListOpen] = useState(false)
+  const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
+  const [savingListEdits, setSavingListEdits] = useState(false)
+  const dragIndexRef = useRef<number | null>(null)
   const [pendingAction, setPendingAction] = useState<
     | {
         workoutKey: string
-        type: 'start' | 'share' | 'duplicate' | 'edit' | 'delete'
+        type: 'start' | 'restore' | 'share' | 'duplicate' | 'edit' | 'delete'
       }
     | null
   >(null)
@@ -86,6 +104,8 @@ export default function StudentDashboard(props: Props) {
   const showIronRank = props.settings?.showIronRank !== false
   const showBadges = props.settings?.showBadges !== false
   const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
+  const archivedCount = workouts.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0)
+  const visibleWorkouts = showArchived ? workouts : workouts.filter((w) => !w?.archived_at)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -470,6 +490,104 @@ export default function StudentDashboard(props: Props) {
             </div>
           )}
 
+          {editListOpen && (
+            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => !savingListEdits && setEditListOpen(false)}>
+              <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Treinos</div>
+                    <div className="text-white font-black text-lg truncate">Organizar</div>
+                    <div className="text-xs text-neutral-400">Arraste para reordenar e edite os títulos.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditListOpen(false)}
+                    disabled={savingListEdits}
+                    className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center disabled:opacity-50"
+                    aria-label="Fechar"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                  {editListDraft.length === 0 ? (
+                    <div className="text-sm text-neutral-400">Nenhum treino para organizar.</div>
+                  ) : (
+                    editListDraft.map((it, idx) => (
+                      <div
+                        key={it.id}
+                        draggable={!savingListEdits}
+                        onDragStart={() => {
+                          dragIndexRef.current = idx
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                        }}
+                        onDrop={() => {
+                          const from = dragIndexRef.current
+                          const to = idx
+                          if (from == null || from === to) return
+                          setEditListDraft((prev) => {
+                            const next = [...prev]
+                            const [moved] = next.splice(from, 1)
+                            next.splice(to, 0, moved)
+                            return next.map((x, i) => ({ ...x, sort_order: i }))
+                          })
+                          dragIndexRef.current = null
+                        }}
+                        className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3"
+                      >
+                        <div className="text-neutral-500 cursor-grab">
+                          <GripVertical size={18} />
+                        </div>
+                        <div className="w-10 text-xs font-mono text-neutral-500">#{idx + 1}</div>
+                        <input
+                          value={it.title}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            setEditListDraft((prev) => prev.map((x) => (x.id === it.id ? { ...x, title: v } : x)))
+                          }}
+                          className="flex-1 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                          placeholder="Título"
+                        />
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditListOpen(false)}
+                    disabled={savingListEdits}
+                    className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingListEdits || typeof props.onBulkEditWorkouts !== 'function' || editListDraft.length === 0}
+                    onClick={async () => {
+                      if (typeof props.onBulkEditWorkouts !== 'function') return
+                      try {
+                        setSavingListEdits(true)
+                        await props.onBulkEditWorkouts(editListDraft)
+                        setEditListOpen(false)
+                      } finally {
+                        setSavingListEdits(false)
+                      }
+                    }}
+                    className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2 disabled:opacity-60"
+                  >
+                    <Save size={16} />
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {showNewRecordsCard ? <RecentAchievements userId={props.currentUserId} /> : null}
 
           {(showIronRank || showBadges) && (
@@ -505,7 +623,37 @@ export default function StudentDashboard(props: Props) {
           <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Meus Treinos</h3>
-              <div className="relative">
+              <div className="flex items-center gap-2">
+                {archivedCount > 0 ? (
+                  <button
+                    onClick={() => setShowArchived((v) => !v)}
+                    className={
+                      showArchived
+                        ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black rounded-xl font-black text-xs uppercase'
+                        : 'min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700'
+                    }
+                  >
+                    {showArchived ? `Arquivados (${archivedCount})` : `Mostrar arquivados (${archivedCount})`}
+                  </button>
+                ) : null}
+                <button
+                  onClick={() => {
+                    const items = visibleWorkouts
+                      .map((w, idx) => {
+                        const id = String(w?.id || '').trim()
+                        if (!id) return null
+                        return { id, title: String(w?.title || 'Treino'), sort_order: idx }
+                      })
+                      .filter(Boolean) as { id: string; title: string; sort_order: number }[]
+                    setEditListDraft(items)
+                    setEditListOpen(true)
+                    setToolsOpen(false)
+                  }}
+                  className="min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
+                >
+                  Organizar
+                </button>
+                <div className="relative">
                 <button
                   onClick={() => setToolsOpen((v) => !v)}
                   className="min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
@@ -569,6 +717,74 @@ export default function StudentDashboard(props: Props) {
                           <span className="text-yellow-500">↵</span>
                         </button>
                         <button
+                          onClick={async () => {
+                            setToolsOpen(false)
+                            if (typeof props.onNormalizeAiWorkoutTitles !== 'function') return
+                            try {
+                              setNormalizingAiTitles(true)
+                              await props.onNormalizeAiWorkoutTitles()
+                            } finally {
+                              setNormalizingAiTitles(false)
+                            }
+                          }}
+                          disabled={normalizingAiTitles}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{normalizingAiTitles ? 'Padronizando...' : 'Padronizar nomes IA'}</span>
+                          {normalizingAiTitles ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Sparkles size={16} className="text-yellow-500" />}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setToolsOpen(false)
+                            if (typeof props.onNormalizeExercises !== 'function') return
+                            try {
+                              setNormalizingExercises(true)
+                              await props.onNormalizeExercises()
+                            } finally {
+                              setNormalizingExercises(false)
+                            }
+                          }}
+                          disabled={normalizingExercises}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{normalizingExercises ? 'Normalizando...' : 'Normalizar exercícios'}</span>
+                          {normalizingExercises ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">✦</span>}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setToolsOpen(false)
+                            if (typeof props.onOpenDuplicates !== 'function') return
+                            try {
+                              setFindingDuplicates(true)
+                              await props.onOpenDuplicates()
+                            } finally {
+                              setFindingDuplicates(false)
+                            }
+                          }}
+                          disabled={findingDuplicates}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{findingDuplicates ? 'Buscando...' : 'Encontrar duplicados'}</span>
+                          {findingDuplicates ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">≋</span>}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setToolsOpen(false)
+                            if (typeof props.onApplyTitleRule !== 'function') return
+                            try {
+                              setApplyingTitleRule(true)
+                              await props.onApplyTitleRule()
+                            } finally {
+                              setApplyingTitleRule(false)
+                            }
+                          }}
+                          disabled={applyingTitleRule}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{applyingTitleRule ? 'Aplicando...' : 'Padronizar títulos (A/B/C)'}</span>
+                          {applyingTitleRule ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">A</span>}
+                        </button>
+                        <button
                           onClick={() => {
                             setToolsOpen(false)
                             props.onExportAll()
@@ -583,10 +799,11 @@ export default function StudentDashboard(props: Props) {
                     </div>
                   </>
                 )}
+                </div>
               </div>
             </div>
 
-            {workouts.length === 0 && (
+            {visibleWorkouts.length === 0 && (
               <div className="text-center py-10 text-neutral-600">
                 <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
                   <Dumbbell size={32} />
@@ -595,7 +812,7 @@ export default function StudentDashboard(props: Props) {
               </div>
             )}
 
-            {workouts.map((w, idx) => (
+            {visibleWorkouts.map((w, idx) => (
               <div
                 key={String(w?.id ?? idx)}
                 className={
@@ -612,18 +829,38 @@ export default function StudentDashboard(props: Props) {
                 <div className="relative z-10">
                   <h3 className="font-bold text-white text-lg uppercase mb-1 pr-32 leading-tight">{String(w?.title || 'Treino')}</h3>
                   <p className="text-xs text-neutral-400 font-mono mb-4">{Array.isArray(w?.exercises) ? w.exercises.length : 0} EXERCÍCIOS</p>
+                  {w?.archived_at ? (
+                    <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
+                      ARQUIVADO
+                    </div>
+                  ) : null}
 
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={async (e) => {
                         e.stopPropagation()
                         const key = getWorkoutKey(w, idx)
+                        if (w?.archived_at) {
+                          if (typeof props.onRestoreWorkout !== 'function') return
+                          await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
+                          return
+                        }
                         await runWorkoutAction(key, 'start', () => props.onStartSession(w))
                       }}
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
                       className="relative z-30 flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg flex items-center justify-center gap-2 text-white font-bold text-sm transition-colors border border-white/10 active:scale-95 touch-manipulation disabled:opacity-60"
                     >
-                      {isActionBusy(getWorkoutKey(w, idx), 'start') ? (
+                      {w?.archived_at ? (
+                        isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
+                          <>
+                            <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
+                          </>
+                        ) : (
+                          <>
+                            <Undo2 size={16} /> RESTAURAR
+                          </>
+                        )
+                      ) : isActionBusy(getWorkoutKey(w, idx), 'start') ? (
                         <>
                           <Loader2 size={16} className="text-yellow-500 animate-spin" /> INICIANDO...
                         </>

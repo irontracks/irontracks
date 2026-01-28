@@ -7,44 +7,6 @@ import { motion } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { useDialog } from '@/contexts/DialogContext'
 
-const parseExt = (rawName: string) => {
-  const n = String(rawName || '').trim().toLowerCase()
-  const i = n.lastIndexOf('.')
-  if (i < 0) return ''
-  const ext = n.slice(i)
-  return ext === '.jpeg' || ext === '.jpg' || ext === '.png' || ext === '.mp4' || ext === '.mov' || ext === '.webm' ? ext : ''
-}
-
-const guessMediaKind = (mime: string, ext: string) => {
-  const t = String(mime || '').trim().toLowerCase()
-  if (t.startsWith('video/')) return 'video'
-  if (t.startsWith('image/')) return 'image'
-  if (ext === '.mp4' || ext === '.mov' || ext === '.webm') return 'video'
-  if (ext === '.jpg' || ext === '.jpeg' || ext === '.png') return 'image'
-  return 'unknown'
-}
-
-const extFromMime = (mime: string) => {
-  const t = String(mime || '').trim().toLowerCase()
-  if (t === 'image/png') return '.png'
-  if (t === 'image/jpeg') return '.jpg'
-  if (t === 'video/mp4') return '.mp4'
-  if (t === 'video/quicktime') return '.mov'
-  if (t === 'video/webm') return '.webm'
-  return ''
-}
-
-const mediaKindFromUrl = (mediaUrl: string | null) => {
-  const u = String(mediaUrl || '').trim()
-  if (!u) return 'unknown'
-  let pathname = u
-  try {
-    pathname = new URL(u).pathname
-  } catch {}
-  const ext = parseExt(pathname)
-  return guessMediaKind('', ext)
-}
-
 type Story = {
   id: string
   createdAt: string
@@ -122,12 +84,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       if (!uid) throw new Error('unauthorized')
 
       const rawName = String(file?.name || '').trim().toLowerCase()
-      const ext0 = parseExt(rawName) || extFromMime(file.type)
-      const kind = guessMediaKind(file.type, ext0)
-      if (kind === 'video' && (ext0 === '.webm' || String(file?.type || '').toLowerCase() === 'video/webm')) {
-        throw new Error('WEBM pode não rodar no Safari. Prefira MP4/MOV.')
-      }
-      const ext = ext0 || (kind === 'video' ? '.mp4' : '.jpg')
+      const ext = rawName.endsWith('.png') ? '.png' : rawName.endsWith('.jpeg') ? '.jpeg' : rawName.endsWith('.jpg') ? '.jpg' : '.jpg'
       const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
       const path = `${uid}/stories/${storyId}${ext}`
 
@@ -141,7 +98,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
 
       const { error: upErr } = await supabase.storage
         .from('social-stories')
-        .uploadToSignedUrl(path, String(signJson.token), file, { contentType: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg') })
+        .uploadToSignedUrl(path, String(signJson.token), file, { contentType: file.type || 'image/jpeg' })
       if (upErr) throw upErr
 
       const createResp = await fetch('/api/social/stories/create', {
@@ -223,31 +180,17 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       <input
         ref={uploadRef}
         type="file"
-        accept="image/*,video/*"
+        accept="image/*"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files && e.target.files[0] ? e.target.files[0] : null
           if (!f) return
-          const ext0 = parseExt(String(f.name || '')) || extFromMime(f.type)
-          const kind = guessMediaKind(f.type, ext0)
-          if (kind !== 'image' && kind !== 'video') {
-            setError('Selecione uma imagem ou um vídeo.')
+          if (!String(f.type || '').toLowerCase().startsWith('image/')) {
+            setError('Selecione uma imagem.')
             return
           }
-          if (kind === 'video' && (ext0 === '.webm' || String(f?.type || '').toLowerCase() === 'video/webm')) {
-            setError('Formato WEBM pode não rodar no Safari. Prefira MP4/MOV.')
-            return
-          }
-          if (kind === 'video' && !ext0) {
-            setError('Formato de vídeo não suportado. Use MP4.')
-            return
-          }
-          if (kind === 'image' && f.size > 12 * 1024 * 1024) {
+          if (f.size > 12 * 1024 * 1024) {
             setError('Imagem muito grande (máx 12MB).')
-            return
-          }
-          if (kind === 'video' && f.size > 50 * 1024 * 1024) {
-            setError('Vídeo muito grande (máx 50MB).')
             return
           }
           uploadStory(f)
@@ -298,46 +241,39 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
               : 'border-neutral-400/60'
 
           const name = String(g.displayName || '').trim() || (g.authorId === myId ? 'Você' : 'Amigo')
-          const isMine = g.authorId === myId
           return (
-            <div key={g.authorId} className="shrink-0 w-[72px] relative">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!hasStories) return
-                  setOpenAuthorId(g.authorId)
-                  setOpen(true)
-                }}
-                className="w-[72px] focus:outline-none"
-                aria-label={hasStories ? `Abrir stories de ${name}` : `Sem stories de ${name}`}
-              >
-                <div className={`w-16 h-16 rounded-full border-2 ${ringCls} p-1 mx-auto relative`}>
-                  <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 border border-neutral-800 flex items-center justify-center">
-                    {g.photoUrl ? (
-                      <Image src={g.photoUrl} alt={name} width={64} height={64} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-yellow-500 font-black">{initials(name)}</span>
-                    )}
-                  </div>
+            <button
+              key={g.authorId}
+              type="button"
+              onClick={() => {
+                if (g.authorId === myId && !hasStories) {
+                  if (!uploading && uploadRef.current) uploadRef.current.click()
+                  return
+                }
+                if (!hasStories) return
+                setOpenAuthorId(g.authorId)
+                setOpen(true)
+              }}
+              className="shrink-0 w-[72px] focus:outline-none"
+              aria-label={hasStories ? `Abrir stories de ${name}` : `Sem stories de ${name}`}
+            >
+              <div className={`w-16 h-16 rounded-full border-2 ${ringCls} p-1 mx-auto relative`}>
+                <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+                  {g.photoUrl ? (
+                    <Image src={g.photoUrl} alt={name} width={64} height={64} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-yellow-500 font-black">{initials(name)}</span>
+                  )}
                 </div>
-                <div className="mt-1 text-[11px] text-neutral-300 font-bold truncate text-center">{name}</div>
-              </button>
 
-              {isMine ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (uploading) return
-                    if (uploadRef.current) uploadRef.current.click()
-                  }}
-                  className="absolute left-[calc(50%+18px)] top-[44px] w-6 h-6 rounded-full bg-yellow-500 border-2 border-black flex items-center justify-center"
-                  aria-label="Adicionar story (foto ou vídeo)"
-                  disabled={uploading}
-                >
-                  <Plus size={14} className="text-black" />
-                </button>
-              ) : null}
-            </div>
+                {g.authorId === myId && !hasStories ? (
+                  <div className="absolute -right-1 -bottom-1 w-6 h-6 rounded-full bg-yellow-500 border-2 border-black flex items-center justify-center">
+                    <Plus size={14} className="text-black" />
+                  </div>
+                ) : null}
+              </div>
+              <div className="mt-1 text-[11px] text-neutral-300 font-bold truncate text-center">{name}</div>
+            </button>
           )
         })}
       </div>
@@ -403,18 +339,10 @@ function StoryViewer({
   const lastTsRef = useRef<number>(0)
   const elapsedRef = useRef<number>(0)
   const closeRequestedRef = useRef(false)
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const [durationMs, setDurationMs] = useState(5000)
 
   const name = String(group.displayName || '').trim() || (group.authorId === myId ? 'Você' : 'Amigo')
   const isMine = String(group.authorId || '').trim() && String(group.authorId || '').trim() === String(myId || '').trim()
-  const mediaKind = useMemo(() => mediaKindFromUrl(story?.mediaUrl || null), [story?.mediaUrl])
-  const isVideo = mediaKind === 'video'
-  const videoSrc = useMemo(() => {
-    const sid = String(story?.id || '').trim()
-    if (!sid) return String(story?.mediaUrl || '')
-    return `/api/social/stories/media?storyId=${encodeURIComponent(sid)}`
-  }, [story?.id, story?.mediaUrl])
+  const durationMs = 5000
 
   const markViewed = async (storyId: string) => {
     try {
@@ -433,26 +361,6 @@ function StoryViewer({
     markViewed(story.id)
   }, [story?.id, story?.viewed, onStoryUpdated])
 
-  const goNext = useCallback(() => {
-    setIdx((v) => {
-      const nextIdx = v + 1
-      if (nextIdx >= stories.length) {
-        if (!closeRequestedRef.current) {
-          closeRequestedRef.current = true
-          try {
-            window.setTimeout(() => {
-              try {
-                onClose()
-              } catch {}
-            }, 0)
-          } catch {}
-        }
-        return v
-      }
-      return nextIdx
-    })
-  }, [onClose, stories.length])
-
   useEffect(() => {
     elapsedRef.current = 0
     lastTsRef.current = 0
@@ -463,11 +371,6 @@ function StoryViewer({
     setViewers([])
     viewersStoryIdRef.current = ''
   }, [story?.id])
-
-  useEffect(() => {
-    closeRequestedRef.current = false
-    setDurationMs(isVideo ? 15000 : 5000)
-  }, [isVideo, story?.id])
 
   useEffect(() => {
     try {
@@ -494,15 +397,6 @@ function StoryViewer({
     const tick = (ts: number) => {
       rafRef.current = requestAnimationFrame(tick)
       const paused = holding || commentsOpen || viewersOpen || hidden || deleting
-      if (isVideo) {
-        const v = videoRef.current
-        const d = Number(v?.duration || 0)
-        if (!v || !Number.isFinite(d) || d <= 0) return
-        if (paused) return
-        const next = Math.max(0, Math.min(1, Number(v.currentTime || 0) / d))
-        setProgress((prev) => (Math.abs(prev - next) < 0.005 ? prev : next))
-        return
-      }
       if (!lastTsRef.current) {
         lastTsRef.current = ts
         return
@@ -516,7 +410,23 @@ function StoryViewer({
       if (next >= 1) {
         elapsedRef.current = 0
         setProgress(0)
-        goNext()
+        setIdx((v) => {
+          const nextIdx = v + 1
+          if (nextIdx >= stories.length) {
+            if (!closeRequestedRef.current) {
+              closeRequestedRef.current = true
+              try {
+                window.setTimeout(() => {
+                  try {
+                    onClose()
+                  } catch {}
+                }, 0)
+              } catch {}
+            }
+            return v
+          }
+          return nextIdx
+        })
       }
     }
 
@@ -527,25 +437,7 @@ function StoryViewer({
       } catch {}
       rafRef.current = null
     }
-  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, story?.id, viewersOpen])
-
-  useEffect(() => {
-    if (!story?.id) return
-    if (!isVideo) return
-    const v = videoRef.current
-    if (!v) return
-    const paused = holding || commentsOpen || viewersOpen || hidden || deleting
-    if (paused) {
-      try {
-        v.pause()
-      } catch {}
-      return
-    }
-    try {
-      const p = v.play()
-      if (p && typeof (p as any).catch === 'function') (p as any).catch(() => {})
-    } catch {}
-  }, [commentsOpen, deleting, hidden, holding, isVideo, story?.id, viewersOpen])
+  }, [commentsOpen, deleting, hidden, holding, onClose, stories.length, story?.id, viewersOpen])
 
   const loadComments = async (storyId: string) => {
     setCommentsLoading(true)
@@ -709,29 +601,7 @@ function StoryViewer({
 
         <div className="absolute inset-0 flex items-center justify-center">
           {story.mediaUrl ? (
-            isVideo ? (
-              <video
-                ref={videoRef}
-                src={videoSrc}
-                className="w-full h-full object-contain"
-                playsInline
-                muted
-                autoPlay
-                preload="metadata"
-                onLoadedMetadata={(e) => {
-                  const d = Number((e.currentTarget as any)?.duration || 0)
-                  if (!Number.isFinite(d) || d <= 0) return
-                  const ms = Math.round(d * 1000)
-                  setDurationMs(Math.max(3000, Math.min(30000, ms)))
-                }}
-                onEnded={() => {
-                  setProgress(0)
-                  goNext()
-                }}
-              />
-            ) : (
-              <Image src={story.mediaUrl} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" />
-            )
+            <Image src={story.mediaUrl} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" />
           ) : (
             <div className="text-neutral-400 font-bold">Mídia indisponível</div>
           )}

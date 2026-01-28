@@ -7,10 +7,13 @@ type IronScannerExercise = {
   sets: number;
   reps: string;
   notes: string;
+  method?: string;
+  rest_time_sec?: number;
 };
 
 type IronScannerResponse = {
   ok: boolean;
+  workoutTitle?: string;
   exercises?: IronScannerExercise[];
   error?: string;
 };
@@ -54,9 +57,9 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
     const model = genAI.getGenerativeModel({ model: IRON_SCANNER_MODEL });
 
     const prompt =
-      "Analise esta imagem de treino. Extraia os exercícios, séries, repetições, carga (se houver) e observações. " +
-      "Retorne APENAS um JSON válido seguindo estritamente esta estrutura array: " +
-      "[{ name: string, sets: number, reps: string, notes: string }]. " +
+      "Analise esta imagem de treino. Extraia o título do treino (se estiver visível) e os exercícios, séries, repetições, carga (se houver) e observações. " +
+      "Retorne APENAS um JSON válido seguindo estritamente esta estrutura: " +
+      "{ workoutTitle?: string, exercises: [{ name: string, sets: number, reps: string, notes: string, method?: string, rest_time_sec?: number }] }. " +
       "Não inclua markdown ```json```, apenas o texto bruto do JSON. " +
       "REGRAS CRÍTICAS DE DEDUPLICAÇÃO: " +
       "1. Agrupe exercícios repetidos ou listados linha a linha. " +
@@ -65,7 +68,7 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
       "4. Para técnicas como rest-pause, drop-set, bi-set ou pirâmide, use o campo 'sets' apenas para o número de séries principais (não conte micropausas internas como sets separados). " +
       "5. Mantenha o campo 'reps' simples (por exemplo '8-10' ou '4x12'); coloque descrições complexas de rest-pause, drop-set ou progressões de repetições no campo 'notes'. " +
       "6. Se o treino especificar algo como '8 + 4 + 4 rest-pause', trate como 1 série com reps '8' e registre 'rest-pause 8+4+4' em 'notes'. " +
-      "7. Mantenha a estrutura JSON estrita: [{ \"name\": string, \"sets\": number, \"reps\": string, \"notes\": string }].";
+      "7. Mantenha a estrutura JSON estrita.";
 
     const result = await model.generateContent([
       {
@@ -111,9 +114,11 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
       }
     }
 
-    const arr = Array.isArray(parsed) ? parsed : [];
+    const asObj = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as any) : null;
+    const workoutTitle = asObj ? String(asObj.workoutTitle || "").trim() : "";
+    const arr = Array.isArray(parsed) ? parsed : Array.isArray(asObj?.exercises) ? asObj.exercises : [];
     const exercises: IronScannerExercise[] = arr
-      .map((item) => {
+      .map((item: any) => {
         if (!item || typeof item !== "object") return null;
         const anyItem = item as any;
         const name = String(anyItem.name || "").trim();
@@ -121,21 +126,26 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
         const setsNum = typeof setsRaw === "number" ? setsRaw : Number(setsRaw || 0);
         const reps = String(anyItem.reps ?? "").trim() || "10";
         const notes = String(anyItem.notes ?? "").trim();
+        const method = String(anyItem.method ?? "").trim();
+        const restRaw = anyItem.rest_time_sec;
+        const rest_time_sec = typeof restRaw === "number" ? restRaw : Number(restRaw || 0);
         if (!name) return null;
         return {
           name,
           sets: Number.isFinite(setsNum) && setsNum > 0 ? setsNum : 4,
           reps,
           notes,
+          ...(method ? { method } : {}),
+          ...(Number.isFinite(rest_time_sec) && rest_time_sec > 0 ? { rest_time_sec } : {}),
         };
       })
-      .filter((x): x is IronScannerExercise => !!x);
+      .filter((x: any): x is IronScannerExercise => !!x);
 
     if (!exercises.length) {
       return { ok: false, error: "Nenhum exercício válido encontrado" };
     }
 
-    return { ok: true, exercises };
+    return { ok: true, workoutTitle: workoutTitle || undefined, exercises };
   } catch (e: any) {
     const raw = e?.message ? String(e.message) : String(e);
     let msg = raw || "Erro inesperado ao processar treino";

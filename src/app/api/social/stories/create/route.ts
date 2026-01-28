@@ -15,7 +15,15 @@ const isAllowedStoryPath = (userId: string, path: string) => {
   if (parts[0] !== uid) return false
   if (parts[1] !== 'stories') return false
   const name = parts.slice(2).join('/')
-  if (!name.endsWith('.jpg') && !name.endsWith('.jpeg') && !name.endsWith('.png')) return false
+  if (
+    !name.endsWith('.jpg') &&
+    !name.endsWith('.jpeg') &&
+    !name.endsWith('.png') &&
+    !name.endsWith('.mp4') &&
+    !name.endsWith('.mov') &&
+    !name.endsWith('.webm')
+  )
+    return false
   return true
 }
 

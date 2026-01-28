@@ -194,6 +194,7 @@ const buildPromptProgram = (answers: any, days: number) => {
     'O campo rpe deve ser number ou null (ex.: 8). Não use faixas tipo "7-9".',
     '',
     `Gere um PLANO SEMANAL com ${days} treinos (um por dia).`,
+    'No campo "title": NÃO inclua letra (ex.: "A -") e NÃO inclua "(Dia X)" ou dia da semana. Use apenas o nome do treino (ex.: "Empurrar", "Pernas", "Puxar + Abs").',
     splitHint,
     'Garanta que os treinos sejam diferentes entre si (não repetir a mesma lista).',
     '',

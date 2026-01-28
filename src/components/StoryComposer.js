@@ -19,6 +19,34 @@ const safeString = (v) => {
   }
 }
 
+const parseExt = (rawName) => {
+  const n = safeString(rawName).toLowerCase()
+  const i = n.lastIndexOf('.')
+  if (i < 0) return ''
+  const ext = n.slice(i)
+  return ext === '.jpeg' || ext === '.jpg' || ext === '.png' || ext === '.mp4' || ext === '.mov' || ext === '.webm' ? ext : ''
+}
+
+const extFromMime = (mime) => {
+  const t = safeString(mime).toLowerCase()
+  if (t === 'image/png') return '.png'
+  if (t === 'image/jpeg') return '.jpg'
+  if (t === 'video/mp4') return '.mp4'
+  if (t === 'video/quicktime') return '.mov'
+  if (t === 'video/webm') return '.webm'
+  return ''
+}
+
+const guessMediaKind = (mime, ext) => {
+  const t = safeString(mime).toLowerCase()
+  if (t.startsWith('video/')) return 'video'
+  if (t.startsWith('image/')) return 'image'
+  const e = safeString(ext).toLowerCase()
+  if (e === '.mp4' || e === '.mov' || e === '.webm') return 'video'
+  if (e === '.jpg' || e === '.jpeg' || e === '.png') return 'image'
+  return 'unknown'
+}
+
 const formatDatePt = (v) => {
   try {
     if (!v) return ''
@@ -433,6 +461,8 @@ export default function StoryComposer({ open, session, onClose }) {
   const inputRef = useRef(null)
   const scrollAreaRef = useRef(null)
 
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [mediaKind, setMediaKind] = useState('image')
   const [backgroundUrl, setBackgroundUrl] = useState('')
   const [backgroundImage, setBackgroundImage] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -491,14 +521,36 @@ export default function StoryComposer({ open, session, onClose }) {
   }, [metrics])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      try {
+        if (backgroundUrl) URL.revokeObjectURL(backgroundUrl)
+      } catch {
+      }
+      setBackgroundUrl('')
+      setBackgroundImage(null)
+      setSelectedFile(null)
+      setMediaKind('image')
+      setError('')
+      setInfo('')
+      setBusy(false)
+      setShowSafeGuide(true)
+      setLivePositions(defaultLivePositions)
+      setDraggingKey(null)
+      dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
+      return
+    }
     setError('')
+    setInfo('')
     setBusy(false)
     setShowSafeGuide(true)
     setLivePositions(defaultLivePositions)
     setDraggingKey(null)
     dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
-  }, [open])
+    setSelectedFile(null)
+    setMediaKind('image')
+    setBackgroundUrl('')
+    setBackgroundImage(null)
+  }, [backgroundUrl, open])
 
   useEffect(() => {
     if (!open) return
@@ -552,11 +604,34 @@ export default function StoryComposer({ open, session, onClose }) {
     }
   }, [backgroundUrl])
 
-  const loadBackground = async (file) => {
+  const loadMedia = async (file) => {
     try {
       setError('')
+      setInfo('')
       if (!file) return
+      const rawName = safeString(file?.name).toLowerCase()
+      const ext = parseExt(rawName) || extFromMime(file?.type)
+      const kind = guessMediaKind(file?.type, ext)
+      if (kind !== 'image' && kind !== 'video') {
+        setError('Formato não suportado. Use JPG/PNG ou MP4/MOV/WEBM.')
+        return
+      }
+      if (kind === 'video' && (ext === '.webm' || String(file?.type || '').toLowerCase() === 'video/webm')) {
+        setError('Formato WEBM pode não rodar no Safari. Prefira MP4/MOV.')
+        return
+      }
       const url = URL.createObjectURL(file)
+      try {
+        if (backgroundUrl) URL.revokeObjectURL(backgroundUrl)
+      } catch {
+      }
+      setSelectedFile(file)
+      setMediaKind(kind)
+      setBackgroundUrl(url)
+      if (kind === 'video') {
+        setBackgroundImage(null)
+        return
+      }
       const img = new Image()
       img.crossOrigin = 'anonymous'
       await new Promise((resolve, reject) => {
@@ -564,14 +639,9 @@ export default function StoryComposer({ open, session, onClose }) {
         img.onerror = reject
         img.src = url
       })
-      try {
-        if (backgroundUrl) URL.revokeObjectURL(backgroundUrl)
-      } catch {
-      }
-      setBackgroundUrl(url)
       setBackgroundImage(img)
     } catch {
-      setError('Não foi possível carregar a imagem.')
+      setError('Não foi possível carregar a mídia.')
     }
   }
 
@@ -676,13 +746,14 @@ export default function StoryComposer({ open, session, onClose }) {
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+    if (mediaKind === 'video') return
     let raf = 0
     const draw = () => {
       drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions })
     }
     raf = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, metrics, layout, livePositions])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics])
 
   const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob)
@@ -738,6 +809,55 @@ export default function StoryComposer({ open, session, onClose }) {
       const { data: authData } = await supabase.auth.getUser()
       const uid = String(authData?.user?.id || '').trim()
       if (!uid) throw new Error('unauthorized')
+
+      if (mediaKind === 'video') {
+        const file = selectedFile
+        if (!file) throw new Error('Selecione um vídeo primeiro.')
+        const maxBytes = 50 * 1024 * 1024
+        if (Number(file.size) > maxBytes) throw new Error('Vídeo muito grande (máx 50MB).')
+        const ext = parseExt(file.name) || extFromMime(file.type) || '.mp4'
+        const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
+        const path = `${uid}/stories/${storyId}${ext}`
+        const signResp = await fetch('/api/storage/social-stories/signed-upload', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ path }),
+        })
+        const signJson = await signResp.json().catch(() => null)
+        if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
+        const { error: upErr } = await supabase.storage
+          .from('social-stories')
+          .uploadToSignedUrl(path, String(signJson.token), file, { contentType: file.type || 'video/mp4' })
+        if (upErr) throw upErr
+        const meta = {
+          title: String(metrics?.title || ''),
+          dateText: String(metrics?.date || ''),
+          durationSeconds: Number(metrics?.totalTime || 0),
+          totalVolumeKg: Number(metrics?.volume || 0),
+          kcal: Number(metrics?.kcal || 0),
+          layout: String(layout || ''),
+          mediaKind: 'video',
+        }
+        const createResp = await fetch('/api/social/stories/create', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ mediaPath: path, caption: String(metrics?.title || ''), meta }),
+        })
+        const createJson = await createResp.json().catch(() => null)
+        if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
+        setInfo('Publicado no IronTracks. Veja em Dashboard → Stories → Você.')
+        try {
+          window.dispatchEvent(new Event('irontracks:stories:refresh'))
+        } catch {
+        }
+        try {
+          window.setTimeout(() => onClose?.(), 350)
+        } catch {
+          onClose?.()
+        }
+        return
+      }
+
       const result = await createImageBlob({ type: 'jpg' })
       const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
       const path = `${uid}/stories/${storyId}.jpg`
@@ -759,6 +879,7 @@ export default function StoryComposer({ open, session, onClose }) {
         totalVolumeKg: Number(metrics?.volume || 0),
         kcal: Number(metrics?.kcal || 0),
         layout: String(layout || ''),
+        mediaKind: 'image',
       }
       const createResp = await fetch('/api/social/stories/create', {
         method: 'POST',
@@ -792,6 +913,8 @@ export default function StoryComposer({ open, session, onClose }) {
   }
   if (!open) return null
 
+  const isVideo = mediaKind === 'video'
+
   return (
     <div
       ref={overlayRef}
@@ -807,10 +930,10 @@ export default function StoryComposer({ open, session, onClose }) {
         <div className="w-full sm:max-w-5xl bg-neutral-950 sm:bg-neutral-900 border-t sm:border border-neutral-800 rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl max-h-[calc(100dvh_-_24px)] flex flex-col min-h-0">
           <div className="px-4 pb-4 pt-[calc(1rem_+_env(safe-area-inset-top))] border-b border-neutral-800 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Foto</div>
+              <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">{isVideo ? 'Vídeo' : 'Foto'}</div>
               <div className="text-white font-black truncate">{metrics.title || 'Treino'}</div>
               <div className="text-[11px] text-neutral-400 font-semibold truncate">
-                Escolha uma foto de fundo
+                {isVideo ? 'Escolha um vídeo para postar no story' : 'Escolha uma foto de fundo'}
               </div>
             </div>
             <button
@@ -831,12 +954,24 @@ export default function StoryComposer({ open, session, onClose }) {
                 ref={previewRef}
                 className="relative w-full max-w-[380px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-black"
               >
-                <canvas
-                  ref={previewCanvasRef}
-                  width={CANVAS_W}
-                  height={CANVAS_H}
-                  className="absolute inset-0 w-full h-full"
-                />
+                {isVideo ? (
+                  <video
+                    src={backgroundUrl || undefined}
+                    className="absolute inset-0 w-full h-full object-contain bg-black"
+                    controls
+                    playsInline
+                    muted
+                    autoPlay
+                    preload="auto"
+                  />
+                ) : (
+                  <canvas
+                    ref={previewCanvasRef}
+                    width={CANVAS_W}
+                    height={CANVAS_H}
+                    className="absolute inset-0 w-full h-full"
+                  />
+                )}
 
                 {showSafeGuide ? (
                   <>
@@ -894,15 +1029,15 @@ export default function StoryComposer({ open, session, onClose }) {
                     busy ? 'opacity-60 pointer-events-none' : '',
                   ].join(' ')}
                 >
-                  Escolher Foto
+                  {isVideo ? 'Escolher Vídeo' : 'Escolher Foto'}
                 </label>
                 <input
                   id="irontracks-story-bg"
                   ref={inputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,video/*"
                   className="sr-only"
-                  onChange={(e) => loadBackground(e.target.files?.[0] || null)}
+                  onChange={(e) => loadMedia(e.target.files?.[0] || null)}
                 />
                 <button
                   type="button"
@@ -931,7 +1066,7 @@ export default function StoryComposer({ open, session, onClose }) {
                           ? 'bg-yellow-500 text-black border-yellow-500'
                           : 'bg-neutral-900 text-white border-neutral-800 hover:bg-neutral-800',
                       ].join(' ')}
-                      disabled={busy}
+                      disabled={busy || isVideo}
                     >
                       {l.label}
                     </button>
@@ -977,7 +1112,7 @@ export default function StoryComposer({ open, session, onClose }) {
                 type="button"
                 onClick={shareImage}
                 className="mt-2 h-12 rounded-2xl bg-neutral-900 text-white font-black uppercase tracking-widest text-xs hover:bg-neutral-800 border border-neutral-800 inline-flex items-center justify-center gap-2 disabled:opacity-60"
-                disabled={busy}
+                disabled={busy || isVideo}
               >
                 <Share2 size={16} /> Compartilhar (JPG)
               </button>

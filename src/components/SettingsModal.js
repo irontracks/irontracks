@@ -45,6 +45,7 @@ export default function SettingsModal(props) {
   const restTimerTickCountdown = Boolean(draft?.restTimerTickCountdown ?? true)
   const restTimerDefaultSeconds = Math.max(15, Math.min(600, Number(draft?.restTimerDefaultSeconds ?? 90) || 90))
   const autoRestTimerWhenMissing = Boolean(draft?.autoRestTimerWhenMissing ?? false)
+  const programTitleStartDay = String(draft?.programTitleStartDay || 'monday')
   const uiMode = String(draft?.uiMode || 'beginner')
   const moduleSocial = Boolean(draft?.moduleSocial ?? true)
   const moduleCommunity = Boolean(draft?.moduleCommunity ?? true)
@@ -109,6 +110,31 @@ export default function SettingsModal(props) {
                 >
                   <option value="comfortable">Confortável</option>
                   <option value="compact">Compacto</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
+            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Nomes de treinos</div>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Dia inicial do programa</div>
+                  <div className="text-xs text-neutral-400">Define como “A - ... (SEGUNDA)” começa no Wizard.</div>
+                </div>
+                <select
+                  value={programTitleStartDay}
+                  onChange={(e) => setValue('programTitleStartDay', e.target.value)}
+                  className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="monday">Segunda</option>
+                  <option value="tuesday">Terça</option>
+                  <option value="wednesday">Quarta</option>
+                  <option value="thursday">Quinta</option>
+                  <option value="friday">Sexta</option>
+                  <option value="saturday">Sábado</option>
+                  <option value="sunday">Domingo</option>
                 </select>
               </div>
             </div>

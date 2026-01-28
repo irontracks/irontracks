@@ -24,7 +24,7 @@ import {
     X
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { createWorkout, updateWorkout, deleteWorkout, importData, computeWorkoutStreakAndStats } from '@/actions/workout-actions';
+import { createWorkout, updateWorkout, deleteWorkout, importData, computeWorkoutStreakAndStats, setWorkoutArchived, setWorkoutSortOrder } from '@/actions/workout-actions';
 
 import LoginScreen from '@/components/LoginScreen';
 import AdminPanelV2 from '@/components/AdminPanelV2';
@@ -53,6 +53,8 @@ import { playStartSound, unlockAudio } from '@/lib/sounds';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { estimateExerciseSeconds, toMinutesRounded, calculateExerciseDuration } from '@/utils/pacing';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
+import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
+import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { BackButton } from '@/components/ui/BackButton';
 import StudentDashboard from '@/components/dashboard/StudentDashboard.tsx'
 import WorkoutWizardModal from '@/components/dashboard/WorkoutWizardModal'
@@ -154,6 +156,9 @@ const mapWorkoutRow = (w) => {
 		is_template: !!w.is_template,
 		user_id: w.user_id,
 		created_by: w.created_by,
+        archived_at: w.archived_at ?? null,
+        sort_order: typeof w.sort_order === 'number' ? w.sort_order : (w.sort_order == null ? 0 : Number(w.sort_order) || 0),
+        created_at: w.created_at ?? null,
 	};
 };
 
@@ -187,6 +192,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [showJsonImportModal, setShowJsonImportModal] = useState(false);
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const [reportBackView, setReportBackView] = useState('dashboard');
+    const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+    const [duplicateGroups, setDuplicateGroups] = useState([]);
+    const [duplicatesBusy, setDuplicatesBusy] = useState(false);
     const inAppNotifyRef = useRef(null);
     const bindInAppNotify = useCallback((fn) => {
         inAppNotifyRef.current = typeof fn === 'function' ? fn : null;
@@ -1418,8 +1426,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 			if (Array.isArray(data)) {
 				const mappedRaw = data
 					.map((row) => mapWorkoutRow(row))
-					.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-                const mapped = mappedRaw;
+					.filter(Boolean);
+                const mapped = mappedRaw.sort((a, b) => {
+                    const ao = Number.isFinite(Number(a?.sort_order)) ? Number(a.sort_order) : 0
+                    const bo = Number.isFinite(Number(b?.sort_order)) ? Number(b.sort_order) : 0
+                    if (ao !== bo) return ao - bo
+                    return (a.title || '').localeCompare(b.title || '')
+                });
 
                 if (role === 'admin' || role === 'teacher') {
                     setWorkouts(mapped)
@@ -1859,6 +1872,23 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 		} catch (e) { await alert("Erro: " + (e?.message ?? String(e))); }
 	};
 
+    const handleRestoreWorkout = async (workout) => {
+        const id = String(workout?.id || '').trim()
+        if (!id) return
+        const name = workout?.title || 'este treino'
+        if (!(await confirm(`Restaurar o treino "${name}"?`, 'Restaurar Treino'))) return
+        try {
+            const res = await setWorkoutArchived(id, false)
+            if (!res?.ok) {
+                await alert('Erro: ' + (res?.error || 'Falha ao restaurar treino'))
+                return
+            }
+            await fetchWorkouts()
+        } catch (e) {
+            await alert('Erro: ' + (e?.message ?? String(e)))
+        }
+    }
+
 	const handleDuplicateWorkout = async (workout) => {
 		if (!(await confirm(`Duplicar "${workout.title}"?`, "Duplicar Treino"))) return;
 		const newWorkout = { ...workout, title: `${workout.title} (Cópia)` };
@@ -1868,6 +1898,349 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 			await fetchWorkouts();
 		} catch (e) { await alert("Erro ao duplicar: " + (e?.message ?? String(e))); }
 	};
+
+    const handleBulkEditWorkouts = async (items) => {
+        try {
+            const arr = Array.isArray(items) ? items : []
+            if (!arr.length) return
+            let updatedTitles = 0
+            for (let i = 0; i < arr.length; i += 1) {
+                const it = arr[i]
+                const id = String(it?.id || '').trim()
+                if (!id) continue
+                const w = workouts.find((x) => String(x?.id || '') === id)
+                if (!w) continue
+
+                const desiredTitle = String(it?.title || '').trim() || String(w?.title || 'Treino')
+                if (desiredTitle !== String(w?.title || '')) {
+                    const r = await updateWorkout(id, { title: desiredTitle, notes: w?.notes ?? '', exercises: Array.isArray(w?.exercises) ? w.exercises : [] })
+                    if (!r?.ok) throw new Error(String(r?.error || 'Falha ao renomear treino'))
+                    updatedTitles += 1
+                }
+            }
+
+            let sortSaved = true
+            let sortError = ''
+            for (let i = 0; i < arr.length; i += 1) {
+                const it = arr[i]
+                const id = String(it?.id || '').trim()
+                if (!id) continue
+                const r2 = await setWorkoutSortOrder(id, i)
+                if (!r2?.ok) {
+                    sortSaved = false
+                    sortError = String(r2?.error || 'Falha ao ordenar treinos')
+                    break
+                }
+            }
+
+            await fetchWorkouts()
+
+            if (!sortSaved) {
+                const suffix = sortError ? `\n\n${sortError}` : ''
+                await alert(`Lista salva parcialmente: a ordenação não foi aplicada.${suffix}`)
+                return
+            }
+
+            if (updatedTitles) {
+                await alert(`Lista salva: ${updatedTitles} título(s) atualizado(s).`)
+            } else {
+                await alert('Lista salva.')
+            }
+        } catch (e) {
+            await alert('Erro ao salvar lista: ' + (e?.message ?? String(e)))
+        }
+    }
+
+    const handleNormalizeAiWorkoutTitles = async () => {
+        try {
+            const list = Array.isArray(workouts) ? workouts : []
+            const candidates = list
+                .map((w) => {
+                    const title = String(w?.title || '').trim()
+                    const m = title.match(/\(\s*dia\s*(\d+)\s*\)/i)
+                    if (!m?.[1]) return null
+                    const day = Number(m[1])
+                    if (!Number.isFinite(day) || day <= 0) return null
+                    return { workout: w, dayIndex: Math.floor(day - 1) }
+                })
+                .filter(Boolean)
+            if (!candidates.length) {
+                await alert('Nenhum treino no formato antigo “(Dia X)” foi encontrado.')
+                return
+            }
+            if (!(await confirm(`Padronizar nomes de ${candidates.length} treinos gerados automaticamente?`, 'Padronizar nomes'))) return
+
+            let changed = 0
+            for (const item of candidates) {
+                const w = item.workout
+                const idx = item.dayIndex
+                const id = String(w?.id || '').trim()
+                if (!id) continue
+                const oldTitle = String(w?.title || '').trim()
+                const nextTitle = formatProgramWorkoutTitle(oldTitle, idx, { startDay: userSettingsApi?.settings?.programTitleStartDay })
+                if (!nextTitle || nextTitle === oldTitle) continue
+                const res = await updateWorkout(id, { title: nextTitle, notes: w?.notes ?? '', exercises: Array.isArray(w?.exercises) ? w.exercises : [] })
+                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao renomear treino'))
+                changed += 1
+            }
+            try {
+                await fetchWorkouts()
+            } catch {}
+            await alert(`Padronização concluída: ${changed} treinos atualizados.`)
+        } catch (e) {
+            await alert('Erro ao padronizar nomes: ' + (e?.message ?? String(e)))
+        }
+    }
+
+    const handleApplyTitleRule = async () => {
+        try {
+            const list = Array.isArray(workouts) ? workouts : []
+            if (!list.length) {
+                await alert('Nenhum treino encontrado.')
+                return
+            }
+            if (!(await confirm(`Padronizar títulos de ${list.length} treinos com A/B/C... e dia da semana?`, 'Padronizar títulos'))) return
+            let updated = 0
+            for (let i = 0; i < list.length; i += 1) {
+                const w = list[i]
+                const id = String(w?.id || '').trim()
+                if (!id) continue
+                const oldTitle = String(w?.title || '').trim()
+                const nextTitle = formatProgramWorkoutTitle(oldTitle || 'Treino', i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
+                if (!nextTitle || nextTitle === oldTitle) continue
+                const res = await updateWorkout(id, {
+                    title: nextTitle,
+                    notes: w?.notes ?? '',
+                    exercises: Array.isArray(w?.exercises) ? w.exercises : [],
+                })
+                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao renomear treino'))
+                updated += 1
+            }
+            try {
+                await fetchWorkouts()
+            } catch {}
+            await alert(`Padronização concluída: ${updated} treinos atualizados.`)
+        } catch (e) {
+            await alert('Erro ao padronizar títulos: ' + (e?.message ?? String(e)))
+        }
+    }
+
+    const handleNormalizeExercises = async () => {
+        try {
+            const list = Array.isArray(workouts) ? workouts : []
+            const candidates = list
+                .map((w) => {
+                    const exercises = Array.isArray(w?.exercises) ? w.exercises : []
+                    let changesCount = 0
+                    const nextExercises = exercises.map((ex) => {
+                        const name = String(ex?.name || '').trim()
+                        if (!name) return ex
+                        const info = resolveCanonicalExerciseName(name)
+                        if (!info?.changed || !info?.canonical) return ex
+                        changesCount += 1
+                        return { ...ex, name: info.canonical }
+                    })
+                    if (!changesCount) return null
+                    return { workout: w, nextExercises, changesCount }
+                })
+                .filter(Boolean)
+
+            if (!candidates.length) {
+                await alert('Nenhum exercício para normalizar foi encontrado.')
+                return
+            }
+            if (!(await confirm(`Normalizar exercícios em ${candidates.length} treinos?`, 'Normalizar exercícios'))) return
+
+            let updated = 0
+            const updatedWorkouts = []
+            for (const item of candidates) {
+                const w = item.workout
+                const id = String(w?.id || '').trim()
+                if (!id) continue
+                const title = String(w?.title || '').trim() || `Treino ${id.slice(0, 8)}`
+                const notes = w?.notes ?? ''
+                const res = await updateWorkout(id, { title, notes, exercises: item.nextExercises })
+                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao atualizar treino'))
+                updated += 1
+                updatedWorkouts.push({ title, changesCount: Number(item?.changesCount || 0) })
+            }
+            try {
+                await fetchWorkouts()
+            } catch {}
+            const lines = updatedWorkouts
+                .slice(0, 10)
+                .map((it) => `• ${it.title}${it.changesCount ? ` (${it.changesCount} exercício(s))` : ''}`)
+                .join('\n')
+            const more = updatedWorkouts.length > 10 ? `\n(+${updatedWorkouts.length - 10} outros)` : ''
+            const detail = lines ? `\n\nTreinos atualizados:\n${lines}${more}` : ''
+            await alert(`Normalização concluída: ${updated} treinos atualizados.${detail}`)
+        } catch (e) {
+            await alert('Erro ao normalizar exercícios: ' + (e?.message ?? String(e)))
+        }
+    }
+
+    const handleOpenDuplicates = async () => {
+        const list = (Array.isArray(workouts) ? workouts : []).filter((w) => !w?.archived_at)
+        const keys = list.map((w) => {
+            const exercises = Array.isArray(w?.exercises) ? w.exercises : []
+            const set = new Set()
+            for (const ex of exercises) {
+                const name = String(ex?.name || '').trim()
+                if (!name) continue
+                const info = resolveCanonicalExerciseName(name)
+                const base = String(info?.canonical || name).trim()
+                const k = normalizeExerciseName(base)
+                if (k) set.add(k)
+            }
+            return set
+        })
+
+        const parent = Array.from({ length: list.length }).map((_, i) => i)
+        const find = (x) => {
+            let r = x
+            while (parent[r] !== r) r = parent[r]
+            let cur = x
+            while (parent[cur] !== cur) {
+                const p = parent[cur]
+                parent[cur] = r
+                cur = p
+            }
+            return r
+        }
+        const unite = (a, b) => {
+            const ra = find(a)
+            const rb = find(b)
+            if (ra !== rb) parent[rb] = ra
+        }
+
+        const similarity = (a, b) => {
+            const A = keys[a]
+            const B = keys[b]
+            if (!A?.size || !B?.size) return 0
+            let inter = 0
+            for (const v of A) if (B.has(v)) inter += 1
+            const union = A.size + B.size - inter
+            if (!union) return 0
+            return inter / union
+        }
+
+        const edges = []
+        for (let i = 0; i < list.length; i += 1) {
+            for (let j = i + 1; j < list.length; j += 1) {
+                const score = similarity(i, j)
+                if (score >= 0.9) {
+                    unite(i, j)
+                    edges.push({ i, j, score })
+                }
+            }
+        }
+
+        const groupsMap = new Map()
+        for (let i = 0; i < list.length; i += 1) {
+            const r = find(i)
+            const arr = groupsMap.get(r) || []
+            arr.push(i)
+            groupsMap.set(r, arr)
+        }
+
+        const groups = []
+        for (const idxs of groupsMap.values()) {
+            if (!idxs || idxs.length < 2) continue
+            let best = 0
+            for (const e of edges) {
+                if (idxs.includes(e.i) && idxs.includes(e.j)) best = Math.max(best, e.score)
+            }
+            groups.push({ items: idxs.map((i) => list[i]), score: best || 0.9 })
+        }
+
+        if (!groups.length) {
+            await alert('Não encontrei duplicados com alta similaridade.')
+            return
+        }
+        groups.sort((a, b) => b.score - a.score)
+        setDuplicateGroups(groups)
+        setDuplicatesOpen(true)
+    }
+
+    const handleArchiveDuplicateGroup = async (group) => {
+        if (duplicatesBusy) return
+        try {
+            if (!group?.items || group.items.length < 2) return
+            const base = group.items[0]
+            const others = group.items.slice(1)
+            if (!(await confirm(`Arquivar ${others.length} duplicados e manter "${base?.title || 'Treino'}"?`, 'Arquivar duplicados'))) return
+            setDuplicatesBusy(true)
+            for (const w of others) {
+                const id = String(w?.id || '').trim()
+                if (!id) continue
+                const res = await setWorkoutArchived(id, true)
+                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao arquivar'))
+            }
+            await fetchWorkouts()
+            setDuplicatesOpen(false)
+            setDuplicateGroups([])
+        } catch (e) {
+            await alert('Erro ao arquivar duplicados: ' + (e?.message ?? String(e)))
+        } finally {
+            setDuplicatesBusy(false)
+        }
+    }
+
+    const handleMergeDuplicateGroup = async (group) => {
+        if (duplicatesBusy) return
+        try {
+            if (!group?.items || group.items.length < 2) return
+            const base = group.items[0]
+            const others = group.items.slice(1)
+            if (!(await confirm(`Mesclar ${others.length} duplicados em "${base?.title || 'Treino'}" e arquivar os demais?`, 'Mesclar duplicados'))) return
+            setDuplicatesBusy(true)
+
+            const baseExercises = Array.isArray(base?.exercises) ? base.exercises : []
+            const seen = new Set()
+            const merged = []
+            for (const ex of baseExercises) {
+                const name = String(ex?.name || '').trim()
+                const method = String(ex?.method || '').trim()
+                const reps = String(ex?.reps || '').trim()
+                const k = `${normalizeExerciseName(resolveCanonicalExerciseName(name).canonical || name)}|${method}|${reps}`
+                if (k && !seen.has(k)) {
+                    seen.add(k)
+                    merged.push(ex)
+                }
+            }
+            for (const w of others) {
+                const exs = Array.isArray(w?.exercises) ? w.exercises : []
+                for (const ex of exs) {
+                    const name = String(ex?.name || '').trim()
+                    const method = String(ex?.method || '').trim()
+                    const reps = String(ex?.reps || '').trim()
+                    const k = `${normalizeExerciseName(resolveCanonicalExerciseName(name).canonical || name)}|${method}|${reps}`
+                    if (!k || seen.has(k)) continue
+                    seen.add(k)
+                    merged.push(ex)
+                }
+            }
+
+            const baseId = String(base?.id || '').trim()
+            if (!baseId) throw new Error('Treino base sem ID')
+            const res = await updateWorkout(baseId, { title: String(base?.title || 'Treino'), notes: base?.notes ?? '', exercises: merged })
+            if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino mesclado'))
+
+            for (const w of others) {
+                const id = String(w?.id || '').trim()
+                if (!id) continue
+                const a = await setWorkoutArchived(id, true)
+                if (!a?.ok) throw new Error(String(a?.error || 'Falha ao arquivar'))
+            }
+            await fetchWorkouts()
+            setDuplicatesOpen(false)
+            setDuplicateGroups([])
+        } catch (e) {
+            await alert('Erro ao mesclar duplicados: ' + (e?.message ?? String(e)))
+        } finally {
+            setDuplicatesBusy(false)
+        }
+    }
 
     const handleShareWorkout = async (workout) => {
         setExportWorkout(workout);
@@ -2088,15 +2461,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 onCreateWorkout={handleCreateWorkout}
                                 onQuickView={(w) => setQuickViewWorkout(w)}
                                 onStartSession={(w) => handleStartSession(w)}
+                                onRestoreWorkout={(w) => handleRestoreWorkout(w)}
                                 onShareWorkout={(w) => handleShareWorkout(w)}
                                 onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
                                 onEditWorkout={(w) => handleEditWorkout(w)}
                                 onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
+                                onBulkEditWorkouts={handleBulkEditWorkouts}
                                 currentUserId={user?.id || initialUser?.id}
                                 exportingAll={Boolean(exportingAll)}
                                 onExportAll={handleExportAllWorkouts}
                                 streakStats={streakStats}
                                 onOpenJsonImport={() => setShowJsonImportModal(true)}
+                                onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
+                                onNormalizeExercises={handleNormalizeExercises}
+                                onOpenDuplicates={handleOpenDuplicates}
+                                onApplyTitleRule={handleApplyTitleRule}
                                 onOpenIronScanner={async () => {
                                     try {
                                         openManualWorkoutEditor()
@@ -2159,7 +2538,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 for (let i = 0; i < list.length; i += 1) {
                                     const d = list[i]
                                     const baseTitle = String(d?.title || 'Treino').trim() || 'Treino'
-                                    const finalTitle = `${baseTitle} (Dia ${i + 1})`
+                                    const finalTitle = formatProgramWorkoutTitle(baseTitle, i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
                                     const exercises = Array.isArray(d?.exercises) ? d.exercises : []
                                     const res = await createWorkout({ title: finalTitle, exercises })
                                     if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino'))
@@ -2258,6 +2637,76 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 user={user}
                                 onClose={() => setView(reportBackView || 'dashboard')}
                             />
+                        </div>
+                    )}
+
+                    {duplicatesOpen && (
+                        <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => !duplicatesBusy && setDuplicatesOpen(false)}>
+                            <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Ferramentas</div>
+                                        <div className="text-white font-black text-lg truncate">Duplicados</div>
+                                        <div className="text-xs text-neutral-400 truncate">{Array.isArray(duplicateGroups) ? `${duplicateGroups.length} grupos` : ''}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setDuplicatesOpen(false)}
+                                        disabled={duplicatesBusy}
+                                        className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center disabled:opacity-50"
+                                        aria-label="Fechar"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                                    {(Array.isArray(duplicateGroups) ? duplicateGroups : []).map((g, idx) => {
+                                        const items = Array.isArray(g?.items) ? g.items : []
+                                        const score = Number(g?.score || 0)
+                                        const base = items[0]
+                                        return (
+                                            <div key={`dup-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <div className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Similaridade</div>
+                                                        <div className="text-white font-black truncate">{base?.title || 'Treino'}</div>
+                                                        <div className="text-xs text-neutral-400">{Math.round(score * 100)}%</div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            disabled={duplicatesBusy}
+                                                            onClick={() => handleMergeDuplicateGroup(g)}
+                                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-50"
+                                                        >
+                                                            Mesclar
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={duplicatesBusy}
+                                                            onClick={() => handleArchiveDuplicateGroup(g)}
+                                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
+                                                        >
+                                                            Arquivar
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 space-y-2">
+                                                    {items.map((w, wi) => (
+                                                        <div key={`dup-item-${idx}-${wi}`} className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900/40 border border-neutral-800 px-3 py-2">
+                                                            <div className="min-w-0">
+                                                                <div className="text-sm font-bold text-white truncate">{String(w?.title || 'Treino')}</div>
+                                                                <div className="text-[11px] text-neutral-500 font-mono">{Array.isArray(w?.exercises) ? w.exercises.length : 0} EXERCÍCIOS</div>
+                                                            </div>
+                                                            <div className="text-[11px] font-bold text-neutral-500">{wi === 0 ? 'BASE' : 'DUP'}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
                         </div>
                     )}
 
