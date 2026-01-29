@@ -4,6 +4,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
+import { parseExerciseNotesToSetOverrides } from '@/utils/training/notesMethodParser';
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
@@ -345,6 +346,50 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     return s;
                 });
                 newExercises[index] = { ...ex, [field]: value, setDetails: updatedDetails };
+            } else if (field === 'notes') {
+                const setsCount = Math.max(0, parseInt(ex?.sets) || 0);
+                const existingDetails = ensureSetDetails(ex, setsCount);
+                const parsed = parseExerciseNotesToSetOverrides({ notes: value, setsCount });
+                const overrides = Array.isArray(parsed?.overrides) ? parsed.overrides : [];
+                const hash = String(parsed?.hash || '').trim();
+
+                const updatedDetails = existingDetails.map((sd, setIdx) => {
+                    const current = sd && typeof sd === 'object' ? sd : buildDefaultSetDetail(ex, setIdx + 1);
+                    const auto = current?.it_auto && typeof current.it_auto === 'object' ? current.it_auto : null;
+                    const isAuto = String(auto?.source || '') === 'notes';
+                    const override = overrides?.[setIdx] && typeof overrides[setIdx] === 'object' ? overrides[setIdx] : null;
+
+                    if (!override) {
+                        if (!isAuto) return current;
+                        return { ...current, it_auto: null, advanced_config: null };
+                    }
+
+                    const canOverwrite = isAuto || current?.advanced_config == null;
+                    if (!canOverwrite) return current;
+
+                    const nextAuto = {
+                        source: 'notes',
+                        kind: String(override.kind || ''),
+                        label: String(override.label || ''),
+                        hash,
+                    };
+
+                    const next = {
+                        ...current,
+                        it_auto: nextAuto,
+                        advanced_config: override.advanced_config ?? null,
+                    };
+
+                    const plannedReps = String(override.plannedReps || '').trim();
+                    if (plannedReps) {
+                        const existingReps = current?.reps == null ? '' : String(current.reps).trim();
+                        if (!existingReps || isAuto) next.reps = plannedReps;
+                    }
+
+                    return next;
+                });
+
+                newExercises[index] = { ...ex, notes: value, setDetails: updatedDetails };
             } else {
                 newExercises[index] = { ...ex, [field]: value };
             }
@@ -1182,6 +1227,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 const isWarmup = !!(s?.is_warmup ?? s?.isWarmup)
                                                 const borderClass = isWarmup ? 'border-yellow-500/60' : 'border-neutral-700'
                                                 const config = s?.advanced_config ?? s?.advancedConfig ?? null
+                                                const isObj = config && typeof config === 'object' && !Array.isArray(config)
+                                                const isDropCfg = Array.isArray(config)
+                                                const isClusterCfg = isObj && (config?.cluster_size != null || config?.intra_rest_sec != null || config?.total_reps != null)
+                                                const isRestPauseCfg = isObj && (config?.mini_sets != null || config?.rest_time_sec != null || config?.initial_reps != null)
 
                                                 const updateConfig = (nextConfig) => {
                                                     updateSetDetail(index, setIdx, { advanced_config: nextConfig })
@@ -1206,7 +1255,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         </div>
 
-												{(safeMethod === 'Normal' || safeMethod === 'Bi-Set' || (safeMethod === 'Rest-Pause' && !config)) && (
+												{(!isDropCfg && !isClusterCfg && !isRestPauseCfg && (safeMethod === 'Normal' || safeMethod === 'Bi-Set' || safeMethod === 'Rest-Pause' || safeMethod === 'Drop-set' || safeMethod === 'Cluster')) && (
 													<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
 														<div>
 															<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</label>
@@ -1238,7 +1287,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-                                                        {safeMethod === 'Drop-set' && (
+                                                        {(isDropCfg || safeMethod === 'Drop-set') && (
                                                             <div className="mt-3 space-y-2">
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="text-[10px] text-neutral-500 uppercase font-bold">Drop Set</div>
@@ -1301,7 +1350,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-													{safeMethod === 'Rest-Pause' && config && typeof config === 'object' && (
+													{(isRestPauseCfg || safeMethod === 'Rest-Pause') && !isDropCfg && config && typeof config === 'object' && (
 														<div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
 															<div>
 																<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
@@ -1342,7 +1391,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-                                                        {safeMethod === 'Cluster' && (
+                                                        {(isClusterCfg || safeMethod === 'Cluster') && !isDropCfg && (
                                                             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                                                                 <div>
                                                                     <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>

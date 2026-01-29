@@ -126,6 +126,7 @@ export default function ActiveWorkout(props) {
   const [openAiHints, setOpenAiHints] = useState(() => new Set());
   const [clusterModal, setClusterModal] = useState(null);
   const [restPauseModal, setRestPauseModal] = useState(null);
+  const [dropSetModal, setDropSetModal] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [postCheckinOpen, setPostCheckinOpen] = useState(false);
   const [postCheckinDraft, setPostCheckinDraft] = useState({ rpe: '', satisfaction: '', soreness: '', notes: '' });
@@ -697,8 +698,11 @@ export default function ActiveWorkout(props) {
   const renderRestPauseSet = (ex, exIdx, setIdx) => {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
+    const plannedSet = getPlannedSet(ex, setIdx);
     const cfgRaw = getPlanConfig(ex, setIdx);
     const method = String(ex?.method || '').trim();
+    const auto = plannedSet?.it_auto && typeof plannedSet.it_auto === 'object' ? plannedSet.it_auto : null;
+    const modeLabel = String(auto?.label || '').trim() || (String(auto?.kind || '') === 'sst' ? 'SST' : 'Rest-P');
     const cfgMiniRaw = parseTrainingNumber(cfgRaw?.mini_sets);
     const cfgRestRaw = parseTrainingNumber(cfgRaw?.rest_time_sec);
     const shouldFillRestPauseDefaults =
@@ -772,6 +776,7 @@ export default function ActiveWorkout(props) {
               });
               setRestPauseModal({
                 key,
+                label: modeLabel,
                 pauseSec,
                 miniSets: nextMiniCount,
                 weight: baseWeight,
@@ -788,7 +793,7 @@ export default function ActiveWorkout(props) {
             <span className="text-xs font-black">Abrir</span>
           </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Rest-P</span>
+            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
             <span className="text-xs text-neutral-400 truncate">Descanso {pauseSec || 0}s • Total: {total || 0} reps</span>
           </div>
           <button
@@ -1033,7 +1038,138 @@ export default function ActiveWorkout(props) {
     );
   };
 
+  const renderDropSetSet = (ex, exIdx, setIdx) => {
+    const key = `${exIdx}-${setIdx}`;
+    const log = getLog(key);
+    const plannedSet = getPlannedSet(ex, setIdx);
+    const cfgRaw = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
+    const stagesPlannedRaw = Array.isArray(cfgRaw) ? cfgRaw : [];
+    const ds = isObject(log?.drop_set) ? log.drop_set : {};
+    const stagesSavedRaw = Array.isArray(ds?.stages) ? ds.stages : [];
+    const stagesCount = Math.max(stagesPlannedRaw.length, stagesSavedRaw.length);
+    if (!stagesCount) return renderNormalSet(ex, exIdx, setIdx);
+
+    const auto = plannedSet?.it_auto && typeof plannedSet.it_auto === 'object' ? plannedSet.it_auto : null;
+    const modeLabel = String(auto?.label || '').trim() || 'Drop';
+
+    const stages = Array.from({ length: stagesCount }).map((_, idx) => {
+      const saved = stagesSavedRaw?.[idx] && typeof stagesSavedRaw[idx] === 'object' ? stagesSavedRaw[idx] : null;
+      const planned = stagesPlannedRaw?.[idx] && typeof stagesPlannedRaw[idx] === 'object' ? stagesPlannedRaw[idx] : null;
+      const weight = String(saved?.weight ?? planned?.weight ?? '').trim();
+      const reps = parseTrainingNumber(saved?.reps ?? planned?.reps) ?? null;
+      return { weight, reps };
+    });
+
+    const total = stages.reduce((acc, s) => acc + (parseTrainingNumber(s?.reps) ?? 0), 0);
+    const done = !!log?.done;
+    const canDone = stages.every((s) => String(s?.weight || '').trim() && (parseTrainingNumber(s?.reps) ?? 0) > 0);
+
+    const notesValue = String(log?.notes ?? '');
+    const hasNotes = notesValue.trim().length > 0;
+    const isNotesOpen = openNotesKeys.has(key);
+
+    const toggleNotes = () => {
+      setOpenNotesKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    };
+
+    return (
+      <div key={key} className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+          <button
+            type="button"
+            onClick={() => {
+              const baseStages = stages.map((s) => ({
+                weight: String(s?.weight ?? '').trim(),
+                reps: parseTrainingNumber(s?.reps) ?? null,
+              }));
+              setDropSetModal({ key, label: modeLabel, stages: baseStages, error: '' });
+            }}
+            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+          >
+            <Pencil size={14} />
+            <span className="text-xs font-black">Abrir</span>
+          </button>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">{modeLabel || 'Drop'}</span>
+            <span className="text-xs text-neutral-400 truncate">Etapas {stagesCount} • Total: {total || 0} reps</span>
+          </div>
+          <button
+            type="button"
+            onClick={toggleNotes}
+            className={
+              isNotesOpen || hasNotes
+                ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+            }
+          >
+            <MessageSquare size={14} />
+          </button>
+          <button
+            type="button"
+            disabled={!canDone}
+            onClick={() => {
+              const nextDone = !done;
+              const lastWeight = String(stages?.[stages.length - 1]?.weight || '').trim();
+              const stageOut = stages.map((s) => ({
+                weight: String(s?.weight ?? '').trim(),
+                reps: parseTrainingNumber(s?.reps) ?? null,
+              }));
+              updateLog(key, {
+                done: nextDone,
+                weight: lastWeight,
+                reps: String(total || ''),
+                drop_set: { stages: stageOut },
+              });
+            }}
+            className={
+              canDone
+                ? done
+                  ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                  : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
+                : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
+            }
+          >
+            <Check size={16} />
+            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+          </button>
+        </div>
+
+        {!canDone && (
+          <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
+            Preencha peso e reps em todas as etapas no modal para concluir.
+          </div>
+        )}
+
+        {isNotesOpen && (
+          <textarea
+            value={notesValue}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { notes: v });
+            }}
+            placeholder="Observações da série"
+            rows={2}
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+        )}
+      </div>
+    );
+  };
+
   const renderSet = (ex, exIdx, setIdx) => {
+    const plannedSet = getPlannedSet(ex, setIdx);
+    const rawCfg = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
+    const key = `${exIdx}-${setIdx}`;
+    const log = getLog(key);
+    const hasDropStages = isObject(log?.drop_set) && Array.isArray(log?.drop_set?.stages) && log.drop_set.stages.length > 0;
+    if (Array.isArray(rawCfg) || hasDropStages) return renderDropSetSet(ex, exIdx, setIdx);
+
     const cfg = getPlanConfig(ex, setIdx);
     const method = String(ex?.method || '').trim();
     const isCluster = method === 'Cluster' || isClusterConfig(cfg);
@@ -1297,6 +1433,47 @@ export default function ActiveWorkout(props) {
       advanced_config: cfg,
     });
     setRestPauseModal(null);
+  };
+
+  const saveDropSetModal = async () => {
+    const m = dropSetModal && typeof dropSetModal === 'object' ? dropSetModal : null;
+    const key = String(m?.key || '').trim();
+    if (!key) {
+      setDropSetModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+      return;
+    }
+    const stagesRaw = Array.isArray(m?.stages) ? m.stages : [];
+    if (stagesRaw.length < 2) {
+      setDropSetModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Defina pelo menos 2 etapas.' } : prev));
+      return;
+    }
+
+    const stages = [];
+    let total = 0;
+    for (let i = 0; i < stagesRaw.length; i += 1) {
+      const s = stagesRaw[i] && typeof stagesRaw[i] === 'object' ? stagesRaw[i] : {};
+      const weight = String(s?.weight ?? '').trim();
+      const reps = parseTrainingNumber(s?.reps);
+      if (!weight) {
+        setDropSetModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg) em todas as etapas.' } : prev));
+        return;
+      }
+      if (!reps || reps <= 0) {
+        setDropSetModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps em todas as etapas.' } : prev));
+        return;
+      }
+      stages.push({ weight, reps });
+      total += reps;
+    }
+
+    const lastWeight = String(stages[stages.length - 1]?.weight ?? '').trim();
+    updateLog(key, {
+      done: !!getLog(key)?.done,
+      weight: lastWeight,
+      reps: String(total || ''),
+      drop_set: { stages },
+    });
+    setDropSetModal(null);
   };
 
   if (!session || !workout) {
@@ -1632,7 +1809,7 @@ export default function ActiveWorkout(props) {
           >
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Rest-P</div>
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{String(restPauseModal?.label || '').trim() === 'SST' ? 'SST' : 'Rest-P'}</div>
                 <div className="text-white font-black text-lg truncate">Preencher minis</div>
                 <div className="text-xs text-neutral-400 truncate">
                   {Number(restPauseModal?.miniSets || 0)} minis • descanso {Number(restPauseModal?.pauseSec || 0)}s
@@ -1841,6 +2018,139 @@ export default function ActiveWorkout(props) {
               <button
                 type="button"
                 onClick={saveRestPauseModal}
+                className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2"
+              >
+                <Save size={16} />
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dropSetModal && (
+        <div
+          className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          onClick={() => setDropSetModal(null)}
+        >
+          <div
+            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{String(dropSetModal?.label || 'Drop')}</div>
+                <div className="text-white font-black text-lg truncate">Preencher etapas</div>
+                <div className="text-xs text-neutral-400 truncate">{Array.isArray(dropSetModal?.stages) ? dropSetModal.stages.length : 0} etapas</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDropSetModal(null)}
+                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+              {dropSetModal?.error ? (
+                <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">
+                  {String(dropSetModal.error)}
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Etapas</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDropSetModal((prev) => {
+                      if (!prev || typeof prev !== 'object') return prev
+                      const list = Array.isArray(prev.stages) ? [...prev.stages] : []
+                      if (list.length >= 20) return prev
+                      list.push({ weight: '', reps: null })
+                      return { ...prev, stages: list, error: '' }
+                    })
+                  }}
+                  className="min-h-[36px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 inline-flex items-center gap-2"
+                >
+                  <Plus size={14} />
+                  Adicionar
+                </button>
+              </div>
+
+              {Array.isArray(dropSetModal?.stages) &&
+                dropSetModal.stages.map((st, idx) => (
+                  <div key={`ds-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Etapa {idx + 1}</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropSetModal((prev) => {
+                            if (!prev || typeof prev !== 'object') return prev
+                            const list = Array.isArray(prev.stages) ? [...prev.stages] : []
+                            list.splice(idx, 1)
+                            return { ...prev, stages: list, error: '' }
+                          })
+                        }}
+                        className="h-9 w-9 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 inline-flex items-center justify-center"
+                        aria-label="Remover etapa"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <input
+                        inputMode="decimal"
+                        value={String(st?.weight ?? '')}
+                        onChange={(e) => {
+                          const v = e?.target?.value ?? ''
+                          setDropSetModal((prev) => {
+                            if (!prev || typeof prev !== 'object') return prev
+                            const list = Array.isArray(prev.stages) ? [...prev.stages] : []
+                            const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {}
+                            list[idx] = { ...cur, weight: v }
+                            return { ...prev, stages: list, error: '' }
+                          })
+                        }}
+                        placeholder="kg"
+                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                      />
+                      <input
+                        inputMode="decimal"
+                        value={st?.reps == null ? '' : String(st.reps)}
+                        onChange={(e) => {
+                          const n = parseTrainingNumber(e?.target?.value)
+                          const next = n != null && n > 0 ? n : null
+                          setDropSetModal((prev) => {
+                            if (!prev || typeof prev !== 'object') return prev
+                            const list = Array.isArray(prev.stages) ? [...prev.stages] : []
+                            const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {}
+                            list[idx] = { ...cur, reps: next }
+                            return { ...prev, stages: list, error: '' }
+                          })
+                        }}
+                        placeholder="reps"
+                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
+
+            <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setDropSetModal(null)}
+                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveDropSetModal}
                 className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2"
               >
                 <Save size={16} />
