@@ -13,7 +13,7 @@ export type WorkoutWizardAnswers = {
   goal: WorkoutWizardGoal
   split: WorkoutWizardSplit
   daysPerWeek: 2 | 3 | 4 | 5 | 6
-  timeMinutes: 30 | 45 | 60
+  timeMinutes: 30 | 45 | 60 | 90 | 120
   equipment: WorkoutWizardEquipment
   level: WorkoutWizardLevel
   focus: WorkoutWizardFocus
@@ -104,6 +104,18 @@ export default function WorkoutWizardModal(props: Props) {
     setError('')
     setGenerating(false)
     setSavingAll(false)
+
+    try {
+      const raw = window.localStorage.getItem('irontracks_wizard_prefill_v1')
+      if (raw) {
+        window.localStorage.removeItem('irontracks_wizard_prefill_v1')
+        const parsed = JSON.parse(raw)
+        const extra = parsed && typeof parsed === 'object' ? String(parsed?.constraints || '').trim() : ''
+        if (extra) {
+          setAnswers((prev) => ({ ...prev, constraints: prev.constraints ? `${prev.constraints}\n\n${extra}` : extra }))
+        }
+      }
+    } catch {}
   }, [isOpen])
 
   const previewTitle = useMemo(() => {
@@ -333,7 +345,7 @@ export default function WorkoutWizardModal(props: Props) {
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tempo & Equipamento</div>
                 <div className="mt-3 grid grid-cols-3 gap-2">
-                  {([30, 45, 60] as const).map((m) => (
+                  {([30, 45, 60, 90, 120] as const).map((m) => (
                     <button
                       key={String(m)}
                       type="button"
@@ -405,14 +417,14 @@ export default function WorkoutWizardModal(props: Props) {
                   ))}
                 </div>
                 <div className="mt-4">
-                  <div className="text-sm font-bold text-white">Restrições (opcional)</div>
-                  <div className="text-xs text-neutral-400">Ex.: dor no joelho, evitar overhead, sem barra.</div>
+                  <div className="text-sm font-bold text-white">Preferências e restrições (opcional)</div>
+                  <div className="text-xs text-neutral-400">Ex.: foco em deltoide lateral, evitar overhead, dor no joelho, sem barra.</div>
                   <textarea
                     value={answers.constraints}
                     onChange={(e) => setAnswers((prev) => ({ ...prev, constraints: e.target.value }))}
                     rows={3}
                     className="mt-2 w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
-                    placeholder="Escreva aqui..."
+                    placeholder="Escreva aqui preferências e restrições..."
                   />
                 </div>
               </div>

@@ -717,6 +717,30 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         }
     };
 
+    const renderAiRating = () => {
+        const raw = aiState?.ai?.rating ?? aiState?.ai?.stars ?? aiState?.ai?.score ?? null;
+        const n = Number(raw);
+        if (!Number.isFinite(n)) return null;
+        const rating = Math.max(0, Math.min(5, Math.round(n)));
+        const reason = String(aiState?.ai?.rating_reason || aiState?.ai?.ratingReason || aiState?.ai?.reason || '').trim();
+        return (
+            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-4">
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2">Avaliação da IA</div>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center text-[20px] leading-none tracking-[0.25em] text-yellow-400">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <span key={i} className={i < rating ? 'opacity-100' : 'opacity-20'}>
+                                ★
+                            </span>
+                        ))}
+                    </div>
+                    <div className="text-xs font-black text-neutral-200">{rating}/5</div>
+                </div>
+                {reason ? <div className="mt-2 text-sm text-neutral-200">{reason}</div> : null}
+            </div>
+        );
+    };
+
     const handlePartnerPlan = (participant) => {
         try {
             if (!participant) return;
@@ -1094,6 +1118,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
 
                     {aiState?.ai && (
                         <div className="mt-4 space-y-3">
+                            {renderAiRating()}
                             {aiState.ai.metrics && typeof aiState.ai.metrics === 'object' && (
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">

@@ -167,7 +167,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [user, setUser] = useState(initialUser ?? null);
     const [authLoading, setAuthLoading] = useState(false);
     const [view, setView] = useState('dashboard');
-    const [dashboardMounted, setDashboardMounted] = useState(false);
     const [directChat, setDirectChat] = useState(null);
     const [workouts, setWorkouts] = useState(() => {
         try {
@@ -257,9 +256,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 
     const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open';
 
-    useEffect(() => {
-        setDashboardMounted(true);
-    }, []);
 
     useEffect(() => {
         const uid = user?.id ? String(user.id) : '';
@@ -2448,44 +2444,40 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     }}
                 >
                     {(view === 'dashboard' || view === 'assessments' || view === 'community') && (
-                        dashboardMounted ? (
-                            <StudentDashboard
-                                workouts={Array.isArray(workouts) ? workouts : []}
-                                profileIncomplete={Boolean(profileIncomplete)}
-                                onOpenCompleteProfile={() => setShowCompleteProfile(true)}
-                                view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : 'dashboard'}
-                                onChangeView={(next) => setView(next)}
-                                assessmentsContent={(user?.id || initialUser?.id) ? <AssessmentHistory studentId={user?.id || initialUser?.id} /> : null}
-                                communityContent={(user?.id || initialUser?.id) ? <CommunityClient embedded /> : null}
-                                settings={userSettingsApi?.settings ?? null}
-                                onCreateWorkout={handleCreateWorkout}
-                                onQuickView={(w) => setQuickViewWorkout(w)}
-                                onStartSession={(w) => handleStartSession(w)}
-                                onRestoreWorkout={(w) => handleRestoreWorkout(w)}
-                                onShareWorkout={(w) => handleShareWorkout(w)}
-                                onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
-                                onEditWorkout={(w) => handleEditWorkout(w)}
-                                onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
-                                onBulkEditWorkouts={handleBulkEditWorkouts}
-                                currentUserId={user?.id || initialUser?.id}
-                                exportingAll={Boolean(exportingAll)}
-                                onExportAll={handleExportAllWorkouts}
-                                streakStats={streakStats}
-                                onOpenJsonImport={() => setShowJsonImportModal(true)}
-                                onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
-                                onNormalizeExercises={handleNormalizeExercises}
-                                onOpenDuplicates={handleOpenDuplicates}
-                                onApplyTitleRule={handleApplyTitleRule}
-                                onOpenIronScanner={async () => {
-                                    try {
-                                        openManualWorkoutEditor()
-                                        await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
-                                    } catch {}
-                                }}
-                            />
-                        ) : (
-                            <div className="p-4 pb-24" />
-                        )
+                        <StudentDashboard
+                            workouts={Array.isArray(workouts) ? workouts : []}
+                            profileIncomplete={Boolean(profileIncomplete)}
+                            onOpenCompleteProfile={() => setShowCompleteProfile(true)}
+                            view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : 'dashboard'}
+                            onChangeView={(next) => setView(next)}
+                            assessmentsContent={(user?.id || initialUser?.id) ? <AssessmentHistory studentId={user?.id || initialUser?.id} /> : null}
+                            communityContent={(user?.id || initialUser?.id) ? <CommunityClient embedded /> : null}
+                            settings={userSettingsApi?.settings ?? null}
+                            onCreateWorkout={handleCreateWorkout}
+                            onQuickView={(w) => setQuickViewWorkout(w)}
+                            onStartSession={(w) => handleStartSession(w)}
+                            onRestoreWorkout={(w) => handleRestoreWorkout(w)}
+                            onShareWorkout={(w) => handleShareWorkout(w)}
+                            onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
+                            onEditWorkout={(w) => handleEditWorkout(w)}
+                            onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
+                            onBulkEditWorkouts={handleBulkEditWorkouts}
+                            currentUserId={user?.id || initialUser?.id}
+                            exportingAll={Boolean(exportingAll)}
+                            onExportAll={handleExportAllWorkouts}
+                            streakStats={streakStats}
+                            onOpenJsonImport={() => setShowJsonImportModal(true)}
+                            onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
+                            onNormalizeExercises={handleNormalizeExercises}
+                            onOpenDuplicates={handleOpenDuplicates}
+                            onApplyTitleRule={handleApplyTitleRule}
+                            onOpenIronScanner={async () => {
+                                try {
+                                    openManualWorkoutEditor()
+                                    await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
+                                } catch {}
+                            }}
+                        />
                     )}
 
                     <WorkoutWizardModal

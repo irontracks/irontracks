@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle, Download, Loader2 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import WorkoutReport from '@/components/WorkoutReport';
 import { generatePeriodReportInsights } from '@/actions/workout-actions';
 import { useDialog } from '@/contexts/DialogContext';
+import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -43,6 +44,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [periodReport, setPeriodReport] = useState(null);
     const [periodAi, setPeriodAi] = useState({ status: 'idle', ai: null, error: '' });
+    const [periodPdf, setPeriodPdf] = useState({ status: 'idle', url: null, blob: null, error: '' });
 
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode);
@@ -682,6 +684,55 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     const closePeriodReport = () => {
         setPeriodReport(null);
         setPeriodAi({ status: 'idle', ai: null, error: '' });
+        try { if (periodPdf?.url) URL.revokeObjectURL(periodPdf.url); } catch {}
+        setPeriodPdf({ status: 'idle', url: null, blob: null, error: '' });
+    };
+
+    const downloadPeriodPdf = async () => {
+        const current = periodReport && typeof periodReport === 'object' ? periodReport : null;
+        if (!current) return;
+        if (periodPdf.status === 'loading') return;
+        setPeriodPdf((prev) => ({ ...(prev || {}), status: 'loading', error: '' }));
+        try {
+            const baseUrl = typeof window !== 'undefined' ? String(window.location.origin || '').trim() : '';
+            const userName = String(user?.displayName || user?.name || user?.email || '').trim();
+            const html = buildPeriodReportHtml({
+                type: current.type,
+                stats: current.stats,
+                ai: periodAi?.ai || null,
+                baseUrl,
+                userName
+            });
+            const dateLabel = new Date().toISOString().slice(0, 10);
+            const kind = current.type === 'week' ? 'Semanal' : current.type === 'month' ? 'Mensal' : 'Periodo';
+            const fileName = `Relatorio_${kind}_${dateLabel}`;
+            const res = await fetch('/api/report', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ html, fileName })
+            });
+            if (!res.ok) {
+                const txt = await res.text().catch(() => '');
+                throw new Error(txt || `Falha ao gerar PDF (${res.status})`);
+            }
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            try {
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${fileName}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+            } catch {}
+            setPeriodPdf({ status: 'ready', url, blob, error: '' });
+        } catch (e) {
+            const msg = e?.message ? String(e.message) : String(e);
+            setPeriodPdf((prev) => ({ ...(prev || {}), status: 'error', error: msg || 'Falha ao gerar PDF' }));
+        } finally {
+            setTimeout(() => setPeriodPdf((prev) => (prev?.status === 'loading' ? { ...(prev || {}), status: 'idle' } : prev)), 400);
+        }
     };
 
     const handleShareReport = async () => {
@@ -1175,14 +1226,28 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                                 className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-neutral-100 outline-none h-32 resize-none"
                             />
                         </div>
+                        {periodPdf.status === 'error' && (
+                            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
+                                {String(periodPdf.error || 'Falha ao gerar PDF.')}
+                            </div>
+                        )}
                     </div>
-                    <div className="p-4 bg-neutral-900/50 flex gap-2">
+                    <div className="p-4 bg-neutral-900/50 flex flex-col sm:flex-row gap-2">
                         <button
                             type="button"
                             onClick={closePeriodReport}
                             className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
                         >
                             Fechar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={downloadPeriodPdf}
+                            disabled={periodPdf.status === 'loading'}
+                            className="flex-1 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-bold hover:bg-neutral-900 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                        >
+                            {periodPdf.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                            Baixar PDF
                         </button>
                         <button
                             type="button"

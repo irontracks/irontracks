@@ -200,38 +200,6 @@ export async function generatePostWorkoutInsights(input) {
   }
 }
 
-export async function generateExerciseMuscleMap(input) {
-  try {
-    const body = input && typeof input === 'object' ? input : {}
-    const res = await fetch('/api/ai/exercise-muscle-map', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao mapear exercícios' }
-    return json
-  } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
-  }
-}
-
-export async function getMuscleMapWeek(input) {
-  try {
-    const body = input && typeof input === 'object' ? input : {}
-    const res = await fetch('/api/ai/muscle-map-week', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular' }
-    return json
-  } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
-  }
-}
-
 export async function applyProgressionToNextTemplate(input) {
   try {
     const body = input && typeof input === 'object' ? input : {}
@@ -517,23 +485,26 @@ export async function generateAssessmentPlanAi(input) {
   const weight = assessment?.weight != null ? safeString(assessment.weight) : ''
   const bf = assessment?.body_fat_percentage != null ? safeString(assessment.body_fat_percentage) : assessment?.bf != null ? safeString(assessment.bf) : ''
 
-  const summary = []
-  summary.push(`Plano tático (base) para ${studentName}.`)
-  if (goal) summary.push(`Objetivo: ${goal}`)
-  if (weight) summary.push(`Peso atual: ${weight} kg`)
-  if (bf) summary.push(`BF: ${bf}%`)
-
-  const plan = {
-    summary,
-    training: [
-      'Priorize progressão em básicos (agachamento/terra/supino/remo).',
-      'Registre cargas e reps; busque +1 rep ou +2,5kg quando possível.',
-      'Frequência sugerida: 4–5x/semana (ajuste conforme rotina).',
-    ],
-    nutrition: ['Proteína alta e consistente; carbo em torno do treino; hidratação.'],
-    habits: ['Sono: 7–9h.', 'Passos: 7k–10k/dia (ajuste conforme objetivo).'],
-    warnings: [],
-  }
+  const plan = [
+    `Plano tático (base) para ${studentName}:`,
+    goal ? `Objetivo: ${goal}` : null,
+    weight ? `Peso atual: ${weight} kg` : null,
+    bf ? `BF: ${bf}%` : null,
+    '',
+    'Treino (4-5x/semana):',
+    '- Priorize progressão em básicos (agachamento/terra/supino/remo).',
+    '- Registre cargas e reps; busque +1 rep ou +2,5kg quando possível.',
+    '',
+    'Recuperação:',
+    '- Sono: 7-9h.',
+    '- Passos: 7k-10k/dia (ajuste conforme objetivo).',
+    '',
+    'Nutrição (diretriz):',
+    '- Proteína alta e consistente; carbo em torno do treino; hidratação.',
+  ]
+    .filter((x) => x != null)
+    .join('\n')
 
   return { ok: true, plan, usedAi: false, reason: 'fallback' }
 }
+

@@ -341,6 +341,10 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
 
   const buildAiSection = () => {
     if (!aiRaw) return ''
+    const ratingRaw = aiRaw?.rating ?? aiRaw?.stars ?? aiRaw?.score
+    const ratingNum = Number(ratingRaw)
+    const rating = Number.isFinite(ratingNum) ? Math.max(0, Math.min(5, Math.round(ratingNum))) : null
+    const ratingReason = String(aiRaw?.rating_reason || aiRaw?.ratingReason || aiRaw?.reason || '').trim()
     const summaryItems = Array.isArray(aiRaw?.summary) ? aiRaw.summary.filter(Boolean).map((v) => String(v)) : []
     const summaryText = !summaryItems.length ? String(aiRaw?.summary || '').trim() : ''
     const motivation = String(aiRaw?.motivation || '').trim()
@@ -375,6 +379,18 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
     })()
 
     const sections = []
+    if (rating != null) {
+      const filled = '★'.repeat(rating)
+      const empty = '☆'.repeat(Math.max(0, 5 - rating))
+      sections.push(`
+        <div class="card" style="border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .06)">
+          <div class="muted" style="margin-bottom:8px; color:#f59e0b">Avaliação da IA</div>
+          <div style="font-size:20px; letter-spacing:6px; color:#fbbf24; font-weight:900">${escapeHtml(filled + empty)}</div>
+          <div style="margin-top:6px; font-size:12px; color:#e5e7eb; font-weight:900">${escapeHtml(String(rating))}/5</div>
+          ${ratingReason ? `<div style="margin-top:10px; font-size:12px; color:#a3a3a3">${escapeHtml(ratingReason)}</div>` : ''}
+        </div>
+      `)
+    }
     if (summaryBlock) {
       sections.push(`
         <div class="card" style="border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .06)">

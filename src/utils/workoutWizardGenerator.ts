@@ -47,7 +47,9 @@ const schemeFor = (goal: WorkoutWizardGoal, level: WorkoutWizardLevel): RepSchem
 const countByTime = (timeMinutes: number) => {
   if (timeMinutes <= 30) return { main: 4, accessory: 0, core: 0 }
   if (timeMinutes <= 45) return { main: 5, accessory: 1, core: 1 }
-  return { main: 6, accessory: 1, core: 1 }
+  if (timeMinutes <= 60) return { main: 6, accessory: 1, core: 1 }
+  if (timeMinutes <= 90) return { main: 7, accessory: 2, core: 1 }
+  return { main: 8, accessory: 2, core: 1 }
 }
 
 const isKneeSensitive = (constraints: string) => {

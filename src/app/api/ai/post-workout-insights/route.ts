@@ -21,9 +21,17 @@ const normalizeAi = (obj: any) => {
   const base = obj && typeof obj === 'object' ? obj : {}
   const toArr = (v: any) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean) : [])
   const toStr = (v: any) => String(v || '').trim()
+  const toRating = (v: any) => {
+    const n = Number(v)
+    if (!Number.isFinite(n)) return null
+    const clamped = Math.max(0, Math.min(5, Math.round(n)))
+    return clamped
+  }
   const prsRaw = Array.isArray(base?.prs) ? base.prs : []
   const progRaw = Array.isArray(base?.progression) ? base.progression : []
   return {
+    rating: toRating(base?.rating ?? base?.stars ?? base?.score),
+    rating_reason: toStr(base?.rating_reason ?? base?.ratingReason ?? base?.reason).slice(0, 500),
     summary: toArr(base?.summary).slice(0, 8),
     motivation: toStr(base?.motivation).slice(0, 600),
     highlights: toArr(base?.highlights).slice(0, 10),
@@ -202,6 +210,8 @@ export async function POST(req: Request) {
       '',
       'Retorne APENAS um JSON válido (sem markdown, sem texto extra) com esta estrutura:',
       '{',
+      '  "rating": number (0-5) (inteiro),',
+      '  "rating_reason": string (1-2 frases curtas),',
       '  "summary": string[] (3-6 bullets curtos),',
       '  "motivation": string (1-2 frases),',
       '  "highlights": string[] (0-6),',

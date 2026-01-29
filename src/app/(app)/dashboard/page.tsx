@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import IronTracksAppClient from './IronTracksAppClient'
+import DashboardClientEntry from './DashboardClientEntry'
 import { resolveRoleByUser } from '@/utils/auth/route'
 
 type SP = Record<string, string | string[] | undefined>
@@ -141,5 +141,5 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
   const initialWorkouts = await hydrateWorkouts(supabase, baseWorkouts)
 
-  return <IronTracksAppClient initialUser={initialUser} initialProfile={initialProfile} initialWorkouts={initialWorkouts} />
+  return <DashboardClientEntry initialUser={initialUser} initialProfile={initialProfile} initialWorkouts={initialWorkouts} />
 }
