@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
+import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 
 export const dynamic = 'force-dynamic'
 
@@ -91,14 +92,46 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
-    if (!apiKey) return NextResponse.json({ ok: false, error: 'missing_api_key' }, { status: 400 })
-
     const body = await req.json().catch(() => ({}))
-    const names = Array.isArray(body?.names) ? body.names.map((v: any) => String(v || '').trim()).filter(Boolean) : []
+    const names: string[] = Array.isArray(body?.names)
+      ? body.names.map((v: any) => String(v || '').trim()).filter((v: string) => Boolean(v))
+      : []
     if (!names.length) return NextResponse.json({ ok: false, error: 'names required' }, { status: 400 })
 
-    const unique = Array.from(new Set(names)).slice(0, 60)
+    const unique: string[] = Array.from(new Set(names)).slice(0, 60)
+    const userId = String(auth.user.id || '').trim()
+    const admin = createAdminClient()
+
+    const heuristicItems = unique
+      .map((name) => {
+        const canonical = resolveCanonicalExerciseName(name)?.canonical || name
+        return buildHeuristicExerciseMap(canonical)
+      })
+      .filter(Boolean) as any[]
+
+    if (heuristicItems.length) {
+      const rows = heuristicItems.map((it) => ({
+        user_id: userId,
+        exercise_key: it.exercise_key,
+        canonical_name: it.canonical_name,
+        mapping: it.mapping,
+        confidence: it.confidence,
+        source: 'heuristic',
+      }))
+      await admin.from('exercise_muscle_maps').upsert(rows, { onConflict: 'user_id,exercise_key' })
+    }
+
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json({ ok: true, items: heuristicItems })
+    }
+
+    const remaining = unique.filter((name) => {
+      const canonical = resolveCanonicalExerciseName(name)?.canonical || name
+      const k = normalizeExerciseName(canonical || name)
+      return !heuristicItems.some((it) => String((it as any)?.exercise_key || '') === k)
+    })
+    if (!remaining.length) return NextResponse.json({ ok: true, items: heuristicItems })
     const muscleList = MUSCLE_GROUPS.map((m) => `${m.id}: ${m.label}`).join(', ')
 
     const schema = [
@@ -135,7 +168,7 @@ export async function POST(req: Request) {
       schema,
       '',
       'Exercícios para mapear (array):',
-      JSON.stringify(unique),
+      JSON.stringify(remaining),
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
@@ -146,8 +179,6 @@ export async function POST(req: Request) {
     if (!parsed) return NextResponse.json({ ok: false, error: 'invalid_ai_response' }, { status: 400 })
 
     const normalized = normalizeResult(parsed)
-    const admin = createAdminClient()
-    const userId = String(auth.user.id || '').trim()
 
     const upsertRows = normalized.items.map((it: any) => ({
       user_id: userId,
@@ -162,7 +193,7 @@ export async function POST(req: Request) {
       await admin.from('exercise_muscle_maps').upsert(upsertRows, { onConflict: 'user_id,exercise_key' })
     }
 
-    return NextResponse.json({ ok: true, items: upsertRows })
+    return NextResponse.json({ ok: true, items: [...heuristicItems, ...upsertRows] })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }

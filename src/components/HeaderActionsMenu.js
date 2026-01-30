@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Bell, Calendar, Cog, Command, CreditCard, History, LogOut, MessageSquare, Users } from 'lucide-react'
+import { Bell, Calendar, Cog, Command, CreditCard, History, LogOut, MessageSquare, Sparkles, Users } from 'lucide-react'
 
 export default function HeaderActionsMenu({
   user,
@@ -18,6 +18,7 @@ export default function HeaderActionsMenu({
   onOpenSchedule,
   onOpenWallet,
   onOpenSettings,
+  onOpenTour,
 }) {
   const [open, setOpen] = useState(false)
 
@@ -36,6 +37,7 @@ export default function HeaderActionsMenu({
     <div className="relative">
       <button
         type="button"
+        data-tour="header-menu"
         aria-label="Menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -61,6 +63,7 @@ export default function HeaderActionsMenu({
               {isCoach && (
                 <button
                   type="button"
+                  data-tour="menu-coach-tools"
                   onClick={() => {
                     onOpenAdmin?.()
                     close()
@@ -148,6 +151,19 @@ export default function HeaderActionsMenu({
               >
                 <History size={16} className="text-neutral-300" />
                 <span className="flex-1 text-neutral-200 group-hover:text-white">Histórico</span>
+              </button>
+
+              <button
+                type="button"
+                data-tour="menu-tour"
+                onClick={() => {
+                  onOpenTour?.()
+                  close()
+                }}
+                className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors"
+              >
+                <Sparkles size={16} className="text-yellow-500" />
+                <span className="flex-1 text-neutral-200 group-hover:text-white">Ver tour</span>
               </button>
 
               <button

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
+import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 
 export const dynamic = 'force-dynamic'
 
@@ -353,13 +354,36 @@ export async function POST(req: Request) {
       mapByKey.set(k, row?.mapping && typeof row.mapping === 'object' ? row.mapping : null)
     }
 
-    const missingCanonicals: string[] = []
+    const missingPairs: { key: string; canonical: string }[] = []
     for (const [key, canonical] of Array.from(exerciseKeyToCanonical.entries())) {
-      if (!mapByKey.get(key)) missingCanonicals.push(canonical)
+      if (!mapByKey.get(key)) missingPairs.push({ key, canonical })
     }
 
-    const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean))).slice(0, 60)
-    const newlyMapped = refreshAi && apiKey && missingUnique.length ? await classifyExercisesWithAi(apiKey, missingUnique) : []
+    const heuristicRows = missingPairs
+      .map((it) => buildHeuristicExerciseMap(it.canonical))
+      .filter(Boolean)
+      .map((it: any) => ({
+        user_id: userId,
+        exercise_key: it.exercise_key,
+        canonical_name: it.canonical_name,
+        mapping: it.mapping,
+        confidence: it.confidence,
+        source: 'heuristic',
+      }))
+
+    if (heuristicRows.length) {
+      await admin.from('exercise_muscle_maps').upsert(heuristicRows, { onConflict: 'user_id,exercise_key' })
+      for (const row of heuristicRows) mapByKey.set(String(row.exercise_key), row.mapping)
+    }
+
+    const missingCanonicals = missingPairs
+      .filter((it) => !mapByKey.get(it.key))
+      .map((it) => it.canonical)
+
+    const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean)))
+    const mappingBatchLimit = refreshAi ? 60 : 20
+    const toMapWithAi = apiKey ? missingUnique.slice(0, mappingBatchLimit) : []
+    const newlyMapped = toMapWithAi.length ? await classifyExercisesWithAi(apiKey as string, toMapWithAi) : []
     if (newlyMapped.length) {
       const rows = newlyMapped.map((it: any) => ({
         user_id: userId,

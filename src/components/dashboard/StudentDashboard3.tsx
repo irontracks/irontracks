@@ -209,9 +209,10 @@ export default function StudentDashboard(props: Props) {
       <div style={{ minHeight: `${TABS_BAR_MIN_HEIGHT_PX}px` }}>
         <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
           <div className="bg-neutral-900/70 backdrop-blur-md border border-neutral-800/70 rounded-2xl p-1 shadow-lg shadow-black/30">
-            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 flex gap-1">
+            <div data-tour="tabs" className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 flex gap-1">
               <button
                 onClick={() => props.onChangeView('dashboard')}
+                data-tour="tab-workouts"
                 className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${
                   props.view === 'dashboard' ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30' : 'bg-transparent text-neutral-400 hover:text-white'
                 }`}
@@ -220,6 +221,7 @@ export default function StudentDashboard(props: Props) {
               </button>
               <button
                 onClick={() => props.onChangeView('assessments')}
+                data-tour="tab-assessments"
                 className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${
                   props.view === 'assessments' ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30' : 'bg-transparent text-neutral-400 hover:text-white'
                 }`}
@@ -229,6 +231,7 @@ export default function StudentDashboard(props: Props) {
               {showCommunityTab ? (
                 <button
                   onClick={() => props.onChangeView('community')}
+                  data-tour="tab-community"
                   className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${
                     props.view === 'community' ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30' : 'bg-transparent text-neutral-400 hover:text-white'
                   }`}
@@ -833,6 +836,7 @@ export default function StudentDashboard(props: Props) {
                         }
                         await runWorkoutAction(key, 'start', () => props.onStartSession(w))
                       }}
+                      data-tour="workout-start"
                       disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
                       className="relative z-30 flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg flex items-center justify-center gap-2 text-white font-bold text-sm transition-colors border border-white/10 active:scale-95 touch-manipulation disabled:opacity-60"
                     >

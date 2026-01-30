@@ -63,6 +63,8 @@ import { useUserSettings } from '@/hooks/useUserSettings'
 import WhatsNewModal from '@/components/WhatsNewModal'
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { getLatestWhatsNew } from '@/content/whatsNew'
+import GuidedTour from '@/components/onboarding/GuidedTour'
+import { getTourSteps } from '@/utils/tourSteps'
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 
@@ -249,12 +251,86 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [showAdminPanel, setShowAdminPanel] = useState(false);
     const userSettingsApi = useUserSettings(user?.id)
     const whatsNewShownRef = useRef(false)
+    const TOUR_VERSION = 1
+    const [tourOpen, setTourOpen] = useState(false)
+    const [tourBoot, setTourBoot] = useState({ loaded: false, completed: false, skipped: false, version: TOUR_VERSION })
 
     const supabase = useRef(createClient()).current;
     const router = useRouter();
     const isFetching = useRef(false);
 
     const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open';
+
+    const logTourEvent = useCallback(async (event, payload) => {
+        try {
+            if (!user?.id) return
+            const ev = String(event || '').trim()
+            if (!ev) return
+            const basePayload = payload && typeof payload === 'object' ? payload : {}
+            const enriched = {
+                ...basePayload,
+                role: String(user?.role || ''),
+                path: (() => {
+                    try { return typeof window !== 'undefined' ? String(window.location.pathname || '') : '' } catch { return '' }
+                })(),
+            }
+            await supabase.from('onboarding_events').insert({
+                user_id: user.id,
+                event: ev,
+                payload: enriched,
+            })
+        } catch {}
+    }, [supabase, user?.id, user?.role])
+
+    const upsertTourFlags = useCallback(async (patch) => {
+        try {
+            if (!user?.id) return { ok: false, error: 'missing_user' }
+            const base = patch && typeof patch === 'object' ? patch : {}
+            const payload = {
+                user_id: user.id,
+                preferences: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {},
+                tour_version: TOUR_VERSION,
+                updated_at: new Date().toISOString(),
+                ...base,
+            }
+            await supabase.from('user_settings').upsert(payload, { onConflict: 'user_id' })
+            return { ok: true }
+        } catch (e) {
+            return { ok: false, error: e?.message ?? String(e) }
+        }
+    }, [TOUR_VERSION, supabase, user?.id, userSettingsApi?.settings])
+
+    useEffect(() => {
+        if (!user?.id) return
+        let cancelled = false
+        ;(async () => {
+            try {
+                const { data } = await supabase
+                    .from('user_settings')
+                    .select('tour_version, tour_completed_at, tour_skipped_at')
+                    .eq('user_id', user.id)
+                    .maybeSingle()
+
+                if (cancelled) return
+
+                const version = Number(data?.tour_version || TOUR_VERSION)
+                const completed = !!data?.tour_completed_at
+                const skipped = !!data?.tour_skipped_at
+                setTourBoot({ loaded: true, completed, skipped, version })
+
+                const shouldOpen = !completed && !skipped
+                if (shouldOpen) {
+                    await logTourEvent('tour_started', { auto: true, version: TOUR_VERSION })
+                    setTourOpen(true)
+                }
+            } catch {
+                if (!cancelled) setTourBoot((prev) => ({ ...(prev || {}), loaded: true }))
+            }
+        })()
+        return () => {
+            cancelled = true
+        }
+    }, [TOUR_VERSION, logTourEvent, supabase, user?.id])
 
 
     useEffect(() => {
@@ -2368,6 +2444,42 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
                 <IncomingInviteModal onStartSession={handleStartSession} />
                 <InviteAcceptedModal />
+                <GuidedTour
+                    open={Boolean(tourOpen)}
+                    steps={getTourSteps({
+                        role: user?.role,
+                        hasCommunity: (userSettingsApi?.settings?.moduleCommunity !== false),
+                    })}
+                    actions={{
+                        openAdminPanel: (tab) => {
+                            try {
+                                const safe = String(tab || 'dashboard').trim() || 'dashboard'
+                                openAdminPanel(safe)
+                            } catch {}
+                        },
+                    }}
+                    onEvent={(name, payload) => {
+                        logTourEvent(name, payload)
+                    }}
+                    onComplete={async () => {
+                        setTourOpen(false)
+                        setTourBoot((prev) => ({ ...(prev || {}), completed: true, skipped: false, version: TOUR_VERSION }))
+                        await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
+                        await logTourEvent('tour_completed', { version: TOUR_VERSION })
+                    }}
+                    onSkip={async () => {
+                        setTourOpen(false)
+                        setTourBoot((prev) => ({ ...(prev || {}), completed: false, skipped: true, version: TOUR_VERSION }))
+                        await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                        await logTourEvent('tour_skipped', { version: TOUR_VERSION })
+                    }}
+                    onCancel={async () => {
+                        setTourOpen(false)
+                        setTourBoot((prev) => ({ ...(prev || {}), completed: false, skipped: true, version: TOUR_VERSION }))
+                        await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                        await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
+                    }}
+                />
 
                 {/* Header */}
                 {isHeaderVisible && (
@@ -2423,6 +2535,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 }}
                                 onOpenSchedule={() => router.push('/dashboard/schedule')}
                                 onOpenSettings={() => setSettingsOpen(true)}
+                                onOpenTour={async () => {
+                                    try {
+                                        await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
+                                    } catch {}
+                                    setTourOpen(true)
+                                }}
                                 onLogout={handleLogout}
                             />
                         </div>

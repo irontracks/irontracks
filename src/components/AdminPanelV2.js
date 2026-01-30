@@ -1754,7 +1754,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'));
 
     return (
-        <div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col overflow-hidden">
+        <div data-tour="adminpanel.root" className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col overflow-hidden">
             <div className="sticky top-0 z-50 bg-neutral-950/90 backdrop-blur-xl border-b border-neutral-800 shadow-[0_16px_40px_rgba(0,0,0,0.55)] pt-safe flex-shrink-0">
                 {debugError && (
                     <div className="bg-red-600 text-white font-bold p-4 text-center text-xs break-all mb-2 rounded-xl">
@@ -1790,7 +1790,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 						
 						<div className="flex items-center gap-2 min-w-0 mt-1 md:mt-0">
                             <div className="flex-1 min-w-0">
-                                <div className="hidden md:flex items-center gap-2 justify-end flex-wrap">
+                                <div data-tour="adminpanel.tabs" className="hidden md:flex items-center gap-2 justify-end flex-wrap">
                                     {Object.entries(TAB_LABELS).map(([key, label]) => (
                                         <button
                                             key={key}
@@ -1815,6 +1815,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 <div className="md:hidden flex items-center gap-2">
                                     <button
                                         type="button"
+                                        data-tour="adminpanel.tabs"
                                         onClick={() => setMoreTabsOpen(true)}
                                         className="flex-1 min-h-[44px] px-4 rounded-2xl bg-neutral-900/80 border border-neutral-800 flex items-center justify-between gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)] active:scale-95 transition-all duration-300"
                                     >
@@ -2007,7 +2008,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 						</div>
 						
 						{isTeacher && coachInboxItems.length > 0 && (
-							<div className="mt-6 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+							<div data-tour="adminpanel.dashboard.coachInbox" className="mt-6 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                                 <div className="flex items-center justify-between gap-3 mb-3">
                                     <div className="min-w-0">
                                         <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Coach Inbox</div>
@@ -2250,6 +2251,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <button
+                                        data-tour="adminpanel.students.create"
                                         onClick={() => setShowRegisterModal(true)}
                                         className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
                                     >
@@ -2261,13 +2263,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 <div className="relative lg:col-span-2">
                                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                                     <input
+                                        data-tour="adminpanel.students.search"
                                         value={studentQuery}
                                         onChange={(e) => setStudentQuery(e.target.value)}
                                         placeholder="Buscar aluno por nome ou email"
                                         className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl pl-10 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
                                     />
                                 </div>
-                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                <div data-tour="adminpanel.students.statusFilter" className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                                     {[
                                         { key: 'all', label: 'Todos' },
                                         { key: 'pago', label: 'Pago' },
@@ -3705,6 +3708,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         <div className="flex flex-col sm:flex-row gap-2">
                                             <button
                                                 type="button"
+                                                data-tour="adminpanel.student.workouts.history"
                                                 onClick={() => setHistoryOpen(true)}
                                                 className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
                                             >
@@ -3712,6 +3716,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             </button>
                                             <button
                                                 type="button"
+                                                data-tour="adminpanel.student.workouts.create"
                                                 onClick={() => setEditingStudentWorkout({ id: null, title: '', exercises: [] })}
                                                 className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
                                             >

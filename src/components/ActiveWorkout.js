@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, MessageSquare, Pencil, Play, Plus, Save, Sparkles, UserPlus, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, Link2, MessageSquare, Pencil, Play, Plus, Save, Sparkles, UserPlus, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { BackButton } from '@/components/ui/BackButton';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
@@ -751,86 +751,92 @@ export default function ActiveWorkout(props) {
 
     return (
       <div key={key} className="space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          <input
-            inputMode="decimal"
-            value={String(log?.weight ?? cfg?.weight ?? '')}
-            onChange={(e) => {
-              const v = e?.target?.value ?? '';
-              updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-            }}
-            placeholder="kg"
-            className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const baseWeight = String(log?.weight ?? cfg?.weight ?? '');
-              const baseRpe = String(log?.rpe ?? '').trim();
-              const nextMiniCount = Math.max(0, Math.floor(miniSets));
-              const minis = Array.from({ length: nextMiniCount }).map((_, idx) => {
-                const v = miniRepsArrRaw?.[idx];
-                const n = parseTrainingNumber(v);
-                return n != null && n > 0 ? n : null;
-              });
-              setRestPauseModal({
-                key,
-                label: modeLabel,
-                pauseSec,
-                miniSets: nextMiniCount,
-                weight: baseWeight,
-                activationReps: activation != null && activation > 0 ? activation : null,
-                minis,
-                rpe: baseRpe,
-                cfg: cfg ?? null,
-                error: '',
-              });
-            }}
-            className="bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-          >
-            <Pencil size={14} />
-            <span className="text-xs font-black">Abrir</span>
-          </button>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
-            <span className="text-xs text-neutral-400 truncate">Descanso {pauseSec || 0}s • Total: {total || 0} reps</span>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-9 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+            <input
+              inputMode="decimal"
+              value={String(log?.weight ?? cfg?.weight ?? '')}
+              onChange={(e) => {
+                const v = e?.target?.value ?? '';
+                updateLog(key, { weight: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+              }}
+              placeholder="kg"
+              className="w-20 sm:w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const baseWeight = String(log?.weight ?? cfg?.weight ?? '');
+                const baseRpe = String(log?.rpe ?? '').trim();
+                const nextMiniCount = Math.max(0, Math.floor(miniSets));
+                const minis = Array.from({ length: nextMiniCount }).map((_, idx) => {
+                  const v = miniRepsArrRaw?.[idx];
+                  const n = parseTrainingNumber(v);
+                  return n != null && n > 0 ? n : null;
+                });
+                setRestPauseModal({
+                  key,
+                  label: modeLabel,
+                  pauseSec,
+                  miniSets: nextMiniCount,
+                  weight: baseWeight,
+                  activationReps: activation != null && activation > 0 ? activation : null,
+                  minis,
+                  rpe: baseRpe,
+                  cfg: cfg ?? null,
+                  error: '',
+                });
+              }}
+              className="bg-black/30 border border-neutral-700 rounded-lg px-2 sm:px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+            >
+              <Pencil size={14} />
+              <span className="text-xs font-black hidden sm:inline">Abrir</span>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={toggleNotes}
-            className={
-              isNotesOpen || hasNotes
-                ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-            }
-          >
-            <MessageSquare size={14} />
-          </button>
-          <button
-            type="button"
-            disabled={!canDone}
-            onClick={() => {
-              const nextDone = !done;
-              updateLog(key, {
-                done: nextDone,
-                reps: String(total || ''),
-                rest_pause: { ...rp, activation_reps: activation ?? null, mini_reps: minis },
-                advanced_config: cfg ?? log?.advanced_config ?? null,
-              });
-              if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key });
-            }}
-            className={
-              canDone
-                ? done
-                  ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                  : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
-                : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
-            }
-          >
-            <Check size={16} />
-            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
-          </button>
+
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 shrink-0 whitespace-nowrap">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
+            <span className="text-xs text-neutral-400 sm:truncate">Descanso {pauseSec || 0}s • Total: {total || 0} reps</span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleNotes}
+              className={
+                isNotesOpen || hasNotes
+                  ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+              }
+            >
+              <MessageSquare size={14} />
+            </button>
+            <button
+              type="button"
+              disabled={!canDone}
+              onClick={() => {
+                const nextDone = !done;
+                updateLog(key, {
+                  done: nextDone,
+                  reps: String(total || ''),
+                  rest_pause: { ...rp, activation_reps: activation ?? null, mini_reps: minis },
+                  advanced_config: cfg ?? log?.advanced_config ?? null,
+                });
+                if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key });
+              }}
+              className={
+                canDone
+                  ? done
+                    ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                    : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700'
+                  : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
+              }
+            >
+              <Check size={16} />
+              <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+            </button>
+          </div>
         </div>
 
         {!canDone && (
@@ -1301,6 +1307,41 @@ export default function ActiveWorkout(props) {
               exerciseId={ex?.id || ex?.exercise_id || null}
               exerciseLibraryId={ex?.exercise_library_id || null}
             />
+            <button
+              type="button"
+              onClick={() => {
+                const pickWeight = () => {
+                  for (let i = 0; i < setsCount; i += 1) {
+                    const w = String(getLog(`${exIdx}-${i}`)?.weight ?? '').trim();
+                    if (w) return w;
+                  }
+                  const cfg0 = getPlanConfig(ex, 0);
+                  const planned = String(cfg0?.weight ?? '').trim();
+                  if (planned) return planned;
+                  return '';
+                };
+                const w = pickWeight();
+                if (!w) {
+                  try {
+                    window.alert('Preencha pelo menos 1 série com peso antes de linkar.');
+                  } catch {}
+                  return;
+                }
+                for (let i = 0; i < setsCount; i += 1) {
+                  const key = `${exIdx}-${i}`;
+                  const existing = getLog(key);
+                  const cfg = getPlanConfig(ex, i);
+                  updateLog(key, {
+                    weight: w,
+                    advanced_config: existing?.advanced_config ?? cfg ?? null,
+                  });
+                }
+              }}
+              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-black border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-950 active:scale-95 transition-transform"
+            >
+              <Link2 size={16} className="text-yellow-500" />
+              <span className="text-sm">Linkar pesos</span>
+            </button>
             {Array.from({ length: setsCount }).map((_, setIdx) => renderSet(ex, exIdx, setIdx))}
             <button
               type="button"
@@ -1601,6 +1642,43 @@ export default function ActiveWorkout(props) {
               {clusterModal?.error ? (
                 <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">
                   {String(clusterModal.error)}
+                </div>
+              ) : null}
+              {Array.isArray(clusterModal?.blocks) && clusterModal.blocks.length > 0 ? (
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pickWeight = () => {
+                        const blocks = Array.isArray(clusterModal?.blocks) ? clusterModal.blocks : []
+                        for (const b of blocks) {
+                          const w = String(b?.weight ?? '').trim()
+                          if (w) return w
+                        }
+                        return ''
+                      }
+                      const w = pickWeight()
+                      if (!w) {
+                        try {
+                          window.alert('Preencha pelo menos 1 bloco com peso antes de linkar.')
+                        } catch {}
+                        return
+                      }
+                      setClusterModal((prev) => {
+                        if (!prev || typeof prev !== 'object') return prev
+                        const blocks = Array.isArray(prev.blocks) ? prev.blocks : []
+                        const nextBlocks = blocks.map((b) => {
+                          const cur = b && typeof b === 'object' ? b : {}
+                          return { ...cur, weight: w }
+                        })
+                        return { ...prev, blocks: nextBlocks, error: '' }
+                      })
+                    }}
+                    className="min-h-[36px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 inline-flex items-center gap-2"
+                  >
+                    <Link2 size={14} className="text-yellow-500" />
+                    Linkar pesos
+                  </button>
                 </div>
               ) : null}
               {Array.isArray(clusterModal?.blocks) && clusterModal.blocks.length === 0 ? (
@@ -2062,22 +2140,57 @@ export default function ActiveWorkout(props) {
 
               <div className="flex items-center justify-between gap-2">
                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Etapas</div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDropSetModal((prev) => {
-                      if (!prev || typeof prev !== 'object') return prev
-                      const list = Array.isArray(prev.stages) ? [...prev.stages] : []
-                      if (list.length >= 20) return prev
-                      list.push({ weight: '', reps: null })
-                      return { ...prev, stages: list, error: '' }
-                    })
-                  }}
-                  className="min-h-[36px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 inline-flex items-center gap-2"
-                >
-                  <Plus size={14} />
-                  Adicionar
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pickWeight = () => {
+                        const stages = Array.isArray(dropSetModal?.stages) ? dropSetModal.stages : []
+                        for (const st of stages) {
+                          const w = String(st?.weight ?? '').trim()
+                          if (w) return w
+                        }
+                        return ''
+                      }
+                      const w = pickWeight()
+                      if (!w) {
+                        try {
+                          window.alert('Preencha pelo menos 1 etapa com peso antes de linkar.')
+                        } catch {}
+                        return
+                      }
+                      setDropSetModal((prev) => {
+                        if (!prev || typeof prev !== 'object') return prev
+                        const stages = Array.isArray(prev.stages) ? prev.stages : []
+                        const nextStages = stages.map((st) => {
+                          const cur = st && typeof st === 'object' ? st : {}
+                          return { ...cur, weight: w }
+                        })
+                        return { ...prev, stages: nextStages, error: '' }
+                      })
+                    }}
+                    className="min-h-[36px] px-3 py-2 rounded-xl bg-black border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-950 inline-flex items-center gap-2"
+                  >
+                    <Link2 size={14} className="text-yellow-500" />
+                    Linkar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDropSetModal((prev) => {
+                        if (!prev || typeof prev !== 'object') return prev
+                        const list = Array.isArray(prev.stages) ? [...prev.stages] : []
+                        if (list.length >= 20) return prev
+                        list.push({ weight: '', reps: null })
+                        return { ...prev, stages: list, error: '' }
+                      })
+                    }}
+                    className="min-h-[36px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 inline-flex items-center gap-2"
+                  >
+                    <Plus size={14} />
+                    Adicionar
+                  </button>
+                </div>
               </div>
 
               {Array.isArray(dropSetModal?.stages) &&

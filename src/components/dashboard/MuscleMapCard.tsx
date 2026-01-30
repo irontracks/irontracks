@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
-import { getMuscleMapWeek } from '@/actions/workout-actions'
+import { backfillExerciseMuscleMaps, getMuscleMapWeek } from '@/actions/workout-actions'
 import { motion, AnimatePresence } from 'framer-motion'
 
 type ApiMuscle = {
@@ -63,6 +63,7 @@ export default function MuscleMapCard(props: Props) {
   const [view, setView] = useState<'front' | 'back'>('front')
   const [selected, setSelected] = useState<MuscleId | null>(null)
   const [expanded, setExpanded] = useState(true)
+  const [backfill, setBackfill] = useState<{ status: 'idle' | 'loading' | 'error'; error: string }>({ status: 'idle', error: '' })
   const [state, setState] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; data: ApiPayload | null; error: string }>({
     status: 'idle',
     data: null,
@@ -160,9 +161,33 @@ export default function MuscleMapCard(props: Props) {
     props.onOpenWizard?.()
   }
 
+  const runBackfill = useCallback(async () => {
+    if (backfill.status === 'loading') return
+    setBackfill({ status: 'loading', error: '' })
+    const res = await backfillExerciseMuscleMaps({ days: 365, maxAi: 240 })
+    if (!res?.ok) {
+      const msg = String(res?.error || 'Falha ao reprocessar histórico')
+      setBackfill({ status: 'error', error: msg })
+      try { window.alert(msg) } catch {}
+      return
+    }
+    setBackfill({ status: 'idle', error: '' })
+    try {
+      window.alert(
+        `Reprocessamento concluído.\n` +
+          `Exercícios únicos: ${Number(res?.uniqueExercises || 0).toLocaleString('pt-BR')}\n` +
+          `Mapeados (heurística): ${Number(res?.heuristicMapped || 0).toLocaleString('pt-BR')}\n` +
+          `Mapeados (IA): ${Number(res?.aiMapped || 0).toLocaleString('pt-BR')}\n` +
+          `Ainda sem mapa: ${Number((res?.remainingUnmapped || []).length || 0).toLocaleString('pt-BR')}`
+      )
+    } catch {}
+    await load({ refreshCache: true, refreshAi: false })
+  }, [backfill.status, load])
+
   return (
     <div className="bg-neutral-900/70 border border-neutral-800 rounded-2xl shadow-lg shadow-black/30 overflow-hidden">
       <div
+        data-tour="muscle-map"
         className="p-4 cursor-pointer select-none"
         role="button"
         tabIndex={0}
@@ -277,6 +302,18 @@ export default function MuscleMapCard(props: Props) {
                 >
                   {state.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                   Gerar com IA
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    runBackfill()
+                  }}
+                  disabled={state.status === 'loading' || backfill.status === 'loading'}
+                  className="min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-60 inline-flex items-center gap-2"
+                >
+                  {backfill.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
+                  Histórico
                 </button>
                 <button
                   type="button"

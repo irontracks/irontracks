@@ -232,6 +232,22 @@ export async function getMuscleMapWeek(input) {
   }
 }
 
+export async function backfillExerciseMuscleMaps(input) {
+  try {
+    const body = input && typeof input === 'object' ? input : {}
+    const res = await fetch('/api/ai/exercise-muscle-map-backfill', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const json = await res.json().catch(() => null)
+    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao reprocessar histórico' }
+    return json
+  } catch (e) {
+    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+  }
+}
+
 export async function applyProgressionToNextTemplate(input) {
   try {
     const body = input && typeof input === 'object' ? input : {}

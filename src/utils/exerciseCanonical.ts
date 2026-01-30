@@ -39,6 +39,16 @@ const ALIASES: Record<string, string> = {
   'desenvolvimento militar': 'Desenvolvimento',
   'facepull': 'Face pull',
   'face pull': 'Face pull',
+  'panturrilha sentada': 'Elevação de panturrilha sentada',
+  'panturrilha sentado': 'Elevação de panturrilha sentada',
+  'elevacao de panturrilha sentada': 'Elevação de panturrilha sentada',
+  'elevacao panturrilha sentada': 'Elevação de panturrilha sentada',
+  'soleo sentado': 'Elevação de panturrilha sentada',
+  'seated calf raise': 'Elevação de panturrilha sentada',
+  'calf raise': 'Elevação de panturrilha',
+  'standing calf raise': 'Elevação de panturrilha em pé',
+  'panturrilha no leg press': 'Elevação de panturrilha no leg press',
+  'calf press': 'Elevação de panturrilha no leg press',
 }
 
 export type CanonicalExerciseResult = {
@@ -60,4 +70,3 @@ export const resolveCanonicalExerciseName = (input: string): CanonicalExerciseRe
   const changed = canonicalRaw ? canonical !== original : false
   return { original, normalized, canonical, changed, source: canonicalRaw ? 'alias' : 'none' }
 }
-
