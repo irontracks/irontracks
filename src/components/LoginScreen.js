@@ -26,12 +26,6 @@ const LoginScreen = () => {
         try {
             const href = getLoginHref();
             window.location.assign(href);
-            setTimeout(() => {
-                try {
-                    setIsLoading(false);
-                    setErrorMsg('Não foi possível iniciar o login. Tente novamente.');
-                } catch {}
-            }, 2500);
             return
         } catch (error) {
             console.error("Login Error:", error);

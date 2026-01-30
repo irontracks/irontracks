@@ -11,20 +11,6 @@ export async function updateSession(request: NextRequest) {
     return response
   }
 
-  const hasAuthCookie = (() => {
-    try {
-      const cookies = request.cookies.getAll()
-      return cookies.some((c) => {
-        const name = String(c?.name || '')
-        if (!name) return false
-        return name.startsWith('sb-') || name.includes('supabase')
-      })
-    } catch {
-      return false
-    }
-  })()
-  if (!hasAuthCookie) return response
-
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookieOptions: getSupabaseCookieOptions(),
     cookies: {
