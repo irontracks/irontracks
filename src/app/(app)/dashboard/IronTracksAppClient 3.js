@@ -69,6 +69,7 @@ import { cacheGetWorkouts, cacheSetWorkouts, flushOfflineQueue, getOfflineQueueS
 import OfflineSyncModal from '@/components/OfflineSyncModal'
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
+const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
 
 const appId = 'irontracks-production';
 
@@ -227,6 +228,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [whatsNewOpen, setWhatsNewOpen] = useState(false)
     const [isCoach, setIsCoach] = useState(false);
+    const initialRole = String(initialProfile?.role || '').toLowerCase()
+    const [vipAccess, setVipAccess] = useState(() => ({
+        loaded: initialRole === 'admin' || initialRole === 'teacher',
+        hasVip: initialRole === 'admin' || initialRole === 'teacher',
+    }))
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
     const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
     const [exportWorkout, setExportWorkout] = useState(null);
@@ -1336,6 +1342,27 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         const role = String(initialProfile?.role || '').toLowerCase()
         setIsCoach(role === 'teacher' || role === 'admin')
     }, [initialUser, initialProfile])
+
+    useEffect(() => {
+        const uid = user?.id ? String(user.id) : ''
+        if (!uid) return
+        let cancelled = false
+        ;(async () => {
+            try {
+                const res = await fetch('/api/vip/access', { method: 'GET', credentials: 'include', cache: 'no-store' })
+                const json = await res.json().catch(() => null)
+                if (cancelled) return
+                if (json && json.ok) {
+                    setVipAccess({ loaded: true, hasVip: !!json.hasVip })
+                    return
+                }
+                setVipAccess((prev) => ({ loaded: true, hasVip: !!prev?.hasVip }))
+            } catch {
+                if (!cancelled) setVipAccess((prev) => ({ loaded: true, hasVip: !!prev?.hasVip }))
+            }
+        })()
+        return () => { cancelled = true }
+    }, [user?.id])
 
     useEffect(() => {
         try {
@@ -2808,15 +2835,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                         paddingTop: isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : undefined,
                     }}
                 >
-                    {(view === 'dashboard' || view === 'assessments' || view === 'community') && (
+                    {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
                         <StudentDashboard
                             workouts={Array.isArray(workouts) ? workouts : []}
                             profileIncomplete={Boolean(profileIncomplete)}
                             onOpenCompleteProfile={() => setShowCompleteProfile(true)}
-                            view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : 'dashboard'}
+                            view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
                             onChangeView={(next) => setView(next)}
                             assessmentsContent={(user?.id || initialUser?.id) ? <AssessmentHistory studentId={user?.id || initialUser?.id} /> : null}
                             communityContent={(user?.id || initialUser?.id) ? <CommunityClient embedded /> : null}
+                            vipContent={<VipHub user={user} locked={!vipAccess?.hasVip} onOpenWorkoutEditor={(w) => handleEditWorkout(w)} onOpenVipTab={() => setView('vip')} />}
+                            vipLabel="VIP"
+                            vipLocked={!vipAccess?.hasVip}
+                            vipEnabled={true}
                             settings={userSettingsApi?.settings ?? null}
                             onCreateWorkout={handleCreateWorkout}
                             onQuickView={(w) => setQuickViewWorkout(w)}

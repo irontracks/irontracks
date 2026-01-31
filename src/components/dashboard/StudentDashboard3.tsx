@@ -28,10 +28,14 @@ type Props = {
   workouts: DashboardWorkout[]
   profileIncomplete: boolean
   onOpenCompleteProfile: () => void
-  view: 'dashboard' | 'assessments' | 'community'
-  onChangeView: (next: 'dashboard' | 'assessments' | 'community') => void
+  view: 'dashboard' | 'assessments' | 'community' | 'vip'
+  onChangeView: (next: 'dashboard' | 'assessments' | 'community' | 'vip') => void
   assessmentsContent?: React.ReactNode
   communityContent?: React.ReactNode
+  vipContent?: React.ReactNode
+  vipLabel?: string
+  vipLocked?: boolean
+  vipEnabled?: boolean
   settings?: {
     dashboardDensity?: 'compact' | 'comfortable'
     uiMode?: string
@@ -189,6 +193,9 @@ export default function StudentDashboard(props: Props) {
   }, [checkinsOpen, checkinsRange, props.currentUserId])
 
   const showCommunityTab = !!props.communityContent
+  const showVipTab = props.vipEnabled !== false
+  const vipLocked = !!props.vipLocked
+  const vipLabel = String(props.vipLabel || 'VIP')
 
   return (
     <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
@@ -239,6 +246,17 @@ export default function StudentDashboard(props: Props) {
                   Comunidade
                 </button>
               ) : null}
+              {showVipTab ? (
+                <button
+                  onClick={() => props.onChangeView('vip')}
+                  data-tour="tab-vip"
+                  className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${
+                    props.view === 'vip' ? 'bg-neutral-900 text-yellow-500 border border-yellow-500/30' : 'bg-transparent text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  {vipLabel}{vipLocked ? ' 🔒' : ''}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -246,6 +264,7 @@ export default function StudentDashboard(props: Props) {
 
       {props.view === 'assessments' ? <div className="pt-2">{props.assessmentsContent ?? null}</div> : null}
       {props.view === 'community' ? <div className="pt-2">{props.communityContent ?? null}</div> : null}
+      {props.view === 'vip' ? <div className="pt-2">{props.vipContent ?? null}</div> : null}
 
       {props.view === 'dashboard' && (
         <>
