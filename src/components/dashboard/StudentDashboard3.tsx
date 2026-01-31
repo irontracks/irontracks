@@ -575,7 +575,9 @@ export default function StudentDashboard(props: Props) {
             </div>
           )}
 
-          {showNewRecordsCard ? <RecentAchievements userId={props.currentUserId} /> : null}
+          {showNewRecordsCard ? (
+            <RecentAchievements userId={props.currentUserId} badges={props.streakStats?.badges ?? []} showBadges={showBadges} />
+          ) : null}
 
           {(showIronRank || showBadges) && (
             <BadgesGallery
@@ -584,7 +586,7 @@ export default function StudentDashboard(props: Props) {
               totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
               currentUserId={props.currentUserId}
               showIronRank={showIronRank}
-              showBadges={showBadges}
+              showBadges={!showNewRecordsCard && showBadges}
             />
           )}
 

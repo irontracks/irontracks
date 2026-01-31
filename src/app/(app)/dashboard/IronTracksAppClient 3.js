@@ -65,6 +65,8 @@ import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { getLatestWhatsNew } from '@/content/whatsNew'
 import GuidedTour from '@/components/onboarding/GuidedTour'
 import { getTourSteps } from '@/utils/tourSteps'
+import { cacheGetWorkouts, cacheSetWorkouts, flushOfflineQueue, getOfflineQueueSummary, getPendingCount, isOnline } from '@/lib/offline/offlineSync'
+import OfflineSyncModal from '@/components/OfflineSyncModal'
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 
@@ -254,12 +256,172 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const TOUR_VERSION = 1
     const [tourOpen, setTourOpen] = useState(false)
     const [tourBoot, setTourBoot] = useState({ loaded: false, completed: false, skipped: false, version: TOUR_VERSION })
+    const [syncState, setSyncState] = useState({ online: true, syncing: false, pending: 0 })
+    const [offlineSyncOpen, setOfflineSyncOpen] = useState(false)
+
+    // Local fallback to guarantee the tour doesn't re-open when DB upsert fails/offline.
+    // Stored per-user AND per-tour-version.
+    const getTourLocalKey = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        return safeUid ? `irontracks.onboarding.tour.v${TOUR_VERSION}.dismissed.${safeUid}` : ''
+    }, [TOUR_VERSION])
+    const getTourAutoOpenedKey = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        return safeUid ? `irontracks.onboarding.tour.v${TOUR_VERSION}.autoOpened.${safeUid}` : ''
+    }, [TOUR_VERSION])
+    const getTourSeenKey = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        return safeUid ? `irontracks.onboarding.tour.v${TOUR_VERSION}.seen.${safeUid}` : ''
+    }, [TOUR_VERSION])
+    const readLocalTourDismissal = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        if (!safeUid) return null
+        try {
+            if (typeof window === 'undefined') return null
+            const key = getTourLocalKey(safeUid)
+            if (!key) return null
+            const raw = window.localStorage.getItem(key) || ''
+            if (!raw) return null
+            const parsed = JSON.parse(raw)
+            if (!parsed || typeof parsed !== 'object') return null
+            const version = Number(parsed?.version || 0) || 0
+            if (version !== TOUR_VERSION) return null
+            const status = String(parsed?.status || '')
+            if (status !== 'completed' && status !== 'skipped') return null
+            return { version, status, at: Number(parsed?.at || 0) || 0 }
+        } catch {
+            return null
+        }
+    }, [TOUR_VERSION, getTourLocalKey])
+    const writeLocalTourDismissal = useCallback((uid, status) => {
+        const safeUid = uid ? String(uid) : ''
+        if (!safeUid) return
+        const safeStatus = status === 'completed' ? 'completed' : 'skipped'
+        try {
+            if (typeof window === 'undefined') return
+            const key = getTourLocalKey(safeUid)
+            if (!key) return
+            window.localStorage.setItem(key, JSON.stringify({ version: TOUR_VERSION, status: safeStatus, at: Date.now() }))
+        } catch {}
+    }, [TOUR_VERSION, getTourLocalKey])
+    const wasTourSeenEver = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        if (!safeUid) return false
+        try {
+            if (typeof window === 'undefined') return false
+            const key = getTourSeenKey(safeUid)
+            if (!key) return false
+            return (window.localStorage.getItem(key) || '') === '1'
+        } catch {
+            return false
+        }
+    }, [getTourSeenKey])
+    const markTourSeenEver = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        if (!safeUid) return
+        try {
+            if (typeof window === 'undefined') return
+            const key = getTourSeenKey(safeUid)
+            if (!key) return
+            window.localStorage.setItem(key, '1')
+        } catch {}
+    }, [getTourSeenKey])
+    const wasTourAutoOpenedThisSession = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        if (!safeUid) return false
+        try {
+            if (typeof window === 'undefined') return false
+            const key = getTourAutoOpenedKey(safeUid)
+            if (!key) return false
+            return (window.sessionStorage.getItem(key) || '') === '1'
+        } catch {
+            return false
+        }
+    }, [getTourAutoOpenedKey])
+    const markTourAutoOpenedThisSession = useCallback((uid) => {
+        const safeUid = uid ? String(uid) : ''
+        if (!safeUid) return
+        try {
+            if (typeof window === 'undefined') return
+            const key = getTourAutoOpenedKey(safeUid)
+            if (!key) return
+            window.sessionStorage.setItem(key, '1')
+        } catch {}
+    }, [getTourAutoOpenedKey])
 
     const supabase = useRef(createClient()).current;
     const router = useRouter();
     const isFetching = useRef(false);
 
     const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open';
+
+    const refreshSyncState = useCallback(async () => {
+        try {
+            const online = isOnline()
+            const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+            const offlineSyncV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true
+            if (offlineSyncV2Enabled) {
+                const sum = await getOfflineQueueSummary({ userId: user?.id })
+                if (sum?.ok) {
+                    setSyncState((prev) => ({
+                        ...(prev || {}),
+                        online: sum.online !== false,
+                        pending: Number(sum.pending || 0),
+                        failed: Number(sum.failed || 0),
+                        due: Number(sum.due || 0),
+                    }))
+                    return
+                }
+            }
+            const pending = await getPendingCount(user?.id)
+            setSyncState((prev) => ({ ...(prev || {}), online, pending, failed: 0, due: 0 }))
+        } catch {
+            setSyncState((prev) => ({ ...(prev || {}), online: isOnline() }))
+        }
+    }, [user?.id, userSettingsApi?.settings])
+
+    const runFlushQueue = useCallback(async () => {
+        try {
+            if (!isOnline()) {
+                setSyncState((prev) => ({ ...(prev || {}), online: false }))
+                return
+            }
+            setSyncState((prev) => ({ ...(prev || {}), syncing: true, online: true }))
+            await flushOfflineQueue({ max: 8 })
+        } finally {
+            setSyncState((prev) => ({ ...(prev || {}), syncing: false }))
+            await refreshSyncState()
+        }
+    }, [refreshSyncState])
+
+    useEffect(() => {
+        refreshSyncState()
+        const onChanged = () => refreshSyncState()
+        const onOnline = () => runFlushQueue()
+        const onOffline = () => refreshSyncState()
+        try {
+            window.addEventListener('irontracks.offlineQueueChanged', onChanged)
+            window.addEventListener('online', onOnline)
+            window.addEventListener('offline', onOffline)
+        } catch {}
+        return () => {
+            try {
+                window.removeEventListener('irontracks.offlineQueueChanged', onChanged)
+                window.removeEventListener('online', onOnline)
+                window.removeEventListener('offline', onOffline)
+            } catch {}
+        }
+    }, [refreshSyncState, runFlushQueue])
+
+    useEffect(() => {
+        if (!user?.id) return
+        if (!isOnline()) return
+        if ((syncState?.pending || 0) <= 0) return
+        const t = setInterval(() => {
+            runFlushQueue()
+        }, 15000)
+        return () => clearInterval(t)
+    }, [runFlushQueue, syncState?.pending, user?.id])
 
     const logTourEvent = useCallback(async (event, payload) => {
         try {
@@ -305,6 +467,16 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         let cancelled = false
         ;(async () => {
             try {
+                const uid = String(user.id)
+                const localDismissal = readLocalTourDismissal(uid)
+                if (localDismissal) {
+                    // Defensive: if the user already dismissed locally (offline, blocked RLS, etc.), never auto-open again.
+                    const completed = localDismissal.status === 'completed'
+                    const skipped = localDismissal.status === 'skipped'
+                    setTourBoot({ loaded: true, completed, skipped, version: TOUR_VERSION })
+                    return
+                }
+
                 const { data } = await supabase
                     .from('user_settings')
                     .select('tour_version, tour_completed_at, tour_skipped_at')
@@ -313,13 +485,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 
                 if (cancelled) return
 
-                const version = Number(data?.tour_version || TOUR_VERSION)
-                const completed = !!data?.tour_completed_at
-                const skipped = !!data?.tour_skipped_at
-                setTourBoot({ loaded: true, completed, skipped, version })
+                const dbVersion = Number(data?.tour_version || 0) || 0
+                // Only force a new auto-open when the DB explicitly says an older version was seen.
+                // If dbVersion is missing/0 but completed_at exists, we respect completed/skipped to avoid annoying loops.
+                const needsNewVersion = dbVersion > 0 && dbVersion < TOUR_VERSION
+                const completed = needsNewVersion ? false : !!data?.tour_completed_at
+                const skipped = needsNewVersion ? false : !!data?.tour_skipped_at
+                setTourBoot({ loaded: true, completed, skipped, version: dbVersion || TOUR_VERSION })
 
-                const shouldOpen = !completed && !skipped
+                const shouldOpen = !wasTourSeenEver(uid) && !wasTourAutoOpenedThisSession(uid) && (!completed && !skipped)
                 if (shouldOpen) {
+                    markTourAutoOpenedThisSession(uid)
+                    markTourSeenEver(uid)
                     await logTourEvent('tour_started', { auto: true, version: TOUR_VERSION })
                     setTourOpen(true)
                 }
@@ -330,7 +507,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         return () => {
             cancelled = true
         }
-    }, [TOUR_VERSION, logTourEvent, supabase, user?.id])
+    }, [TOUR_VERSION, logTourEvent, markTourAutoOpenedThisSession, markTourSeenEver, readLocalTourDismissal, supabase, user?.id, wasTourAutoOpenedThisSession, wasTourSeenEver])
 
 
     useEffect(() => {
@@ -1310,6 +1487,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 return;
             }
 
+            if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                try {
+                    const cached = await cacheGetWorkouts({ userId: currentUser?.id })
+                    if (cached?.workouts && Array.isArray(cached.workouts) && cached.workouts.length) {
+                        setWorkouts(cached.workouts)
+                        const totalEx = cached.workouts.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0)
+                        setStats({ workouts: cached.workouts.length, exercises: totalEx, activeStreak: 0 })
+                    }
+                } catch {}
+                return
+            }
+
             const role = currentUser.role || 'user';
 
             let data = []
@@ -1506,6 +1695,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     return (a.title || '').localeCompare(b.title || '')
                 });
 
+                try {
+                    await cacheSetWorkouts({ userId: currentUser?.id, workouts: mapped })
+                } catch {}
+
                 if (role === 'admin' || role === 'teacher') {
                     setWorkouts(mapped)
                     try {
@@ -1577,6 +1770,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 			const msg = e?.message ?? String(e);
 			if (msg.includes('Failed to fetch') || msg.includes('ERR_ABORTED')) {
 				// Dev HMR aborts or transient network; ignore quietly
+                try {
+                    const cached = await cacheGetWorkouts({ userId: specificUser?.id })
+                    if (cached?.workouts && Array.isArray(cached.workouts) && cached.workouts.length) {
+                        setWorkouts(cached.workouts)
+                        const totalEx = cached.workouts.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0)
+                        setStats({ workouts: cached.workouts.length, exercises: totalEx, activeStreak: 0 })
+                    }
+                } catch {}
 				return;
 			}
 			console.error("Erro ao buscar:", { message: msg, error: e });
@@ -2440,7 +2641,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             }}
         >
         <InAppNotifyBinder bind={bindInAppNotify} />
-        <TeamWorkoutProvider user={user} settings={userSettingsApi?.settings ?? null}>
+        <TeamWorkoutProvider user={user} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
             <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
                 <IncomingInviteModal onStartSession={handleStartSession} />
                 <InviteAcceptedModal />
@@ -2464,19 +2665,31 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     onComplete={async () => {
                         setTourOpen(false)
                         setTourBoot((prev) => ({ ...(prev || {}), completed: true, skipped: false, version: TOUR_VERSION }))
-                        await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
+                        try { writeLocalTourDismissal(user?.id, 'completed') } catch {}
+                        const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
+                        if (!res?.ok) {
+                            console.warn('Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
+                        }
                         await logTourEvent('tour_completed', { version: TOUR_VERSION })
                     }}
                     onSkip={async () => {
                         setTourOpen(false)
                         setTourBoot((prev) => ({ ...(prev || {}), completed: false, skipped: true, version: TOUR_VERSION }))
-                        await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                        try { writeLocalTourDismissal(user?.id, 'skipped') } catch {}
+                        const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                        if (!res?.ok) {
+                            console.warn('Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
+                        }
                         await logTourEvent('tour_skipped', { version: TOUR_VERSION })
                     }}
                     onCancel={async () => {
                         setTourOpen(false)
                         setTourBoot((prev) => ({ ...(prev || {}), completed: false, skipped: true, version: TOUR_VERSION }))
-                        await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                        try { writeLocalTourDismissal(user?.id, 'skipped') } catch {}
+                        const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                        if (!res?.ok) {
+                            console.warn('Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
+                        }
                         await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
                     }}
                 />
@@ -2501,6 +2714,40 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                         </div>
                         
                         <div className="flex items-center gap-4">
+                                {(() => {
+                                    const pending = Number(syncState?.pending || 0)
+                                    const failed = Number(syncState?.failed || 0)
+                                    const online = syncState?.online !== false
+                                    const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+                                    const offlineSyncV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true
+                                    if (!online) {
+                                        return (
+                                            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-black uppercase tracking-widest">
+                                                Offline
+                                            </div>
+                                        )
+                                    }
+                                    if (offlineSyncV2Enabled && (pending > 0 || failed > 0)) {
+                                        return (
+                                            <button
+                                                type="button"
+                                                onClick={() => setOfflineSyncOpen(true)}
+                                                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest hover:bg-yellow-500/15"
+                                                title="Abrir central de pendências"
+                                            >
+                                                {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}{failed > 0 ? ` • Falhas: ${failed}` : ''}
+                                            </button>
+                                        )
+                                    }
+                                    if (pending > 0) {
+                                        return (
+                                            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest">
+                                                {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}
+                                            </div>
+                                        )
+                                    }
+                                    return null
+                                })()}
                                 <HeaderActionsMenu
                                 user={user}
                                 isCoach={isCoach}
@@ -2732,6 +2979,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     {view === 'history' && (
                         <HistoryList
                             user={user}
+                            settings={userSettingsApi?.settings ?? null}
                             onViewReport={(s) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
                             onBack={() => setView('dashboard')}
                         />
@@ -2745,6 +2993,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 session={reportData.current}
                                 previousSession={reportData.previous}
                                 user={user}
+                                settings={userSettingsApi?.settings ?? null}
                                 onClose={() => setView(reportBackView || 'dashboard')}
                             />
                         </div>
@@ -3241,6 +3490,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                         isOpen={settingsOpen}
                         onClose={() => setSettingsOpen(false)}
                         settings={userSettingsApi?.settings ?? null}
+                        userRole={user?.role || ''}
                         saving={Boolean(userSettingsApi?.saving)}
                         onOpenWhatsNew={() => {
                             setSettingsOpen(false)
@@ -3262,6 +3512,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                         }}
                     />
                 )}
+
+                <OfflineSyncModal
+                    open={offlineSyncOpen}
+                    onClose={() => setOfflineSyncOpen(false)}
+                    userId={user?.id}
+                />
             </div>
         </TeamWorkoutProvider>
         </InAppNotificationsProvider>

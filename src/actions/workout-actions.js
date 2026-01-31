@@ -501,8 +501,15 @@ export async function generatePeriodReportInsights(input) {
     const totalVolumeKg = Number(stats.totalVolumeKg) || 0
     const avgVolumeKg = Number(stats.avgVolumeKg) || 0
     const days = Number(stats.days) || 0
+    const uniqueDaysCount = Number(stats?.uniqueDaysCount) || 0
 
     const label = type === 'week' ? 'semanal' : type === 'month' ? 'mensal' : `de ${days} dias`
+    const cadenceLabel = type === 'week' ? 'na semana' : type === 'month' ? 'no mês' : 'no período'
+
+    const topByVolume = (Array.isArray(stats?.topExercisesByVolume) ? stats.topExercisesByVolume : []).slice(0, 3)
+    const topByFreq = (Array.isArray(stats?.topExercisesByFrequency) ? stats.topExercisesByFrequency : []).slice(0, 3)
+    const topVolumeName = safeString(topByVolume?.[0]?.name)
+    const topFreqName = safeString(topByFreq?.[0]?.name)
 
     const ai = {
       title: `Resumo ${label}`,
@@ -511,10 +518,27 @@ export async function generatePeriodReportInsights(input) {
         `${totalMinutes} min no total (${avgMinutes} min/treino)`,
         `${totalVolumeKg.toLocaleString('pt-BR')}kg de volume (${avgVolumeKg.toLocaleString('pt-BR')}kg/treino)`,
       ],
-      highlights: (Array.isArray(stats?.topExercisesByVolume) ? stats.topExercisesByVolume : [])
-        .slice(0, 3)
-        .map((x) => `${safeString(x?.name) || 'Exercício'}: ${Number(x?.volumeKg || 0).toLocaleString('pt-BR')}kg`),
+      highlights: topByVolume.map((x) => `${safeString(x?.name) || 'Exercício'}: ${Number(x?.volumeKg || 0).toLocaleString('pt-BR')}kg`),
+      focus: [
+        uniqueDaysCount ? `Consistência: ${uniqueDaysCount} dia(s) treinados ${cadenceLabel}.` : '',
+        topFreqName ? `Exercício mais frequente: ${topFreqName}.` : '',
+      ].filter(Boolean),
+      nextSteps: [
+        count <= 1 ? `Meta rápida: faça 2–3 treinos ${cadenceLabel} para retomar consistência.` : '',
+        topVolumeName ? `Progressão: tente +1 rep ou +2,5kg no ${topVolumeName} na próxima sessão.` : '',
+        avgMinutes && avgMinutes < 35 ? 'Duração curta: priorize básicos e reduza trocas de exercício.' : '',
+      ].filter(Boolean),
       warnings: [],
+    }
+
+    if (count === 0) {
+      ai.warnings.push('Sem treinos registrados no período. Ajuste a meta para algo realista e comece pequeno.')
+    }
+    if (avgMinutes >= 95) {
+      ai.warnings.push('Sessões longas: considere reduzir volume por treino para manter qualidade e recuperação.')
+    }
+    if (uniqueDaysCount && count / Math.max(1, uniqueDaysCount) > 2.5) {
+      ai.warnings.push('Muitos treinos no mesmo dia: cuide do sono e do descanso entre sessões.')
     }
 
     return { ok: true, ai }

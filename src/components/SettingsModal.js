@@ -32,6 +32,11 @@ export default function SettingsModal(props) {
   const whatsNewRemind24h = Boolean(draft?.whatsNewRemind24h ?? true)
   const enableSounds = Boolean(draft?.enableSounds ?? true)
   const allowTeamInvites = Boolean(draft?.allowTeamInvites ?? true)
+  const featuresKillSwitch = Boolean(draft?.featuresKillSwitch ?? false)
+  const featureTeamworkV2 = Boolean(draft?.featureTeamworkV2 ?? false)
+  const featureStoriesV2 = Boolean(draft?.featureStoriesV2 ?? false)
+  const featureWeeklyReportCTA = Boolean(draft?.featureWeeklyReportCTA ?? false)
+  const featureOfflineSyncV2 = Boolean(draft?.featureOfflineSyncV2 ?? false)
   const allowDirectMessages = Boolean(draft?.allowDirectMessages ?? true)
   const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
   const notifyAppointments = Boolean(draft?.notifyAppointments ?? true)
@@ -52,6 +57,8 @@ export default function SettingsModal(props) {
   const moduleMarketplace = Boolean(draft?.moduleMarketplace ?? true)
   const promptPreWorkoutCheckin = Boolean(draft?.promptPreWorkoutCheckin ?? true)
   const promptPostWorkoutCheckin = Boolean(draft?.promptPostWorkoutCheckin ?? true)
+  const userRole = String(props?.userRole || '')
+  const canSeeExperimental = userRole === 'admin' || userRole === 'teacher'
 
   const canSave = isOpen && !saving
 
@@ -465,6 +472,106 @@ export default function SettingsModal(props) {
                   {allowTeamInvites ? 'Ativo' : 'Bloqueado'}
                 </button>
               </div>
+
+              {canSeeExperimental ? (
+                <div className="mt-4 rounded-xl border border-neutral-700 bg-neutral-900/40 p-4">
+                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Experimentais</div>
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-white">Kill Switch</div>
+                      <div className="text-xs text-neutral-400">Desativa recursos em teste neste usuário.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setValue('featuresKillSwitch', !featuresKillSwitch)}
+                      className={
+                        !featuresKillSwitch
+                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-red-500/30 text-red-200 font-black'
+                      }
+                    >
+                      {featuresKillSwitch ? 'Ativo' : 'Desligado'}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-white">Treino em Equipe V2</div>
+                      <div className="text-xs text-neutral-400">Link/QR, presença e saída segura da sessão.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setValue('featureTeamworkV2', !featureTeamworkV2)}
+                      disabled={featuresKillSwitch}
+                      className={
+                        featureTeamworkV2 && !featuresKillSwitch
+                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
+                      }
+                    >
+                      {featureTeamworkV2 ? 'Ativo' : 'Desligado'}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-white">Stories/Relatórios V2</div>
+                      <div className="text-xs text-neutral-400">CTA pós-treino e melhorias de compartilhamento.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setValue('featureStoriesV2', !featureStoriesV2)}
+                      disabled={featuresKillSwitch}
+                      className={
+                        featureStoriesV2 && !featuresKillSwitch
+                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
+                      }
+                    >
+                      {featureStoriesV2 ? 'Ativo' : 'Desligado'}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-white">CTA Relatório Semanal</div>
+                      <div className="text-xs text-neutral-400">Atalho para relatório semanal no Histórico.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setValue('featureWeeklyReportCTA', !featureWeeklyReportCTA)}
+                      disabled={featuresKillSwitch}
+                      className={
+                        featureWeeklyReportCTA && !featuresKillSwitch
+                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
+                      }
+                    >
+                      {featureWeeklyReportCTA ? 'Ativo' : 'Desligado'}
+                    </button>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-white">Offline Sync V2</div>
+                      <div className="text-xs text-neutral-400">Fila com backoff, limites e central de pendências.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setValue('featureOfflineSyncV2', !featureOfflineSyncV2)}
+                      disabled={featuresKillSwitch}
+                      className={
+                        featureOfflineSyncV2 && !featuresKillSwitch
+                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
+                      }
+                    >
+                      {featureOfflineSyncV2 ? 'Ativo' : 'Desligado'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
 

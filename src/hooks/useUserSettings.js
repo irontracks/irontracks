@@ -43,6 +43,11 @@ export const DEFAULT_SETTINGS = {
   restTimerDefaultSeconds: 90,
   autoRestTimerWhenMissing: false,
   programTitleStartDay: 'monday',
+  featuresKillSwitch: false,
+  featureTeamworkV2: false,
+  featureStoriesV2: false,
+  featureWeeklyReportCTA: false,
+  featureOfflineSyncV2: false,
 }
 
 const STORAGE_KEY = 'irontracks.userSettings.v1'

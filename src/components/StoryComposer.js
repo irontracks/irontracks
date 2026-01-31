@@ -253,6 +253,30 @@ const drawStory = ({
   const right = canvasW - SAFE_SIDE
   const safeBottomY = canvasH - SAFE_BOTTOM
 
+  const teamCount = Number(metrics?.teamCount) || 0
+  if (teamCount >= 2) {
+    const label = `EQUIPE • ${teamCount}`
+    ctx.save()
+    ctx.textBaseline = 'top'
+    ctx.font = '900 24px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+    const padX = 18
+    const padY = 12
+    const textW = ctx.measureText(label).width
+    const w = Math.ceil(textW + padX * 2)
+    const h = 46
+    const x = Math.max(left, right - w)
+    const y = SAFE_TOP
+    drawRoundedRect(ctx, x, y, w, h, 18)
+    ctx.fillStyle = 'rgba(250,204,21,0.16)'
+    ctx.fill()
+    ctx.lineWidth = 2
+    ctx.strokeStyle = 'rgba(250,204,21,0.28)'
+    ctx.stroke()
+    ctx.fillStyle = '#facc15'
+    ctx.fillText(label, x + padX, y + padY)
+    ctx.restore()
+  }
+
   const gap = 18
   const cardH = 130
 
@@ -459,6 +483,7 @@ export default function StoryComposer({ open, session, onClose }) {
   const previewRef = useRef(null)
   const previewCanvasRef = useRef(null)
   const inputRef = useRef(null)
+  const videoRef = useRef(null)
   const scrollAreaRef = useRef(null)
 
   const [selectedFile, setSelectedFile] = useState(null)
@@ -474,6 +499,12 @@ export default function StoryComposer({ open, session, onClose }) {
   const [kcalEstimate, setKcalEstimate] = useState(0)
   const [draggingKey, setDraggingKey] = useState(null)
   const dragRef = useRef({ key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } })
+  const mediaLoadIdRef = useRef(0)
+  const backgroundUrlRef = useRef('')
+
+  useEffect(() => {
+    backgroundUrlRef.current = backgroundUrl
+  }, [backgroundUrl])
 
   const metrics = useMemo(() => {
     const title = safeString(session?.workoutTitle || session?.name || 'Treino')
@@ -482,12 +513,15 @@ export default function StoryComposer({ open, session, onClose }) {
     const volume = calculateTotalVolume(logs)
     const totalTime = Number(session?.totalTime) || 0
     const kcal = Number.isFinite(Number(kcalEstimate)) && Number(kcalEstimate) > 0 ? Number(kcalEstimate) : computeKcal({ session, volume })
+    const teamCountRaw = session?.team?.participantsCount ?? session?.teamParticipantsCount ?? session?.teamSessionParticipantsCount
+    const teamCount = Number(teamCountRaw)
     return {
       title,
       date,
       volume,
       totalTime,
       kcal,
+      teamCount: Number.isFinite(teamCount) ? teamCount : 0,
     }
   }, [session, kcalEstimate])
 
@@ -523,9 +557,9 @@ export default function StoryComposer({ open, session, onClose }) {
   useEffect(() => {
     if (!open) {
       try {
-        if (backgroundUrl) URL.revokeObjectURL(backgroundUrl)
-      } catch {
-      }
+        const url = String(backgroundUrlRef.current || '')
+        if (url) URL.revokeObjectURL(url)
+      } catch {}
       setBackgroundUrl('')
       setBackgroundImage(null)
       setSelectedFile(null)
@@ -537,6 +571,9 @@ export default function StoryComposer({ open, session, onClose }) {
       setLivePositions(defaultLivePositions)
       setDraggingKey(null)
       dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
+      try {
+        if (inputRef?.current) inputRef.current.value = ''
+      } catch {}
       return
     }
     setError('')
@@ -550,7 +587,10 @@ export default function StoryComposer({ open, session, onClose }) {
     setMediaKind('image')
     setBackgroundUrl('')
     setBackgroundImage(null)
-  }, [backgroundUrl, open])
+    try {
+      if (inputRef?.current) inputRef.current.value = ''
+    } catch {}
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -609,6 +649,8 @@ export default function StoryComposer({ open, session, onClose }) {
       setError('')
       setInfo('')
       if (!file) return
+      const loadId = (mediaLoadIdRef.current || 0) + 1
+      mediaLoadIdRef.current = loadId
       const rawName = safeString(file?.name).toLowerCase()
       const ext = parseExt(rawName) || extFromMime(file?.type)
       const kind = guessMediaKind(file?.type, ext)
@@ -620,6 +662,7 @@ export default function StoryComposer({ open, session, onClose }) {
         setError('Formato WEBM pode não rodar no Safari. Prefira MP4/MOV.')
         return
       }
+      setInfo('Carregando mídia…')
       const url = URL.createObjectURL(file)
       try {
         if (backgroundUrl) URL.revokeObjectURL(backgroundUrl)
@@ -630,6 +673,7 @@ export default function StoryComposer({ open, session, onClose }) {
       setBackgroundUrl(url)
       if (kind === 'video') {
         setBackgroundImage(null)
+        setInfo('')
         return
       }
       const img = new Image()
@@ -639,9 +683,13 @@ export default function StoryComposer({ open, session, onClose }) {
         img.onerror = reject
         img.src = url
       })
+      if (!open) return
+      if (mediaLoadIdRef.current !== loadId) return
       setBackgroundImage(img)
+      setInfo('')
     } catch {
       setError('Não foi possível carregar a mídia.')
+      setInfo('')
     }
   }
 
@@ -956,6 +1004,8 @@ export default function StoryComposer({ open, session, onClose }) {
               >
                 {isVideo ? (
                   <video
+                    key={backgroundUrl || 'no-video'}
+                    ref={videoRef}
                     src={backgroundUrl || undefined}
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                     controls
@@ -963,6 +1013,25 @@ export default function StoryComposer({ open, session, onClose }) {
                     muted
                     autoPlay
                     preload="auto"
+                    onLoadedMetadata={() => {
+                      try {
+                        setInfo('')
+                      } catch {}
+                    }}
+                    onCanPlay={() => {
+                      try {
+                        setInfo('')
+                      } catch {}
+                      try {
+                        if (videoRef?.current?.play) videoRef.current.play().catch(() => null)
+                      } catch {}
+                    }}
+                    onError={() => {
+                      try {
+                        setInfo('')
+                        setError('Não foi possível carregar o vídeo. Tente outro arquivo (MP4/MOV).')
+                      } catch {}
+                    }}
                   />
                 ) : (
                   <canvas
@@ -1037,7 +1106,13 @@ export default function StoryComposer({ open, session, onClose }) {
                   type="file"
                   accept="image/*,video/*"
                   className="sr-only"
-                  onChange={(e) => loadMedia(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null
+                    try {
+                      e.target.value = ''
+                    } catch {}
+                    loadMedia(f)
+                  }}
                 />
                 <button
                   type="button"

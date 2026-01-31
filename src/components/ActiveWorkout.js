@@ -4,8 +4,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, Link2, MessageSquare, Pencil, Play, Plus, Save, Sparkles, UserPlus, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { BackButton } from '@/components/ui/BackButton';
+import { enqueueWorkoutFinishJob } from '@/lib/offline/offlineSync'
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import InviteManager from '@/components/InviteManager';
+import TeamRoomCard from '@/components/TeamRoomCard';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 
@@ -88,13 +90,14 @@ const parseClusterPrescription = (raw) => {
 
 export default function ActiveWorkout(props) {
   const { alert, confirm } = useDialog();
-  const { sendInvite } = useTeamWorkout();
+  const { sendInvite, createJoinCode, setPresenceStatus, teamSession, presence } = useTeamWorkout();
   const session = props?.session && typeof props.session === 'object' ? props.session : null;
   const workout = session?.workout && typeof session.workout === 'object' ? session.workout : null;
   const exercises = Array.isArray(workout?.exercises) ? workout.exercises : [];
   const logs = session?.logs && typeof session.logs === 'object' ? session.logs : {};
   const ui = session?.ui && typeof session.ui === 'object' ? session.ui : {};
   const settings = props?.settings && typeof props.settings === 'object' ? props.settings : null;
+  const teamworkV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureTeamworkV2 === true;
   const defaultRestSeconds = (() => {
     const raw = Number(settings?.restTimerDefaultSeconds ?? 90);
     if (!Number.isFinite(raw)) return 90;
@@ -126,6 +129,49 @@ export default function ActiveWorkout(props) {
   const [openAiHints, setOpenAiHints] = useState(() => new Set());
   const [clusterModal, setClusterModal] = useState(null);
   const [restPauseModal, setRestPauseModal] = useState(null);
+
+  useEffect(() => {
+    if (!teamworkV2Enabled) return;
+    try {
+      if (typeof setPresenceStatus === 'function') setPresenceStatus('in_workout');
+    } catch {}
+    return () => {
+      try {
+        if (typeof setPresenceStatus === 'function') setPresenceStatus('online');
+      } catch {}
+    };
+  }, [setPresenceStatus, teamworkV2Enabled]);
+
+  const shareTeamJoinLink = async () => {
+    try {
+      if (!teamworkV2Enabled) return;
+      if (typeof createJoinCode !== 'function') return;
+      const payloadWorkout = workout && typeof workout === 'object'
+        ? { ...workout, exercises: Array.isArray(workout?.exercises) ? workout.exercises : [] }
+        : { title: 'Treino', exercises: [] };
+      const res = await createJoinCode(payloadWorkout, 90);
+      if (!res?.ok) {
+        await alert('Falha ao gerar link: ' + (res?.error || ''));
+        return;
+      }
+      const url = String(res?.url || '').trim();
+      const code = String(res?.code || '').trim();
+      const text = url ? url : code;
+      try {
+        if (text && navigator?.clipboard?.writeText) await navigator.clipboard.writeText(text);
+      } catch {}
+      try {
+        if (url && navigator?.share) await navigator.share({ title: 'Bora treinar junto', text: 'Entre na sessão do treino:', url });
+      } catch {}
+      await alert(
+        url ? `Link pronto. Código: ${code}` : `Código pronto: ${code}`,
+        'Convite por link'
+      );
+    } catch (e) {
+      const msg = e?.message || String(e || '');
+      await alert('Falha ao gerar link: ' + msg);
+    }
+  };
   const [dropSetModal, setDropSetModal] = useState(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [postCheckinOpen, setPostCheckinOpen] = useState(false);
@@ -432,23 +478,70 @@ export default function ActiveWorkout(props) {
         originWorkoutId: workout?.id ?? null,
         preCheckin: ui?.preCheckin ?? null,
         postCheckin,
+        team: (() => {
+          try {
+            const sid = teamSession?.id ? String(teamSession.id) : ''
+            const list = Array.isArray(teamSession?.participants) ? teamSession.participants : []
+            const count = Math.max(0, Number(list.length) || 0)
+            if (!sid && count <= 0) return null
+            return { sessionId: sid || null, participantsCount: count || null }
+          } catch {
+            return null
+          }
+        })(),
       };
 
       let savedId = null;
       if (shouldSaveHistory) {
+        const idempotencyKey = (() => {
+          try {
+            const fromSession = session && typeof session === 'object' ? (session.finishIdempotencyKey ?? session.idempotencyKey ?? session.idempotency_key) : null
+            const raw = String(fromSession ?? '').trim()
+            if (raw) return raw
+          } catch {}
+          try {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+          } catch {}
+          return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        })()
         try {
           const resp = await fetch('/api/workouts/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session: payload }),
+            body: JSON.stringify({ session: { ...payload, idempotencyKey }, idempotencyKey }),
           });
           const json = await resp.json();
           if (!json?.ok) throw new Error(json?.error || 'Falha ao salvar no histórico');
           savedId = json?.saved?.id ?? null;
         } catch (e) {
           const msg = e?.message ? String(e.message) : String(e);
-          await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
-          savedId = null;
+          const offline = (() => {
+            try {
+              if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+            } catch {}
+            const lower = String(msg || '').toLowerCase()
+            return lower.includes('failed to fetch') || lower.includes('network') || lower.includes('fetch')
+          })()
+          if (offline) {
+            const uid = String(props?.user?.id || '').trim()
+            if (!uid) {
+              await alert('Você precisa estar logado para salvar e sincronizar o treino offline.', 'Sem sessão')
+              savedId = null
+            } else {
+              try {
+                await enqueueWorkoutFinishJob({ userId: uid, session: { ...payload, idempotencyKey }, idempotencyKey })
+              } catch {}
+              try {
+                await alert('Sem internet. O treino foi salvo e será sincronizado automaticamente quando a conexão voltar.', 'Finalização pendente')
+              } catch {}
+              savedId = null
+            }
+            try {
+            } catch {}
+          } else {
+            await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
+            savedId = null;
+          }
         }
       }
 
@@ -1576,12 +1669,31 @@ export default function ActiveWorkout(props) {
               <UserPlus size={16} />
               <span className="text-sm font-black hidden sm:inline">Convidar</span>
             </button>
+            {teamworkV2Enabled ? (
+              <button
+                type="button"
+                onClick={shareTeamJoinLink}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors active:scale-95"
+                title="Convite por link/QR"
+              >
+                <Link2 size={16} className="text-yellow-500" />
+                <span className="text-sm font-black hidden sm:inline">Link</span>
+              </button>
+            ) : null}
             </div>
             <div className="text-xs text-neutral-400 flex items-center justify-end gap-2">
               <Clock size={14} className="text-yellow-500" />
               <span className="font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
             </div>
           </div>
+          {teamworkV2Enabled && teamSession?.id ? (
+            <div className="mt-2 px-1 flex items-center justify-center gap-2">
+              <div className="px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-[11px] font-black uppercase tracking-widest text-neutral-200">
+                Equipe: {(Array.isArray(teamSession?.participants) ? teamSession.participants.length : 1)}
+              </div>
+            </div>
+          ) : null}
+          {teamworkV2Enabled ? <TeamRoomCard teamSession={teamSession} presence={presence} /> : null}
           <div className="mt-2 px-1">
             <div className="font-black text-white text-center leading-tight break-words">
               {String(workout?.title || 'Treino')}

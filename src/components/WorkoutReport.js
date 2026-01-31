@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 import StoryComposer from '@/components/StoryComposer';
 import { getKcalEstimate } from '@/utils/calories/kcalClient';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
+import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 
 const parseSessionNotes = (notes) => {
     try {
@@ -182,11 +183,15 @@ const computeMatchKey = (s) => {
     return { originId: originId ? String(originId) : null, titleKey };
 };
 
-const WorkoutReport = ({ session, previousSession, user, onClose }) => {
+const WorkoutReport = ({ session, previousSession, user, onClose, settings }) => {
     const reportRef = useRef();
     const [isGenerating, setIsGenerating] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showStory, setShowStory] = useState(false);
+    const storiesV2Enabled = useMemo(() => {
+        return isFeatureEnabled(settings, FEATURE_KEYS.storiesV2);
+    }, [settings]);
+    const [showStoryPrompt, setShowStoryPrompt] = useState(false);
     const [pdfUrl, setPdfUrl] = useState(null);
     const [pdfBlob, setPdfBlob] = useState(null);
     const pdfFrameRef = useRef(null);
@@ -206,6 +211,18 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
         const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
         return { status: existing ? 'ready' : 'idle', ai: existing, saved: false, error: '' };
     });
+
+    useEffect(() => {
+        if (!storiesV2Enabled) {
+            setShowStoryPrompt(false);
+            return;
+        }
+        if (!session) {
+            setShowStoryPrompt(false);
+            return;
+        }
+        setShowStoryPrompt(true);
+    }, [storiesV2Enabled, session]);
 
     useEffect(() => {
         const onAfterPrint = () => { setIsGenerating(false); };
@@ -972,7 +989,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                     </div>
                     <button
                         type="button"
-                        onClick={() => { setShowExportMenu(false); setShowStory(true); }}
+                        onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowStory(true); }}
                         className="min-h-[44px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 rounded-xl font-black shadow-lg inline-flex items-center gap-2"
                     >
                         <span className="text-xs uppercase tracking-widest">Foto</span>
@@ -982,6 +999,33 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                         <span className="text-xs uppercase tracking-widest">Voltar</span>
                     </button>
                 </div>
+                {storiesV2Enabled && showStoryPrompt && !showStory ? (
+                    <div className="max-w-4xl mx-auto mt-3">
+                        <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">1 clique</div>
+                                <div className="text-sm font-black text-white">Quer criar um story deste treino agora?</div>
+                                <div className="text-xs text-neutral-300">Gera a arte e você escolhe publicar ou só compartilhar.</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowStoryPrompt(false); setShowStory(true); }}
+                                    className="min-h-[40px] px-4 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-colors"
+                                >
+                                    Criar story
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowStoryPrompt(false)}
+                                    className="min-h-[40px] px-4 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 transition-colors"
+                                >
+                                    Agora não
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
             </div>
 
             <div className="flex-1 overflow-y-auto bg-neutral-950">
@@ -1491,7 +1535,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose }) => {
                     </div>
                 </div>
             )}
-            <StoryComposer open={showStory} session={session} onClose={() => setShowStory(false)} />
+            {showStory ? <StoryComposer open={showStory} session={session} onClose={() => setShowStory(false)} /> : null}
         </div>
     );
 };

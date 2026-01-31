@@ -62,7 +62,7 @@ const PREFILL_KEY = 'irontracks_wizard_prefill_v1'
 export default function MuscleMapCard(props: Props) {
   const [view, setView] = useState<'front' | 'back'>('front')
   const [selected, setSelected] = useState<MuscleId | null>(null)
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
   const [backfill, setBackfill] = useState<{ status: 'idle' | 'loading' | 'error'; error: string }>({ status: 'idle', error: '' })
   const [state, setState] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; data: ApiPayload | null; error: string }>({
     status: 'idle',

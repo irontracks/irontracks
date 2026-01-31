@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Trophy, TrendingUp, X, ChevronDown } from 'lucide-react'
 import { getLatestWorkoutPrs } from '@/actions/workout-actions'
 import { motion, AnimatePresence } from 'framer-motion'
+import BadgesInline, { type Badge } from './BadgesInline'
 
 type PrData = {
   exercise: string
@@ -19,9 +20,11 @@ type PrData = {
 
 type RecentAchievementsProps = {
   userId?: string
+  badges?: Badge[]
+  showBadges?: boolean
 }
 
-export default function RecentAchievements({ userId }: RecentAchievementsProps) {
+export default function RecentAchievements({ userId, badges, showBadges = false }: RecentAchievementsProps) {
   const [prs, setPrs] = useState<PrData[]>([])
   const [workoutTitle, setWorkoutTitle] = useState<string>('')
   const [workoutDateIso, setWorkoutDateIso] = useState<string>('')
@@ -70,6 +73,7 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
     const diffHours = diffMs / (1000 * 60 * 60)
     return diffHours < 168
   })()
+  const safeBadges = Array.isArray(badges) ? badges : []
 
   return (
     <AnimatePresence>
@@ -191,6 +195,13 @@ export default function RecentAchievements({ userId }: RecentAchievementsProps) 
                         : 'Sem novos recordes detectados neste treino.'}
                   </div>
                 )}
+
+                {showBadges ? (
+                  <div className="pt-2">
+                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-2">Conquistas ({safeBadges.length})</div>
+                    <BadgesInline badges={safeBadges} />
+                  </div>
+                ) : null}
               </motion.div>
             )}
           </AnimatePresence>

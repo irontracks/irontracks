@@ -99,11 +99,32 @@ export async function POST(request: Request) {
     const session = body?.session
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
 
+    const idempotencyKeyRaw = body?.idempotencyKey ?? body?.idempotency_key ?? session?.idempotencyKey ?? session?.idempotency_key
+    const idempotencyKey = typeof idempotencyKeyRaw === 'string' ? idempotencyKeyRaw.trim() : String(idempotencyKeyRaw ?? '').trim()
+
+    if (idempotencyKey) {
+      try {
+        const { data: existing } = await supabase
+          .from('workouts')
+          .select('id, created_at')
+          .eq('user_id', user.id)
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle()
+
+        if (existing?.id) {
+          return NextResponse.json({ ok: true, saved: existing, idempotent: true })
+        }
+      } catch {
+        // If idempotency check fails (e.g. migration not applied yet), continue without blocking.
+      }
+    }
+
     const { data, error } = await supabase
       .from('workouts')
       .insert({
         user_id: user.id,
         created_by: user.id,
+        idempotency_key: idempotencyKey || null,
         name: normalizeWorkoutTitle(session.workoutTitle || 'Treino Realizado'),
         date: new Date(session?.date ?? new Date()),
         completed_at: new Date().toISOString(),
@@ -113,7 +134,26 @@ export async function POST(request: Request) {
       .select('id, created_at')
       .single()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) {
+      const isDuplicate = (error as any)?.code === '23505' || /duplicate key value/i.test(String(error?.message || ''))
+
+      if (isDuplicate && idempotencyKey) {
+        try {
+          const { data: existing } = await supabase
+            .from('workouts')
+            .select('id, created_at')
+            .eq('user_id', user.id)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle()
+
+          if (existing?.id) {
+            return NextResponse.json({ ok: true, saved: existing, idempotent: true })
+          }
+        } catch {}
+      }
+
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    }
 
     try {
       const originWorkoutId = session?.originWorkoutId ? String(session.originWorkoutId) : ''

@@ -2,15 +2,10 @@
 
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Award, Flame, Crown, Star, X } from 'lucide-react'
+import { Crown, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { getIronRankLeaderboard } from '@/actions/workout-actions'
-
-export type Badge = {
-  id: string
-  label: string
-  kind: string
-}
+import BadgesInline, { type Badge } from './BadgesInline'
 
 type Props = {
   badges: Badge[]
@@ -20,33 +15,6 @@ type Props = {
   showIronRank?: boolean
   showBadges?: boolean
 }
-
-const getBadgeIcon = (id: string, kind: string) => {
-  if (kind === 'streak') return <Flame className="text-orange-500" size={18} />
-  if (kind === 'volume') return <DumbbellIcon />
-  if (id === 'first_workout') return <Star className="text-yellow-400" size={18} />
-  return <Award className="text-yellow-500" size={18} />
-}
-
-const DumbbellIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="text-blue-400"
-  >
-    <path d="M6.5 6.5h11" />
-    <path d="M6.5 17.5h11" />
-    <path d="M6.5 6.5v11" />
-    <path d="M17.5 6.5v11" />
-    <path d="M2 12h20" />
-  </svg>
-)
 
 export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, currentUserId, showIronRank = true, showBadges = true }: Props) {
   const safeBadges = Array.isArray(badges) ? badges : []
@@ -230,29 +198,7 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
           <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2 px-1">
             Conquistas ({safeBadges.length})
           </h3>
-          {safeBadges.length ? (
-            <div className="flex flex-wrap gap-2">
-              {safeBadges.map((badge) => (
-                <motion.div
-                  key={badge.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-neutral-800 border border-neutral-700 px-2 py-1.5 rounded-xl flex items-center gap-2"
-                >
-                  <div className="bg-neutral-900 p-1.5 rounded-full border border-neutral-800">
-                    {getBadgeIcon(badge.id, badge.kind)}
-                  </div>
-                  <span className="text-[11px] font-bold text-neutral-200 leading-tight">
-                    {badge.label}
-                  </span>
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-xs text-neutral-400 font-bold">
-              Sem conquistas ainda. Complete treinos para desbloquear badges.
-            </div>
-          )}
+          <BadgesInline badges={safeBadges} />
         </div>
       ) : null}
 

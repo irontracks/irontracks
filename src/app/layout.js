@@ -1,4 +1,5 @@
 import "./globals.css";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const metadata = {
   title: "IronTracks - Alta Performance",
@@ -306,6 +307,7 @@ export default function RootLayout({ children }) {
         ) : null}
       </head>
       <body className="antialiased bg-neutral-950 text-white">
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>

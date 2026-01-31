@@ -8,6 +8,7 @@ import WorkoutReport from '@/components/WorkoutReport';
 import { generatePeriodReportInsights } from '@/actions/workout-actions';
 import { useDialog } from '@/contexts/DialogContext';
 import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
+import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -15,7 +16,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const PERIOD_SESSIONS_LIMIT = 30;
 const TOP_EXERCISES_LIMIT = 5;
 
-const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false }) => {
+const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false }) => {
     const { confirm, alert } = useDialog();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -28,6 +29,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     const [manualDuration, setManualDuration] = useState('45');
     const [manualNotes, setManualNotes] = useState('');
     const [manualTab, setManualTab] = useState('existing');
+    const weeklyReportCtaEnabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.weeklyReportCTA), [settings]);
     const [availableWorkouts, setAvailableWorkouts] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
     const [newWorkout, setNewWorkout] = useState({ title: '', exercises: [] });
@@ -45,6 +47,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
     const [periodReport, setPeriodReport] = useState(null);
     const [periodAi, setPeriodAi] = useState({ status: 'idle', ai: null, error: '' });
     const [periodPdf, setPeriodPdf] = useState({ status: 'idle', url: null, blob: null, error: '' });
+    const [shareError, setShareError] = useState('');
 
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode);
@@ -686,6 +689,7 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         setPeriodAi({ status: 'idle', ai: null, error: '' });
         try { if (periodPdf?.url) URL.revokeObjectURL(periodPdf.url); } catch {}
         setPeriodPdf({ status: 'idle', url: null, blob: null, error: '' });
+        setShareError('');
     };
 
     const downloadPeriodPdf = async () => {
@@ -740,10 +744,32 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
         if (!current) return;
         const text = buildShareText(current);
         if (!text) return;
+
+        const legacyCopy = async () => {
+            try {
+                if (typeof document === 'undefined') return false;
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', 'true');
+                ta.style.position = 'fixed';
+                ta.style.top = '-1000px';
+                ta.style.left = '-1000px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                const ok = document.execCommand && document.execCommand('copy');
+                ta.remove();
+                return !!ok;
+            } catch {
+                return false;
+            }
+        };
+
         try {
             const nav = typeof navigator !== 'undefined' ? navigator : null;
             if (nav && typeof nav.share === 'function') {
                 await nav.share({ text });
+                setShareError('');
                 return;
             }
         } catch {}
@@ -751,14 +777,30 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
             const nav = typeof navigator !== 'undefined' ? navigator : null;
             if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
                 await nav.clipboard.writeText(text);
+                setShareError('');
+                await alert('Texto do relatório copiado para a área de transferência.');
+                return;
+            }
+            const copied = await legacyCopy();
+            if (copied) {
+                setShareError('');
                 await alert('Texto do relatório copiado para a área de transferência.');
                 return;
             }
         } catch (e) {
-            await alert('Erro ao compartilhar relatório: ' + (e?.message ?? String(e)));
+            const msg = e?.message ? String(e.message) : String(e);
+            const copied = await legacyCopy();
+            if (copied) {
+                setShareError('');
+                await alert('Texto do relatório copiado para a área de transferência.');
+                return;
+            }
+            setShareError(msg || 'Falha ao compartilhar');
+            await alert('Seu navegador bloqueou o compartilhamento/cópia automática. Copie o texto manualmente abaixo.', 'Compartilhamento indisponível');
             return;
         }
-        await alert('Não foi possível usar compartilhamento nativo. Copie o texto manualmente.');
+        setShareError('O compartilhamento nativo não está disponível neste navegador.');
+        await alert('Compartilhamento nativo indisponível. Copie o texto manualmente abaixo.', 'Compartilhamento indisponível');
     };
 
     return (
@@ -774,6 +816,15 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                         </div>
                     </div>
                     <div className="flex items-center gap-2 justify-end shrink-0">
+                        {weeklyReportCtaEnabled && !loading && historyItems.length > 0 ? (
+                            <button
+                                type="button"
+                                onClick={() => openPeriodReport('week')}
+                                className="h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 bg-neutral-800 border border-neutral-700 text-neutral-100 hover:bg-neutral-700"
+                            >
+                                Semanal
+                            </button>
+                        ) : null}
                         {!isReadOnly && historyItems.length > 0 && (
                             <button
                                 type="button"
@@ -1226,6 +1277,38 @@ const HistoryList = ({ user, onViewReport, onBack, targetId, targetEmail, readOn
                                 className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-neutral-100 outline-none h-32 resize-none"
                             />
                         </div>
+                        {shareError ? (
+                            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200 flex items-start justify-between gap-3">
+                                <div className="min-w-0 break-words">
+                                    <div className="font-black">Falha ao compartilhar</div>
+                                    <div className="text-xs text-red-200/90">{String(shareError).slice(0, 260)}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        try {
+                                            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                                                window.dispatchEvent(new CustomEvent('irontracks:error', {
+                                                    detail: {
+                                                        error: new Error(String(shareError)),
+                                                        source: 'period_report_share',
+                                                        meta: {
+                                                            reportType: String(periodReport?.type || ''),
+                                                            hasShare: typeof navigator !== 'undefined' && typeof navigator.share === 'function',
+                                                            hasClipboard: typeof navigator !== 'undefined' && !!navigator.clipboard,
+                                                            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+                                                        }
+                                                    }
+                                                }));
+                                            }
+                                        } catch {}
+                                    }}
+                                    className="shrink-0 h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 transition-all duration-300 active:scale-95"
+                                >
+                                    Reportar
+                                </button>
+                            </div>
+                        ) : null}
                         {periodPdf.status === 'error' && (
                             <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
                                 {String(periodPdf.error || 'Falha ao gerar PDF.')}
