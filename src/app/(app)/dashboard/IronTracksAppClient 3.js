@@ -1509,14 +1509,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 		try {
 			const currentUser = specificUser;
 
-            if (!currentUser) {
+            if (!currentUser?.id) {
                 console.warn("DASHBOARD: Usuário não identificado ao buscar treinos.");
                 return;
             }
 
             if (typeof navigator !== 'undefined' && navigator.onLine === false) {
                 try {
-                    const cached = await cacheGetWorkouts({ userId: currentUser?.id })
+                    const cached = await cacheGetWorkouts({ userId: currentUser.id })
                     if (cached?.workouts && Array.isArray(cached.workouts) && cached.workouts.length) {
                         setWorkouts(cached.workouts)
                         const totalEx = cached.workouts.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0)
@@ -1526,7 +1526,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 return
             }
 
-            const role = currentUser.role || 'user';
+            const role = String(currentUser?.role || 'user') || 'user';
 
             let data = []
             let studentData = []
@@ -2644,7 +2644,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     };
 
     if (authLoading) return <LoadingScreen />;
-    if (!user) return <LoadingScreen />;
+    if (!user?.id) return <LoadingScreen />;
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;
@@ -2669,7 +2669,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         >
         <InAppNotifyBinder bind={bindInAppNotify} />
         <TeamWorkoutProvider user={user} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
-            <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden">
+            <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                 <IncomingInviteModal onStartSession={handleStartSession} />
                 <InviteAcceptedModal />
                 <GuidedTour
@@ -3556,6 +3556,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 }
 
 export default function IronTracksAppClient({ initialUser, initialProfile, initialWorkouts }) {
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setIsMounted(true);
+        }, 0);
+        return () => clearTimeout(t);
+    }, []);
+    if (!isMounted) return <LoadingScreen />;
     return (
         <DialogProvider>
             <ErrorReporterProvider>

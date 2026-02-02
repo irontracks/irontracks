@@ -21,6 +21,7 @@ export default function HeaderActionsMenu({
   onOpenTour,
 }) {
   const [open, setOpen] = useState(false)
+  const [cancellingVip, setCancellingVip] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -32,6 +33,33 @@ export default function HeaderActionsMenu({
   }, [open])
 
   const close = () => setOpen(false)
+  const cancelVip = async () => {
+    if (cancellingVip) return
+    const confirmed = window.confirm('Cancelar sua assinatura VIP agora?')
+    if (!confirmed) return
+    setCancellingVip(true)
+    try {
+      const res = await fetch('/api/app/subscriptions/cancel-active', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!json?.ok) {
+        window.alert(String(json?.error || 'Falha ao cancelar assinatura.'))
+        return
+      }
+      if (!json?.cancelled) {
+        window.alert('Nenhuma assinatura ativa encontrada.')
+        return
+      }
+      window.alert('Assinatura cancelada.')
+    } catch (e) {
+      window.alert('Falha ao cancelar assinatura.')
+    } finally {
+      setCancellingVip(false)
+      close()
+    }
+  }
 
   return (
     <div className="relative">
@@ -176,6 +204,16 @@ export default function HeaderActionsMenu({
               >
                 <Cog size={16} className="text-neutral-300" />
                 <span className="flex-1 text-neutral-200 group-hover:text-white">Configurações</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={cancellingVip}
+                onClick={cancelVip}
+                className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-60"
+              >
+                <CreditCard size={16} className="text-red-500" />
+                <span className="flex-1 text-neutral-200 group-hover:text-white">Cancelar assinatura VIP</span>
               </button>
 
               <div className="h-px bg-neutral-800 my-1" />

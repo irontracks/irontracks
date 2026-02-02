@@ -21,6 +21,7 @@ type AppPlan = {
 type CheckoutResponse = {
   ok: boolean
   error?: string
+  resumed?: boolean
   subscription?: { id: string; status: string; asaas_subscription_id: string }
   payment?: {
     id: string
@@ -49,6 +50,19 @@ const normalizePixImageSrc = (encodedImage: string) => {
   if (!s) return ''
   if (s.startsWith('data:image/')) return s
   return `data:image/png;base64,${s}`
+}
+
+const toCheckoutUserMessage = (raw: string) => {
+  const s = String(raw || '').trim()
+  if (!s) return 'Erro ao criar cobrança.'
+  if (s === 'db_migration_required') return 'O banco de dados ainda não foi atualizado (migrations pendentes).'
+  if (s === 'already_has_active_subscription') return 'Você já tem uma assinatura ativa ou pendente nesta conta.'
+  if (s === 'already_subscribed') return 'Você já iniciou uma assinatura deste plano nesta conta.'
+  if (s === 'pending_subscription_exists') return 'Você tem uma tentativa de assinatura pendente. Finalize ou cancele para tentar novamente.'
+  if (s === 'asaas_api_key_missing') return 'Pagamento PIX indisponível (Asaas não configurado no servidor).'
+  if (s === 'mercadopago_access_token_missing') return 'Pagamento no cartão indisponível (Mercado Pago não configurado no servidor).'
+  if (s === 'unauthorized') return 'Você precisa estar logado para assinar.'
+  return s
 }
 
 export default function MarketplaceClient() {
@@ -197,6 +211,31 @@ export default function MarketplaceClient() {
     }
   }, [cardRedirecting, selectedPlan])
 
+  const cancelPendingAttempt = useCallback(async () => {
+    if (!selectedPlan) return
+    try {
+      const res = await fetch('/api/app/subscriptions/cancel-pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: selectedPlan.id }),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!json?.ok) {
+        setCheckoutResult({ ok: false, error: String(json?.error || 'Falha ao cancelar tentativa.') })
+        return
+      }
+      setCheckoutResult(null)
+      window.alert('Tentativa cancelada. Você pode tentar novamente.')
+    } catch (e: any) {
+      setCheckoutResult({ ok: false, error: e?.message || String(e) })
+    }
+  }, [selectedPlan])
+
+  const canCancelPending = Boolean(
+    (checkoutResult && checkoutResult.ok && checkoutResult.resumed) ||
+      (checkoutResult && !checkoutResult.ok && ['already_subscribed', 'pending_subscription_exists'].includes(String(checkoutResult.error || ''))),
+  )
+
   const copyToClipboard = useCallback(async (text: string) => {
     const v = (text || '').trim()
     if (!v) return
@@ -333,7 +372,7 @@ export default function MarketplaceClient() {
 
             <div className="p-4 space-y-3">
               <div className="text-sm text-neutral-300">
-                {formatMoney(selectedPlan.price_cents)} / {selectedPlan.interval === 'year' ? 'ano' : 'mês'} • Pagamento via PIX
+                {formatMoney(selectedPlan.price_cents)} / {selectedPlan.interval === 'year' ? 'ano' : 'mês'} • Pix ou Cartão
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -377,8 +416,18 @@ export default function MarketplaceClient() {
 
               {checkoutResult && !checkoutResult.ok ? (
                 <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-                  {String(checkoutResult.error || 'Erro ao criar cobrança.')}
+                  {toCheckoutUserMessage(String(checkoutResult.error || ''))}
                 </div>
+              ) : null}
+
+              {canCancelPending ? (
+                <button
+                  type="button"
+                  onClick={cancelPendingAttempt}
+                  className={`${minButtonClass} w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-black flex items-center justify-center gap-2`}
+                >
+                  Cancelar tentativa
+                </button>
               ) : null}
 
               {checkoutResult && checkoutResult.ok && checkoutResult.payment ? (

@@ -22,11 +22,13 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const [profileLoaded, setProfileLoaded] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileSavedAt, setProfileSavedAt] = useState(0)
+  const [profileAuto, setProfileAuto] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [threadId, setThreadId] = useState('')
   const [chatLoaded, setChatLoaded] = useState(false)
   const [chatLoading, setChatLoading] = useState(false)
   const inputRef = useRef(null)
+  const profileInitAttemptedRef = useRef(false)
 
   const presets = useMemo(() => {
     if (mode === 'planner') {
@@ -136,6 +138,44 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
           return
         }
         const p = json?.profile && typeof json.profile === 'object' ? json.profile : null
+        if (!p && !profileInitAttemptedRef.current) {
+          profileInitAttemptedRef.current = true
+          const payload = {
+            goal: 'hypertrophy',
+            equipment: 'gym',
+            constraints: '',
+            preferences: { level: 'intermediate', split: 'full_body', focus: 'balanced', daysPerWeek: 4, timeMinutes: 60 },
+          }
+          try {
+            const putRes = await fetch('/api/vip/profile', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify(payload),
+            })
+            const putJson = await putRes.json().catch(() => null)
+            if (!cancelled && putJson && putJson.ok) {
+              const created = putJson?.profile && typeof putJson.profile === 'object' ? putJson.profile : null
+              setProfile(created)
+              setProfileAuto(true)
+              const cprefs = created?.preferences && typeof created.preferences === 'object' && !Array.isArray(created.preferences) ? created.preferences : payload.preferences
+              setProfileDraft({
+                goal: String(created?.goal || payload.goal) || payload.goal,
+                equipment: String(created?.equipment || payload.equipment) || payload.equipment,
+                constraints: String(created?.constraints || payload.constraints),
+                preferences: {
+                  level: String(cprefs?.level || payload.preferences.level) || payload.preferences.level,
+                  split: String(cprefs?.split || payload.preferences.split) || payload.preferences.split,
+                  focus: String(cprefs?.focus || payload.preferences.focus) || payload.preferences.focus,
+                  daysPerWeek: Number(cprefs?.daysPerWeek || payload.preferences.daysPerWeek) || payload.preferences.daysPerWeek,
+                  timeMinutes: Number(cprefs?.timeMinutes || payload.preferences.timeMinutes) || payload.preferences.timeMinutes,
+                },
+              })
+              return
+            }
+          } catch {}
+        }
+
         setProfile(p)
         const prefs = p?.preferences && typeof p.preferences === 'object' && !Array.isArray(p.preferences) ? p.preferences : {}
         setProfileDraft({
@@ -255,6 +295,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       if (json && json.ok) {
         setProfile(json.profile || null)
         setProfileSavedAt(Date.now())
+        setProfileAuto(false)
         setProfileOpen(false)
         setMessages((prev) => [...(Array.isArray(prev) ? prev : []), { id: `${Date.now()}-p`, role: 'assistant', text: 'Perfil VIP atualizado. Vou usar isso nas próximas respostas.' }].slice(-60))
       } else {
@@ -569,7 +610,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               {!profileOpen ? (
                 <div className="mt-3 space-y-2">
                   <div className="text-sm text-neutral-300">
-                    {profileLoading ? 'Carregando…' : String(profile?.updated_at ? 'Configurado' : 'Ainda não configurado')}
+                    {profileLoading ? 'Carregando…' : String(!profile?.updated_at ? 'Ainda não configurado' : profileAuto ? 'Padrão aplicado' : 'Configurado')}
                     {profileSavedAt ? <span className="text-neutral-500"> • Salvo agora</span> : null}
                   </div>
                   {constraintChips.length ? (

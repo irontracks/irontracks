@@ -34,13 +34,25 @@ export async function POST(req: Request) {
 
     const { data: anyActive } = await admin
       .from('app_subscriptions')
-      .select('id, status')
+      .select('id, status, provider, plan_id, metadata, created_at')
       .eq('user_id', user.id)
       .in('status', ['pending', 'active', 'past_due'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (anyActive?.id) {
+    if (anyActive?.id && String(anyActive.status || '') === 'pending') {
+      const ageMs = Date.now() - new Date(String(anyActive.created_at || '')).getTime()
+      const initPoint = String((anyActive as any)?.metadata?.mercadopago?.init_point || '').trim()
+      if (String(anyActive.plan_id || '') === planId && String(anyActive.provider || '') === 'mercadopago' && initPoint) {
+        return NextResponse.json({ ok: true, subscription: { id: anyActive.id, status: anyActive.status }, redirect_url: initPoint, resumed: true })
+      }
+      if (Number.isFinite(ageMs) && ageMs > 10 * 60 * 1000) {
+        await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', anyActive.id)
+      } else {
+        return NextResponse.json({ ok: false, error: 'pending_subscription_exists' }, { status: 409 })
+      }
+    }
+    if (anyActive?.id && ['active', 'past_due'].includes(String(anyActive.status || ''))) {
       return NextResponse.json({ ok: false, error: 'already_has_active_subscription' }, { status: 409 })
     }
 
@@ -91,7 +103,13 @@ export async function POST(req: Request) {
       })
       .select('id, status')
       .single()
-    if (subErr || !subRow) return NextResponse.json({ ok: false, error: subErr?.message || 'failed_to_store_subscription' }, { status: 400 })
+    if (subErr || !subRow) {
+      const msg = String(subErr?.message || '')
+      if (msg.toLowerCase().includes('column') && msg.toLowerCase().includes('provider')) {
+        return NextResponse.json({ ok: false, error: 'db_migration_required' }, { status: 500 })
+      }
+      return NextResponse.json({ ok: false, error: subErr?.message || 'failed_to_store_subscription' }, { status: 400 })
+    }
 
     return NextResponse.json({
       ok: true,
@@ -103,4 +121,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

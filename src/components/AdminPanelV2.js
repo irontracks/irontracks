@@ -76,6 +76,18 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [tab, setTab] = useState('dashboard');
     const [usersList, setUsersList] = useState([]);
     const [teachersList, setTeachersList] = useState([]);
+    const [selectedTeacher, setSelectedTeacher] = useState(null);
+    const [teacherDetailTab, setTeacherDetailTab] = useState('students');
+    const [teacherStudents, setTeacherStudents] = useState([]);
+    const [teacherStudentsLoading, setTeacherStudentsLoading] = useState(false);
+    const [teacherTemplatesRows, setTeacherTemplatesRows] = useState([]);
+    const [teacherTemplatesLoading, setTeacherTemplatesLoading] = useState(false);
+    const [teacherTemplatesCursor, setTeacherTemplatesCursor] = useState(null);
+    const [teacherHistoryRows, setTeacherHistoryRows] = useState([]);
+    const [teacherHistoryLoading, setTeacherHistoryLoading] = useState(false);
+    const [teacherHistoryCursor, setTeacherHistoryCursor] = useState(null);
+    const [teacherInboxItems, setTeacherInboxItems] = useState([]);
+    const [teacherInboxLoading, setTeacherInboxLoading] = useState(false);
     const [templates, setTemplates] = useState([]);
     const [templatesUserId, setTemplatesUserId] = useState('');
     const [myWorkoutsCount, setMyWorkoutsCount] = useState(0);
@@ -319,6 +331,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     useEffect(() => {
         if (!selectedStudent) setHistoryOpen(false);
+    }, [selectedStudent]);
+
+    useEffect(() => {
+        if (selectedStudent) setSelectedTeacher(null);
     }, [selectedStudent]);
 
     const handleExportSystem = async () => {
@@ -660,6 +676,93 @@ const AdminPanelV2 = ({ user, onClose }) => {
             fetchTeachers();
         }
     }, [tab, isAdmin, addingTeacher, editingTeacher, supabase]);
+
+    const loadTeacherStudents = useCallback(async (teacher) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherStudents([]); return; }
+        setTeacherStudentsLoading(true);
+        try {
+            const res = await fetch(`/api/admin/teachers/students?teacher_user_id=${encodeURIComponent(uid)}`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) { setTeacherStudents([]); return; }
+            setTeacherStudents(Array.isArray(json.students) ? json.students : []);
+        } finally {
+            setTeacherStudentsLoading(false);
+        }
+    }, []);
+
+    const loadTeacherTemplates = useCallback(async (teacher, reset = false) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); return; }
+        if (reset) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); }
+        setTeacherTemplatesLoading(true);
+        try {
+            const cursor = reset ? '' : String(teacherTemplatesCursor || '');
+            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
+            if (cursor) qs.set('cursor', cursor);
+            const res = await fetch(`/api/admin/teachers/workouts/templates?${qs.toString()}`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) return;
+            const rows = Array.isArray(json.rows) ? json.rows : [];
+            setTeacherTemplatesRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
+            setTeacherTemplatesCursor(json.next_cursor || null);
+        } finally {
+            setTeacherTemplatesLoading(false);
+        }
+    }, [teacherTemplatesCursor]);
+
+    const loadTeacherHistory = useCallback(async (teacher, reset = false) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); return; }
+        if (reset) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); }
+        setTeacherHistoryLoading(true);
+        try {
+            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
+            const cur = reset ? null : teacherHistoryCursor;
+            if (cur?.cursor_date) qs.set('cursor_date', String(cur.cursor_date));
+            if (cur?.cursor_created_at) qs.set('cursor_created_at', String(cur.cursor_created_at));
+            const res = await fetch(`/api/admin/teachers/workouts/history?${qs.toString()}`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) return;
+            const rows = Array.isArray(json.rows) ? json.rows : [];
+            setTeacherHistoryRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
+            setTeacherHistoryCursor(json.next_cursor || null);
+        } finally {
+            setTeacherHistoryLoading(false);
+        }
+    }, [teacherHistoryCursor]);
+
+    const loadTeacherInbox = useCallback(async (teacher) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherInboxItems([]); return; }
+        setTeacherInboxLoading(true);
+        try {
+            const res = await fetch(`/api/admin/teachers/inbox?teacher_user_id=${encodeURIComponent(uid)}&limit=80`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) { setTeacherInboxItems([]); return; }
+            setTeacherInboxItems(Array.isArray(json.items) ? json.items : []);
+        } finally {
+            setTeacherInboxLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!selectedTeacher || !isAdmin) return;
+        setTeacherDetailTab('students');
+        setTeacherTemplatesRows([]);
+        setTeacherTemplatesCursor(null);
+        setTeacherHistoryRows([]);
+        setTeacherHistoryCursor(null);
+        setTeacherInboxItems([]);
+        loadTeacherStudents(selectedTeacher).catch(() => {});
+    }, [isAdmin, loadTeacherStudents, selectedTeacher]);
+
+    useEffect(() => {
+        if (!selectedTeacher || !isAdmin) return;
+        if (teacherDetailTab === 'templates' && teacherTemplatesRows.length === 0) loadTeacherTemplates(selectedTeacher, true).catch(() => {});
+        if (teacherDetailTab === 'history' && teacherHistoryRows.length === 0) loadTeacherHistory(selectedTeacher, true).catch(() => {});
+        if (teacherDetailTab === 'inbox' && teacherInboxItems.length === 0) loadTeacherInbox(selectedTeacher).catch(() => {});
+    }, [isAdmin, loadTeacherHistory, loadTeacherInbox, loadTeacherTemplates, selectedTeacher, teacherDetailTab, teacherHistoryRows.length, teacherInboxItems.length, teacherTemplatesRows.length]);
 
     // URL Persistence for Tabs (Fixed)
     useEffect(() => {
@@ -3354,7 +3457,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
-				{tab === 'teachers' && isAdmin && !selectedStudent && (
+				{tab === 'teachers' && isAdmin && !selectedStudent && !selectedTeacher && (
 					<div className="w-full space-y-4">
                         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -3419,7 +3522,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     <div
                                         key={t.id}
                                         className="bg-neutral-800 p-4 rounded-2xl flex justify-between items-center border border-neutral-700 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
-                                        onClick={() => setEditingTeacher(t)}
+                                        onClick={() => { setSelectedTeacher(t); }}
                                     >
                                         <div className="min-w-0">
                                             <h3 className="font-black text-white truncate">{normalizeWorkoutTitle(t.name)}</h3>
@@ -3491,6 +3594,232 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {tab === 'teachers' && isAdmin && !selectedStudent && selectedTeacher && (
+                    <div className="w-full space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Professor</div>
+                                    <h2 className="text-base md:text-lg font-black text-white truncate">{normalizeWorkoutTitle(selectedTeacher?.name || '') || 'Professor'}</h2>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold truncate">{selectedTeacher?.email || ''}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => { setSelectedTeacher(null); }}
+                                    className="w-11 h-11 rounded-2xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Voltar"
+                                >
+                                    <ArrowLeft size={18} />
+                                </button>
+                            </div>
+
+                            <div className="mt-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                {[
+                                    { key: 'students', label: 'Alunos' },
+                                    { key: 'templates', label: 'Treinos' },
+                                    { key: 'history', label: 'Histórico' },
+                                    { key: 'inbox', label: 'Interações' },
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        onClick={() => setTeacherDetailTab(opt.key)}
+                                        className={`whitespace-nowrap min-h-[40px] px-3 py-2 rounded-full text-[11px] font-black uppercase tracking-wide border transition-all duration-300 active:scale-95 ${
+                                            teacherDetailTab === opt.key
+                                                ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/15'
+                                                : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {teacherDetailTab === 'students' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Alunos</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherStudentsLoading ? 'Carregando…' : `${(Array.isArray(teacherStudents) ? teacherStudents.length : 0)} alunos`}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => loadTeacherStudents(selectedTeacher)}
+                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                    >
+                                        Atualizar
+                                    </button>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherStudents) ? teacherStudents : []).length === 0 && !teacherStudentsLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhum aluno atribuído.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherStudents) ? teacherStudents : []).map((s) => (
+                                        <div
+                                            key={s.id}
+                                            className="bg-neutral-800 p-4 rounded-2xl flex justify-between items-center border border-neutral-700 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="font-black text-white truncate">{normalizeWorkoutTitle(s.name) || s.email}</div>
+                                                <div className="text-xs text-neutral-400 truncate">{s.email}</div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setSelectedStudent(s); setSubTab('workouts'); }}
+                                                className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                            >
+                                                Ver aluno
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {teacherDetailTab === 'templates' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treinos (Templates)</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherTemplatesLoading ? 'Carregando…' : `${(Array.isArray(teacherTemplatesRows) ? teacherTemplatesRows.length : 0)} itens`}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => loadTeacherTemplates(selectedTeacher, true)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                        >
+                                            Atualizar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={!teacherTemplatesCursor || teacherTemplatesLoading}
+                                            onClick={() => loadTeacherTemplates(selectedTeacher, false)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            Mais
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherTemplatesRows) ? teacherTemplatesRows : []).length === 0 && !teacherTemplatesLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhum treino encontrado.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherTemplatesRows) ? teacherTemplatesRows : []).map((w) => (
+                                        <div key={w.id} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-black text-white truncate">{normalizeWorkoutTitle(w.name) || 'Treino'}</div>
+                                                    <div className="text-xs text-neutral-400 truncate">{w.student_name || ''}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSelectedStudent({ user_id: w.user_id, name: w.student_name || '' }); setSubTab('workouts'); }}
+                                                    className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                                >
+                                                    Abrir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {teacherDetailTab === 'history' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Histórico de Treinos</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherHistoryLoading ? 'Carregando…' : `${(Array.isArray(teacherHistoryRows) ? teacherHistoryRows.length : 0)} itens`}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => loadTeacherHistory(selectedTeacher, true)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                        >
+                                            Atualizar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={!teacherHistoryCursor || teacherHistoryLoading}
+                                            onClick={() => loadTeacherHistory(selectedTeacher, false)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            Mais
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherHistoryRows) ? teacherHistoryRows : []).length === 0 && !teacherHistoryLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhum treino executado encontrado.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherHistoryRows) ? teacherHistoryRows : []).map((w) => (
+                                        <div key={w.id} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-black text-white truncate">{normalizeWorkoutTitle(w.name) || 'Treino'}</div>
+                                                    <div className="text-xs text-neutral-400 truncate">{w.student_name || ''}{w.date ? ` • ${new Date(w.date).toLocaleDateString()}` : ''}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSelectedStudent({ user_id: w.user_id, name: w.student_name || '' }); setSubTab('workouts'); }}
+                                                    className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                                >
+                                                    Abrir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {teacherDetailTab === 'inbox' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Interações (Inbox)</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherInboxLoading ? 'Carregando…' : `${(Array.isArray(teacherInboxItems) ? teacherInboxItems.length : 0)} itens`}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => loadTeacherInbox(selectedTeacher)}
+                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                    >
+                                        Atualizar
+                                    </button>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherInboxItems) ? teacherInboxItems : []).length === 0 && !teacherInboxLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhuma interação sugerida.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherInboxItems) ? teacherInboxItems : []).map((it) => (
+                                        <div key={it.id} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-black text-white truncate">{it.title || 'Alerta'}</div>
+                                                    <div className="text-xs text-neutral-400 truncate">{it.student_name || ''}</div>
+                                                    <div className="mt-2 text-xs text-neutral-300">{it.reason || ''}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSelectedStudent({ user_id: it.student_user_id, name: it.student_name || '' }); setSubTab('workouts'); }}
+                                                    className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                                >
+                                                    Abrir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>

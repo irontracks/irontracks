@@ -111,7 +111,10 @@ const buildPrompt = (payload: {
   const mode = String(payload.mode || 'coach')
   const userMessage = String(payload.message || '').trim()
   const context = payload.context && typeof payload.context === 'object' ? payload.context : {}
-  const vipProfile = context?.vipProfile && typeof context.vipProfile === 'object' ? context.vipProfile : null
+  const vipProfile =
+    context?.vipProfile && typeof context.vipProfile === 'object'
+      ? context.vipProfile
+      : { goal: 'hypertrophy', equipment: 'gym', constraints: '', preferences: { level: 'intermediate', split: 'full_body', focus: 'balanced', daysPerWeek: 4, timeMinutes: 60 } }
 
   const absoluteRules = [
     'Escreva em pt-BR.',
@@ -144,8 +147,8 @@ const buildPrompt = (payload: {
     '',
     modeGuidance,
     '',
-    vipProfile ? 'MEMÓRIA VIP (prioridade alta):' : '',
-    vipProfile ? JSON.stringify(vipProfile) : '',
+    'MEMÓRIA VIP (prioridade alta):',
+    JSON.stringify(vipProfile),
     '',
     'CONTEXTO DO ATLETA (JSON):',
     JSON.stringify(context),
