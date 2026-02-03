@@ -2999,7 +2999,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     return (
                                         <div key={r.id} className="bg-neutral-800 border border-neutral-700 rounded-2xl p-4">
                                             <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0 flex-1">
+                                                <div className="min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
                                                         <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${statusTone}`}>
                                                             {status}
@@ -3008,29 +3008,17 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                             <div className="text-[11px] text-neutral-500 font-semibold">{createdAt}</div>
                                                         ) : null}
                                                         {email ? (
-                                                            <div className="text-[11px] text-neutral-400 font-semibold truncate max-w-[150px]" title={email}>• {email}</div>
+                                                            <div className="text-[11px] text-neutral-400 font-semibold truncate">• {email}</div>
                                                         ) : null}
                                                         {pathname ? (
-                                                            <div className="text-[11px] text-neutral-500 font-semibold truncate max-w-[150px]" title={pathname}>• {pathname}</div>
+                                                            <div className="text-[11px] text-neutral-500 font-semibold truncate">• {pathname}</div>
                                                         ) : null}
                                                     </div>
-                                                    <div className="mt-2 text-sm text-neutral-100 font-semibold whitespace-pre-wrap break-words pr-2">
+                                                    <div className="mt-2 text-sm text-neutral-100 font-semibold whitespace-pre-wrap break-words">
                                                         {message || '—'}
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const content = `Erro: ${message}\nUser: ${email}\nPath: ${pathname}\nStack:\n${stack || 'N/A'}`;
-                                                            navigator.clipboard.writeText(content);
-                                                            // Feedback visual rápido seria ideal, mas alert serve por enquanto
-                                                        }}
-                                                        title="Copiar detalhes"
-                                                        className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center active:scale-95 transition-all"
-                                                    >
-                                                        <Copy size={16} />
-                                                    </button>
                                                     <button
                                                         type="button"
                                                         onClick={async () => {
@@ -3049,64 +3037,37 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                                 await alert('Erro ao atualizar status: ' + (e?.message ?? String(e)));
                                                             }
                                                         }}
-                                                        className={`min-h-[40px] px-3 py-2 rounded-xl border font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all ${
-                                                            status === 'resolved' 
-                                                            ? 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:bg-neutral-800' 
-                                                            : 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
-                                                        }`}
+                                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
                                                     >
                                                         {status === 'resolved' ? 'Reabrir' : 'Resolver'}
                                                     </button>
-                                                    {status !== 'ignored' && status !== 'resolved' && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={async () => {
-                                                                try {
-                                                                    const { error } = await supabase.from('error_reports').update({ status: 'ignored' }).eq('id', r.id);
-                                                                    if (error) throw error;
-                                                                    setErrorReports((prev) => {
-                                                                        const list = Array.isArray(prev) ? prev : [];
-                                                                        return list.map((x) => (x?.id === r.id ? { ...x, status: 'ignored' } : x));
-                                                                    });
-                                                                } catch (e) {
-                                                                    await alert('Erro ao ignorar: ' + (e?.message ?? String(e)));
-                                                                }
-                                                            }}
-                                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-400 hover:text-white font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
-                                                        >
-                                                            Ignorar
-                                                        </button>
-                                                    )}
                                                     <button
                                                         type="button"
                                                         onClick={async () => {
-                                                            if (!confirm('Tem certeza que deseja apagar este erro permanentemente?')) return;
                                                             try {
-                                                                const { error } = await supabase.from('error_reports').delete().eq('id', r.id);
+                                                                const { error } = await supabase.from('error_reports').update({ status: 'ignored' }).eq('id', r.id);
                                                                 if (error) throw error;
                                                                 setErrorReports((prev) => {
                                                                     const list = Array.isArray(prev) ? prev : [];
-                                                                    return list.filter((x) => x?.id !== r.id);
+                                                                    return list.map((x) => (x?.id === r.id ? { ...x, status: 'ignored' } : x));
                                                                 });
                                                             } catch (e) {
-                                                                await alert('Erro ao apagar: ' + (e?.message ?? String(e)));
+                                                                await alert('Erro ao ignorar: ' + (e?.message ?? String(e)));
                                                             }
                                                         }}
-                                                        title="Apagar erro"
-                                                        className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-red-900/20 hover:border-red-500/30 text-neutral-500 hover:text-red-400 flex items-center justify-center active:scale-95 transition-all"
+                                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
                                                     >
-                                                        <Trash2 size={16} />
+                                                        Ignorar
                                                     </button>
                                                 </div>
                                             </div>
 
                                             {(stack || r?.url) ? (
-                                                <details className="mt-3 group/details">
-                                                    <summary className="cursor-pointer text-[11px] font-black uppercase tracking-widest text-neutral-500 hover:text-white flex items-center gap-2 select-none">
-                                                        <ChevronDown size={14} className="group-open/details:rotate-180 transition-transform" />
-                                                        Detalhes Técnicos
+                                                <details className="mt-3">
+                                                    <summary className="cursor-pointer text-[11px] font-black uppercase tracking-widest text-neutral-400 hover:text-white">
+                                                        Detalhes
                                                     </summary>
-                                                    <div className="mt-3 grid gap-3 pl-2 border-l-2 border-neutral-800">
+                                                    <div className="mt-2 grid gap-2">
                                                         {String(r?.url || '').trim() ? (
                                                             <div className="text-[11px] text-neutral-400 break-all">
                                                                 <span className="font-black text-neutral-300">URL:</span> {String(r.url)}
@@ -3123,18 +3084,9 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                             </div>
                                                         ) : null}
                                                         {stack ? (
-                                                            <div className="relative group/stack">
-                                                                <pre className="text-[10px] leading-relaxed font-mono text-neutral-400 whitespace-pre-wrap break-words bg-black/40 border border-neutral-800 rounded-lg p-3 overflow-auto max-h-[300px] custom-scrollbar select-text">
-                                                                    {stack}
-                                                                </pre>
-                                                                <button 
-                                                                    onClick={() => navigator.clipboard.writeText(stack)}
-                                                                    className="absolute top-2 right-2 p-1.5 rounded-md bg-neutral-800 text-neutral-400 hover:text-white opacity-0 group-hover/stack:opacity-100 transition-opacity"
-                                                                    title="Copiar Stack Trace"
-                                                                >
-                                                                    <Copy size={12} />
-                                                                </button>
-                                                            </div>
+                                                            <pre className="text-[11px] text-neutral-300 whitespace-pre-wrap break-words bg-neutral-950/60 border border-neutral-800 rounded-xl p-3 overflow-auto max-h-[260px]">
+                                                                {stack}
+                                                            </pre>
                                                         ) : null}
                                                     </div>
                                                 </details>

@@ -5,6 +5,7 @@ import { Crown, Sparkles, ArrowRight, Lock, MessageSquare, CalendarDays, Trendin
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { createWorkout } from '@/actions/workout-actions'
 import { vipPlaybooks } from '@/content/vipPlaybooks'
+import CoachChatModal from '@/components/CoachChatModal'
 
 export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab }) {
   const isLocked = !!locked
@@ -29,6 +30,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const [chatLoading, setChatLoading] = useState(false)
   const inputRef = useRef(null)
   const profileInitAttemptedRef = useRef(false)
+  const [showCoachChat, setShowCoachChat] = useState(false)
 
   const presets = useMemo(() => {
     if (mode === 'planner') {
@@ -538,7 +540,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         <div className="min-w-0">
           <div className="inline-flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-yellow-500">
             <Crown size={16} />
-            VIP
+            {user?.role === 'admin' ? 'VIP ELITE' : 'VIP'}
           </div>
           <div className="mt-2 text-xl font-black text-white">
             {name ? `Coach IA • ${name}` : 'Coach IA'}

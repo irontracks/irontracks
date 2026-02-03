@@ -25,12 +25,36 @@ const StudentEvolution = ({ user, onClose }) => {
             }
 
             try {
-                const { data: assData } = await supabase
+                const { data: rawAssData, error: assError } = await supabase
                     .from('assessments')
                     .select('*')
-                    .eq('user_id', safeUserId)
-                    .order('date', { ascending: false });
+                    .eq('student_id', safeUserId)
+                    .order('assessment_date', { ascending: false });
 
+                if (assError) throw assError;
+
+                // Adaptar dados do schema novo para o componente antigo
+                const assData = (rawAssData || []).map(a => ({
+                    ...a,
+                    id: a.id,
+                    date: a.assessment_date || a.date, // fallback
+                    bf: a.body_fat_percentage ?? a.bf,
+                    weight: a.weight,
+                    waist: a.waist_circ ?? a.waist,
+                    arm: a.arm_circ ?? a.arm,
+                    sum7: (a.sum7 ?? (
+                        (Number(a.triceps_skinfold)||0) + 
+                        (Number(a.biceps_skinfold)||0) + 
+                        (Number(a.subscapular_skinfold)||0) + 
+                        (Number(a.suprailiac_skinfold)||0) + 
+                        (Number(a.abdominal_skinfold)||0) + 
+                        (Number(a.thigh_skinfold)||0) + 
+                        (Number(a.calf_skinfold)||0)
+                    )) || null
+                }));
+
+                // Tentar buscar fotos (tabela antiga ou nova?)
+                // Mantendo lógica original para photos por enquanto para evitar quebra se a tabela existir
                 const { data: photoData } = await supabase
                     .from('photos')
                     .select('*')

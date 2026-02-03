@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import { ArrowLeft, Copy, CreditCard, ExternalLink, QrCode, RefreshCw, X } from 'lucide-react'
+import { ArrowLeft, Copy, CreditCard, ExternalLink, QrCode, RefreshCw, X, MessageSquare } from 'lucide-react'
 
 type AppPlan = {
   id: string
@@ -341,6 +341,14 @@ export default function MarketplaceClient() {
                 <div className="min-w-0">
                   <div className="text-white font-black text-lg">{plan.name}</div>
                   {plan.description ? <div className="text-sm text-neutral-300 mt-1">{plan.description}</div> : null}
+                  
+                  {plan.features?.limits?.messagesPerDay ? (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-neutral-300 bg-neutral-900/50 p-2 rounded-lg border border-neutral-800">
+                      <MessageSquare size={14} className="text-yellow-500" />
+                      <span>Coach IA: <strong className="text-white">{plan.features.limits.messagesPerDay} msgs/dia</strong></span>
+                    </div>
+                  ) : null}
+
                   <div className="text-sm text-neutral-400 mt-3">
                     <span className="font-black text-white">{formatMoney(plan.price_cents)}</span> / {plan.interval === 'year' ? 'ano' : 'mês'}
                   </div>

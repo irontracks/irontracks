@@ -1,12 +1,13 @@
 "use client"
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
-import { Download, ArrowLeft, TrendingUp, TrendingDown, Flame, FileText, Code, Users, Sparkles, Loader2, Check } from 'lucide-react';
+import { Download, ArrowLeft, TrendingUp, TrendingDown, Flame, FileText, Code, Users, Sparkles, Loader2, Check, MessageSquare } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { createClient } from '@/utils/supabase/client';
 // @ts-ignore
 import StoryComposer from '@/components/StoryComposer';
+import CoachChatModal from '@/components/CoachChatModal';
 import { getKcalEstimate } from '@/utils/calories/kcalClient';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
@@ -184,7 +185,7 @@ const computeMatchKey = (s) => {
     return { originId: originId ? String(originId) : null, titleKey };
 };
 
-const WorkoutReport = ({ session, previousSession, user, onClose, settings }) => {
+const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings }) => {
     const reportRef = useRef();
     const [isGenerating, setIsGenerating] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -212,6 +213,7 @@ const WorkoutReport = ({ session, previousSession, user, onClose, settings }) =>
         const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
         return { status: existing ? 'ready' : 'idle', ai: existing, saved: false, error: '' };
     });
+    const [showCoachChat, setShowCoachChat] = useState(false);
 
     useEffect(() => {
         if (!storiesV2Enabled) {
@@ -1140,21 +1142,31 @@ const WorkoutReport = ({ session, previousSession, user, onClose, settings }) =>
                 )}
 
                 <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
                             <div className="text-xs font-black uppercase tracking-widest text-neutral-400">IA</div>
                             <div className="text-lg font-black text-white">Insights pós-treino</div>
                             <div className="text-xs text-neutral-300">Resumo + progressão + motivação com IA IronTracks</div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={handleGenerateAi}
-                            disabled={aiState?.status === 'loading'}
-                            className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60 w-full md:w-auto"
-                        >
-                            {aiState?.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                            {aiState?.ai ? 'Regerar' : 'Gerar'}
-                        </button>
+                        <div className="flex items-center gap-2 w-full md:w-auto">
+                            <button
+                                type="button"
+                                onClick={handleGenerateAi}
+                                disabled={aiState?.status === 'loading'}
+                                className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                                {aiState?.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                                {aiState?.ai ? 'Regerar' : 'Gerar'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowCoachChat(true)}
+                                className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-black flex items-center justify-center gap-2 border border-neutral-700"
+                            >
+                                <MessageSquare size={18} />
+                                Conversar
+                            </button>
+                        </div>
                     </div>
 
                     {aiState?.status === 'error' && (
@@ -1537,6 +1549,21 @@ const WorkoutReport = ({ session, previousSession, user, onClose, settings }) =>
                 </div>
             )}
             {showStory ? <StoryComposer open={showStory} session={session} onClose={() => setShowStory(false)} /> : null}
+            {showCoachChat && (
+                <CoachChatModal
+                    isOpen={showCoachChat}
+                    onClose={() => setShowCoachChat(false)}
+                    session={session}
+                    previousSession={effectivePreviousSession}
+                    isVip={isVip}
+                    onSaveToReport={(summary) => {
+                        setAiState((prev) => ({
+                            ...prev,
+                            ai: { ...(prev.ai || {}), summary: [...(prev.ai?.summary || []), summary] }
+                        }));
+                    }}
+                />
+            )}
         </div>
     );
 };

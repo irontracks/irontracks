@@ -9,5 +9,10 @@ export function createClient() {
   }
   return createBrowserClient(supabaseUrl, supabaseAnonKey, {
     cookieOptions: getSupabaseCookieOptions(),
+    global: {
+      headers: {
+        apikey: supabaseAnonKey,
+      },
+    },
   })
 }

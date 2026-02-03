@@ -43,19 +43,14 @@ const LoginScreen = () => {
             <h1 className="text-5xl font-black mb-2 tracking-tighter italic text-center">IRON<span className="text-yellow-500">TRACKS</span></h1>
             <p className="text-neutral-400 mb-8 text-center max-w-xs font-medium">Sistema de Alta Performance • v3.0</p>
             
-            <a
-                href="/auth/login?next=%2Fdashboard"
-                onClick={(e) => {
-                    try {
-                        e.preventDefault();
-                    } catch {}
-                    handleLogin();
-                }}
-                aria-disabled={isLoading ? 'true' : 'false'}
+            <button
+                type="button"
+                onClick={handleLogin}
+                disabled={isLoading}
                 className="w-full max-w-xs flex items-center justify-center gap-3 bg-white text-neutral-900 px-6 py-4 rounded-xl font-bold text-lg hover:bg-neutral-100 transition-all active:scale-95 shadow-xl disabled:opacity-50 mb-4"
             >
                 {isLoading ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-neutral-900"></span> : <><Image src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width={20} height={20} alt="Google" className="w-5 h-5"/> Entrar com Google</>}
-            </a>
+            </button>
 
             {errorMsg && (
                 <div className="mt-6 p-4 bg-red-900/20 border border-red-500/50 rounded-lg max-w-xs text-center">

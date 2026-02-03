@@ -7,8 +7,20 @@ export type WhatsNewEntry = {
 
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    id: '2026-02-03-coach-ia-2.0',
+    title: 'Nova Era do Iron Coach IA',
+    dateIso: '2026-02-03',
+    items: [
+      '🧠 Iron Coach 2.0: Muito mais inteligente, usando o modelo Gemini Flash para análises profundas.',
+      '💬 Chat Limitado: Usuários gratuitos agora têm 10 mensagens para testar o poder da IA.',
+      '👑 VIP Elite: Nova experiência exclusiva para assinantes de alto nível.',
+      '✨ Interface Renovada: Botões de ação mais acessíveis e nova janela de boas-vindas.',
+      '🚀 Marketplace: Veja claramente os limites e benefícios de cada plano VIP.'
+    ],
+  },
+  {
     id: '2026-01-21',
-    title: 'Atualizações recentes',
+    title: 'Atualizações anteriores',
     dateIso: '2026-01-21',
     items: ['Novas ferramentas no Dashboard: Novos Recordes, Iron Rank e Conquistas', 'Configurações do Dashboard: ativar/desativar ferramentas', 'Correções e ajustes visuais'],
   },

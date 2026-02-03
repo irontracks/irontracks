@@ -3,12 +3,52 @@
 import React, { useEffect, useRef, useState } from 'react'
 
 import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2 } from 'lucide-react'
+import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import BadgesGallery from './BadgesGallery'
 import RecentAchievements from './RecentAchievements'
 import WorkoutCalendarModal from './WorkoutCalendarModal'
 import StoriesBar from './StoriesBar'
 import MuscleMapCard from './MuscleMapCard'
+
+function SortableWorkoutItem({
+  item,
+  index,
+  onChangeTitle,
+  saving,
+}: {
+  item: { id: string; title: string; sort_order: number }
+  index: number
+  onChangeTitle: (id: string, val: string) => void
+  saving: boolean
+}) {
+  const controls = useDragControls()
+
+  return (
+    <Reorder.Item
+      value={item}
+      dragListener={false}
+      dragControls={controls}
+      className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative touch-none select-none"
+    >
+      <div
+        className={`text-neutral-500 p-2 -m-2 touch-none ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
+        onPointerDown={(e) => !saving && controls.start(e)}
+      >
+        <GripVertical size={18} />
+      </div>
+      <div className="w-10 text-xs font-mono text-neutral-500">#{index + 1}</div>
+      <input
+        value={item.title}
+        onChange={(e) => onChangeTitle(item.id, e.target.value)}
+        disabled={saving}
+        className="flex-1 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 disabled:opacity-50"
+        placeholder="Título"
+        onPointerDown={(e) => e.stopPropagation()}
+      />
+    </Reorder.Item>
+  )
+}
 
 export type DashboardWorkout = {
   id?: string
@@ -94,7 +134,6 @@ export default function StudentDashboard(props: Props) {
   const [editListOpen, setEditListOpen] = useState(false)
   const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
   const [savingListEdits, setSavingListEdits] = useState(false)
-  const dragIndexRef = useRef<number | null>(null)
   const [pendingAction, setPendingAction] = useState<
     | {
         workoutKey: string
@@ -520,45 +559,19 @@ export default function StudentDashboard(props: Props) {
                   {editListDraft.length === 0 ? (
                     <div className="text-sm text-neutral-400">Nenhum treino para organizar.</div>
                   ) : (
-                    editListDraft.map((it, idx) => (
-                      <div
-                        key={it.id}
-                        draggable={!savingListEdits}
-                        onDragStart={() => {
-                          dragIndexRef.current = idx
-                        }}
-                        onDragOver={(e) => {
-                          e.preventDefault()
-                        }}
-                        onDrop={() => {
-                          const from = dragIndexRef.current
-                          const to = idx
-                          if (from == null || from === to) return
-                          setEditListDraft((prev) => {
-                            const next = [...prev]
-                            const [moved] = next.splice(from, 1)
-                            next.splice(to, 0, moved)
-                            return next.map((x, i) => ({ ...x, sort_order: i }))
-                          })
-                          dragIndexRef.current = null
-                        }}
-                        className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3"
-                      >
-                        <div className="text-neutral-500 cursor-grab">
-                          <GripVertical size={18} />
-                        </div>
-                        <div className="w-10 text-xs font-mono text-neutral-500">#{idx + 1}</div>
-                        <input
-                          value={it.title}
-                          onChange={(e) => {
-                            const v = e.target.value
-                            setEditListDraft((prev) => prev.map((x) => (x.id === it.id ? { ...x, title: v } : x)))
+                    <Reorder.Group axis="y" values={editListDraft} onReorder={setEditListDraft} className="space-y-2">
+                      {editListDraft.map((it, idx) => (
+                        <SortableWorkoutItem
+                          key={it.id}
+                          item={it}
+                          index={idx}
+                          saving={savingListEdits}
+                          onChangeTitle={(id, val) => {
+                            setEditListDraft((prev) => prev.map((x) => (x.id === id ? { ...x, title: val } : x)))
                           }}
-                          className="flex-1 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                          placeholder="Título"
                         />
-                      </div>
-                    ))
+                      ))}
+                    </Reorder.Group>
                   )}
                 </div>
 
