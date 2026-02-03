@@ -1074,16 +1074,16 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       className="fixed inset-0 z-[2500] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
     >
         {/* Mobile Header / Close */}
-        <div className="absolute top-0 inset-x-0 p-4 flex justify-between items-start z-10 sm:hidden bg-gradient-to-b from-black/80 to-transparent pb-12">
-            <div className="text-white">
-                <h3 className="font-black text-lg">{metrics.title || 'Story Composer'}</h3>
-                <p className="text-xs text-neutral-400 font-medium">Compartilhe sua conquista</p>
+        <div className="flex-none p-4 flex justify-between items-start sm:hidden bg-neutral-950 border-b border-neutral-800">
+            <div className="text-white min-w-0 flex-1 mr-4">
+                <h3 className="font-black text-base truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
+                <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider mt-0.5">Compartilhe sua conquista</p>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-neutral-800/80 backdrop-blur text-white flex items-center justify-center"
+              className="w-9 h-9 rounded-full bg-neutral-800 text-neutral-200 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
         </div>
 
@@ -1113,13 +1113,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         </div>
 
         <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 h-full">
+          <div className="p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 sm:gap-8 h-full">
             
             {/* Preview Column */}
-            <div className="flex flex-col items-center justify-center gap-6 min-h-[50vh]">
+            <div className="flex flex-col items-center justify-start sm:justify-center gap-4 sm:gap-6 min-h-0">
               <div
                 ref={previewRef}
-                className="relative w-full max-w-[360px] aspect-[9/16] rounded-2xl overflow-hidden border border-neutral-800 bg-black shadow-2xl ring-1 ring-white/5"
+                className="relative w-full max-w-[320px] sm:max-w-[360px] aspect-[9/16] rounded-2xl overflow-hidden border border-neutral-800 bg-black shadow-2xl ring-1 ring-white/5 mx-auto shrink-0"
               >
                 {isVideo && (
                   <video
@@ -1154,8 +1154,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
                       }}
                     />
-                    <div className="absolute top-4 right-4 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] text-yellow-500 font-mono">
-                        SAFE AREA
+                    <div className="absolute top-3 inset-x-0 text-center pointer-events-none">
+                        <span className="bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[9px] text-yellow-500 font-mono tracking-widest border border-yellow-500/20">
+                            SAFE AREA
+                        </span>
                     </div>
                   </div>
                 )}
@@ -1195,14 +1197,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
               </div>
 
               {/* Media Controls */}
-              <div className="w-full max-w-[360px] flex items-center gap-2">
+              <div className="w-full max-w-[320px] sm:max-w-[360px] flex items-center gap-2">
                 <label
                   className={[
-                    'flex-1 h-12 rounded-xl bg-neutral-800 border border-neutral-700 text-white font-bold text-xs hover:bg-neutral-700 hover:border-neutral-600 inline-flex items-center justify-center gap-2 cursor-pointer transition-all',
+                    'flex-1 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]',
                     busy ? 'opacity-50 pointer-events-none' : '',
                   ].join(' ')}
                 >
-                  <Upload size={16} className="text-yellow-500" />
+                  <Upload size={14} className="text-yellow-500" />
                   {isVideo ? 'Trocar Vídeo' : 'Trocar Foto'}
                   <input
                     ref={inputRef}
@@ -1220,10 +1222,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                 <button
                   type="button"
                   onClick={() => setShowSafeGuide((v) => !v)}
-                  className={`h-12 px-4 rounded-xl border font-bold text-xs transition-colors ${
+                  className={`h-11 px-4 rounded-xl border font-bold text-[10px] uppercase tracking-wider transition-colors active:scale-[0.98] ${
                     showSafeGuide 
                         ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' 
-                        : 'bg-neutral-800 border-neutral-700 text-neutral-400 hover:text-white'
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
                   }`}
                   disabled={busy}
                 >
@@ -1233,12 +1235,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             </div>
 
             {/* Controls Column */}
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-5 sm:gap-6 pb-6">
                 
                 {/* Layout Selector */}
                 <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-bold text-white">
-                        <Layout size={16} className="text-yellow-500" />
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-neutral-400 px-1">
+                        <Layout size={14} className="text-yellow-500" />
                         Escolha o Layout
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1248,9 +1250,9 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                             type="button"
                             onClick={() => onSelectLayout(l.id)}
                             className={[
-                            'h-12 rounded-xl border text-xs font-bold transition-all',
+                            'h-11 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all active:scale-[0.98]',
                             layout === l.id
-                                ? 'bg-white text-black border-white shadow-lg scale-[1.02]'
+                                ? 'bg-white text-black border-white shadow-lg scale-[1.01]'
                                 : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700',
                             ].join(' ')}
                             disabled={busy}
