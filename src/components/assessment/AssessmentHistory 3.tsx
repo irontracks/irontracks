@@ -134,74 +134,17 @@ const safeDateMsEndOfDay = (raw: any): number | null => {
   return safeDateMs(raw);
 };
 
-const normalizeTacticalPlan = (raw: any) => {
-  const empty = { summary: [], training: [], nutrition: [], habits: [], warnings: [] } as {
-    summary: string[];
-    training: string[];
-    nutrition: string[];
-    habits: string[];
-    warnings: string[];
-  };
-
-  if (!raw) return null;
-  if (typeof raw === 'object') {
-    const plan = raw as any;
-    return {
-      summary: Array.isArray(plan.summary) ? plan.summary.map((x: any) => String(x || '').trim()).filter(Boolean) : [],
-      training: Array.isArray(plan.training) ? plan.training.map((x: any) => String(x || '').trim()).filter(Boolean) : [],
-      nutrition: Array.isArray(plan.nutrition) ? plan.nutrition.map((x: any) => String(x || '').trim()).filter(Boolean) : [],
-      habits: Array.isArray(plan.habits) ? plan.habits.map((x: any) => String(x || '').trim()).filter(Boolean) : [],
-      warnings: Array.isArray(plan.warnings) ? plan.warnings.map((x: any) => String(x || '').trim()).filter(Boolean) : [],
-    };
-  }
-
-  if (typeof raw !== 'string') return null;
-  const text = raw.trim();
-  if (!text) return null;
-
-  const plan = { ...empty };
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  let section: keyof typeof plan | null = null;
-
-  const toSection = (line: string) => {
-    const normalized = line
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    if (normalized.startsWith('treino')) return 'training';
-    if (normalized.startsWith('nutricao')) return 'nutrition';
-    if (normalized.startsWith('habitos') || normalized.startsWith('recuperacao')) return 'habits';
-    if (normalized.startsWith('alertas') || normalized.startsWith('atencao')) return 'warnings';
-    return null;
-  };
-
-  for (const rawLine of lines) {
-    const heading = toSection(rawLine.replace(/:$/, ''));
-    if (heading) {
-      section = heading;
-      continue;
-    }
-    const item = rawLine.replace(/^[-•]\s*/, '').trim();
-    if (!item) continue;
-    if (section) plan[section].push(item);
-    else plan.summary.push(item);
-  }
-
-  return plan;
-};
-
 const countSessionSets = (session: any): number => {
   const logs = session?.logs;
   if (logs && typeof logs === 'object') {
     try {
       const values = Object.values(logs);
       if (Array.isArray(values)) {
-        const doneCountRaw = values.reduce((acc: number, v: any) => {
+        const doneCount = values.reduce((acc: number, v: any) => {
           if (v && typeof v === 'object' && v.done === true) return acc + 1;
           return acc;
-        }, 0 as number);
-        const doneCount = Number(doneCountRaw);
-        if (Number.isFinite(doneCount) && doneCount > 0) return doneCount;
+        }, 0);
+        if (doneCount > 0) return doneCount;
         return values.length;
       }
     } catch {
@@ -496,13 +439,12 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
         return;
       }
 
-      const normalizedPlan = normalizeTacticalPlan(res.plan);
       setAiPlanByAssessmentId((prev) => ({
         ...prev,
         [id]: {
           loading: false,
           error: null,
-          plan: normalizedPlan ?? null,
+          plan: res.plan ?? null,
           usedAi: !!res.usedAi,
           reason: res?.reason ? String(res.reason) : (res?.usedAi ? 'ai' : 'fallback'),
         },

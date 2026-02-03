@@ -22,7 +22,7 @@ export default function ExecutionVideoCapture(props) {
   const inputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const variant = String(props?.variant || 'icon');
-  const label = String(props?.label || (variant === 'wide' ? 'Enviar vídeo ao professor' : 'Enviar'));
+  const label = String(props?.label || (variant === 'wide' ? 'Enviar vídeo ao professor' : variant === 'compact' ? 'Vídeo' : 'Enviar'));
 
   const meta = useMemo(() => {
     return {
@@ -138,6 +138,25 @@ export default function ExecutionVideoCapture(props) {
         >
           <Video size={16} />
           <span className="text-xs">{uploading ? 'Enviando...' : label}</span>
+        </button>
+      ) : variant === 'compact' ? (
+        <button
+          type="button"
+          data-testid="execution-video-send"
+          onClick={(e) => {
+            try {
+              e.preventDefault();
+              e.stopPropagation();
+            } catch {}
+            pickFile();
+          }}
+          disabled={uploading}
+          className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-black/30 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 active:scale-95 transition-transform disabled:opacity-60"
+          title={uploading ? 'Enviando...' : 'Enviar vídeo ao professor'}
+          aria-label={uploading ? 'Enviando vídeo' : 'Enviar vídeo ao professor'}
+        >
+          <Video size={16} className="text-yellow-500" />
+          <span className="text-sm">{uploading ? 'Enviando...' : label}</span>
         </button>
       ) : (
         <button

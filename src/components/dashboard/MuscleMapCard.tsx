@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
-import { backfillExerciseMuscleMaps, getMuscleMapWeek } from '@/actions/workout-actions'
+import { backfillExerciseMuscleMaps, getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
 import { motion, AnimatePresence } from 'framer-motion'
 
 type ApiMuscle = {
@@ -17,7 +17,7 @@ type ApiMuscle = {
   view: 'front' | 'back'
 }
 
-type ApiPayload = {
+type ApiPayloadWeek = {
   ok: boolean
   weekStartDate: string
   weekEndDate: string
@@ -40,8 +40,28 @@ type ApiPayload = {
   ai?: { requested?: boolean; status?: string; insightsStale?: boolean }
 }
 
+type ApiPayloadDay = {
+  ok: boolean
+  date: string
+  workoutsCount: number
+  muscles: Record<string, ApiMuscle>
+  unknownExercises: string[]
+  diagnostics?: { estimatedSetsUsed?: number; sessionsWithNoLogs?: number }
+  ai?: { requested?: boolean; status?: string; mapped?: number; remaining?: number }
+}
+
+type ApiPayload = ApiPayloadWeek | ApiPayloadDay
+
 type Props = {
   onOpenWizard?: () => void
+}
+
+const localIsoDate = () => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 const formatWeek = (start: string, end: string) => {
@@ -57,9 +77,25 @@ const formatWeek = (start: string, end: string) => {
   return `${format(s)}–${format(e)}`
 }
 
+const formatDay = (dateIso: string) => {
+  const s = String(dateIso || '').trim()
+  if (!s) return 'Dia'
+  const d = new Date(`${s}T00:00:00.000`)
+  const ok = Number.isFinite(d.getTime())
+  if (!ok) return s
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+const isWeekPayload = (data: ApiPayload | null): data is ApiPayloadWeek => {
+  const d: any = data
+  return !!d && typeof d.weekStartDate === 'string' && typeof d.weekEndDate === 'string'
+}
+
 const PREFILL_KEY = 'irontracks_wizard_prefill_v1'
 
 export default function MuscleMapCard(props: Props) {
+  const [period, setPeriod] = useState<'day' | 'week'>('day')
+  const [selectedDate, setSelectedDate] = useState(localIsoDate)
   const [view, setView] = useState<'front' | 'back'>('front')
   const [selected, setSelected] = useState<MuscleId | null>(null)
   const [expanded, setExpanded] = useState(false)
@@ -72,13 +108,22 @@ export default function MuscleMapCard(props: Props) {
 
   const load = useCallback(async (opts?: { refreshCache?: boolean; refreshAi?: boolean }) => {
     setState((p) => ({ ...p, status: 'loading', error: '' }))
-    const res = await getMuscleMapWeek({ refreshCache: !!opts?.refreshCache, refreshAi: !!opts?.refreshAi })
+    const res =
+      period === 'day'
+        ? await getMuscleMapDay({
+            date: selectedDate,
+            tzOffsetMinutes: new Date().getTimezoneOffset(),
+            refreshAi: !!opts?.refreshAi,
+            maxAi: 400,
+            batchLimit: 40,
+          })
+        : await getMuscleMapWeek({ refreshCache: !!opts?.refreshCache, refreshAi: !!opts?.refreshAi })
     if (!res?.ok) {
       setState({ status: 'error', data: null, error: String(res?.error || 'Falha ao carregar mapa muscular') })
       return
     }
     setState({ status: 'ready', data: res as ApiPayload, error: '' })
-  }, [])
+  }, [period, selectedDate])
 
   useEffect(() => {
     const t = window.setTimeout(() => {
@@ -121,7 +166,7 @@ export default function MuscleMapCard(props: Props) {
     return { id, label: meta.label, sets: 0, minSets: meta.minSets, maxSets: meta.maxSets, ratio: 0, color: '#111827', view: meta.view }
   }, [selected, state.data])
 
-  const weekLabel = state.data ? formatWeek(state.data.weekStartDate, state.data.weekEndDate) : 'Semana'
+  const weekLabel = period === 'day' ? formatDay(selectedDate) : isWeekPayload(state.data) ? formatWeek(state.data.weekStartDate, state.data.weekEndDate) : 'Semana'
   const aiStatus = String(state.data?.ai?.status || '').trim()
   const aiLabel =
     aiStatus === 'ok'
@@ -203,7 +248,9 @@ export default function MuscleMapCard(props: Props) {
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Mapa muscular</div>
             <div className="text-white font-black text-lg truncate">{weekLabel}</div>
             <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-2">
-              <span>{state.data ? `${state.data.workoutsCount} treino(s) na semana` : 'Análise por músculo'}</span>
+              <span>
+                {state.data ? `${state.data.workoutsCount} treino(s) ${period === 'day' ? 'no dia' : 'na semana'}` : 'Análise por músculo'}
+              </span>
               <span className="text-neutral-600">•</span>
               <span>{aiLabel}</span>
               {weakMuscles.length ? (
@@ -247,6 +294,49 @@ export default function MuscleMapCard(props: Props) {
             className="px-4 pb-4 space-y-4 overflow-hidden"
           >
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-1 flex gap-1 w-fit">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPeriod('day')
+                    }}
+                    className={
+                      period === 'day'
+                        ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                        : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
+                    }
+                  >
+                    Dia
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPeriod('week')
+                    }}
+                    className={
+                      period === 'week'
+                        ? 'min-h-[36px] px-3 rounded-lg bg-neutral-900 text-yellow-500 border border-yellow-500/30 font-black text-xs uppercase tracking-widest'
+                        : 'min-h-[36px] px-3 rounded-lg bg-transparent text-neutral-400 hover:text-white font-black text-xs uppercase tracking-widest'
+                    }
+                  >
+                    Semana
+                  </button>
+                </div>
+
+                {period === 'day' ? (
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(String(e.target.value || '').trim())}
+                    onClick={(e) => e.stopPropagation()}
+                    className="min-h-[40px] px-3 rounded-xl bg-black border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest"
+                  />
+                ) : null}
+              </div>
+
               <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-1 flex gap-1 w-fit">
                 <button
                   type="button"
@@ -381,7 +471,7 @@ export default function MuscleMapCard(props: Props) {
                   Meta sugerida: {selectedInfo.minSets}–{selectedInfo.maxSets} sets/semana
                 </div>
 
-                {state.data?.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
+                {isWeekPayload(state.data) && state.data.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
                   <div className="mt-3 space-y-2">
                     <div className="text-xs font-black uppercase tracking-widest text-neutral-500">Top exercícios</div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -408,7 +498,7 @@ export default function MuscleMapCard(props: Props) {
               {state.status === 'loading' ? <Loader2 size={16} className="animate-spin text-neutral-400" /> : null}
             </div>
 
-            {state.data?.insights?.summary?.length ? (
+            {isWeekPayload(state.data) && state.data.insights?.summary?.length ? (
               <ul className="mt-3 space-y-2">
                 {state.data.insights.summary.map((item, idx) => (
                   <li key={idx} className="text-sm text-neutral-100">
@@ -420,7 +510,7 @@ export default function MuscleMapCard(props: Props) {
               <div className="mt-3 text-sm text-neutral-400">Sem insights suficientes para essa semana.</div>
             )}
 
-            {state.data?.insights?.imbalanceAlerts?.length ? (
+            {isWeekPayload(state.data) && state.data.insights?.imbalanceAlerts?.length ? (
               <div className="mt-4 space-y-2">
                 {state.data.insights.imbalanceAlerts.slice(0, 4).map((a, idx) => (
                   <div key={idx} className="rounded-xl border border-neutral-800 bg-black p-3">
@@ -448,7 +538,7 @@ export default function MuscleMapCard(props: Props) {
           <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
             <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top músculos</div>
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {(state.data?.topMuscles || [])
+              {(isWeekPayload(state.data) ? state.data.topMuscles : [])
                 .filter((x) => x && x.id && (state.data?.muscles?.[x.id]?.view || '') === view)
                 .slice(0, 6)
                 .map((m) => (

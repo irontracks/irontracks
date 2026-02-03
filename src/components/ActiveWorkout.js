@@ -1063,7 +1063,9 @@ export default function ActiveWorkout(props) {
             <span className="text-xs font-black">Abrir</span>
           </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Cluster</span>
+            <span className="inline-flex items-center rounded-full px-2 py-1 text-[10px] uppercase tracking-wide font-black text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 shrink-0 whitespace-nowrap">
+              CLUSTER
+            </span>
             <span className="text-xs text-neutral-400 truncate">
               {notation ? `(${notation})` : ''} • Intra {restsByGap?.[0] || intra || 0}s • Total: {total || 0} reps
             </span>
@@ -1393,48 +1395,50 @@ export default function ActiveWorkout(props) {
 
         {!collapsedNow && (
           <div className="mt-4 space-y-2">
-            <ExecutionVideoCapture
-              variant="wide"
-              exerciseName={name}
-              workoutId={workout?.id || null}
-              exerciseId={ex?.id || ex?.exercise_id || null}
-              exerciseLibraryId={ex?.exercise_library_id || null}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const pickWeight = () => {
-                  for (let i = 0; i < setsCount; i += 1) {
-                    const w = String(getLog(`${exIdx}-${i}`)?.weight ?? '').trim();
-                    if (w) return w;
+            <div className="grid grid-cols-2 gap-2">
+              <ExecutionVideoCapture
+                variant="compact"
+                exerciseName={name}
+                workoutId={workout?.id || null}
+                exerciseId={ex?.id || ex?.exercise_id || null}
+                exerciseLibraryId={ex?.exercise_library_id || null}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const pickWeight = () => {
+                    for (let i = 0; i < setsCount; i += 1) {
+                      const w = String(getLog(`${exIdx}-${i}`)?.weight ?? '').trim();
+                      if (w) return w;
+                    }
+                    const cfg0 = getPlanConfig(ex, 0);
+                    const planned = String(cfg0?.weight ?? '').trim();
+                    if (planned) return planned;
+                    return '';
+                  };
+                  const w = pickWeight();
+                  if (!w) {
+                    try {
+                      window.alert('Preencha pelo menos 1 série com peso antes de linkar.');
+                    } catch {}
+                    return;
                   }
-                  const cfg0 = getPlanConfig(ex, 0);
-                  const planned = String(cfg0?.weight ?? '').trim();
-                  if (planned) return planned;
-                  return '';
-                };
-                const w = pickWeight();
-                if (!w) {
-                  try {
-                    window.alert('Preencha pelo menos 1 série com peso antes de linkar.');
-                  } catch {}
-                  return;
-                }
-                for (let i = 0; i < setsCount; i += 1) {
-                  const key = `${exIdx}-${i}`;
-                  const existing = getLog(key);
-                  const cfg = getPlanConfig(ex, i);
-                  updateLog(key, {
-                    weight: w,
-                    advanced_config: existing?.advanced_config ?? cfg ?? null,
-                  });
-                }
-              }}
-              className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-black border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-950 active:scale-95 transition-transform"
-            >
-              <Link2 size={16} className="text-yellow-500" />
-              <span className="text-sm">Linkar pesos</span>
-            </button>
+                  for (let i = 0; i < setsCount; i += 1) {
+                    const key = `${exIdx}-${i}`;
+                    const existing = getLog(key);
+                    const cfg = getPlanConfig(ex, i);
+                    updateLog(key, {
+                      weight: w,
+                      advanced_config: existing?.advanced_config ?? cfg ?? null,
+                    });
+                  }
+                }}
+                className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-black/30 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 active:scale-95 transition-transform"
+              >
+                <Link2 size={16} className="text-yellow-500" />
+                <span className="text-sm">Pesos</span>
+              </button>
+            </div>
             {Array.from({ length: setsCount }).map((_, setIdx) => renderSet(ex, exIdx, setIdx))}
             <button
               type="button"
