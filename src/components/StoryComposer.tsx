@@ -1094,7 +1094,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-6xl bg-neutral-950 sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
       >
         {/* Desktop Header */}
-        <div className="hidden sm:flex px-6 py-4 border-b border-neutral-800 items-center justify-between">
+        <div className="hidden sm:flex px-6 py-4 border-b border-neutral-800 items-center justify-between flex-none">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
                     <Share2 size={20} />
@@ -1112,14 +1112,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             </button>
         </div>
 
-        <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain">
-          <div className="p-4 sm:p-8 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 sm:gap-8 h-full">
+        <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0">
+          <div className="p-4 sm:p-8 flex flex-col lg:grid lg:grid-cols-[1fr_360px] gap-6 sm:gap-8 h-full">
             
             {/* Preview Column */}
-            <div className="flex flex-col items-center justify-start sm:justify-center gap-4 sm:gap-6 min-h-0">
+            <div className="flex-none flex flex-col items-center justify-start sm:justify-center gap-4 sm:gap-6">
               <div
                 ref={previewRef}
-                className="relative w-full max-w-[320px] sm:max-w-[360px] aspect-[9/16] rounded-2xl overflow-hidden border border-neutral-800 bg-black shadow-2xl ring-1 ring-white/5 mx-auto shrink-0"
+                className="relative w-full max-w-[280px] sm:max-w-[360px] aspect-[9/16] rounded-2xl overflow-hidden border border-neutral-800 bg-black shadow-2xl ring-1 ring-white/5 mx-auto shrink-0"
               >
                 {isVideo && (
                   <video
