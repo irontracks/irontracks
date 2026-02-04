@@ -36,3 +36,25 @@ export type AppNotification = {
   metadata?: Record<string, any> | null
   is_read?: boolean
 }
+
+export type Story = {
+  id: string
+  createdAt: string
+  expiresAt: string
+  caption: string | null
+  mediaUrl: string | null
+  viewed: boolean
+  likeCount: number
+  hasLiked: boolean
+  commentCount: number
+}
+
+export type StoryGroup = {
+  authorId: string
+  displayName: string | null
+  photoUrl: string | null
+  role: string | null
+  hasStories?: boolean
+  hasUnseen?: boolean
+  stories: Story[]
+}

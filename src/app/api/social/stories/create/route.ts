@@ -2,30 +2,9 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isAllowedStoryPath, validateStoryPayload } from '@/lib/social/storyValidation'
 
 export const dynamic = 'force-dynamic'
-
-const isAllowedStoryPath = (userId: string, path: string) => {
-  const uid = String(userId || '').trim()
-  const p = String(path || '').trim()
-  if (!uid || !p) return false
-  if (p.includes('..') || p.includes('\\') || p.includes('\0') || p.startsWith('/')) return false
-  const parts = p.split('/').filter(Boolean)
-  if (parts.length < 3) return false
-  if (parts[0] !== uid) return false
-  if (parts[1] !== 'stories') return false
-  const name = parts.slice(2).join('/')
-  if (
-    !name.endsWith('.jpg') &&
-    !name.endsWith('.jpeg') &&
-    !name.endsWith('.png') &&
-    !name.endsWith('.mp4') &&
-    !name.endsWith('.mov') &&
-    !name.endsWith('.webm')
-  )
-    return false
-  return true
-}
 
 export async function POST(req: Request) {
   try {
@@ -33,11 +12,14 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response
 
     const body = await req.json().catch(() => ({}))
-    const mediaPath = String(body?.mediaPath || body?.media_path || '').trim()
-    const caption = body?.caption != null ? String(body.caption).trim() : null
-    const meta = body?.meta && typeof body.meta === 'object' ? body.meta : {}
+    const validation = validateStoryPayload(body)
+    
+    if (!validation.ok || !validation.data) {
+        return NextResponse.json({ ok: false, error: validation.error || 'invalid_payload' }, { status: 400 })
+    }
 
-    if (!mediaPath) return NextResponse.json({ ok: false, error: 'media_path required' }, { status: 400 })
+    const { mediaPath, caption, meta } = validation.data
+
     if (!isAllowedStoryPath(auth.user.id, mediaPath)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
     const { data, error } = await auth.supabase

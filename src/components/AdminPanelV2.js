@@ -19,6 +19,7 @@ import {
 } from 'chart.js';
 import { createClient } from '@/utils/supabase/client';
 import AdminWorkoutEditor from './AdminWorkoutEditor';
+import RequestsTab from '@/components/admin/RequestsTab';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { useDialog } from '@/contexts/DialogContext';
 import { sendBroadcastMessage, clearAllStudents, clearAllTeachers, clearAllWorkouts, deleteTeacher, updateTeacher, addTeacher, exportAllData, importAllData } from '@/actions/admin-actions';
@@ -1664,7 +1665,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
 	let TAB_LABELS = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
 	if (isAdmin) {
-		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', system: 'SISTEMA' };
+		TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', system: 'SISTEMA' };
 	}
 	if (isTeacher && !isAdmin) {
 		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
@@ -2560,6 +2561,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </div>
                         )}
                     </div>
+                )}
+
+                {tab === 'requests' && !selectedStudent && isAdmin && (
+                    <RequestsTab />
                 )}
 
                 {tab === 'videos' && !selectedStudent && isAdmin && (

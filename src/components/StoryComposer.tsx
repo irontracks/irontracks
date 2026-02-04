@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react'
+import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 // @ts-ignore - Ignoring type check for js file
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { motion, AnimatePresence } from 'framer-motion'
+import VideoTrimmer from '@/components/stories/VideoTrimmer'
 
 // --- Types ---
 
@@ -553,8 +554,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const [kcalEstimate, setKcalEstimate] = useState(0)
   const [draggingKey, setDraggingKey] = useState<string | null>(null)
   const dragRef = useRef({ key: null as string | null, pointerId: null as number | null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } })
-  const mediaLoadIdRef = useRef(0)
+  const [mediaLoadIdRef] = useState({ current: 0 })
   const backgroundUrlRef = useRef('')
+  
+  // Trimming State
+  const [showTrimmer, setShowTrimmer] = useState(false)
+  const [videoDuration, setVideoDuration] = useState(0)
+  const [trimRange, setTrimRange] = useState<[number, number]>([0, 15])
+  const [previewTime, setPreviewTime] = useState(0)
 
   useEffect(() => {
     backgroundUrlRef.current = backgroundUrl
@@ -646,6 +653,9 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     setMediaKind('image')
     setBackgroundUrl('')
     setBackgroundImage(null)
+    setShowTrimmer(false)
+    setVideoDuration(0)
+    setTrimRange([0, 15])
     try {
       if (inputRef?.current) inputRef.current.value = ''
     } catch {}
@@ -736,6 +746,16 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       if (kind === 'video') {
         setBackgroundImage(null)
         setInfo('')
+        
+        // Load video metadata to set defaults
+        const v = document.createElement('video')
+        v.preload = 'metadata'
+        v.onloadedmetadata = () => {
+             const dur = v.duration || 0
+             setVideoDuration(dur)
+             setTrimRange([0, Math.min(dur, 15)])
+        }
+        v.src = url
         return
       }
       const img = new Image()
@@ -902,6 +922,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
     const chunks: Blob[] = []
     let mime = 'video/mp4'
+    // Safari e Chrome modernos suportam mp4
     if (!MediaRecorder.isTypeSupported(mime)) {
       mime = 'video/webm;codecs=vp9'
       if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm'
@@ -932,15 +953,16 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         reject(e)
       }
 
+      // Configuração inicial do vídeo para gravação
       video.pause()
-      video.currentTime = 0
+      video.currentTime = trimRange[0] // Start from trim start
       video.loop = false
-      // video.muted = false // Descomente para gravar áudio (pode causar eco durante gravação)
       
       recorder.start()
       video.play().then(() => {
         const draw = () => {
-          if (video.paused || video.ended) {
+          // Stop if reached end of trim or video ended
+          if (video.paused || video.ended || video.currentTime >= trimRange[1]) {
             if (recorder.state === 'recording') recorder.stop()
             return
           }
@@ -968,7 +990,11 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           rafId = requestAnimationFrame(draw)
         }
         draw()
-      }).catch(reject)
+      }).catch((err) => {
+         cancelAnimationFrame(rafId)
+         if (recorder.state === 'recording') recorder.stop()
+         reject(err)
+      })
     })
   }
 
@@ -1150,19 +1176,19 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[2500] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
+      className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
     >
         {/* Mobile Header / Close */}
-        <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start sm:hidden bg-neutral-950 border-b border-neutral-800">
+        <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-transparent border-b border-neutral-800/50">
             <div className="text-white min-w-0 flex-1 mr-4">
-                <h3 className="font-black text-base truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
-                <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider mt-0.5">Compartilhe sua conquista</p>
+                <h3 className="font-bold text-lg truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
+                <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
             </div>
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-neutral-800 text-neutral-200 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none"
+              className="w-8 h-8 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
         </div>
 
@@ -1170,35 +1196,30 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         initial={{ y: 20, scale: 0.95 }}
         animate={{ y: 0, scale: 1 }}
         exit={{ y: 20, scale: 0.95 }}
-        className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-6xl bg-neutral-950 sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-5xl bg-black sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
       >
         {/* Desktop Header */}
-        <div className="hidden sm:flex px-6 py-4 border-b border-neutral-800 items-center justify-between flex-none">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center text-yellow-500">
-                    <Share2 size={20} />
-                </div>
-                <div>
-                    <h2 className="font-bold text-white">Criar Story</h2>
-                    <p className="text-xs text-neutral-400">Personalize o layout e compartilhe</p>
-                </div>
+        <div className="hidden sm:flex px-6 py-5 border-b border-neutral-800 items-center justify-between flex-none bg-neutral-900">
+            <div>
+                <h2 className="font-bold text-white text-xl">{metrics.title || 'Story Composer'}</h2>
+                <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
             </div>
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"
+              className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
         </div>
 
-        <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0">
-          <div className="p-4 sm:p-8 flex flex-col lg:grid lg:grid-cols-[1fr_360px] gap-6 sm:gap-8 h-full">
+        <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent">
+          <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
             
             {/* Preview Column */}
-            <div className="flex-none flex flex-col items-center justify-start sm:justify-center gap-4 sm:gap-6">
+            <div className="flex-none flex flex-col items-center gap-6">
               <div
                 ref={previewRef}
-                className="relative w-full max-w-[280px] sm:max-w-[360px] aspect-[9/16] rounded-2xl overflow-hidden border border-neutral-800 bg-black shadow-2xl ring-1 ring-white/5 mx-auto shrink-0"
+                className="relative w-full max-w-[300px] sm:max-w-[340px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl ring-1 ring-white/10 shrink-0"
               >
                 {isVideo && (
                   <video
@@ -1206,8 +1227,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                     ref={videoRef}
                     crossOrigin="anonymous"
                     src={backgroundUrl || undefined}
-                    className="absolute inset-0 w-full h-full object-contain bg-black"
-                    controls
+                    className="absolute inset-0 w-full h-full object-cover bg-black"
+                    controls={false}
                     playsInline
                     muted
                     autoPlay
@@ -1224,9 +1245,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
                 {showSafeGuide && (
                   <div className="absolute inset-0 pointer-events-none z-10">
-                    <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40" />
                     <div
-                      className="absolute border border-yellow-500/30 rounded-2xl border-dashed"
+                      className="absolute border border-yellow-500/20 rounded-3xl border-dashed"
                       style={{
                         left: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
                         right: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
@@ -1234,11 +1254,6 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
                       }}
                     />
-                    <div className="absolute top-3 inset-x-0 text-center pointer-events-none">
-                        <span className="bg-black/60 backdrop-blur px-2 py-0.5 rounded text-[9px] text-yellow-500 font-mono tracking-widest border border-yellow-500/20">
-                            SAFE AREA
-                        </span>
-                    </div>
                   </div>
                 )}
 
@@ -1277,15 +1292,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
               </div>
 
               {/* Media Controls */}
-              <div className="w-full max-w-[320px] sm:max-w-[360px] flex items-center gap-2">
+              <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
                 <label
                   className={[
-                    'flex-1 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]',
+                    'flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]',
                     busy ? 'opacity-50 pointer-events-none' : '',
                   ].join(' ')}
                 >
-                  <Upload size={14} className="text-yellow-500" />
-                  {isVideo ? 'Trocar Vídeo' : 'Trocar Foto'}
+                  <Upload size={16} className="text-yellow-500" />
+                  {isVideo ? 'TROCAR' : 'TROCAR FOTO'}
                   <input
                     ref={inputRef}
                     type="file"
@@ -1299,41 +1314,102 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                    />
                 </label>
                 
+                {isVideo && (
+                    <button
+                        type="button"
+                        onClick={() => setShowTrimmer(v => !v)}
+                        className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors active:scale-[0.98] ${
+                            showTrimmer 
+                            ? 'bg-yellow-500 text-black border-yellow-500' 
+                            : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                        disabled={busy}
+                    >
+                        <Scissors size={18} />
+                    </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setShowSafeGuide((v) => !v)}
-                  className={`h-11 px-4 rounded-xl border font-bold text-[10px] uppercase tracking-wider transition-colors active:scale-[0.98] ${
+                  className={`w-28 h-12 rounded-xl border font-bold text-[10px] uppercase tracking-wider transition-colors active:scale-[0.98] ${
                     showSafeGuide 
                         ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' 
                         : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
                   }`}
                   disabled={busy}
                 >
-                  Guia {showSafeGuide ? 'ON' : 'OFF'}
+                  GUIA {showSafeGuide ? 'ON' : 'OFF'}
                 </button>
               </div>
             </div>
 
             {/* Controls Column */}
-            <div className="flex flex-col gap-5 sm:gap-6 pb-6">
+            <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
                 
+                {/* Trimmer UI */}
+                <AnimatePresence>
+                    {showTrimmer && isVideo && (
+                        <motion.div 
+                            initial={{ height: 0, opacity: 0 }} 
+                            animate={{ height: 'auto', opacity: 1 }} 
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                        >
+                            <VideoTrimmer 
+                                duration={videoDuration} 
+                                value={trimRange} 
+                                onChange={(val) => {
+                                    setTrimRange(val)
+                                    // Update preview frame if paused
+                                    if (videoRef.current && videoRef.current.paused) {
+                                        videoRef.current.currentTime = val[0]
+                                    }
+                                }}
+                                onPreview={(play) => {
+                                    if (!videoRef.current) return
+                                    if (play) {
+                                        videoRef.current.currentTime = trimRange[0]
+                                        videoRef.current.play()
+                                        const check = () => {
+                                            if (!videoRef.current) return
+                                            setPreviewTime(videoRef.current.currentTime)
+                                            if (videoRef.current.currentTime >= trimRange[1]) {
+                                                videoRef.current.pause()
+                                                videoRef.current.currentTime = trimRange[0]
+                                            } else if (!videoRef.current.paused) {
+                                                requestAnimationFrame(check)
+                                            }
+                                        }
+                                        requestAnimationFrame(check)
+                                    } else {
+                                        videoRef.current.pause()
+                                    }
+                                }}
+                                currentTime={previewTime}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 {/* Layout Selector */}
                 <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-neutral-400 px-1">
-                        <Layout size={14} className="text-yellow-500" />
-                        Escolha o Layout
+                    <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-yellow-500/80 mb-2">
+                        <Layout size={14} />
+                        ESCOLHA O LAYOUT
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-3">
                         {STORY_LAYOUTS.map((l) => (
                         <button
                             key={l.id}
                             type="button"
                             onClick={() => onSelectLayout(l.id)}
                             className={[
-                            'h-11 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all active:scale-[0.98]',
+                            'h-12 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all active:scale-[0.98]',
                             layout === l.id
-                                ? 'bg-white text-black border-white shadow-lg scale-[1.01]'
+                                ? 'bg-white text-black border-white shadow-lg scale-[1.02]'
                                 : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700',
+                            l.id === 'live' ? 'col-span-2' : '' // LIVE spans full width
                             ].join(' ')}
                             disabled={busy}
                         >
@@ -1342,7 +1418,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         ))}
                     </div>
                     {layout === 'live' && (
-                        <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3">
+                        <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3 mt-2">
                             <Move size={16} className="text-blue-400 mt-0.5" />
                             <div className="flex-1">
                                 <p className="text-xs text-blue-200 font-medium">Modo LIVE ativado</p>
@@ -1357,13 +1433,9 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                             </button>
                         </div>
                     )}
-                    {/* {isVideo && (
-                         <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center gap-3">
-                            <Info size={16} className="text-neutral-500" />
-                            <p className="text-xs text-neutral-400">Vídeos usam layout fixo no momento.</p>
-                         </div>
-                    )} */}
                 </div>
+
+                <div className="flex-1 hidden lg:block" />
 
                 {/* Status Messages */}
                 <AnimatePresence mode="wait">
@@ -1374,33 +1446,31 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         </motion.div>
                     )}
                     {error && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
-                            <AlertCircle size={18} className="text-red-500" />
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-red-950/40 border border-red-900/50 flex items-center gap-3">
+                            <AlertCircle size={18} className="text-red-400" />
                             <p className="text-xs font-bold text-red-200">{error}</p>
                         </motion.div>
                     )}
                 </AnimatePresence>
 
-                <div className="flex-1" />
-
                 {/* Actions */}
-                <div className="grid grid-cols-1 gap-3 pt-6 border-t border-neutral-800">
+                <div className="space-y-3 pt-2">
                     <button
                         onClick={postToIronTracks}
                         disabled={busy}
-                        className="h-14 rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
+                        className="h-14 w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
                     >
-                        {busy ? 'Processando...' : 'Postar no IronTracks'}
+                        {busy ? 'PROCESSANDO...' : 'POSTAR NO IRONTRACKS'}
                     </button>
                     
-                    <button
+                    {/* <button
                         onClick={shareImage}
                         disabled={busy}
-                        className="h-14 rounded-xl bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 border border-neutral-700 transition-all active:scale-[0.98]"
+                        className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
                     >
-                        <Share2 size={18} />
-                        Compartilhar / Salvar
-                    </button>
+                        <Share2 size={14} />
+                        BAIXAR / COMPARTILHAR
+                    </button> */}
                 </div>
 
             </div>
