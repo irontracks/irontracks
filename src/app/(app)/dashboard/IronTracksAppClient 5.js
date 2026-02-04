@@ -21,8 +21,7 @@ import {
     Clock,
     Upload,
     ArrowLeft,
-    X,
-    Crown
+    X
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { createWorkout, updateWorkout, deleteWorkout, importData, computeWorkoutStreakAndStats, setWorkoutArchived, setWorkoutSortOrder } from '@/actions/workout-actions';
@@ -62,7 +61,6 @@ import WorkoutWizardModal from '@/components/dashboard/WorkoutWizardModal'
 import SettingsModal from '@/components/SettingsModal'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import WhatsNewModal from '@/components/WhatsNewModal'
-import WelcomeFloatingWindow from '@/components/WelcomeFloatingWindow'
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { getLatestWhatsNew } from '@/content/whatsNew'
 import GuidedTour from '@/components/onboarding/GuidedTour'
@@ -2737,17 +2735,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 </h1>
                             </div>
                             <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50"></div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
-                                    {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
-                                </span>
-                                {vipAccess?.hasVip && (
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3">
-                                        <Crown size={11} className="text-yellow-500 fill-yellow-500" />
-                                        <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
-                                    </div>
-                                )}
-                            </div>
+                            <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
+                                {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
+                            </span>
                         </div>
                         
                         <div className="flex items-center gap-4">
@@ -3034,7 +3024,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 session={reportData.current}
                                 previousSession={reportData.previous}
                                 user={user}
-                                isVip={vipAccess?.hasVip}
                                 settings={userSettingsApi?.settings ?? null}
                                 onClose={() => setView(reportBackView || 'dashboard')}
                             />
@@ -3560,8 +3549,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     onClose={() => setOfflineSyncOpen(false)}
                     userId={user?.id}
                 />
-
-                <WelcomeFloatingWindow user={user} />
             </div>
         </TeamWorkoutProvider>
         </InAppNotificationsProvider>

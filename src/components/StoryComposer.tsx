@@ -878,36 +878,111 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     return () => cancelAnimationFrame(raf)
   }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey])
 
+  const renderVideo = async (): Promise<{ blob: Blob; filename: string; mime: string }> => {
+    if (!videoRef.current) throw new Error('Vídeo não disponível')
+    const video = videoRef.current
+    const duration = video.duration
+    if (!duration || !Number.isFinite(duration)) throw new Error('Duração inválida')
+
+    const canvas = document.createElement('canvas')
+    canvas.width = CANVAS_W
+    canvas.height = CANVAS_H
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Erro no Canvas')
+
+    const stream = canvas.captureStream(30)
+    
+    // Tenta capturar áudio (se disponível e não mudo)
+    // @ts-ignore
+    const vidStream = video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null
+    if (vidStream) {
+      const audioTrack = vidStream.getAudioTracks()[0]
+      if (audioTrack) stream.addTrack(audioTrack)
+    }
+
+    const chunks: Blob[] = []
+    let mime = 'video/mp4'
+    if (!MediaRecorder.isTypeSupported(mime)) {
+      mime = 'video/webm;codecs=vp9'
+      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm'
+    }
+
+    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 }) // 5 Mbps
+
+    return new Promise((resolve, reject) => {
+      let rafId = 0
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data)
+      }
+
+      recorder.onstop = () => {
+        cancelAnimationFrame(rafId)
+        video.loop = true
+        video.muted = true
+        video.play().catch(() => {})
+        
+        const blob = new Blob(chunks, { type: mime })
+        const ext = mime.includes('mp4') ? 'mp4' : 'webm'
+        resolve({ blob, filename: `irontracks-story-${Date.now()}.${ext}`, mime })
+      }
+
+      recorder.onerror = (e) => {
+        cancelAnimationFrame(rafId)
+        reject(e)
+      }
+
+      video.pause()
+      video.currentTime = 0
+      video.loop = false
+      // video.muted = false // Descomente para gravar áudio (pode causar eco durante gravação)
+      
+      recorder.start()
+      video.play().then(() => {
+        const draw = () => {
+          if (video.paused || video.ended) {
+            if (recorder.state === 'recording') recorder.stop()
+            return
+          }
+          
+          const vw = video.videoWidth
+          const vh = video.videoHeight
+          const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
+          const dw = vw * scale
+          const dh = vh * scale
+          const cx = (CANVAS_W - dw) / 2
+          const cy = (CANVAS_H - dh) / 2
+          ctx.drawImage(video, cx, cy, dw, dh)
+
+          drawStory({ 
+            ctx, 
+            canvasW: CANVAS_W, 
+            canvasH: CANVAS_H, 
+            backgroundImage: null, 
+            metrics, 
+            layout, 
+            livePositions, 
+            transparentBg: true 
+          })
+
+          rafId = requestAnimationFrame(draw)
+        }
+        draw()
+      }).catch(reject)
+    })
+  }
+
   const createImageBlob = async ({ type = 'jpg', quality = 0.95 }): Promise<{ blob: Blob; filename: string; mime: string }> => {
+    if (mediaKind === 'video') {
+      return renderVideo()
+    }
+
     const canvas = document.createElement('canvas')
     canvas.width = CANVAS_W
     canvas.height = CANVAS_H
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('canvas_error')
 
-    if (mediaKind === 'video') {
-      // For video, we can only grab a frame if we use a hidden video element or just fail over to black bg
-      // Since complex video frame grabbing is hard in browser without heavy libs, we'll draw the overlay only?
-      // Or just fallback to default bg.
-      // Current implementation: Just draw story with black bg (no video frame capture)
-      // Ideally we would want to draw the video frame but `videoRef` is playing.
-      // We can try to draw videoRef to canvas
-      if (videoRef.current) {
-        try {
-            const vw = videoRef.current.videoWidth
-            const vh = videoRef.current.videoHeight
-            const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
-            const dw = vw * scale
-            const dh = vh * scale
-            const cx = (CANVAS_W - dw) / 2
-            const cy = (CANVAS_H - dh) / 2
-            ctx.drawImage(videoRef.current, cx, cy, dw, dh)
-        } catch {
-            // fail safe
-        }
-      }
-    }
-    
     // If image is loaded, use it
     if (mediaKind === 'image') {
         // drawStory already handles this
@@ -980,11 +1055,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       let meta: any = {}
       
       if (mediaKind === 'video') {
-        const file = selectedFile
-        if (!file) throw new Error('Selecione um vídeo primeiro.')
-        const maxBytes = 50 * 1024 * 1024
-        if (Number(file.size) > maxBytes) throw new Error('Vídeo muito grande (máx 50MB).')
-        const ext = parseExt(file.name) || extFromMime(file.type) || '.mp4'
+        if (!selectedFile) throw new Error('Selecione um vídeo primeiro.')
+        const maxBytes = 100 * 1024 * 1024 // 100MB Limit
+        if (Number(selectedFile.size) > maxBytes) throw new Error('Vídeo muito grande (máx 100MB).')
+        
+        // Renderiza vídeo com layout
+        const { blob, mime } = await createImageBlob({})
+        if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 100MB).')
+
+        const ext = mime.includes('mp4') ? '.mp4' : '.webm'
         const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
         path = `${uid}/stories/${storyId}${ext}`
         const signResp = await fetch('/api/storage/social-stories/signed-upload', {
@@ -996,7 +1075,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
         const { error: upErr } = await supabase.storage
           .from('social-stories')
-          .uploadToSignedUrl(path, String(signJson.token), file, { contentType: file.type || 'video/mp4' })
+          .uploadToSignedUrl(path, String(signJson.token), blob, { contentType: mime })
         if (upErr) throw upErr
         
         meta = {
@@ -1074,7 +1153,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       className="fixed inset-0 z-[2500] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
     >
         {/* Mobile Header / Close */}
-        <div className="flex-none p-4 flex justify-between items-start sm:hidden bg-neutral-950 border-b border-neutral-800">
+        <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start sm:hidden bg-neutral-950 border-b border-neutral-800">
             <div className="text-white min-w-0 flex-1 mr-4">
                 <h3 className="font-black text-base truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
                 <p className="text-[10px] text-neutral-400 font-medium uppercase tracking-wider mt-0.5">Compartilhe sua conquista</p>
@@ -1125,6 +1204,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                   <video
                     key={backgroundUrl || 'no-video'}
                     ref={videoRef}
+                    crossOrigin="anonymous"
                     src={backgroundUrl || undefined}
                     className="absolute inset-0 w-full h-full object-contain bg-black"
                     controls

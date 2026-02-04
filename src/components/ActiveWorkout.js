@@ -342,9 +342,73 @@ export default function ActiveWorkout(props) {
     }
   };
 
+  const validateWorkout = async () => {
+    const errors = [];
+    const title = String(workout?.title || '').trim();
+    if (!title) {
+      errors.push('O treino precisa de um título.');
+    }
+
+    if (!exercises || exercises.length === 0) {
+      errors.push('O treino não tem exercícios.');
+    }
+
+    let totalDone = 0;
+
+    exercises.forEach((ex, exIdx) => {
+      const exName = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
+      if (!String(ex?.name || '').trim()) {
+        errors.push(`Exercício ${exIdx + 1}: Nome não preenchido.`);
+      }
+
+      const setsHeader = Math.max(0, Number(ex?.sets) || 0);
+      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
+      const setsCount = Math.max(setsHeader, sdArr.length);
+
+      for (let i = 0; i < setsCount; i++) {
+        const key = `${exIdx}-${i}`;
+        const log = getLog(key);
+        
+        // Se a série foi marcada como feita, TEM QUE ter peso e reps
+        if (log?.done) {
+          totalDone++;
+          const w = String(log?.weight ?? '').trim();
+          const r = String(log?.reps ?? '').trim();
+          const cfg = getPlanConfig(ex, i); // Fallback to plan config if needed? No, log should have it if edited.
+          // Actually renderNormalSet uses: const weightValue = String(log?.weight ?? cfg?.weight ?? '');
+          // So we should check the effective value
+          const effWeight = w || String(cfg?.weight ?? '').trim();
+          
+          if (!effWeight && effWeight !== '0') {
+             errors.push(`${exName} (Série ${i + 1}): Peso não preenchido.`);
+          }
+          if (!r && r !== '0') {
+             errors.push(`${exName} (Série ${i + 1}): Repetições não preenchidas.`);
+          }
+        }
+      }
+    });
+
+    if (exercises.length > 0 && totalDone === 0) {
+       errors.push('Nenhuma série foi concluída. Marque "Feito" nas séries realizadas.');
+    }
+
+    if (errors.length > 0) {
+      const list = errors.map(e => `• ${e}`).join('\n');
+      await alert(`Para finalizar, verifique os seguintes campos:\n\n${list}`, 'Campos obrigatórios');
+      return false;
+    }
+
+    return true;
+  };
+
   const finishWorkout = async () => {
     if (!session || !workout) return;
     if (finishing) return;
+
+    // Validação obrigatória
+    const isValid = await validateWorkout();
+    if (!isValid) return;
 
     const minSecondsForFullSession = 30 * 60;
     const elapsedSafe = Number(elapsedSeconds) || 0;

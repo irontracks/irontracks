@@ -59,14 +59,18 @@ const nextConfig = {
     ],
   },
   async headers() {
+    const isDev = String(process.env.NODE_ENV || '').toLowerCase() !== 'production'
+    const staticCache = isDev ? 'no-store, max-age=0' : 'public, max-age=31536000, immutable'
+    const imageCache = isDev ? 'no-store, max-age=0' : 'public, max-age=0, must-revalidate'
+
     return [
       {
         source: '/_next/static/:path*',
-        headers: [{ key: 'cache-control', value: 'public, max-age=31536000, immutable' }],
+        headers: [{ key: 'cache-control', value: staticCache }],
       },
       {
         source: '/_next/image',
-        headers: [{ key: 'cache-control', value: 'public, max-age=0, must-revalidate' }],
+        headers: [{ key: 'cache-control', value: imageCache }],
       },
       {
         source: '/manifest.json',

@@ -21,13 +21,15 @@ const LoginScreen = () => {
     };
 
     const handleLogin = async () => {
+        console.log('Iniciando login...');
         setIsLoading(true);
         setErrorMsg('');
         
         try {
             const href = getLoginHref();
+            console.log('Navegando para:', href);
             window.location.assign(href);
-            return
+            // Não fazemos return aqui para permitir que o navegador processe a navegação
         } catch (error) {
             console.error("Login Error:", error);
             setIsLoading(false);
@@ -41,7 +43,7 @@ const LoginScreen = () => {
             {/* Spotlight Gradient Background */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] opacity-60" />
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150 mix-blend-overlay" />
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuNjUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCgjbm9pc2VGaWx0ZXIpIiBvcGFjaXR5PSIwLjUiLz48L3N2Zz4=')] opacity-20 brightness-100 contrast-150 mix-blend-overlay" />
             </div>
 
             {/* Glassmorphism Card */}

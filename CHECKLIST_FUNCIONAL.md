@@ -147,3 +147,23 @@ Este documento serve para validar, manualmente, cada feature adicionada durante 
 
 **Resultado esperado**
 - O scanner continua funcionando mesmo com o Wizard no “Novo Treino”.
+
+## 11) Story Composer (Vídeo & Compartilhamento)
+**Para que serve**: Compartilhar treinos no Instagram/Iron Story com vídeos longos (até 100MB) e layout aplicado (overlay).
+
+**Onde achar**:
+- Ao finalizar treino -> Botão de compartilhar.
+- Histórico -> Selecionar treino -> Compartilhar.
+
+**Passos de teste**:
+- Gravar/Escolher vídeo > 50MB (até 100MB).
+- Verificar se carrega sem erro.
+- Escolher layout (Live, Normal, etc.).
+- Clicar "Salvar" (deve gerar arquivo MP4/WebM com layout).
+- Clicar "Iron Story" (deve enviar vídeo com layout para o feed).
+- Clicar "Compartilhar" (deve abrir share sheet nativo com vídeo processado).
+
+**Resultado esperado**:
+- Vídeo deve conter as métricas desenhadas em cima (não só fundo preto).
+- Áudio deve estar mudo (padrão atual).
+- Qualidade deve ser mantida (1080p approx).
