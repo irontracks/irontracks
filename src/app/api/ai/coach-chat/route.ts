@@ -17,7 +17,7 @@ const formatSession = (session: any) => {
     const logs = session.logs || {};
     
     summary += 'Exercícios:\n';
-    exercises.forEach((ex, idx) => {
+    exercises.forEach((ex: any, idx) => {
         summary += `${idx + 1}. ${ex.name} (${ex.sets} séries, Método: ${ex.method || 'Normal'}, RPE: ${ex.rpe || '-'}, Descanso: ${ex.restTime || '-'}s)\n`;
         // Add logs detail
         for (let s = 0; s < (ex.sets || 0); s++) {
@@ -32,7 +32,7 @@ const formatSession = (session: any) => {
     return summary;
 };
 
-export async function POST(req) {
+export async function POST(req: any) {
     try {
         const user = await requireUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
