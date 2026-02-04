@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.0-flash-exp';
 
-const formatSession = (session) => {
+const formatSession = (session: any) => {
     if (!session) return 'Nenhum dado disponível.';
     
     let summary = `Título: ${session.workoutTitle || 'Treino sem nome'}\n`;
