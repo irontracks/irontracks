@@ -14,6 +14,21 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, errorInfo) {
     console.error("Uncaught error:", error, errorInfo);
     this.setState({ errorInfo });
+    try {
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(
+          new CustomEvent('irontracks:error', {
+            detail: {
+              source: 'errorboundary',
+              error,
+              meta: {
+                componentStack: errorInfo?.componentStack || null,
+              },
+            },
+          })
+        );
+      }
+    } catch {}
   }
 
   render() {
@@ -54,4 +69,3 @@ class ErrorBoundary extends React.Component {
 }
 
 export default ErrorBoundary;
-

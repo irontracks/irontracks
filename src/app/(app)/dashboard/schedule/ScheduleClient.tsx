@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, ArrowLeft, Clock, User, Plus, Pencil, Trash2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { InAppNotificationsProvider } from '@/contexts/InAppNotificationsContext'
 
 type AppointmentRow = {
   id: string
@@ -356,6 +357,7 @@ export default function SchedulePage() {
   const safeAppointments = Array.isArray(appointments) ? appointments : []
 
   return (
+    <InAppNotificationsProvider>
     <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
       <header className="bg-neutral-950 border-b border-neutral-800 px-4 pt-[env(safe-area-inset-top)] pb-3 flex items-center justify-between gap-3">
         <button
@@ -569,5 +571,6 @@ export default function SchedulePage() {
         </div>
       )}
     </div>
+    </InAppNotificationsProvider>
   )
 }

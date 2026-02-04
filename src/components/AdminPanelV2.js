@@ -1,10 +1,12 @@
+"use client";
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
 	Crown, X, UserCog, AlertCircle, Trash2, Megaphone, Plus, Copy, ArrowLeft,
 	MessageSquare, Send, RefreshCw, Dumbbell, Share2, UserPlus, AlertTriangle, Edit3, ShieldAlert,
-		ChevronDown, FileText, Download, History, Search, Play
+		ChevronDown, FileText, Download, History, Search, Play, Video
 } from 'lucide-react';
 import { Bar } from 'react-chartjs-2';
 import {
@@ -17,19 +19,30 @@ import {
 } from 'chart.js';
 import { createClient } from '@/utils/supabase/client';
 import AdminWorkoutEditor from './AdminWorkoutEditor';
+import RequestsTab from '@/components/admin/RequestsTab';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { useDialog } from '@/contexts/DialogContext';
 import { sendBroadcastMessage, clearAllStudents, clearAllTeachers, clearAllWorkouts, deleteTeacher, updateTeacher, addTeacher, exportAllData, importAllData } from '@/actions/admin-actions';
 import { updateWorkout, deleteWorkout } from '@/actions/workout-actions';
 import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
+import { normalizeWorkoutTitle, workoutTitleKey } from '@/utils/workoutTitle';
+import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
+const COACH_INBOX_DEFAULTS = {
+    churnDays: 7,
+    volumeDropPct: 30,
+    loadSpikePct: 60,
+    minPrev7Volume: 500,
+    minCurrent7VolumeSpike: 800,
+    snoozeDefaultMinutes: 1440,
+};
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
 const AdminPanelV2 = ({ user, onClose }) => {
-    const { alert, confirm } = useDialog();
+    const { alert, confirm, prompt } = useDialog();
     const supabaseRef = useRef(null);
     if (!supabaseRef.current) supabaseRef.current = createClient();
     const supabase = supabaseRef.current;
@@ -50,11 +63,34 @@ const AdminPanelV2 = ({ user, onClose }) => {
     };
 
     const router = useRouter();
+    const executionVideoEnabled = (() => {
+        try {
+            const raw = String(process.env.NEXT_PUBLIC_ENABLE_EXECUTION_VIDEO ?? '').trim().toLowerCase();
+            if (raw === 'false') return false;
+            if (raw === 'true') return true;
+            return true;
+        } catch {
+            return true;
+        }
+    })();
 
     const [tab, setTab] = useState('dashboard');
     const [usersList, setUsersList] = useState([]);
     const [teachersList, setTeachersList] = useState([]);
+    const [selectedTeacher, setSelectedTeacher] = useState(null);
+    const [teacherDetailTab, setTeacherDetailTab] = useState('students');
+    const [teacherStudents, setTeacherStudents] = useState([]);
+    const [teacherStudentsLoading, setTeacherStudentsLoading] = useState(false);
+    const [teacherTemplatesRows, setTeacherTemplatesRows] = useState([]);
+    const [teacherTemplatesLoading, setTeacherTemplatesLoading] = useState(false);
+    const [teacherTemplatesCursor, setTeacherTemplatesCursor] = useState(null);
+    const [teacherHistoryRows, setTeacherHistoryRows] = useState([]);
+    const [teacherHistoryLoading, setTeacherHistoryLoading] = useState(false);
+    const [teacherHistoryCursor, setTeacherHistoryCursor] = useState(null);
+    const [teacherInboxItems, setTeacherInboxItems] = useState([]);
+    const [teacherInboxLoading, setTeacherInboxLoading] = useState(false);
     const [templates, setTemplates] = useState([]);
+    const [templatesUserId, setTemplatesUserId] = useState('');
     const [myWorkoutsCount, setMyWorkoutsCount] = useState(0);
     const [selectedStudent, setSelectedStudent] = useState(null);
     const [subTab, setSubTab] = useState('workouts');
@@ -68,6 +104,17 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [viewWorkout, setViewWorkout] = useState(null);
     const [exportOpen, setExportOpen] = useState(false);
     const [historyOpen, setHistoryOpen] = useState(false);
+    const [executionVideos, setExecutionVideos] = useState([]);
+    const [executionVideosLoading, setExecutionVideosLoading] = useState(false);
+    const [executionVideosError, setExecutionVideosError] = useState('');
+    const [executionVideoModalOpen, setExecutionVideoModalOpen] = useState(false);
+    const [executionVideoModalUrl, setExecutionVideoModalUrl] = useState('');
+    const [executionVideoFeedbackDraft, setExecutionVideoFeedbackDraft] = useState({});
+    const [studentCheckinsRange, setStudentCheckinsRange] = useState('7d');
+    const [studentCheckinsFilter, setStudentCheckinsFilter] = useState('all');
+    const [studentCheckinsLoading, setStudentCheckinsLoading] = useState(false);
+    const [studentCheckinsError, setStudentCheckinsError] = useState('');
+    const [studentCheckinsRows, setStudentCheckinsRows] = useState([]);
     const loadedStudentInfo = useRef(new Set());
     const [systemExporting, setSystemExporting] = useState(false);
     const [systemImporting, setSystemImporting] = useState(false);
@@ -88,12 +135,36 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [videoExerciseName, setVideoExerciseName] = useState('');
     const [videoQueue, setVideoQueue] = useState([]);
     const [videoLoading, setVideoLoading] = useState(false);
+
+    const [prioritiesItems, setPrioritiesItems] = useState([]);
+    const [prioritiesLoading, setPrioritiesLoading] = useState(false);
+    const [prioritiesError, setPrioritiesError] = useState('');
+    const [prioritiesSettingsOpen, setPrioritiesSettingsOpen] = useState(false);
+    const [prioritiesSettingsLoading, setPrioritiesSettingsLoading] = useState(false);
+    const [prioritiesSettingsError, setPrioritiesSettingsError] = useState('');
+    const [prioritiesSettings, setPrioritiesSettings] = useState(() => ({ ...COACH_INBOX_DEFAULTS }));
+    const prioritiesSettingsPrefRef = useRef(null);
+    const [prioritiesComposeOpen, setPrioritiesComposeOpen] = useState(false);
+    const [prioritiesComposeStudentId, setPrioritiesComposeStudentId] = useState('');
+    const [prioritiesComposeKind, setPrioritiesComposeKind] = useState('');
+    const [prioritiesComposeText, setPrioritiesComposeText] = useState('');
     const [videoBackfillLimit, setVideoBackfillLimit] = useState('20');
     const [videoMissingCount, setVideoMissingCount] = useState(null);
     const [videoMissingLoading, setVideoMissingLoading] = useState(false);
     const [videoCycleRunning, setVideoCycleRunning] = useState(false);
     const [videoCycleStats, setVideoCycleStats] = useState({ processed: 0, created: 0, skipped: 0 });
     const videoCycleStopRef = useRef(false);
+
+    const [errorReports, setErrorReports] = useState([]);
+    const [errorsLoading, setErrorsLoading] = useState(false);
+    const [errorsQuery, setErrorsQuery] = useState('');
+    const [errorsStatusFilter, setErrorsStatusFilter] = useState('all');
+
+    const [exerciseAliasesReview, setExerciseAliasesReview] = useState([]);
+    const [exerciseAliasesLoading, setExerciseAliasesLoading] = useState(false);
+    const [exerciseAliasesError, setExerciseAliasesError] = useState('');
+    const [exerciseAliasesBackfillLoading, setExerciseAliasesBackfillLoading] = useState(false);
+    const [exerciseAliasesNotice, setExerciseAliasesNotice] = useState('');
 
     useEffect(() => {
         if (unauthorized) onClose && onClose();
@@ -160,6 +231,23 @@ const AdminPanelV2 = ({ user, onClose }) => {
 		const list = Array.isArray(templates) ? templates : [];
 		return list.filter(templateMatchesQuery);
 	}, [templateMatchesQuery, templates]);
+
+    const errorsFiltered = useMemo(() => {
+        const list = Array.isArray(errorReports) ? errorReports : [];
+        const q = normalizeText(errorsQuery).trim();
+        return list
+            .filter((r) => {
+                if (!errorsStatusFilter || errorsStatusFilter === 'all') return true;
+                return normalizeText(r?.status || '') === normalizeText(errorsStatusFilter);
+            })
+            .filter((r) => {
+                if (!q) return true;
+                const msg = normalizeText(r?.message || '');
+                const email = normalizeText(r?.user_email || r?.userEmail || '');
+                const path = normalizeText(r?.pathname || '');
+                return msg.includes(q) || email.includes(q) || path.includes(q);
+            });
+    }, [errorReports, errorsQuery, errorsStatusFilter, normalizeText]);
 
 	const coachInboxItems = useMemo(() => {
 		if (!isTeacher) return [];
@@ -244,6 +332,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     useEffect(() => {
         if (!selectedStudent) setHistoryOpen(false);
+    }, [selectedStudent]);
+
+    useEffect(() => {
+        if (selectedStudent) setSelectedTeacher(null);
     }, [selectedStudent]);
 
     const handleExportSystem = async () => {
@@ -586,6 +678,93 @@ const AdminPanelV2 = ({ user, onClose }) => {
         }
     }, [tab, isAdmin, addingTeacher, editingTeacher, supabase]);
 
+    const loadTeacherStudents = useCallback(async (teacher) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherStudents([]); return; }
+        setTeacherStudentsLoading(true);
+        try {
+            const res = await fetch(`/api/admin/teachers/students?teacher_user_id=${encodeURIComponent(uid)}`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) { setTeacherStudents([]); return; }
+            setTeacherStudents(Array.isArray(json.students) ? json.students : []);
+        } finally {
+            setTeacherStudentsLoading(false);
+        }
+    }, []);
+
+    const loadTeacherTemplates = useCallback(async (teacher, reset = false) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); return; }
+        if (reset) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); }
+        setTeacherTemplatesLoading(true);
+        try {
+            const cursor = reset ? '' : String(teacherTemplatesCursor || '');
+            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
+            if (cursor) qs.set('cursor', cursor);
+            const res = await fetch(`/api/admin/teachers/workouts/templates?${qs.toString()}`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) return;
+            const rows = Array.isArray(json.rows) ? json.rows : [];
+            setTeacherTemplatesRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
+            setTeacherTemplatesCursor(json.next_cursor || null);
+        } finally {
+            setTeacherTemplatesLoading(false);
+        }
+    }, [teacherTemplatesCursor]);
+
+    const loadTeacherHistory = useCallback(async (teacher, reset = false) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); return; }
+        if (reset) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); }
+        setTeacherHistoryLoading(true);
+        try {
+            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
+            const cur = reset ? null : teacherHistoryCursor;
+            if (cur?.cursor_date) qs.set('cursor_date', String(cur.cursor_date));
+            if (cur?.cursor_created_at) qs.set('cursor_created_at', String(cur.cursor_created_at));
+            const res = await fetch(`/api/admin/teachers/workouts/history?${qs.toString()}`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) return;
+            const rows = Array.isArray(json.rows) ? json.rows : [];
+            setTeacherHistoryRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
+            setTeacherHistoryCursor(json.next_cursor || null);
+        } finally {
+            setTeacherHistoryLoading(false);
+        }
+    }, [teacherHistoryCursor]);
+
+    const loadTeacherInbox = useCallback(async (teacher) => {
+        const uid = String(teacher?.user_id || '').trim();
+        if (!uid) { setTeacherInboxItems([]); return; }
+        setTeacherInboxLoading(true);
+        try {
+            const res = await fetch(`/api/admin/teachers/inbox?teacher_user_id=${encodeURIComponent(uid)}&limit=80`);
+            const json = await res.json().catch(() => ({}));
+            if (!json?.ok) { setTeacherInboxItems([]); return; }
+            setTeacherInboxItems(Array.isArray(json.items) ? json.items : []);
+        } finally {
+            setTeacherInboxLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!selectedTeacher || !isAdmin) return;
+        setTeacherDetailTab('students');
+        setTeacherTemplatesRows([]);
+        setTeacherTemplatesCursor(null);
+        setTeacherHistoryRows([]);
+        setTeacherHistoryCursor(null);
+        setTeacherInboxItems([]);
+        loadTeacherStudents(selectedTeacher).catch(() => {});
+    }, [isAdmin, loadTeacherStudents, selectedTeacher]);
+
+    useEffect(() => {
+        if (!selectedTeacher || !isAdmin) return;
+        if (teacherDetailTab === 'templates' && teacherTemplatesRows.length === 0) loadTeacherTemplates(selectedTeacher, true).catch(() => {});
+        if (teacherDetailTab === 'history' && teacherHistoryRows.length === 0) loadTeacherHistory(selectedTeacher, true).catch(() => {});
+        if (teacherDetailTab === 'inbox' && teacherInboxItems.length === 0) loadTeacherInbox(selectedTeacher).catch(() => {});
+    }, [isAdmin, loadTeacherHistory, loadTeacherInbox, loadTeacherTemplates, selectedTeacher, teacherDetailTab, teacherHistoryRows.length, teacherInboxItems.length, teacherTemplatesRows.length]);
+
     // URL Persistence for Tabs (Fixed)
     useEffect(() => {
        if (typeof window === 'undefined') return;
@@ -619,15 +798,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
             try {
                 const { data: { user: currentUser } } = await supabase.auth.getUser();
                 if (!currentUser) return;
+                setTemplatesUserId(currentUser.id || '');
                 let list = [];
                 if (isAdmin || isTeacher) {
                     try {
                         const res = await fetch('/api/admin/workouts/mine');
                         const json = await res.json();
                         if (json.ok) {
-                            list = (json.rows || []).filter(
-                                w => w?.is_template === true && (w?.created_by === currentUser.id || w?.user_id === currentUser.id)
-                            );
+                            list = (json.rows || []).filter((w) => w?.is_template === true && w?.user_id === currentUser.id);
                         }
                     } catch (e) { console.error("API fetch error", e); }
 
@@ -637,11 +815,9 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 .from('workouts')
                                 .select('*, exercises(*, sets(*))')
                                 .eq('is_template', true)
-                                .or(`created_by.eq.${currentUser.id},user_id.eq.${currentUser.id}`)
+                                .eq('user_id', currentUser.id)
                                 .order('name');
-                            list = (data || []).filter(
-                                w => w?.is_template === true && (w?.created_by === currentUser.id || w?.user_id === currentUser.id)
-                            );
+                            list = (data || []).filter((w) => w?.is_template === true && w?.user_id === currentUser.id);
                         } catch (e) { console.error("Supabase fetch error", e); }
                     }
                 } else {
@@ -664,12 +840,6 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     }
                 } catch {}
                 // Deduplicar por título, priorizando treinos completos (maior número de exercícios)
-                const normalize = (s) => (s || '')
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\s+/g,' ')
-                    .trim();
                 const score = (w) => {
                     const exs = Array.isArray(w.exercises) ? w.exercises : [];
                     const exCount = exs.length;
@@ -679,14 +849,23 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 for (const w of (list || [])) {
                     if (!w || !w.name) continue; // Defensive check
                     try {
-                        const key = normalize(w.name);
+                        const key = workoutTitleKey(w.name);
                         const prev = byTitle.get(key);
-                        if (!prev || score(w) > score(prev) || (score(w) === score(prev) && !!w.is_template && !prev.is_template)) {
+                        const curHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(w?.name || ''));
+                        const prevHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(prev?.name || ''));
+                        if (
+                            !prev
+                            || score(w) > score(prev)
+                            || (score(w) === score(prev) && curHasPrefix && !prevHasPrefix)
+                            || (score(w) === score(prev) && !!w.is_template && !prev.is_template)
+                        ) {
                             byTitle.set(key, w);
                         }
                     } catch (e) { console.error("Error processing workout", w, e); }
                 }
-                const deduped = Array.from(byTitle.values()).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+                const deduped = Array.from(byTitle.values())
+                    .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name || '') }))
+                    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
                 setTemplates(deduped || []);
             } catch (err) {
                 console.error("Critical error fetching templates", err);
@@ -781,6 +960,72 @@ const AdminPanelV2 = ({ user, onClose }) => {
     }, [tab, isAdmin, supabase]);
 
     useEffect(() => {
+        if (tab !== 'errors' || !isAdmin) return;
+        let cancelled = false;
+        const fetchErrors = async () => {
+            setErrorsLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('error_reports')
+                    .select('id, user_id, user_email, message, stack, pathname, url, user_agent, app_version, source, meta, status, created_at, updated_at, resolved_at, resolved_by')
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (cancelled) return;
+                if (error) {
+                    setErrorReports([]);
+                    return;
+                }
+                setErrorReports(Array.isArray(data) ? data : []);
+            } catch {
+                if (!cancelled) setErrorReports([]);
+            } finally {
+                if (!cancelled) setErrorsLoading(false);
+            }
+        };
+        fetchErrors();
+        return () => {
+            cancelled = true;
+        };
+    }, [tab, isAdmin, supabase]);
+
+    useEffect(() => {
+        if (tab !== 'system' || !isAdmin) return;
+        let cancelled = false;
+        const fetchAliases = async () => {
+            setExerciseAliasesLoading(true);
+            setExerciseAliasesError('');
+            try {
+                const { data, error } = await supabase
+                    .from('exercise_aliases')
+                    .select('id, user_id, canonical_id, alias, normalized_alias, confidence, source, needs_review, created_at, updated_at')
+                    .eq('needs_review', true)
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (cancelled) return;
+                if (error) {
+                    setExerciseAliasesReview([]);
+                    const msg = String(error?.message || '');
+                    if (msg) setExerciseAliasesError(msg);
+                    return;
+                }
+                setExerciseAliasesReview(Array.isArray(data) ? data : []);
+            } catch (e) {
+                if (!cancelled) {
+                    setExerciseAliasesReview([]);
+                    const msg = e?.message ? String(e.message) : '';
+                    if (msg) setExerciseAliasesError(msg);
+                }
+            } finally {
+                if (!cancelled) setExerciseAliasesLoading(false);
+            }
+        };
+        fetchAliases();
+        return () => {
+            cancelled = true;
+        };
+    }, [tab, isAdmin, supabase]);
+
+    useEffect(() => {
         const fetchMyWorkoutsCount = async () => {
             const { data: { user: currentUser } } = await supabase.auth.getUser();
             if (!currentUser) { setMyWorkoutsCount(0); return; }
@@ -789,15 +1034,9 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     const res = await fetch('/api/admin/workouts/mine');
                     const json = await res.json();
                     if (json.ok) {
-                        const normalize = (s) => (s || '')
-                            .toLowerCase()
-                            .normalize('NFD')
-                            .replace(/[\u0300-\u036f]/g, '')
-                            .replace(/\s+/g,' ')
-                            .trim();
                         const byTitle = new Map();
                         for (const w of (json.rows || [])) {
-                            const key = normalize(w.name);
+                            const key = workoutTitleKey(w.name);
                             if (!byTitle.has(key)) byTitle.set(key, w);
                         }
                         const count = byTitle.size;
@@ -835,6 +1074,113 @@ const AdminPanelV2 = ({ user, onClose }) => {
         };
         if (tab === 'dashboard') fetchMyWorkoutsCount();
     }, [tab, isAdmin, supabase]);
+
+    const fetchPriorities = useCallback(async () => {
+        try {
+            setPrioritiesLoading(true);
+            setPrioritiesError('');
+            const res = await fetch('/api/teacher/inbox/feed?limit=80', { cache: 'no-store', credentials: 'include' });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.ok) {
+                setPrioritiesItems([]);
+                setPrioritiesError(String(json?.error || `Falha ao carregar (${res.status})`));
+                return;
+            }
+            setPrioritiesItems(Array.isArray(json.items) ? json.items : []);
+        } catch (e) {
+            setPrioritiesItems([]);
+            setPrioritiesError(e?.message ? String(e.message) : 'Erro ao carregar');
+        } finally {
+            setPrioritiesLoading(false);
+        }
+    }, []);
+
+    const normalizeCoachInboxSettings = useCallback((raw) => {
+        const s = raw && typeof raw === 'object' ? raw : {};
+        const toInt = (v, min, max, fallback) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return fallback;
+            const x = Math.floor(n);
+            return Math.max(min, Math.min(max, x));
+        };
+        return {
+            churnDays: toInt(s?.churnDays, 1, 60, COACH_INBOX_DEFAULTS.churnDays),
+            volumeDropPct: toInt(s?.volumeDropPct, 5, 90, COACH_INBOX_DEFAULTS.volumeDropPct),
+            loadSpikePct: toInt(s?.loadSpikePct, 10, 300, COACH_INBOX_DEFAULTS.loadSpikePct),
+            minPrev7Volume: toInt(s?.minPrev7Volume, 0, 1000000, COACH_INBOX_DEFAULTS.minPrev7Volume),
+            minCurrent7VolumeSpike: toInt(s?.minCurrent7VolumeSpike, 0, 1000000, COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike),
+            snoozeDefaultMinutes: toInt(s?.snoozeDefaultMinutes, 5, 10080, COACH_INBOX_DEFAULTS.snoozeDefaultMinutes),
+        };
+    }, []);
+
+    const loadPrioritiesSettings = useCallback(async () => {
+        try {
+            setPrioritiesSettingsLoading(true);
+            setPrioritiesSettingsError('');
+            const uid = user?.id ? String(user.id) : '';
+            if (!uid) return;
+            const { data, error } = await supabase
+                .from('user_settings')
+                .select('preferences')
+                .eq('user_id', uid)
+                .maybeSingle();
+            if (error) {
+                const msg = String(error?.message || '');
+                const code = String(error?.code || '');
+                const missing = code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg);
+                if (missing) {
+                    prioritiesSettingsPrefRef.current = null;
+                    setPrioritiesSettings({ ...COACH_INBOX_DEFAULTS });
+                    setPrioritiesSettingsError('Tabela user_settings não disponível (migrations pendentes).');
+                    return;
+                }
+                setPrioritiesSettingsError(msg || 'Falha ao carregar configurações.');
+                return;
+            }
+            const prefs = data?.preferences && typeof data.preferences === 'object' ? data.preferences : {};
+            prioritiesSettingsPrefRef.current = prefs;
+            const next = normalizeCoachInboxSettings(prefs?.coachInbox);
+            setPrioritiesSettings(next);
+        } catch (e) {
+            setPrioritiesSettingsError(e?.message ? String(e.message) : 'Falha ao carregar configurações.');
+        } finally {
+            setPrioritiesSettingsLoading(false);
+        }
+    }, [normalizeCoachInboxSettings, supabase, user?.id]);
+
+    const savePrioritiesSettings = useCallback(async () => {
+        try {
+            const uid = user?.id ? String(user.id) : '';
+            if (!uid) return false;
+            setPrioritiesSettingsLoading(true);
+            setPrioritiesSettingsError('');
+            const basePrefs = prioritiesSettingsPrefRef.current && typeof prioritiesSettingsPrefRef.current === 'object'
+                ? prioritiesSettingsPrefRef.current
+                : {};
+            const payload = {
+                user_id: uid,
+                preferences: { ...basePrefs, coachInbox: normalizeCoachInboxSettings(prioritiesSettings) },
+                updated_at: new Date().toISOString(),
+            };
+            const { error } = await supabase.from('user_settings').upsert(payload, { onConflict: 'user_id' });
+            if (error) {
+                setPrioritiesSettingsError(String(error?.message || 'Falha ao salvar.'));
+                return false;
+            }
+            prioritiesSettingsPrefRef.current = payload.preferences;
+            return true;
+        } catch (e) {
+            setPrioritiesSettingsError(e?.message ? String(e.message) : 'Falha ao salvar.');
+            return false;
+        } finally {
+            setPrioritiesSettingsLoading(false);
+        }
+    }, [normalizeCoachInboxSettings, prioritiesSettings, supabase, user?.id]);
+
+    useEffect(() => {
+        if (tab !== 'priorities') return;
+        fetchPriorities();
+    }, [tab, fetchPriorities]);
 
     useEffect(() => {
         if (!selectedStudent) return;
@@ -932,21 +1278,21 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 my = (my || []).filter(w => (w?.user_id === me.id) && (w?.is_template === true));
                 
                 // Helper reintroduzido para deduplicação de TEMPLATES (Meus Treinos)
-                const normalizeTitle = (s) => (s || '')
-                    .toLowerCase()
-                    .normalize('NFD')
-                    .replace(/[\u0300-\u036f]/g, '')
-                    .replace(/\s+/g,' ')
-                    .trim();
-
                 const tMap = new Map();
                 for (const w of (my || [])) {
-                    const key = normalizeTitle(w.name);
+                    const key = workoutTitleKey(w.name);
                     const prev = tMap.get(key);
                     const exs = Array.isArray(w.exercises) ? w.exercises : [];
                     const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                     const score = (x) => (Array.isArray(x) ? x.length : 0);
-                    if (!prev || score(exs) > score(prevExs) || (score(exs) === score(prevExs) && !!w.is_template && !prev?.is_template)) {
+                    const curHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(w?.name || ''));
+                    const prevHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(prev?.name || ''));
+                    if (
+                        !prev
+                        || score(exs) > score(prevExs)
+                        || (score(exs) === score(prevExs) && curHasPrefix && !prevHasPrefix)
+                        || (score(exs) === score(prevExs) && !!w.is_template && !prev?.is_template)
+                    ) {
                         tMap.set(key, w);
                     }
                 }
@@ -955,15 +1301,17 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     const jsonLegacy = await resLegacy.json();
                     if (jsonLegacy.ok) {
                         for (const r of (jsonLegacy.rows || [])) {
-                            const key = normalizeTitle(r.name);
+                            const key = workoutTitleKey(r.name);
                             const prev = tMap.get(key);
-                            const candidate = { id: r.id || r.uuid, name: r.name, exercises: [] };
+                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] };
                             const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                             if (!prev || prevExs.length < 1) tMap.set(key, candidate);
                         }
                     }
                 } catch {}
-                const dedupTemplates = Array.from(tMap.values()).sort((a,b) => (a.name||'').localeCompare(b.name||''));
+                const dedupTemplates = Array.from(tMap.values())
+                    .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name || '') }))
+                    .sort((a,b) => (a.name||'').localeCompare(b.name||''));
                 setTemplates(dedupTemplates || []);
             }
             if (targetUserId) {
@@ -985,6 +1333,86 @@ const AdminPanelV2 = ({ user, onClose }) => {
         };
         fetchDetails();
     }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher]);
+
+    useEffect(() => {
+        if (!executionVideoEnabled) return;
+        if (!selectedStudent) return;
+        if (subTab !== 'videos') return;
+        let cancelled = false;
+        const run = async () => {
+            const studentUserId = selectedStudent?.user_id ? String(selectedStudent.user_id) : '';
+            if (!studentUserId) return;
+            setExecutionVideosLoading(true);
+            setExecutionVideosError('');
+            try {
+                const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(studentUserId)}`, { cache: 'no-store', credentials: 'include' });
+                const json = await res.json().catch(() => null);
+                if (cancelled) return;
+                if (!res.ok || !json?.ok) {
+                    setExecutionVideos([]);
+                    setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
+                    return;
+                }
+                setExecutionVideos(Array.isArray(json.items) ? json.items : []);
+            } catch (e) {
+                if (!cancelled) {
+                    setExecutionVideos([]);
+                    setExecutionVideosError(e?.message ? String(e.message) : 'Erro ao carregar');
+                }
+            } finally {
+                if (!cancelled) setExecutionVideosLoading(false);
+            }
+        };
+        run();
+        return () => {
+            cancelled = true;
+        };
+    }, [executionVideoEnabled, selectedStudent, subTab]);
+
+    useEffect(() => {
+        if (!selectedStudent) return;
+        if (subTab !== 'checkins') return;
+        let cancelled = false;
+        const run = async () => {
+            try {
+                setStudentCheckinsLoading(true);
+                setStudentCheckinsError('');
+                const looksLikeUuid = (v) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || '').trim());
+                const rawCandidate = selectedStudent?.user_id || selectedStudent?.id || '';
+                const studentUserId = looksLikeUuid(rawCandidate) ? String(rawCandidate) : '';
+                if (!studentUserId) {
+                    setStudentCheckinsRows([]);
+                    setStudentCheckinsError('Aluno sem user_id (não é possível buscar check-ins).');
+                    return;
+                }
+
+                const days = String(studentCheckinsRange || '7d') === '30d' ? 30 : 7;
+                const startIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+                let q = supabase
+                    .from('workout_checkins')
+                    .select('id, kind, created_at, energy, mood, soreness, notes, answers, workout_id, planned_workout_id')
+                    .eq('user_id', studentUserId)
+                    .gte('created_at', startIso)
+                    .order('created_at', { ascending: false })
+                    .limit(400);
+                if (studentCheckinsFilter && studentCheckinsFilter !== 'all') q = q.eq('kind', String(studentCheckinsFilter));
+                const { data, error } = await q;
+                if (error) throw error;
+                if (cancelled) return;
+                setStudentCheckinsRows(Array.isArray(data) ? data : []);
+            } catch (e) {
+                if (cancelled) return;
+                setStudentCheckinsRows([]);
+                setStudentCheckinsError(e?.message ? String(e.message) : 'Falha ao carregar check-ins.');
+            } finally {
+                if (!cancelled) setStudentCheckinsLoading(false);
+            }
+        };
+        run();
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedStudent, subTab, studentCheckinsFilter, studentCheckinsRange, supabase]);
 
     // Ensure teachers list available when viewing a student (for assignment)
     useEffect(() => {
@@ -1237,7 +1665,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
 	let TAB_LABELS = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
 	if (isAdmin) {
-		TAB_LABELS = { ...TAB_LABELS, teachers: 'PROFESSORES', videos: 'VÍDEOS', system: 'SISTEMA' };
+		TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', system: 'SISTEMA' };
+	}
+	if (isTeacher && !isAdmin) {
+		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
+	}
+	if (isAdmin) {
+		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
 	}
 
 	const tabKeys = Object.keys(TAB_LABELS);
@@ -1424,7 +1858,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'));
 
     return (
-        <div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col overflow-hidden">
+        <div data-tour="adminpanel.root" className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col overflow-hidden">
             <div className="sticky top-0 z-50 bg-neutral-950/90 backdrop-blur-xl border-b border-neutral-800 shadow-[0_16px_40px_rgba(0,0,0,0.55)] pt-safe flex-shrink-0">
                 {debugError && (
                     <div className="bg-red-600 text-white font-bold p-4 text-center text-xs break-all mb-2 rounded-xl">
@@ -1460,7 +1894,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 						
 						<div className="flex items-center gap-2 min-w-0 mt-1 md:mt-0">
                             <div className="flex-1 min-w-0">
-                                <div className="hidden md:flex items-center gap-2 justify-end flex-wrap">
+                                <div data-tour="adminpanel.tabs" className="hidden md:flex items-center gap-2 justify-end flex-wrap">
                                     {Object.entries(TAB_LABELS).map(([key, label]) => (
                                         <button
                                             key={key}
@@ -1485,6 +1919,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 <div className="md:hidden flex items-center gap-2">
                                     <button
                                         type="button"
+                                        data-tour="adminpanel.tabs"
                                         onClick={() => setMoreTabsOpen(true)}
                                         className="flex-1 min-h-[44px] px-4 rounded-2xl bg-neutral-900/80 border border-neutral-800 flex items-center justify-between gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.35)] active:scale-95 transition-all duration-300"
                                     >
@@ -1532,6 +1967,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     else if (key === 'templates') subtitle = 'Biblioteca de treinos-base';
                                     else if (key === 'teachers') subtitle = 'Gestão de professores e convites';
                                     else if (key === 'videos') subtitle = 'Fila de vídeos por exercício';
+                                    else if (key === 'priorities') subtitle = 'Triagem inteligente do coach';
+                                    else if (key === 'errors') subtitle = 'Erros reportados pelos usuários';
                                     else if (key === 'system') subtitle = 'Backup, broadcasts e operações críticas';
 
                                     let iconColor = isActive ? 'text-yellow-400' : 'text-neutral-400';
@@ -1568,6 +2005,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     {key === 'templates' && <Dumbbell size={16} className={iconColor} />}
                                                     {key === 'teachers' && <UserCog size={16} className={iconColor} />}
                                                     {key === 'videos' && <Play size={16} className={iconColor} />}
+                                                    {key === 'priorities' && <AlertCircle size={16} className={iconColor} />}
+                                                    {key === 'errors' && <AlertTriangle size={16} className={iconColor} />}
                                                     {key === 'system' && <ShieldAlert size={16} className={iconColor} />}
                                                 </div>
                                                 <div className="min-w-0 text-left">
@@ -1673,7 +2112,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 						</div>
 						
 						{isTeacher && coachInboxItems.length > 0 && (
-							<div className="mt-6 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+							<div data-tour="adminpanel.dashboard.coachInbox" className="mt-6 bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                                 <div className="flex items-center justify-between gap-3 mb-3">
                                     <div className="min-w-0">
                                         <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Coach Inbox</div>
@@ -1731,6 +2170,176 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
+				{tab === 'priorities' && !selectedStudent && (
+					<div className="w-full space-y-4">
+						<div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+							<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+								<div className="min-w-0">
+									<div className="flex items-center gap-2">
+										<AlertCircle size={18} className="text-yellow-500" />
+										<h2 className="text-base md:text-lg font-black tracking-tight">Prioridades</h2>
+									</div>
+									<div className="mt-1 text-xs text-neutral-400 font-semibold">
+										{prioritiesLoading ? 'Carregando...' : `${Array.isArray(prioritiesItems) ? prioritiesItems.length : 0} item(ns)`}
+									</div>
+								</div>
+								<div className="flex flex-col sm:flex-row gap-2">
+									<button
+										type="button"
+										onClick={async () => {
+											try {
+												setPrioritiesSettingsOpen(true);
+												await loadPrioritiesSettings();
+											} catch {}
+										}}
+										className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+									>
+										Configurar
+									</button>
+									<button
+										type="button"
+										onClick={() => fetchPriorities()}
+										disabled={prioritiesLoading}
+										className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 disabled:opacity-60"
+									>
+										Atualizar
+									</button>
+								</div>
+							</div>
+						</div>
+
+						{prioritiesError ? (
+							<div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+								{prioritiesError}
+							</div>
+						) : null}
+
+						{prioritiesLoading ? (
+							<div className="text-center animate-pulse text-neutral-400 font-semibold">Carregando prioridades...</div>
+						) : !Array.isArray(prioritiesItems) || prioritiesItems.length === 0 ? (
+							<div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 text-neutral-400 font-semibold">
+								Nenhuma prioridade no momento.
+							</div>
+						) : (
+							<div className="space-y-3">
+								{prioritiesItems.map((it) => {
+									const itemId = String(it?.id || '').trim();
+									const studentId = String(it?.student_user_id || '').trim();
+									const studentName = String(it?.student_name || '').trim();
+									const kind = String(it?.kind || '').trim();
+									const title = String(it?.title || '').trim();
+									const reason = String(it?.reason || '').trim();
+									const msg = String(it?.suggested_message || '').trim();
+									const badgeTone =
+										kind === 'load_spike'
+											? 'border-red-500/30 text-red-300'
+											: kind === 'checkins_alert'
+												? 'border-red-500/30 text-red-300'
+											: kind === 'volume_drop'
+												? 'border-yellow-500/30 text-yellow-300'
+												: 'border-neutral-500/30 text-neutral-200';
+									return (
+										<div key={itemId || `${studentId}:${kind}`} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+											<div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+												<div className="min-w-0">
+													<div className="flex flex-wrap items-center gap-2">
+														<div className="text-base font-black text-white truncate">{studentName || 'Aluno'}</div>
+														<span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${badgeTone}`}>{title || kind}</span>
+													</div>
+													{reason ? (
+														<div className="mt-1 text-xs text-neutral-400 font-semibold">{reason}</div>
+													) : null}
+												</div>
+												<div className="flex flex-col sm:flex-row gap-2">
+													<button
+														type="button"
+														onClick={() => {
+															try {
+																const found = (Array.isArray(usersList) ? usersList : []).find((s) => String(s?.user_id || '').trim() === studentId);
+																setTab('students');
+																setSelectedStudent(found || null);
+																if (!found) setStudentQuery(studentName || '');
+															} catch {}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Ver aluno
+													</button>
+													<button
+														type="button"
+														onClick={() => {
+															setPrioritiesComposeStudentId(studentId);
+															setPrioritiesComposeKind(kind);
+															setPrioritiesComposeText(msg);
+															setPrioritiesComposeOpen(true);
+														}}
+														className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Enviar mensagem
+													</button>
+													<button
+														type="button"
+														onClick={async () => {
+															try {
+																const v = await prompt('Sonecar (minutos)', String(prioritiesSettings?.snoozeDefaultMinutes ?? COACH_INBOX_DEFAULTS.snoozeDefaultMinutes));
+																const minutes = Number(String(v || '').trim());
+																if (!Number.isFinite(minutes) || minutes <= 0) return;
+																const res = await fetch('/api/teacher/inbox/action', {
+																	method: 'POST',
+																	credentials: 'include',
+																	headers: { 'content-type': 'application/json' },
+																	body: JSON.stringify({ student_user_id: studentId, kind, action: 'snooze', snooze_minutes: minutes }),
+																});
+																const json = await res.json().catch(() => null);
+																if (!res.ok || !json?.ok) {
+																	await alert(String(json?.error || `Falha ao sonecar (${res.status})`));
+																	return;
+																}
+																setPrioritiesItems((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== itemId) : prev));
+															} catch (e) {
+																await alert('Erro: ' + (e?.message ?? String(e)));
+															}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Sonecar
+													</button>
+													<button
+														type="button"
+														onClick={async () => {
+															try {
+																const ok = await confirm('Concluir este item?', 'Prioridades');
+																if (!ok) return;
+																const res = await fetch('/api/teacher/inbox/action', {
+																	method: 'POST',
+																	credentials: 'include',
+																	headers: { 'content-type': 'application/json' },
+																	body: JSON.stringify({ student_user_id: studentId, kind, action: 'done' }),
+																});
+																const json = await res.json().catch(() => null);
+																if (!res.ok || !json?.ok) {
+																	await alert(String(json?.error || `Falha ao concluir (${res.status})`));
+																	return;
+																}
+																setPrioritiesItems((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== itemId) : prev));
+															} catch (e) {
+																await alert('Erro: ' + (e?.message ?? String(e)));
+															}
+														}}
+														className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+													>
+														Concluir
+													</button>
+												</div>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						)}
+					</div>
+				)}
+
 				{tab === 'students' && !selectedStudent && (
 					<div className="w-full space-y-4">
                         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
@@ -1746,6 +2355,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <button
+                                        data-tour="adminpanel.students.create"
                                         onClick={() => setShowRegisterModal(true)}
                                         className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
                                     >
@@ -1757,13 +2367,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 <div className="relative lg:col-span-2">
                                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                                     <input
+                                        data-tour="adminpanel.students.search"
                                         value={studentQuery}
                                         onChange={(e) => setStudentQuery(e.target.value)}
                                         placeholder="Buscar aluno por nome ou email"
                                         className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl pl-10 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
                                     />
                                 </div>
-                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                <div data-tour="adminpanel.students.statusFilter" className="flex items-center gap-2 overflow-x-auto no-scrollbar">
                                     {[
                                         { key: 'all', label: 'Todos' },
                                         { key: 'pago', label: 'Pago' },
@@ -1913,7 +2524,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         onClick={() => openEditTemplate(t)}
                                     >
                                         <div className="min-w-0">
-                                            <h3 className="font-black text-white truncate">{t.name}</h3>
+                                            <h3 className="font-black text-white truncate">{normalizeWorkoutTitle(t.name)}</h3>
                                             <p className="text-xs text-neutral-500">{t.exercises?.length || 0} exercícios</p>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -1928,11 +2539,17 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                     e.stopPropagation();
                                                     if (!(await confirm('Excluir este treino?', 'Apagar Treino'))) return;
                                                     try {
-                                                        await deleteWorkout(t.id);
+                                                        if (templatesUserId && t?.user_id && String(t.user_id) !== String(templatesUserId)) {
+                                                            await alert('Esse treino pertence a um aluno. Para não apagar o treino dele, a exclusão aqui é bloqueada.');
+                                                            return;
+                                                        }
+                                                        const res = await deleteWorkout(t.id);
+                                                        if (!res?.success) {
+                                                            await alert('Erro ao excluir: ' + (res?.error || 'Falha ao excluir treino'));
+                                                            return;
+                                                        }
                                                         setTemplates(prev => prev.filter(x => x.id !== t.id));
-                                                    } catch (err) {
-                                                        await alert('Erro ao excluir: ' + (err?.message ?? String(err)));
-                                                    }
+                                                    } catch (err) { await alert('Erro ao excluir: ' + (err?.message ?? String(err))); }
                                                 }}
                                                 className="w-9 h-9 rounded-full bg-neutral-900 border border-neutral-700 hover:border-red-500/40 hover:bg-red-900/20 text-neutral-300 hover:text-red-400 flex items-center justify-center transition-all duration-300 active:scale-95"
                                             >
@@ -1944,6 +2561,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </div>
                         )}
                     </div>
+                )}
+
+                {tab === 'requests' && !selectedStudent && isAdmin && (
+                    <RequestsTab />
                 )}
 
                 {tab === 'videos' && !selectedStudent && isAdmin && (
@@ -2287,6 +2908,250 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
+                {tab === 'errors' && !selectedStudent && isAdmin && (
+                    <div className="w-full space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle size={18} className="text-yellow-500" />
+                                        <h2 className="text-base md:text-lg font-black tracking-tight">Erros reportados</h2>
+                                    </div>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">{errorsFiltered.length} visíveis</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        setErrorsLoading(true);
+                                        try {
+                                            const { data, error } = await supabase
+                                                .from('error_reports')
+                                                .select('id, user_id, user_email, message, stack, pathname, url, user_agent, app_version, source, meta, status, created_at, updated_at, resolved_at, resolved_by')
+                                                .order('created_at', { ascending: false })
+                                                .limit(200);
+                                            if (!error) setErrorReports(Array.isArray(data) ? data : []);
+                                        } catch {} finally {
+                                            setErrorsLoading(false);
+                                        }
+                                    }}
+                                    disabled={errorsLoading}
+                                    className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-800 hover:bg-neutral-800 text-neutral-200 font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                                >
+                                    {errorsLoading ? 'Atualizando...' : 'Atualizar'}
+                                </button>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="md:col-span-2 relative">
+                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <input
+                                        value={errorsQuery}
+                                        onChange={(e) => setErrorsQuery(e.target.value)}
+                                        placeholder="Buscar por mensagem, usuário ou rota"
+                                        className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl pl-10 pr-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500"
+                                    />
+                                </div>
+                                <select
+                                    value={errorsStatusFilter}
+                                    onChange={(e) => setErrorsStatusFilter(e.target.value)}
+                                    className="min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500"
+                                >
+                                    <option value="all">Todos</option>
+                                    <option value="new">Novos</option>
+                                    <option value="triaged">Triados</option>
+                                    <option value="resolved">Resolvidos</option>
+                                    <option value="ignored">Ignorados</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {errorsLoading ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center text-neutral-400 font-semibold">
+                                Carregando erros...
+                            </div>
+                        ) : errorsFiltered.length === 0 ? (
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-center">
+                                <p className="text-neutral-500">Nenhum erro reportado encontrado.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {errorsFiltered.map((r) => {
+                                    const status = String(r?.status || 'new');
+                                    const statusTone =
+                                        status === 'resolved'
+                                            ? 'bg-green-500/10 text-green-400 border-green-500/30'
+                                            : status === 'ignored'
+                                                ? 'bg-neutral-500/10 text-neutral-300 border-neutral-500/25'
+                                                : status === 'triaged'
+                                                    ? 'bg-blue-500/10 text-blue-300 border-blue-500/30'
+                                                    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30';
+                                    const createdAt = (() => {
+                                        try {
+                                            const raw = r?.created_at || r?.createdAt;
+                                            if (!raw) return '';
+                                            const d = raw?.toDate ? raw.toDate() : new Date(raw);
+                                            const t = d?.toLocaleString ? d.toLocaleString('pt-BR') : String(raw);
+                                            return t || '';
+                                        } catch {
+                                            return '';
+                                        }
+                                    })();
+                                    const email = String(r?.user_email || r?.userEmail || '').trim();
+                                    const message = String(r?.message || '').trim();
+                                    const pathname = String(r?.pathname || '').trim();
+                                    const stack = String(r?.stack || '').trim();
+
+                                    return (
+                                        <div key={r.id} className="bg-neutral-800 border border-neutral-700 rounded-2xl p-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${statusTone}`}>
+                                                            {status}
+                                                        </div>
+                                                        {createdAt ? (
+                                                            <div className="text-[11px] text-neutral-500 font-semibold">{createdAt}</div>
+                                                        ) : null}
+                                                        {email ? (
+                                                            <div className="text-[11px] text-neutral-400 font-semibold truncate max-w-[150px]" title={email}>• {email}</div>
+                                                        ) : null}
+                                                        {pathname ? (
+                                                            <div className="text-[11px] text-neutral-500 font-semibold truncate max-w-[150px]" title={pathname}>• {pathname}</div>
+                                                        ) : null}
+                                                    </div>
+                                                    <div className="mt-2 text-sm text-neutral-100 font-semibold whitespace-pre-wrap break-words pr-2">
+                                                        {message || '—'}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const content = `Erro: ${message}\nUser: ${email}\nPath: ${pathname}\nStack:\n${stack || 'N/A'}`;
+                                                            navigator.clipboard.writeText(content);
+                                                            // Feedback visual rápido seria ideal, mas alert serve por enquanto
+                                                        }}
+                                                        title="Copiar detalhes"
+                                                        className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center active:scale-95 transition-all"
+                                                    >
+                                                        <Copy size={16} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const nextStatus = status === 'resolved' ? 'new' : 'resolved';
+                                                                const patch = nextStatus === 'resolved'
+                                                                    ? { status: nextStatus, resolved_at: new Date().toISOString(), resolved_by: user?.id ?? null }
+                                                                    : { status: nextStatus, resolved_at: null, resolved_by: null };
+                                                                const { error } = await supabase.from('error_reports').update(patch).eq('id', r.id);
+                                                                if (error) throw error;
+                                                                setErrorReports((prev) => {
+                                                                    const list = Array.isArray(prev) ? prev : [];
+                                                                    return list.map((x) => (x?.id === r.id ? { ...x, ...patch } : x));
+                                                                });
+                                                            } catch (e) {
+                                                                await alert('Erro ao atualizar status: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        className={`min-h-[40px] px-3 py-2 rounded-xl border font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all ${
+                                                            status === 'resolved' 
+                                                            ? 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:bg-neutral-800' 
+                                                            : 'bg-green-500/10 border-green-500/30 text-green-400 hover:bg-green-500/20'
+                                                        }`}
+                                                    >
+                                                        {status === 'resolved' ? 'Reabrir' : 'Resolver'}
+                                                    </button>
+                                                    {status !== 'ignored' && status !== 'resolved' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const { error } = await supabase.from('error_reports').update({ status: 'ignored' }).eq('id', r.id);
+                                                                    if (error) throw error;
+                                                                    setErrorReports((prev) => {
+                                                                        const list = Array.isArray(prev) ? prev : [];
+                                                                        return list.map((x) => (x?.id === r.id ? { ...x, status: 'ignored' } : x));
+                                                                    });
+                                                                } catch (e) {
+                                                                    await alert('Erro ao ignorar: ' + (e?.message ?? String(e)));
+                                                                }
+                                                            }}
+                                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-neutral-400 hover:text-white font-black text-[11px] uppercase tracking-widest active:scale-95 transition-all"
+                                                        >
+                                                            Ignorar
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            if (!confirm('Tem certeza que deseja apagar este erro permanentemente?')) return;
+                                                            try {
+                                                                const { error } = await supabase.from('error_reports').delete().eq('id', r.id);
+                                                                if (error) throw error;
+                                                                setErrorReports((prev) => {
+                                                                    const list = Array.isArray(prev) ? prev : [];
+                                                                    return list.filter((x) => x?.id !== r.id);
+                                                                });
+                                                            } catch (e) {
+                                                                await alert('Erro ao apagar: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        title="Apagar erro"
+                                                        className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-red-900/20 hover:border-red-500/30 text-neutral-500 hover:text-red-400 flex items-center justify-center active:scale-95 transition-all"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {(stack || r?.url) ? (
+                                                <details className="mt-3 group/details">
+                                                    <summary className="cursor-pointer text-[11px] font-black uppercase tracking-widest text-neutral-500 hover:text-white flex items-center gap-2 select-none">
+                                                        <ChevronDown size={14} className="group-open/details:rotate-180 transition-transform" />
+                                                        Detalhes Técnicos
+                                                    </summary>
+                                                    <div className="mt-3 grid gap-3 pl-2 border-l-2 border-neutral-800">
+                                                        {String(r?.url || '').trim() ? (
+                                                            <div className="text-[11px] text-neutral-400 break-all">
+                                                                <span className="font-black text-neutral-300">URL:</span> {String(r.url)}
+                                                            </div>
+                                                        ) : null}
+                                                        {String(r?.source || '').trim() ? (
+                                                            <div className="text-[11px] text-neutral-400 break-all">
+                                                                <span className="font-black text-neutral-300">Fonte:</span> {String(r.source)}
+                                                            </div>
+                                                        ) : null}
+                                                        {String(r?.app_version || r?.appVersion || '').trim() ? (
+                                                            <div className="text-[11px] text-neutral-400 break-all">
+                                                                <span className="font-black text-neutral-300">Versão:</span> {String(r.app_version || r.appVersion)}
+                                                            </div>
+                                                        ) : null}
+                                                        {stack ? (
+                                                            <div className="relative group/stack">
+                                                                <pre className="text-[10px] leading-relaxed font-mono text-neutral-400 whitespace-pre-wrap break-words bg-black/40 border border-neutral-800 rounded-lg p-3 overflow-auto max-h-[300px] custom-scrollbar select-text">
+                                                                    {stack}
+                                                                </pre>
+                                                                <button 
+                                                                    onClick={() => navigator.clipboard.writeText(stack)}
+                                                                    className="absolute top-2 right-2 p-1.5 rounded-md bg-neutral-800 text-neutral-400 hover:text-white opacity-0 group-hover/stack:opacity-100 transition-opacity"
+                                                                    title="Copiar Stack Trace"
+                                                                >
+                                                                    <Copy size={12} />
+                                                                </button>
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                </details>
+                                            ) : null}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {tab === 'system' && !selectedStudent && (
                     <div className="space-y-8">
                         <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 space-y-4">
@@ -2311,6 +3176,188 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             <button onClick={handleSendBroadcast} disabled={sendingBroadcast} className="w-full py-4 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl flex items-center justify-center gap-2 disabled:opacity-50">
                                 {sendingBroadcast ? 'Enviando...' : 'ENVIAR AVISO'}
                             </button>
+                        </div>
+
+                        <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-white flex items-center gap-2"><Dumbbell size={20} className="text-yellow-500"/> REVISAR EXERCÍCIOS (ALIASES)</h3>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                        {exerciseAliasesLoading ? 'Carregando...' : `${Array.isArray(exerciseAliasesReview) ? exerciseAliasesReview.length : 0} pendentes`}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!isAdmin) return;
+                                            if (exerciseAliasesBackfillLoading) return;
+                                            setExerciseAliasesBackfillLoading(true);
+                                            setExerciseAliasesNotice('');
+                                            try {
+                                                const res = await fetch('/api/admin/exercises/canonicalize/backfill', {
+                                                    method: 'POST',
+                                                    headers: { 'content-type': 'application/json' },
+                                                    body: JSON.stringify({ limit: 30 }),
+                                                });
+                                                const json = await res.json().catch(() => null);
+                                                if (!res.ok || !json?.ok) {
+                                                    const msg = String(json?.error || `Falha ao processar (${res.status})`);
+                                                    setExerciseAliasesNotice(msg);
+                                                    return;
+                                                }
+                                                const msg = `Processados: ${json.processed || 0} · Atualizados: ${json.updated || 0} · Falhas: ${json.failed || 0}`;
+                                                setExerciseAliasesNotice(msg);
+                                            } catch (e) {
+                                                const msg = e?.message ? String(e.message) : '';
+                                                if (msg) setExerciseAliasesNotice(msg);
+                                            } finally {
+                                                setExerciseAliasesBackfillLoading(false);
+                                            }
+                                        }}
+                                        disabled={exerciseAliasesBackfillLoading}
+                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-yellow-500 hover:bg-yellow-400 text-black disabled:opacity-50"
+                                    >
+                                        {exerciseAliasesBackfillLoading ? 'Processando...' : 'Processar (Gemini)'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            if (!isAdmin) return;
+                                            setExerciseAliasesLoading(true);
+                                            setExerciseAliasesError('');
+                                            setExerciseAliasesNotice('');
+                                            try {
+                                                const { data, error } = await supabase
+                                                    .from('exercise_aliases')
+                                                    .select('id, user_id, canonical_id, alias, normalized_alias, confidence, source, needs_review, created_at, updated_at')
+                                                    .eq('needs_review', true)
+                                                    .order('created_at', { ascending: false })
+                                                    .limit(200);
+                                                if (error) {
+                                                    setExerciseAliasesReview([]);
+                                                    const msg = String(error?.message || '');
+                                                    if (msg) setExerciseAliasesError(msg);
+                                                    return;
+                                                }
+                                                setExerciseAliasesReview(Array.isArray(data) ? data : []);
+                                            } catch (e) {
+                                                setExerciseAliasesReview([]);
+                                                const msg = e?.message ? String(e.message) : '';
+                                                if (msg) setExerciseAliasesError(msg);
+                                            } finally {
+                                                setExerciseAliasesLoading(false);
+                                            }
+                                        }}
+                                        disabled={exerciseAliasesLoading}
+                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 disabled:opacity-50"
+                                    >
+                                        {exerciseAliasesLoading ? 'Atualizando...' : 'Atualizar'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {exerciseAliasesNotice ? (
+                                <div className="text-xs text-neutral-200 font-bold bg-neutral-900 border border-neutral-700 rounded-xl p-3">
+                                    {exerciseAliasesNotice}
+                                </div>
+                            ) : null}
+
+                            {exerciseAliasesError ? (
+                                <div className="text-xs text-red-300 font-bold bg-neutral-900 border border-neutral-700 rounded-xl p-3">
+                                    {exerciseAliasesError}
+                                </div>
+                            ) : null}
+
+                            {exerciseAliasesLoading ? (
+                                <div className="text-xs text-neutral-400 font-semibold">Carregando aliases pendentes...</div>
+                            ) : !Array.isArray(exerciseAliasesReview) || exerciseAliasesReview.length === 0 ? (
+                                <div className="text-xs text-neutral-400 font-semibold">Nenhum alias pendente de revisão.</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {exerciseAliasesReview.slice(0, 30).map((row) => {
+                                        const id = row?.id ? String(row.id) : '';
+                                        const userId = row?.user_id ? String(row.user_id) : '';
+                                        const alias = row?.alias ? String(row.alias) : '';
+                                        const conf = Number(row?.confidence);
+                                        const src = row?.source ? String(row.source) : '';
+                                        return (
+                                            <div key={id || `${userId}-${alias}`} className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-black text-white truncate">{alias || '—'}</div>
+                                                    <div className="text-[11px] text-neutral-400 break-all">
+                                                        <span className="font-black text-neutral-300">User:</span> {userId ? `${userId.slice(0, 8)}...` : '—'}{' '}
+                                                        <span className="mx-2">·</span>
+                                                        <span className="font-black text-neutral-300">Fonte:</span> {src || '—'}{' '}
+                                                        <span className="mx-2">·</span>
+                                                        <span className="font-black text-neutral-300">Conf:</span> {Number.isFinite(conf) ? conf.toFixed(2) : '—'}
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col sm:flex-row gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const name = await prompt('Defina o nome canônico', 'Resolver alias', alias);
+                                                                const canon = String(name || '').trim();
+                                                                if (!canon) return;
+                                                                const norm = normalizeExerciseName(canon);
+                                                                if (!norm) return;
+                                                                const { data: canonRow, error: canonErr } = await supabase
+                                                                    .from('exercise_canonical')
+                                                                    .upsert(
+                                                                        { user_id: userId, display_name: canon, normalized_name: norm },
+                                                                        { onConflict: 'user_id,normalized_name' }
+                                                                    )
+                                                                    .select('id')
+                                                                    .maybeSingle();
+                                                                if (canonErr || !canonRow?.id) {
+                                                                    await alert('Falha ao salvar canônico: ' + String(canonErr?.message || ''));
+                                                                    return;
+                                                                }
+                                                                const canonicalId = String(canonRow.id);
+                                                                const { error: upErr } = await supabase
+                                                                    .from('exercise_aliases')
+                                                                    .update({ canonical_id: canonicalId, confidence: 1, source: 'human', needs_review: false })
+                                                                    .eq('id', id);
+                                                                if (upErr) {
+                                                                    await alert('Falha ao atualizar alias: ' + String(upErr?.message || ''));
+                                                                    return;
+                                                                }
+                                                                setExerciseAliasesReview((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== id) : prev));
+                                                            } catch (e) {
+                                                                await alert('Falha ao resolver: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-yellow-500 hover:bg-yellow-400 text-black active:scale-95 transition-transform"
+                                                    >
+                                                        Resolver
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            try {
+                                                                if (!(await confirm('Ignorar este alias? (não aparecerá mais para revisão)', 'Ignorar'))) return;
+                                                                const { error: upErr } = await supabase.from('exercise_aliases').update({ needs_review: false }).eq('id', id);
+                                                                if (upErr) {
+                                                                    await alert('Falha ao ignorar: ' + String(upErr?.message || ''));
+                                                                    return;
+                                                                }
+                                                                setExerciseAliasesReview((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x?.id || '') !== id) : prev));
+                                                            } catch (e) {
+                                                                await alert('Falha ao ignorar: ' + (e?.message ?? String(e)));
+                                                            }
+                                                        }}
+                                                        className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform"
+                                                    >
+                                                        Ignorar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
 
                         <div className="bg-red-950/40 p-4 rounded-2xl border border-red-500/40 shadow-[0_16px_40px_rgba(0,0,0,0.75)]">
@@ -2463,7 +3510,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
-				{tab === 'teachers' && isAdmin && !selectedStudent && (
+				{tab === 'teachers' && isAdmin && !selectedStudent && !selectedTeacher && (
 					<div className="w-full space-y-4">
                         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
                             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -2528,10 +3575,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                     <div
                                         key={t.id}
                                         className="bg-neutral-800 p-4 rounded-2xl flex justify-between items-center border border-neutral-700 cursor-pointer hover:border-yellow-500/50 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
-                                        onClick={() => setEditingTeacher(t)}
+                                        onClick={() => { setSelectedTeacher(t); }}
                                     >
                                         <div className="min-w-0">
-                                            <h3 className="font-black text-white truncate">{t.name}</h3>
+                                            <h3 className="font-black text-white truncate">{normalizeWorkoutTitle(t.name)}</h3>
                                             <p className="text-xs text-neutral-400 truncate">{t.email}</p>
                                             <div className="mt-2 flex flex-wrap items-center gap-2">
                                                 <span className="px-3 py-1.5 rounded-full bg-neutral-900 border border-neutral-700 text-[11px] font-black uppercase tracking-wide text-neutral-200">
@@ -2605,6 +3652,232 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     </div>
                 )}
 
+                {tab === 'teachers' && isAdmin && !selectedStudent && selectedTeacher && (
+                    <div className="w-full space-y-4">
+                        <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Professor</div>
+                                    <h2 className="text-base md:text-lg font-black text-white truncate">{normalizeWorkoutTitle(selectedTeacher?.name || '') || 'Professor'}</h2>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold truncate">{selectedTeacher?.email || ''}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => { setSelectedTeacher(null); }}
+                                    className="w-11 h-11 rounded-2xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Voltar"
+                                >
+                                    <ArrowLeft size={18} />
+                                </button>
+                            </div>
+
+                            <div className="mt-4 flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                {[
+                                    { key: 'students', label: 'Alunos' },
+                                    { key: 'templates', label: 'Treinos' },
+                                    { key: 'history', label: 'Histórico' },
+                                    { key: 'inbox', label: 'Interações' },
+                                ].map((opt) => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        onClick={() => setTeacherDetailTab(opt.key)}
+                                        className={`whitespace-nowrap min-h-[40px] px-3 py-2 rounded-full text-[11px] font-black uppercase tracking-wide border transition-all duration-300 active:scale-95 ${
+                                            teacherDetailTab === opt.key
+                                                ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/15'
+                                                : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {teacherDetailTab === 'students' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Alunos</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherStudentsLoading ? 'Carregando…' : `${(Array.isArray(teacherStudents) ? teacherStudents.length : 0)} alunos`}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => loadTeacherStudents(selectedTeacher)}
+                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                    >
+                                        Atualizar
+                                    </button>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherStudents) ? teacherStudents : []).length === 0 && !teacherStudentsLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhum aluno atribuído.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherStudents) ? teacherStudents : []).map((s) => (
+                                        <div
+                                            key={s.id}
+                                            className="bg-neutral-800 p-4 rounded-2xl flex justify-between items-center border border-neutral-700 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30 transition-all duration-300"
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="font-black text-white truncate">{normalizeWorkoutTitle(s.name) || s.email}</div>
+                                                <div className="text-xs text-neutral-400 truncate">{s.email}</div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => { setSelectedStudent(s); setSubTab('workouts'); }}
+                                                className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                            >
+                                                Ver aluno
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {teacherDetailTab === 'templates' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treinos (Templates)</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherTemplatesLoading ? 'Carregando…' : `${(Array.isArray(teacherTemplatesRows) ? teacherTemplatesRows.length : 0)} itens`}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => loadTeacherTemplates(selectedTeacher, true)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                        >
+                                            Atualizar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={!teacherTemplatesCursor || teacherTemplatesLoading}
+                                            onClick={() => loadTeacherTemplates(selectedTeacher, false)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            Mais
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherTemplatesRows) ? teacherTemplatesRows : []).length === 0 && !teacherTemplatesLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhum treino encontrado.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherTemplatesRows) ? teacherTemplatesRows : []).map((w) => (
+                                        <div key={w.id} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-black text-white truncate">{normalizeWorkoutTitle(w.name) || 'Treino'}</div>
+                                                    <div className="text-xs text-neutral-400 truncate">{w.student_name || ''}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSelectedStudent({ user_id: w.user_id, name: w.student_name || '' }); setSubTab('workouts'); }}
+                                                    className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                                >
+                                                    Abrir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {teacherDetailTab === 'history' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Histórico de Treinos</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherHistoryLoading ? 'Carregando…' : `${(Array.isArray(teacherHistoryRows) ? teacherHistoryRows.length : 0)} itens`}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => loadTeacherHistory(selectedTeacher, true)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                        >
+                                            Atualizar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={!teacherHistoryCursor || teacherHistoryLoading}
+                                            onClick={() => loadTeacherHistory(selectedTeacher, false)}
+                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            Mais
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherHistoryRows) ? teacherHistoryRows : []).length === 0 && !teacherHistoryLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhum treino executado encontrado.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherHistoryRows) ? teacherHistoryRows : []).map((w) => (
+                                        <div key={w.id} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-black text-white truncate">{normalizeWorkoutTitle(w.name) || 'Treino'}</div>
+                                                    <div className="text-xs text-neutral-400 truncate">{w.student_name || ''}{w.date ? ` • ${new Date(w.date).toLocaleDateString()}` : ''}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSelectedStudent({ user_id: w.user_id, name: w.student_name || '' }); setSubTab('workouts'); }}
+                                                    className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                                >
+                                                    Abrir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {teacherDetailTab === 'inbox' && (
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)]">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Interações (Inbox)</div>
+                                        <div className="text-xs text-neutral-400 font-semibold">{teacherInboxLoading ? 'Carregando…' : `${(Array.isArray(teacherInboxItems) ? teacherInboxItems.length : 0)} itens`}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => loadTeacherInbox(selectedTeacher)}
+                                        className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                    >
+                                        Atualizar
+                                    </button>
+                                </div>
+                                <div className="mt-4 space-y-2">
+                                    {(Array.isArray(teacherInboxItems) ? teacherInboxItems : []).length === 0 && !teacherInboxLoading ? (
+                                        <div className="text-sm text-neutral-500">Nenhuma interação sugerida.</div>
+                                    ) : null}
+                                    {(Array.isArray(teacherInboxItems) ? teacherInboxItems : []).map((it) => (
+                                        <div key={it.id} className="bg-neutral-800 p-4 rounded-2xl border border-neutral-700">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <div className="font-black text-white truncate">{it.title || 'Alerta'}</div>
+                                                    <div className="text-xs text-neutral-400 truncate">{it.student_name || ''}</div>
+                                                    <div className="mt-2 text-xs text-neutral-300">{it.reason || ''}</div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setSelectedStudent({ user_id: it.student_user_id, name: it.student_name || '' }); setSubTab('workouts'); }}
+                                                    className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95"
+                                                >
+                                                    Abrir
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {selectedStudent && (
                     <div className="animate-slide-up">
                         {editingStudent ? (
@@ -2639,8 +3912,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.35)] mb-6">
-                                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                            <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-4 shadow-[0_16px_40px_rgba(0,0,0,0.35)] mb-6">
+                                <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                                     <div className="flex items-start gap-3 md:gap-4 min-w-0">
                                         <button
                                             type="button"
@@ -2659,71 +3932,71 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${selectedStatusTone}`}> {selectedStatusLabel}</span>
                                             </div>
                                             <p className="text-xs md:text-sm text-neutral-400 font-semibold truncate">{selectedStudent?.email}</p>
-                                            {isAdmin && (Array.isArray(teachersList) ? teachersList.length : 0) > 0 && (
-                                                <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2">
-                                                    <span className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Professor</span>
-                                                    {(() => {
-                                                        const currentUid = selectedStudent.teacher_id || '';
-                                                        const list = Array.isArray(teachersList) ? [...teachersList] : [];
-                                                        if (currentUid && !list.some(t => t.user_id === currentUid)) {
-                                                            list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
-                                                        }
-                                                        const currentValue = currentUid ? `uid:${currentUid}` : '';
-                                                        return (
-                                                            <select
-                                                                value={currentValue}
-                                                                onChange={async (e) => {
-                                                                    const raw = String(e.target.value || '').trim();
-                                                                    const teacherUserId = raw.startsWith('uid:') ? raw.slice(4) : '';
-                                                                    try {
-                                                                        const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null })});
-                                                                        const json = await res.json();
-                                                                        if (json.ok) {
-                                                                            const nextTid = json.teacher_user_id || teacherUserId || null;
-                                                                            setSelectedStudent(prev => ({ ...prev, teacher_id: nextTid }));
-                                                                            setUsersList(prev => prev.map(x => (
-                                                                                (x.id === selectedStudent.id)
-                                                                                || (x.user_id === selectedStudent.user_id)
-                                                                                || ((x.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase())
-                                                                            ) ? { ...x, teacher_id: nextTid } : x));
-                                                                            try { if (selectedStudent.email) localStorage.setItem('student_teacher_'+selectedStudent.email, nextTid || ''); } catch {}
-                                                                            try {
-                                                                                const resp = await fetch('/api/admin/students/list');
-                                                                                const js = await resp.json();
-                                                                                if (js.ok) setUsersList(js.students || []);
-                                                                            } catch {}
-                                                                        } else {
-                                                                            await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));
-                                                                        }
-                                                                    } catch (e) {
-                                                                        await alert('Erro: ' + (e?.message ?? String(e)));
-                                                                    }
-                                                                }}
-                                                                className="min-h-[44px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs w-full sm:w-auto max-w-full border border-neutral-800 focus:border-yellow-500 focus:outline-none"
-                                                            >
-                                                                <option value="">Sem Professor</option>
-                                                                {list.map(t => (
-                                                                    <option
-                                                                        key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)}
-                                                                        value={t.user_id ? `uid:${t.user_id}` : ''}
-                                                                        disabled={!t.user_id}
-                                                                    >
-                                                                        {(t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')) + (!t.user_id ? ' (sem conta)' : '')}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                        );
-                                                    })()}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex flex-col sm:flex-row md:flex-row items-stretch md:items-center gap-2">
+                                        {isAdmin && (Array.isArray(teachersList) ? teachersList.length : 0) > 0 && (
+                                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                                <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest text-neutral-500">Professor</span>
+                                                {(() => {
+                                                    const currentUid = selectedStudent.teacher_id || '';
+                                                    const list = Array.isArray(teachersList) ? [...teachersList] : [];
+                                                    if (currentUid && !list.some(t => t.user_id === currentUid)) {
+                                                        list.unshift({ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' });
+                                                    }
+                                                    const currentValue = currentUid ? `uid:${currentUid}` : '';
+                                                    return (
+                                                        <select
+                                                            value={currentValue}
+                                                            onChange={async (e) => {
+                                                                const raw = String(e.target.value || '').trim();
+                                                                const teacherUserId = raw.startsWith('uid:') ? raw.slice(4) : '';
+                                                                try {
+                                                                    const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null })});
+                                                                    const json = await res.json();
+                                                                    if (json.ok) {
+                                                                        const nextTid = json.teacher_user_id || teacherUserId || null;
+                                                                        setSelectedStudent(prev => ({ ...prev, teacher_id: nextTid }));
+                                                                        setUsersList(prev => prev.map(x => (
+                                                                            (x.id === selectedStudent.id)
+                                                                            || (x.user_id === selectedStudent.user_id)
+                                                                            || ((x.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase())
+                                                                        ) ? { ...x, teacher_id: nextTid } : x));
+                                                                        try { if (selectedStudent.email) localStorage.setItem('student_teacher_'+selectedStudent.email, nextTid || ''); } catch {}
+                                                                        try {
+                                                                            const resp = await fetch('/api/admin/students/list');
+                                                                            const js = await resp.json();
+                                                                            if (js.ok) setUsersList(js.students || []);
+                                                                        } catch {}
+                                                                    } else {
+                                                                        await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));
+                                                                    }
+                                                                } catch (e) {
+                                                                    await alert('Erro: ' + (e?.message ?? String(e)));
+                                                                }
+                                                            }}
+                                                            className="min-h-[44px] bg-neutral-900/70 text-neutral-200 rounded-xl px-3 py-2 text-xs w-full sm:w-64 md:w-72 border border-neutral-800 focus:border-yellow-500 focus:outline-none"
+                                                        >
+                                                            <option value="">Sem Professor</option>
+                                                            {list.map(t => (
+                                                                <option
+                                                                    key={t.id || t.user_id || t.email || Math.random().toString(36).slice(2)}
+                                                                    value={t.user_id ? `uid:${t.user_id}` : ''}
+                                                                    disabled={!t.user_id}
+                                                                >
+                                                                    {(t.name || t.email || (t.user_id ? t.user_id.slice(0,8) : 'Professor')) + (!t.user_id ? ' (sem conta)' : '')}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    );
+                                                })()}
+                                            </div>
+                                        )}
                                         <button
                                             type="button"
                                             onClick={() => setEditingStudent(true)}
-                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 shrink-0"
                                             title="Editar"
                                         >
                                             <Edit3 size={18} className="text-yellow-500" /> Editar
@@ -2772,6 +4045,30 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 >
                                     Evolução
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setSubTab('checkins')}
+                                    className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${
+                                        subTab === 'checkins'
+                                            ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                            : 'text-neutral-200'
+                                    }`}
+                                >
+                                    Check-ins
+                                </button>
+                                {executionVideoEnabled ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSubTab('videos')}
+                                        className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${
+                                            subTab === 'videos'
+                                                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                                : 'text-neutral-200'
+                                        }`}
+                                    >
+                                        Vídeos
+                                    </button>
+                                ) : null}
                             </div>
                         </div>
 
@@ -2793,6 +4090,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         <div className="flex flex-col sm:flex-row gap-2">
                                             <button
                                                 type="button"
+                                                data-tour="adminpanel.student.workouts.history"
                                                 onClick={() => setHistoryOpen(true)}
                                                 className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
                                             >
@@ -2800,6 +4098,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             </button>
                                             <button
                                                 type="button"
+                                                data-tour="adminpanel.student.workouts.create"
                                                 onClick={() => setEditingStudentWorkout({ id: null, title: '', exercises: [] })}
                                                 className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
                                             >
@@ -2905,7 +4204,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         {syncedWorkouts.map(w => (
                                             <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer" onClick={() => setViewWorkout(w)}>
                                                 <div>
-                                                    <h4 className="font-bold text-white">{w.name}</h4>
+                                                    <h4 className="font-bold text-white">{normalizeWorkoutTitle(w.name)}</h4>
                                                     <p className="text-xs text-neutral-500">{w.exercises?.length || 0} exercícios</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
@@ -2920,7 +4219,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 {studentWorkouts.map(w => (
                             <div key={w.id} className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer" onClick={() => setViewWorkout(w)}>
                                 <div>
-                                    <h4 className="font-bold text-white">{w.name}</h4>
+                                    <h4 className="font-bold text-white">{normalizeWorkoutTitle(w.name)}</h4>
                                     <p className="text-xs text-neutral-500">{w.exercises?.length || 0} exercícios</p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -2939,6 +4238,402 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         </button>
                     ))}
                 </div>
+            </div>
+        )}
+
+        {!loading && executionVideoEnabled && subTab === 'videos' && (
+            <div className="space-y-4">
+                <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <Video size={18} className="text-yellow-500" />
+                                <h3 className="text-base font-black text-white tracking-tight">Vídeos de execução</h3>
+                            </div>
+                            <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                {executionVideosLoading ? 'Carregando...' : `${Array.isArray(executionVideos) ? executionVideos.length : 0} enviado(s)`}
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                try {
+                                    if (!selectedStudent?.user_id) return;
+                                    setExecutionVideosLoading(true);
+                                    setExecutionVideosError('');
+                                    const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(String(selectedStudent.user_id))}`, { cache: 'no-store', credentials: 'include' });
+                                    const json = await res.json().catch(() => null);
+                                    if (!res.ok || !json?.ok) {
+                                        setExecutionVideos([]);
+                                        setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
+                                        return;
+                                    }
+                                    setExecutionVideos(Array.isArray(json.items) ? json.items : []);
+                                } catch (e) {
+                                    setExecutionVideos([]);
+                                    setExecutionVideosError(e?.message ? String(e.message) : 'Erro ao carregar');
+                                } finally {
+                                    setExecutionVideosLoading(false);
+                                }
+                            }}
+                            disabled={executionVideosLoading}
+                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 disabled:opacity-60"
+                        >
+                            Atualizar
+                        </button>
+                    </div>
+                </div>
+
+                {executionVideosError ? (
+                    <div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+                        {executionVideosError}
+                    </div>
+                ) : null}
+
+                {executionVideosLoading ? (
+                    <div className="text-center animate-pulse text-neutral-400 font-semibold">Carregando vídeos...</div>
+                ) : !Array.isArray(executionVideos) || executionVideos.length === 0 ? (
+                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 text-neutral-400 font-semibold">
+                        Nenhum vídeo enviado ainda.
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {executionVideos.map((it) => {
+                            const id = it?.id ? String(it.id) : '';
+                            const when = it?.created_at ? new Date(it.created_at) : null;
+                            const title = String(it?.exercise_name || 'Execução').trim();
+                            const status = String(it?.status || 'pending').toLowerCase();
+                            const draft = executionVideoFeedbackDraft && typeof executionVideoFeedbackDraft === 'object' ? executionVideoFeedbackDraft[id] : '';
+                            const statusLabel = status === 'approved' ? 'Aprovado' : status === 'rejected' ? 'Reprovado' : 'Pendente';
+                            const statusTone =
+                                status === 'approved'
+                                    ? 'border-green-500/30 text-green-300'
+                                    : status === 'rejected'
+                                      ? 'border-red-500/30 text-red-300'
+                                      : 'border-yellow-500/30 text-yellow-300';
+                            return (
+                                <div key={id || Math.random().toString(36).slice(2)} className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <div className="text-base font-black text-white truncate">{title}</div>
+                                                <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${statusTone}`}>{statusLabel}</span>
+                                            </div>
+                                            <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                                {when ? when.toLocaleString() : ''}
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-col sm:flex-row gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const res = await fetch('/api/execution-videos/media', {
+                                                            method: 'POST',
+                                                            credentials: 'include',
+                                                            headers: { 'content-type': 'application/json' },
+                                                            body: JSON.stringify({ submission_id: id }),
+                                                        });
+                                                        const json = await res.json().catch(() => null);
+                                                        if (!res.ok || !json?.ok || !json?.url) {
+                                                            await alert(String(json?.error || `Falha ao abrir (${res.status})`));
+                                                            return;
+                                                        }
+                                                        setExecutionVideoModalUrl(String(json.url));
+                                                        setExecutionVideoModalOpen(true);
+                                                    } catch (e) {
+                                                        await alert('Erro: ' + (e?.message ?? String(e)));
+                                                    }
+                                                }}
+                                                className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                            >
+                                                Assistir
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const feedback = String(draft || '').trim();
+                                                        const res = await fetch('/api/teacher/execution-videos/review', {
+                                                            method: 'POST',
+                                                            credentials: 'include',
+                                                            headers: { 'content-type': 'application/json' },
+                                                            body: JSON.stringify({ submission_id: id, status: 'approved', feedback, send_message: true }),
+                                                        });
+                                                        const json = await res.json().catch(() => null);
+                                                        if (!res.ok || !json?.ok) {
+                                                            await alert(String(json?.error || `Falha ao aprovar (${res.status})`));
+                                                            return;
+                                                        }
+                                                        setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'approved', teacher_feedback: feedback } : x)) : prev));
+                                                    } catch (e) {
+                                                        await alert('Erro: ' + (e?.message ?? String(e)));
+                                                    }
+                                                }}
+                                                className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+                                            >
+                                                Aprovar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    try {
+                                                        const feedback = String(draft || '').trim();
+                                                        const res = await fetch('/api/teacher/execution-videos/review', {
+                                                            method: 'POST',
+                                                            credentials: 'include',
+                                                            headers: { 'content-type': 'application/json' },
+                                                            body: JSON.stringify({ submission_id: id, status: 'rejected', feedback, send_message: true }),
+                                                        });
+                                                        const json = await res.json().catch(() => null);
+                                                        if (!res.ok || !json?.ok) {
+                                                            await alert(String(json?.error || `Falha ao reprovar (${res.status})`));
+                                                            return;
+                                                        }
+                                                        setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'rejected', teacher_feedback: feedback } : x)) : prev));
+                                                    } catch (e) {
+                                                        await alert('Erro: ' + (e?.message ?? String(e)));
+                                                    }
+                                                }}
+                                                className="min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+                                            >
+                                                Reprovar
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3">
+                                        <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2">Mensagem para o aluno</label>
+                                        <textarea
+                                            value={String(draft || '')}
+                                            onChange={(e) => {
+                                                const v = e?.target?.value ?? '';
+                                                setExecutionVideoFeedbackDraft((prev) => ({ ...(prev && typeof prev === 'object' ? prev : {}), [id]: v }));
+                                            }}
+                                            rows={3}
+                                            className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                            placeholder="Escreva seu feedback..."
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        )}
+
+        {!loading && subTab === 'checkins' && (
+            <div className="space-y-4">
+                <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <History size={18} className="text-yellow-500" />
+                                <h3 className="text-base font-black text-white tracking-tight">Check-ins do aluno</h3>
+                            </div>
+                            <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                {studentCheckinsLoading ? 'Carregando...' : `${Array.isArray(studentCheckinsRows) ? studentCheckinsRows.length : 0} item(s)`}
+                            </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            {['7d', '30d'].map((k) => (
+                                <button
+                                    key={k}
+                                    type="button"
+                                    onClick={() => setStudentCheckinsRange(k)}
+                                    className={`min-h-[44px] px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 active:scale-95 ${
+                                        String(studentCheckinsRange || '7d') === k
+                                            ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/15'
+                                            : 'bg-neutral-900/70 border border-neutral-800 text-neutral-200 hover:bg-neutral-900'
+                                    }`}
+                                >
+                                    {k === '7d' ? '7 dias' : '30 dias'}
+                                </button>
+                            ))}
+                            {['all', 'pre', 'post'].map((k) => (
+                                <button
+                                    key={k}
+                                    type="button"
+                                    onClick={() => setStudentCheckinsFilter(k)}
+                                    className={`min-h-[44px] px-4 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 active:scale-95 ${
+                                        String(studentCheckinsFilter || 'all') === k
+                                            ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/15'
+                                            : 'bg-neutral-900/70 border border-neutral-800 text-neutral-200 hover:bg-neutral-900'
+                                    }`}
+                                >
+                                    {k === 'all' ? 'Todos' : k === 'pre' ? 'Pré' : 'Pós'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {studentCheckinsError ? (
+                    <div className="bg-neutral-950/40 border border-yellow-500/20 rounded-2xl p-4 text-sm text-neutral-200">
+                        {studentCheckinsError}
+                    </div>
+                ) : null}
+
+                {(() => {
+                    const rows = Array.isArray(studentCheckinsRows) ? studentCheckinsRows : [];
+                    const filter = String(studentCheckinsFilter || 'all');
+                    const filtered = filter === 'all' ? rows : rows.filter((r) => String(r?.kind || '').trim() === filter);
+
+                    const toNumberOrNull = (v) => {
+                        const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'));
+                        return Number.isFinite(n) ? n : null;
+                    };
+                    const avg = (vals) => {
+                        const list = Array.isArray(vals) ? vals.filter((v) => typeof v === 'number' && Number.isFinite(v)) : [];
+                        if (!list.length) return null;
+                        return list.reduce((a, b) => a + b, 0) / list.length;
+                    };
+
+                    const preRows = rows.filter((r) => String(r?.kind || '').trim() === 'pre');
+                    const postRows = rows.filter((r) => String(r?.kind || '').trim() === 'post');
+                    const preAvgEnergy = avg(preRows.map((r) => toNumberOrNull(r?.energy)));
+                    const preAvgSoreness = avg(preRows.map((r) => toNumberOrNull(r?.soreness)));
+                    const preAvgTime = avg(preRows.map((r) => {
+                        const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {};
+                        return toNumberOrNull(answers?.time_minutes ?? answers?.timeMinutes);
+                    }));
+                    const postAvgSoreness = avg(postRows.map((r) => toNumberOrNull(r?.soreness)));
+                    const postAvgSatisfaction = avg(postRows.map((r) => toNumberOrNull(r?.mood)));
+                    const postAvgRpe = avg(postRows.map((r) => {
+                        const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {};
+                        return toNumberOrNull(answers?.rpe);
+                    }));
+
+                    const highSorenessCount = rows.filter((r) => {
+                        const s = toNumberOrNull(r?.soreness);
+                        return s != null && s >= 7;
+                    }).length;
+                    const lowEnergyCount = preRows.filter((r) => {
+                        const e = toNumberOrNull(r?.energy);
+                        return e != null && e <= 2;
+                    }).length;
+                    const alerts = [];
+                    if (highSorenessCount >= 3) alerts.push('Dor alta (≥ 7) apareceu 3+ vezes no período.');
+                    if (preAvgSoreness != null && preAvgSoreness >= 7) alerts.push('Média de dor no pré está alta (≥ 7).');
+                    if (lowEnergyCount >= 3) alerts.push('Energia baixa (≤ 2) apareceu 3+ vezes no período.');
+                    if (postAvgSatisfaction != null && postAvgSatisfaction <= 2) alerts.push('Satisfação média no pós está baixa (≤ 2).');
+
+                    const suggestions = [];
+                    if (highSorenessCount >= 3 || (preAvgSoreness != null && preAvgSoreness >= 7) || (postAvgSoreness != null && postAvgSoreness >= 7)) {
+                        suggestions.push('Dor alta: reduzir volume/carga 20–30% e priorizar técnica + mobilidade.');
+                    }
+                    if (lowEnergyCount >= 3 || (preAvgEnergy != null && preAvgEnergy <= 2.2)) {
+                        suggestions.push('Energia baixa: treino mais curto, sem falha, foco em recuperação (sono/estresse).');
+                    }
+                    if (postAvgRpe != null && postAvgRpe >= 9) {
+                        suggestions.push('RPE médio alto: reduzir intensidade e aumentar descanso entre séries.');
+                    }
+                    if (postAvgSatisfaction != null && postAvgSatisfaction <= 2) {
+                        suggestions.push('Satisfação baixa: revisar seleção de exercícios e meta da sessão.');
+                    }
+                    if (preAvgTime != null && preAvgTime > 0 && preAvgTime < 45) {
+                        suggestions.push('Pouco tempo: usar treino “mínimo efetivo” (menos exercícios e mais foco).');
+                    }
+
+                    return (
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                                    <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Pré</div>
+                                    <div className="mt-2 grid grid-cols-3 gap-3">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Energia</div>
+                                            <div className="font-black text-white">{preAvgEnergy == null ? '—' : preAvgEnergy.toFixed(1)}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                                            <div className="font-black text-white">{preAvgSoreness == null ? '—' : preAvgSoreness.toFixed(1)}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo</div>
+                                            <div className="font-black text-white">{preAvgTime == null ? '—' : `${Math.round(preAvgTime)}m`}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                                    <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Pós</div>
+                                    <div className="mt-2 grid grid-cols-3 gap-3">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">RPE</div>
+                                            <div className="font-black text-white">{postAvgRpe == null ? '—' : postAvgRpe.toFixed(1)}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Satisf.</div>
+                                            <div className="font-black text-white">{postAvgSatisfaction == null ? '—' : postAvgSatisfaction.toFixed(1)}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                                            <div className="font-black text-white">{postAvgSoreness == null ? '—' : postAvgSoreness.toFixed(1)}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {alerts.length ? (
+                                <div className="rounded-2xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+                                    <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Alertas</div>
+                                    <div className="mt-2 space-y-1 text-sm text-neutral-200">
+                                        {alerts.map((a) => (
+                                            <div key={a}>{a}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {suggestions.length ? (
+                                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-200">Sugestões</div>
+                                    <div className="mt-2 space-y-1 text-sm text-neutral-200">
+                                        {suggestions.map((s) => (
+                                            <div key={s}>{s}</div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+
+                            {filtered.length === 0 ? (
+                                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4 text-sm text-neutral-400">
+                                    Nenhum check-in encontrado.
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filtered.map((r) => {
+                                        const kind = String(r?.kind || '').trim();
+                                        const createdAt = r?.created_at ? new Date(String(r.created_at)) : null;
+                                        const dateLabel = createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleString('pt-BR') : '—';
+                                        const energy = r?.energy != null ? String(r.energy) : '—';
+                                        const soreness = r?.soreness != null ? String(r.soreness) : '—';
+                                        const mood = r?.mood != null ? String(r.mood) : '—';
+                                        const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {};
+                                        const rpe = answers?.rpe != null ? String(answers.rpe) : '—';
+                                        const timeMinutes = answers?.time_minutes != null ? String(answers.time_minutes) : answers?.timeMinutes != null ? String(answers.timeMinutes) : '—';
+                                        const notes = r?.notes ? String(r.notes) : '';
+                                        return (
+                                            <div key={String(r?.id || dateLabel)} className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">{kind === 'pre' ? 'Pré' : 'Pós'}</div>
+                                                        <div className="text-xs text-neutral-500">{dateLabel}</div>
+                                                    </div>
+                                                    <div className="text-xs text-neutral-300 font-mono">
+                                                        {kind === 'pre' ? `E:${energy} D:${soreness} T:${timeMinutes}` : `RPE:${rpe} Sat:${mood} D:${soreness}`}
+                                                    </div>
+                                                </div>
+                                                {notes ? <div className="mt-2 text-sm text-neutral-200">{notes}</div> : null}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
             </div>
         )}
 
@@ -2963,6 +4658,210 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 )}
             </div>
         )}
+
+                {prioritiesComposeOpen ? (
+                    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPrioritiesComposeOpen(false)}>
+                        <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Enviar mensagem</div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPrioritiesComposeOpen(false)}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4 space-y-3">
+                                <textarea
+                                    value={prioritiesComposeText}
+                                    onChange={(e) => setPrioritiesComposeText(e.target.value)}
+                                    rows={5}
+                                    className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                    placeholder="Escreva sua mensagem..."
+                                />
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPrioritiesComposeOpen(false)}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={async () => {
+                                            try {
+                                                const content = String(prioritiesComposeText || '').trim();
+                                                const studentId = String(prioritiesComposeStudentId || '').trim();
+                                                const kind = String(prioritiesComposeKind || '').trim();
+                                                if (!content || !studentId || !kind) return;
+                                                const res = await fetch('/api/teacher/inbox/send-message', {
+                                                    method: 'POST',
+                                                    credentials: 'include',
+                                                    headers: { 'content-type': 'application/json' },
+                                                    body: JSON.stringify({ student_user_id: studentId, content }),
+                                                });
+                                                const json = await res.json().catch(() => null);
+                                                if (!res.ok || !json?.ok) {
+                                                    await alert(String(json?.error || `Falha ao enviar (${res.status})`));
+                                                    return;
+                                                }
+                                                try {
+                                                    await fetch('/api/teacher/inbox/action', {
+                                                        method: 'POST',
+                                                        credentials: 'include',
+                                                        headers: { 'content-type': 'application/json' },
+                                                        body: JSON.stringify({ student_user_id: studentId, kind, action: 'done' }),
+                                                    });
+                                                } catch {}
+                                                setPrioritiesComposeOpen(false);
+                                                setPrioritiesComposeStudentId('');
+                                                setPrioritiesComposeKind('');
+                                                setPrioritiesComposeText('');
+                                                fetchPriorities();
+                                            } catch (e) {
+                                                await alert('Erro: ' + (e?.message ?? String(e)));
+                                            }
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95"
+                                    >
+                                        Enviar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {prioritiesSettingsOpen ? (
+                    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPrioritiesSettingsOpen(false)}>
+                        <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Configurar Prioridades</div>
+                                <button
+                                    type="button"
+                                    onClick={() => setPrioritiesSettingsOpen(false)}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4 space-y-4">
+                                {prioritiesSettingsError ? (
+                                    <div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
+                                        {prioritiesSettingsError}
+                                    </div>
+                                ) : null}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Churn (dias sem treino)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.churnDays ?? COACH_INBOX_DEFAULTS.churnDays)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), churnDays: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Queda de volume (%)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.volumeDropPct ?? COACH_INBOX_DEFAULTS.volumeDropPct)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), volumeDropPct: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Aumento de carga (%)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.loadSpikePct ?? COACH_INBOX_DEFAULTS.loadSpikePct)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), loadSpikePct: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Volume mínimo (7d anterior)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.minPrev7Volume ?? COACH_INBOX_DEFAULTS.minPrev7Volume)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), minPrev7Volume: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Volume mínimo (7d atual p/ spike)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.minCurrent7VolumeSpike ?? COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), minCurrent7VolumeSpike: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Soneca padrão (min)</div>
+                                        <input
+                                            type="number"
+                                            value={String(prioritiesSettings?.snoozeDefaultMinutes ?? COACH_INBOX_DEFAULTS.snoozeDefaultMinutes)}
+                                            onChange={(e) => setPrioritiesSettings((prev) => ({ ...(prev || {}), snoozeDefaultMinutes: e.target.value }))}
+                                            className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-yellow-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={prioritiesSettingsLoading}
+                                        onClick={() => {
+                                            setPrioritiesSettings({ ...COACH_INBOX_DEFAULTS });
+                                            setPrioritiesSettingsError('');
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
+                                    >
+                                        Resetar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={prioritiesSettingsLoading}
+                                        onClick={async () => {
+                                            const ok = await savePrioritiesSettings();
+                                            if (!ok) return;
+                                            setPrioritiesSettingsOpen(false);
+                                            fetchPriorities();
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
+                                    >
+                                        {prioritiesSettingsLoading ? 'Salvando...' : 'Salvar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {executionVideoModalOpen && executionVideoModalUrl ? (
+                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
+                        <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                <div className="font-black text-white">Vídeo de execução</div>
+                                <button
+                                    type="button"
+                                    onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}
+                                    className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                    aria-label="Fechar"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+                            <div className="p-4">
+                                <video src={executionVideoModalUrl} controls className="w-full rounded-xl bg-black" />
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
 
                 {editingTemplate && (
                     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingTemplate(null)}>
@@ -3080,7 +4979,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewWorkout(null)}>
                         <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                <h3 className="font-bold text-white">Treino: {viewWorkout.name}</h3>
+                                <h3 className="font-bold text-white">Treino: {normalizeWorkoutTitle(viewWorkout.name)}</h3>
                                 <button onClick={() => setViewWorkout(null)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300"><ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span></button>
                             </div>
                             <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">

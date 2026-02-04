@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
@@ -40,6 +42,7 @@ const ChatScreen = ({ user, onClose }) => {
     const [uploading, setUploading] = useState(false);
     
     const [searchQuery] = useState('');
+    const safeUserId = user?.id ? String(user.id) : '';
 
     const dummy = useRef();
     const supabase = useMemo(() => createClient(), []);
@@ -280,6 +283,10 @@ const ChatScreen = ({ user, onClose }) => {
     }
 
     const handleUserClick = async (targetUser) => {
+        if (!safeUserId) {
+            await alertRef.current('Sessão inválida. Faça login novamente.');
+            return;
+        }
         const existingChat = privateChannels.find(c => c.otherUserId === targetUser.id);
         
         if (existingChat) {
@@ -293,7 +300,7 @@ const ChatScreen = ({ user, onClose }) => {
                 const { data: pending } = await supabase
                     .from('chat_invites')
                     .select('*')
-                    .eq('sender_id', user.id)
+                    .eq('sender_id', safeUserId)
                     .eq('receiver_id', targetUser.id)
                     .eq('status', 'pending')
                     .single();
@@ -304,7 +311,7 @@ const ChatScreen = ({ user, onClose }) => {
                         const { error: delErr } = await supabase.from('chat_invites').delete().eq('id', pending.id);
                         if (delErr) throw delErr;
                         const { error: reErr } = await supabase.from('chat_invites').insert({
-                            sender_id: user.id,
+                            sender_id: safeUserId,
                             receiver_id: targetUser.id
                         });
                         if (reErr) throw reErr;
@@ -315,7 +322,7 @@ const ChatScreen = ({ user, onClose }) => {
                     }
                 } else {
                     const { error } = await supabase.from('chat_invites').insert({
-                        sender_id: user.id,
+                        sender_id: safeUserId,
                         receiver_id: targetUser.id
                     });
                     if (error) throw error;
@@ -331,12 +338,16 @@ const ChatScreen = ({ user, onClose }) => {
     };
 
     const handleAcceptInvite = async (invite) => {
+        if (!safeUserId) {
+            await alertRef.current('Sessão inválida. Faça login novamente.');
+            return;
+        }
         try {
             const { data: channel, error: cErr } = await supabase.from('chat_channels').insert({ type: 'private' }).select().single();
             if (cErr) throw cErr;
 
             await supabase.from('chat_members').insert([
-                { channel_id: channel.id, user_id: user.id },
+                { channel_id: channel.id, user_id: safeUserId },
                 { channel_id: channel.id, user_id: invite.sender_id }
             ]);
 
@@ -407,7 +418,7 @@ const ChatScreen = ({ user, onClose }) => {
                         {messages.length === 0 && <div className="text-center py-10 text-neutral-500 text-sm">Nenhuma mensagem ainda.<br/>Seja o primeiro a dizer olá! 👋</div>}
                         
                         {messages.map((msg, idx) => {
-                            const myId = user?.id ? String(user.id) : '';
+                            const myId = safeUserId;
                             const msgUid = msg?.uid ? String(msg.uid) : '';
                             const isMe = !!myId && msgUid === myId;
                             const prevUid = messages?.[idx - 1]?.uid ? String(messages[idx - 1].uid) : '';

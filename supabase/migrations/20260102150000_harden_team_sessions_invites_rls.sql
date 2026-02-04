@@ -12,6 +12,10 @@ ALTER TABLE public.invites ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Anyone can view team sessions they are part of" ON public.team_sessions;
 DROP POLICY IF EXISTS "Authenticated users can create sessions" ON public.team_sessions;
 DROP POLICY IF EXISTS "Participants can update sessions" ON public.team_sessions;
+DROP POLICY IF EXISTS team_sessions_select ON public.team_sessions;
+DROP POLICY IF EXISTS team_sessions_insert ON public.team_sessions;
+DROP POLICY IF EXISTS team_sessions_update ON public.team_sessions;
+DROP POLICY IF EXISTS team_sessions_delete ON public.team_sessions;
 
 CREATE POLICY team_sessions_select
 ON public.team_sessions
@@ -54,6 +58,10 @@ DROP POLICY IF EXISTS "Users can see invites sent to them" ON public.invites;
 DROP POLICY IF EXISTS "Users can see invites they sent" ON public.invites;
 DROP POLICY IF EXISTS "Users can send invites" ON public.invites;
 DROP POLICY IF EXISTS "Users can update invites sent to them" ON public.invites;
+DROP POLICY IF EXISTS invites_select ON public.invites;
+DROP POLICY IF EXISTS invites_insert ON public.invites;
+DROP POLICY IF EXISTS invites_update ON public.invites;
+DROP POLICY IF EXISTS invites_delete ON public.invites;
 
 CREATE POLICY invites_select
 ON public.invites

@@ -76,6 +76,18 @@ export async function POST(req: Request) {
       .select('id, subscription_id')
       .maybeSingle()
 
+    const { data: appPayRow } = payRow
+      ? { data: null as any }
+      : await admin
+          .from('app_payments')
+          .update(updates)
+          .eq('asaas_payment_id', paymentId)
+          .select('id, subscription_id')
+          .maybeSingle()
+    if (!payRow?.id && !appPayRow?.id) {
+      await admin.from('app_payments').update(updates).eq('provider', 'asaas').eq('provider_payment_id', paymentId)
+    }
+
     const subStatus = mapSubscriptionStatusFromPayment(paymentStatus)
     const subTargetId = subscriptionId
     if (subTargetId) {
@@ -88,6 +100,23 @@ export async function POST(req: Request) {
         .from('marketplace_subscriptions')
         .update({ status: subStatus, updated_at: new Date().toISOString() })
         .eq('id', payRow.subscription_id)
+    }
+
+    if (subTargetId) {
+      await admin
+        .from('app_subscriptions')
+        .update({ status: subStatus, updated_at: new Date().toISOString() })
+        .eq('asaas_subscription_id', subTargetId)
+      await admin
+        .from('app_subscriptions')
+        .update({ status: subStatus, updated_at: new Date().toISOString() })
+        .eq('provider', 'asaas')
+        .eq('provider_subscription_id', subTargetId)
+    } else if (appPayRow?.subscription_id) {
+      await admin
+        .from('app_subscriptions')
+        .update({ status: subStatus, updated_at: new Date().toISOString() })
+        .eq('id', appPayRow.subscription_id)
     }
 
     await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)

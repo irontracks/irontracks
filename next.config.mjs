@@ -58,6 +58,34 @@ const nextConfig = {
       },
     ],
   },
+  async headers() {
+    const isDev = String(process.env.NODE_ENV || '').toLowerCase() !== 'production'
+    const staticCache = isDev ? 'no-store, max-age=0' : 'public, max-age=31536000, immutable'
+    const imageCache = isDev ? 'no-store, max-age=0' : 'public, max-age=0, must-revalidate'
+
+    return [
+      {
+        source: '/_next/static/:path*',
+        headers: [{ key: 'cache-control', value: staticCache }],
+      },
+      {
+        source: '/_next/image',
+        headers: [{ key: 'cache-control', value: imageCache }],
+      },
+      {
+        source: '/manifest.json',
+        headers: [{ key: 'cache-control', value: 'public, max-age=3600' }],
+      },
+      {
+        source: '/icone.png',
+        headers: [{ key: 'cache-control', value: 'public, max-age=86400' }],
+      },
+      {
+        source: '/((?!_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml).*)',
+        headers: [{ key: 'cache-control', value: 'no-store, max-age=0' }],
+      },
+    ]
+  },
 };
 
 export default nextConfig;

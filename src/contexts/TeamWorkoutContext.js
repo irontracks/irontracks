@@ -1,14 +1,24 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+"use client";
+
+import React, { createContext, useCallback, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { playStartSound } from '@/lib/sounds';
+import { useInAppNotifications } from '@/contexts/InAppNotificationsContext';
+import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 
 const TeamWorkoutContext = createContext({
     incomingInvites: [],
+    acceptedInviteNotice: null,
     teamSession: null,
     sendInvite: async () => { },
     acceptInvite: async () => { },
     rejectInvite: async () => { },
     leaveSession: async () => { },
+    createJoinCode: async () => ({ ok: false }),
+    joinByCode: async () => ({ ok: false }),
+    setPresenceStatus: () => { },
+    presence: {},
+    dismissAcceptedInvite: () => { },
     loading: false
 });
 
@@ -20,25 +30,53 @@ export const useTeamWorkout = () => {
     return context;
 };
 
-export const TeamWorkoutProvider = ({ children, user }) => {
+export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }) => {
     const [incomingInvites, setIncomingInvites] = useState([]);
+    const [acceptedInviteNotice, setAcceptedInviteNotice] = useState(null);
     const [teamSession, setTeamSession] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [presence, setPresence] = useState({});
+    const [presenceStatus, setPresenceStatus] = useState('online');
     const supabase = useMemo(() => createClient(), []);
+    const seenAcceptedInviteIdsRef = useRef(new Set());
+    const { notify } = useInAppNotifications();
+    const joinHandledRef = useRef(new Set());
 
     const canReceiveInvites = useMemo(() => {
-        const uid = user?.id ? String(user.id) : '';
-        if (!uid) return true;
+        const s = settings && typeof settings === 'object' ? settings : null;
+        const allow = s ? s.allowTeamInvites : undefined;
+        return allow !== false;
+    }, [settings]);
+
+    const teamworkV2Enabled = useMemo(() => {
+        return isFeatureEnabled(settings, FEATURE_KEYS.teamworkV2);
+    }, [settings]);
+
+    const soundOpts = useMemo(() => {
+        const s = settings && typeof settings === 'object' ? settings : null;
+        const enabled = s ? s.enableSounds !== false : true;
+        const volumeRaw = s ? Number(s.soundVolume ?? 100) : 100;
+        const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1;
+        return { enabled, volume };
+    }, [settings]);
+
+    const joinByCode = useCallback(async (code) => {
         try {
-            if (typeof window === 'undefined') return true;
-            const raw = window.localStorage.getItem(`irontracks.userSettings.v1.${uid}`) || '';
-            const parsed = raw ? JSON.parse(raw) : null;
-            const allow = parsed && typeof parsed === 'object' ? parsed.allowTeamInvites : undefined;
-            return allow !== false;
-        } catch {
-            return true;
+            if (!teamworkV2Enabled) return { ok: false, error: 'disabled' };
+            const safe = String(code || '').trim();
+            if (!safe) throw new Error('Código inválido');
+            const { data, error } = await supabase.rpc('join_team_session_by_code', { code: safe });
+            if (error) throw error;
+            const payload = data && typeof data === 'object' ? data : {};
+            const sessionId = payload?.team_session_id ? String(payload.team_session_id) : '';
+            if (!sessionId) throw new Error('Sessão inválida');
+            const parts = Array.isArray(payload?.participants) ? payload.participants : [];
+            setTeamSession({ id: sessionId, isHost: false, participants: parts });
+            return { ok: true, teamSessionId: sessionId, participants: parts, workout: payload?.workout ?? null };
+        } catch (e) {
+            return { ok: false, error: e?.message || String(e || '') };
         }
-    }, [user?.id]);
+    }, [supabase, teamworkV2Enabled]);
 
     const refetchInvites = useMemo(() => {
         return async () => {
@@ -124,7 +162,18 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                                 workout: newInvite.workout_data
                             }, ...current];
                         });
-                        try { playStartSound(); } catch {}
+                        try {
+                            const fromName = String(profile?.display_name || 'Alguém').trim() || 'Alguém';
+                            notify({
+                                id: newInvite.id,
+                                type: 'invite',
+                                senderName: fromName,
+                                displayName: 'Convite',
+                                photoURL: profile?.photo_url || null,
+                                text: `${fromName} te convidou para treinar junto.`,
+                            });
+                        } catch {}
+                        try { playStartSound(soundOpts); } catch {}
                     } catch {
                         return;
                     }
@@ -163,7 +212,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites, soundOpts, notify]);
 
     // Fallback: if invites realtime isn't enabled, notifications will still fire
     useEffect(() => {
@@ -217,7 +266,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                         const type = String(n?.type ?? '');
                     if (type !== 'invite') return;
                         refetchInvites();
-                        try { playStartSound(); } catch {}
+                        try { playStartSound(soundOpts); } catch {}
                     } catch {
                         return;
                     }
@@ -263,7 +312,7 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                 if (typeof window !== 'undefined') window.removeEventListener('focus', handleFocus);
             } catch {}
         };
-    }, [supabase, user?.id, refetchInvites, canReceiveInvites]);
+    }, [supabase, user?.id, refetchInvites, canReceiveInvites, soundOpts]);
 
     // 2. Listen to Active Team Session
     useEffect(() => {
@@ -283,7 +332,8 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                     try {
                         const updated = payload?.new;
                         if (!updated || typeof updated !== 'object') return;
-                        if (updated.status === 'finished') {
+                        const st = String(updated.status || '').toLowerCase();
+                        if (st === 'finished' || st === 'ended') {
                             setTeamSession(null);
                             return;
                         }
@@ -309,6 +359,246 @@ export const TeamWorkoutProvider = ({ children, user }) => {
             supabase.removeChannel(channel);
         };
     }, [supabase, teamSession?.id]);
+
+    useEffect(() => {
+        if (!teamworkV2Enabled) return;
+        if (!teamSession?.id) return;
+        if (!user?.id) return;
+        let cancelled = false;
+        let channel = null;
+
+        const hydrate = async () => {
+            try {
+                const { data } = await supabase
+                    .from('team_session_presence')
+                    .select('user_id, status, updated_at')
+                    .eq('session_id', teamSession.id);
+                if (cancelled) return;
+                const rows = Array.isArray(data) ? data : [];
+                const next = {};
+                for (const r of rows) {
+                    const uid = String(r?.user_id || '').trim();
+                    if (!uid) continue;
+                    next[uid] = { status: String(r?.status || 'online'), updatedAt: r?.updated_at ? String(r.updated_at) : '' };
+                }
+                setPresence(next);
+            } catch {
+            }
+        };
+
+        (async () => {
+            await hydrate();
+            if (cancelled) return;
+            try {
+                channel = supabase
+                    .channel(`team_session_presence:${teamSession.id}`)
+                    .on(
+                        'postgres_changes',
+                        { event: '*', schema: 'public', table: 'team_session_presence', filter: `session_id=eq.${teamSession.id}` },
+                        (payload) => {
+                            try {
+                                const ev = String(payload?.eventType || '').toUpperCase();
+                                const row = ev === 'DELETE' ? payload?.old : payload?.new;
+                                const uid = String(row?.user_id || '').trim();
+                                if (!uid) return;
+                                setPresence((prev) => {
+                                    const base = prev && typeof prev === 'object' ? { ...prev } : {};
+                                    if (ev === 'DELETE') {
+                                        delete base[uid];
+                                        return base;
+                                    }
+                                    base[uid] = { status: String(row?.status || 'online'), updatedAt: row?.updated_at ? String(row.updated_at) : '' };
+                                    return base;
+                                });
+                            } catch {
+                            }
+                        }
+                    )
+                    .subscribe();
+            } catch {
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+            try {
+                if (channel) supabase.removeChannel(channel);
+            } catch {
+            }
+        };
+    }, [supabase, teamSession?.id, teamworkV2Enabled, user?.id]);
+
+    useEffect(() => {
+        if (!teamworkV2Enabled) return;
+        if (!teamSession?.id) return;
+        if (!user?.id) return;
+        let cancelled = false;
+        const upsert = async () => {
+            try {
+                await supabase
+                    .from('team_session_presence')
+                    .upsert(
+                        { session_id: teamSession.id, user_id: user.id, status: String(presenceStatus || 'online') },
+                        { onConflict: 'session_id,user_id' }
+                    );
+            } catch {
+            }
+        };
+        const t = setInterval(() => {
+            if (cancelled) return;
+            upsert();
+        }, 15000);
+        upsert();
+        return () => {
+            cancelled = true;
+            clearInterval(t);
+        };
+    }, [presenceStatus, supabase, teamSession?.id, teamworkV2Enabled, user?.id]);
+
+    useEffect(() => {
+        if (!teamworkV2Enabled) return;
+        const uid = user?.id ? String(user.id) : '';
+        if (!uid) return;
+        try {
+            if (typeof window === 'undefined') return;
+            const url = new URL(window.location.href);
+            const code = String(url.searchParams.get('join') || '').trim();
+            if (!code) return;
+            const key = `${uid}:${code.toLowerCase()}`;
+            if (joinHandledRef.current.has(key)) return;
+            joinHandledRef.current.add(key);
+            window.setTimeout(async () => {
+                try {
+                    const res = await joinByCode(code);
+                    if (res?.ok && res?.workout && typeof onStartSession === 'function') {
+                        onStartSession(res.workout);
+                    }
+                    try {
+                        const next = new URL(window.location.href);
+                        next.searchParams.delete('join');
+                        window.history.replaceState({}, '', next.pathname + next.search + next.hash);
+                    } catch {}
+                } catch {}
+            }, 0);
+        } catch {}
+    }, [joinByCode, onStartSession, teamworkV2Enabled, user?.id]);
+
+    // 3. Host: listen for invite acceptance (realtime + polling fallback)
+    useEffect(() => {
+        const userId = user?.id ? String(user.id) : '';
+        if (!userId) return;
+        let mounted = true;
+        let channel = null;
+
+        const showAccepted = async (inviteRow) => {
+            try {
+                if (!mounted) return;
+                const id = inviteRow?.id ? String(inviteRow.id) : '';
+                if (!id) return;
+                if (seenAcceptedInviteIdsRef.current.has(id)) return;
+                seenAcceptedInviteIdsRef.current.add(id);
+
+                const toUid = inviteRow?.to_uid ? String(inviteRow.to_uid) : '';
+                const teamSessionId = inviteRow?.team_session_id ? String(inviteRow.team_session_id) : '';
+
+                let profile = null;
+                if (toUid) {
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('display_name, photo_url')
+                        .eq('id', toUid)
+                        .maybeSingle();
+                    profile = data && typeof data === 'object' ? data : null;
+                }
+
+                if (!mounted) return;
+                setAcceptedInviteNotice({
+                    inviteId: id,
+                    teamSessionId: teamSessionId || null,
+                    user: {
+                        displayName: profile?.display_name || 'Seu parceiro',
+                        photoURL: profile?.photo_url || null,
+                        uid: toUid || null,
+                    }
+                });
+                try { playStartSound(soundOpts); } catch {}
+            } catch {
+                return;
+            }
+        };
+
+        const pollAccepted = async () => {
+            try {
+                if (!mounted) return;
+                const currentSessionId = teamSession?.id ? String(teamSession.id) : '';
+                if (!currentSessionId) return;
+
+                const { data } = await supabase
+                    .from('invites')
+                    .select('id, to_uid, team_session_id, status')
+                    .eq('from_uid', userId)
+                    .eq('team_session_id', currentSessionId)
+                    .eq('status', 'accepted')
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                const list = Array.isArray(data) ? data : [];
+                for (const inv of list) {
+                    const id = inv?.id ? String(inv.id) : '';
+                    if (!id) continue;
+                    if (seenAcceptedInviteIdsRef.current.has(id)) continue;
+                    await showAccepted(inv);
+                    break;
+                }
+            } catch {
+                return;
+            }
+        };
+
+        try {
+            channel = supabase
+                .channel(`invites-accepted:${userId}`)
+                .on(
+                    'postgres_changes',
+                    {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'invites',
+                        filter: `from_uid=eq.${userId}`,
+                    },
+                    (payload) => {
+                        try {
+                            if (!mounted) return;
+                            const updated = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+                            if (!updated) return;
+                            const status = updated?.status ? String(updated.status) : '';
+                            if (status !== 'accepted') return;
+                            const currentSessionId = teamSession?.id ? String(teamSession.id) : '';
+                            const inviteSessionId = updated?.team_session_id ? String(updated.team_session_id) : '';
+                            if (currentSessionId && inviteSessionId && inviteSessionId !== currentSessionId) return;
+                            showAccepted(updated);
+                        } catch {
+                            return;
+                        }
+                    }
+                )
+                .subscribe();
+        } catch {}
+
+        const pollId = setInterval(() => {
+            try { pollAccepted(); } catch {}
+        }, 20_000);
+
+        try { pollAccepted(); } catch {}
+
+        return () => {
+            mounted = false;
+            try {
+                if (channel) supabase.removeChannel(channel);
+            } catch {}
+            try { clearInterval(pollId); } catch {}
+        };
+    }, [supabase, user?.id, teamSession?.id, soundOpts]);
 
     const sendInvite = async (targetUser, workout, currentTeamSessionId = null) => {
         try {
@@ -339,6 +629,15 @@ export const TeamWorkoutProvider = ({ children, user }) => {
                     hostName: user.displayName,
                     participants: Array.isArray(session?.participants) ? session.participants : []
                 });
+
+                if (teamworkV2Enabled) {
+                    try {
+                        await supabase.from('team_session_presence').upsert(
+                            { session_id: sessionId, user_id: user.id, status: 'online' },
+                            { onConflict: 'session_id,user_id' }
+                        );
+                    } catch {}
+                }
             }
 
             const { error: inviteError } = await supabase
@@ -356,6 +655,63 @@ export const TeamWorkoutProvider = ({ children, user }) => {
         } catch (e) {
             const msg = e?.message || String(e || 'Erro ao enviar convite');
             throw new Error(msg);
+        }
+    };
+
+    const generateJoinCode = () => {
+        const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        let out = '';
+        for (let i = 0; i < 6; i += 1) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+        return out;
+    };
+
+    const createJoinCode = async (workout, ttlMinutes = 90) => {
+        try {
+            if (!teamworkV2Enabled) return { ok: false, error: 'disabled' };
+            if (!user?.id) throw new Error('Usuário inválido');
+            const expiresAt = new Date(Date.now() + Math.max(10, Number(ttlMinutes) || 90) * 60_000).toISOString();
+            const code = generateJoinCode();
+
+            let sessionId = teamSession?.id ? String(teamSession.id) : '';
+            let participants = teamSession?.participants || [];
+            if (!sessionId) {
+                const { data: session, error } = await supabase
+                    .from('team_sessions')
+                    .insert({
+                        host_uid: user.id,
+                        status: 'active',
+                        participants: [{ uid: user.id, name: user.displayName, photo: user.photoURL }],
+                        workout_state: { workout_data: workout, join_code: code, join_expires_at: expiresAt }
+                    })
+                    .select()
+                    .single();
+                if (error) throw error;
+                sessionId = session?.id ? String(session.id) : '';
+                participants = Array.isArray(session?.participants) ? session.participants : [];
+                if (!sessionId) throw new Error('Falha ao criar sessão');
+                setTeamSession({ id: sessionId, isHost: true, hostName: user.displayName, participants });
+            } else {
+                const { data: existing } = await supabase
+                    .from('team_sessions')
+                    .select('workout_state')
+                    .eq('id', sessionId)
+                    .maybeSingle();
+                const prev = existing?.workout_state && typeof existing.workout_state === 'object' ? existing.workout_state : {};
+                const nextState = { ...prev, workout_data: workout, join_code: code, join_expires_at: expiresAt };
+                await supabase.from('team_sessions').update({ workout_state: nextState }).eq('id', sessionId);
+            }
+
+            const url = (() => {
+                try {
+                    if (typeof window === 'undefined') return '';
+                    return `${window.location.origin}/dashboard?join=${encodeURIComponent(code)}`;
+                } catch {
+                    return '';
+                }
+            })();
+            return { ok: true, sessionId, code, expiresAt, url };
+        } catch (e) {
+            return { ok: false, error: e?.message || String(e || '') };
         }
     };
 
@@ -424,18 +780,42 @@ export const TeamWorkoutProvider = ({ children, user }) => {
     };
 
     const leaveSession = async () => {
-        setTeamSession(null);
-        // Ideally we would remove ourselves from the participants list in DB too
+        try {
+            const sid = teamSession?.id ? String(teamSession.id) : '';
+            if (!sid) {
+                setTeamSession(null);
+                return;
+            }
+            if (teamworkV2Enabled) {
+                try {
+                    await supabase.rpc('leave_team_session', { p_session_id: sid });
+                } catch {
+                }
+            }
+            setTeamSession(null);
+        } catch {
+            setTeamSession(null);
+        }
+    };
+
+    const dismissAcceptedInvite = () => {
+        setAcceptedInviteNotice(null);
     };
 
     return (
         <TeamWorkoutContext.Provider value={{
             incomingInvites,
+            acceptedInviteNotice,
             teamSession,
             sendInvite,
             acceptInvite,
             rejectInvite,
             leaveSession,
+            createJoinCode,
+            joinByCode,
+            setPresenceStatus,
+            presence,
+            dismissAcceptedInvite,
             loading
         }}>
             {children}
