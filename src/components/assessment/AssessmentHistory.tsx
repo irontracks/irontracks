@@ -1354,7 +1354,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                           return (
                             <div key={key} className="flex justify-between">
                               <span className="text-neutral-400">{label}:</span>
-                              <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                              <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                             </div>
                           );
                         })}
@@ -1368,7 +1368,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                           return (
                             <div key={key} className="flex justify-between">
                               <span className="text-neutral-400">{label}:</span>
-                              <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                              <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                             </div>
                           );
                         })}
@@ -1698,7 +1698,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                             return (
                               <div key={key} className="flex justify-between">
                                 <span className="text-neutral-400">{label}:</span>
-                                <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                                <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                               </div>
                             );
                           })}
@@ -1712,7 +1712,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                             return (
                               <div key={key} className="flex justify-between">
                                 <span className="text-neutral-400">{label}:</span>
-                                <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                                <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                               </div>
                             );
                           })}

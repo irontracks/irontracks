@@ -297,11 +297,17 @@ export const useAssessment = (): UseAssessmentReturn => {
 
     // Calcular métricas
     const sumSkinfolds = calculateSumSkinfolds({
-      triceps, biceps, subscapular, suprailiac, abdominal, thigh, calf
+      triceps_skinfold: triceps ?? undefined,
+      biceps_skinfold: biceps ?? undefined,
+      subscapular_skinfold: subscapular ?? undefined,
+      suprailiac_skinfold: suprailiac ?? undefined,
+      abdominal_skinfold: abdominal ?? undefined,
+      thigh_skinfold: thigh ?? undefined,
+      calf_skinfold: calf ?? undefined,
     });
 
     const bodyDensity = calculateBodyDensity(sumSkinfolds, age, gender);
-    const bodyFat = calculateBodyFatPercentage(bodyDensity, age, gender);
+    const bodyFat = calculateBodyFatPercentage(bodyDensity);
     const fatMass = calculateFatMass(weight, bodyFat);
     const leanMass = calculateLeanMass(weight, fatMass);
     const bmi = calculateBMI(weight, height);
@@ -317,21 +323,21 @@ export const useAssessment = (): UseAssessmentReturn => {
       gender,
       
       // Circunferências
-      arm_circ: parseNumberInput(data.arm_circ),
-      chest_circ: parseNumberInput(data.chest_circ),
-      waist_circ: parseNumberInput(data.waist_circ),
-      hip_circ: parseNumberInput(data.hip_circ),
-      thigh_circ: parseNumberInput(data.thigh_circ),
-      calf_circ: parseNumberInput(data.calf_circ),
+      arm_circ: parseNumberInput(data.arm_circ) ?? undefined,
+      chest_circ: parseNumberInput(data.chest_circ) ?? undefined,
+      waist_circ: parseNumberInput(data.waist_circ) ?? undefined,
+      hip_circ: parseNumberInput(data.hip_circ) ?? undefined,
+      thigh_circ: parseNumberInput(data.thigh_circ) ?? undefined,
+      calf_circ: parseNumberInput(data.calf_circ) ?? undefined,
 
       // Dobras
-      triceps_skinfold: triceps,
-      biceps_skinfold: biceps,
-      subscapular_skinfold: subscapular,
-      suprailiac_skinfold: suprailiac,
-      abdominal_skinfold: abdominal,
-      thigh_skinfold: thigh,
-      calf_skinfold: calf,
+      triceps_skinfold: triceps ?? undefined,
+      biceps_skinfold: biceps ?? undefined,
+      subscapular_skinfold: subscapular ?? undefined,
+      suprailiac_skinfold: suprailiac ?? undefined,
+      abdominal_skinfold: abdominal ?? undefined,
+      thigh_skinfold: thigh ?? undefined,
+      calf_skinfold: calf ?? undefined,
 
       // Calculados
       body_fat_percentage: bodyFat,

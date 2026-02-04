@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.0-flash-exp';
 
-const formatSession = (session: any) => {
+const formatSession = (session: any): string => {
     if (!session) return 'Nenhum dado disponível.';
     
     let summary = `Título: ${session.workoutTitle || 'Treino sem nome'}\n`;
@@ -17,7 +17,7 @@ const formatSession = (session: any) => {
     const logs = session.logs || {};
     
     summary += 'Exercícios:\n';
-    exercises.forEach((ex: any, idx) => {
+    exercises.forEach((ex: any, idx: number) => {
         summary += `${idx + 1}. ${ex.name} (${ex.sets} séries, Método: ${ex.method || 'Normal'}, RPE: ${ex.rpe || '-'}, Descanso: ${ex.restTime || '-'}s)\n`;
         // Add logs detail
         for (let s = 0; s < (ex.sets || 0); s++) {
@@ -32,7 +32,7 @@ const formatSession = (session: any) => {
     return summary;
 };
 
-export async function POST(req: any) {
+export async function POST(req: Request) {
     try {
         const user = await requireUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -87,7 +87,7 @@ RESUMO DA CONVERSA ATÉ AGORA:
         // Convert messages to Gemini format
         // Gemini expects: { role: 'user' | 'model', parts: [{ text: ... }] }
         // Our messages: { role: 'user' | 'assistant', content: ... }
-        const history = (messages || []).map(m => ({
+        const history = (messages || []).map((m: any) => ({
             role: m.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: m.content }]
         }));
@@ -141,11 +141,11 @@ RESUMO DA CONVERSA ATÉ AGORA:
             content: responseText 
         });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Coach Chat Error:', error);
         return NextResponse.json({ 
             error: 'Failed to process chat', 
-            details: error.message 
+            details: error?.message ?? String(error) 
         }, { status: 500 });
     }
 }
