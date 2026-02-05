@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
+    localPatterns: [
+      {
+        pathname: '/api/social/stories/media',
+      },
+    ],
     remotePatterns: [
       {
         protocol: 'https',

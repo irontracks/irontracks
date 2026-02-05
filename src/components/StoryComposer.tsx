@@ -280,6 +280,7 @@ const drawStory = ({
   layout,
   livePositions,
   transparentBg = false,
+  skipClear = false,
 }: {
   ctx: CanvasRenderingContext2D
   canvasW: number
@@ -289,8 +290,9 @@ const drawStory = ({
   layout: string
   livePositions: LivePositions
   transparentBg?: boolean
+  skipClear?: boolean
 }) => {
-  ctx.clearRect(0, 0, canvasW, canvasH)
+  if (!skipClear) ctx.clearRect(0, 0, canvasW, canvasH)
   
   // Background
   if (!transparentBg) {
@@ -560,7 +562,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   // Trimming State
   const [showTrimmer, setShowTrimmer] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
-  const [trimRange, setTrimRange] = useState<[number, number]>([0, 15])
+  const [trimRange, setTrimRange] = useState<[number, number]>([0, 60])
   const [previewTime, setPreviewTime] = useState(0)
 
   useEffect(() => {
@@ -655,7 +657,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     setBackgroundImage(null)
     setShowTrimmer(false)
     setVideoDuration(0)
-    setTrimRange([0, 15])
+    setTrimRange([0, 60])
     try {
       if (inputRef?.current) inputRef.current.value = ''
     } catch {}
@@ -753,7 +755,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         v.onloadedmetadata = () => {
              const dur = v.duration || 0
              setVideoDuration(dur)
-             setTrimRange([0, Math.min(dur, 15)])
+             setTrimRange([0, Math.min(dur, 60)])
         }
         v.src = url
         return
@@ -904,6 +906,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     const duration = video.duration
     if (!duration || !Number.isFinite(duration)) throw new Error('Duração inválida')
 
+    const prevMuted = video.muted
+    const prevLoop = video.loop
+    const prevVolume = video.volume
+    video.muted = false
+    video.volume = 1
+
     const canvas = document.createElement('canvas')
     canvas.width = CANVAS_W
     canvas.height = CANVAS_H
@@ -921,17 +929,27 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     }
 
     const chunks: Blob[] = []
-    let mime = 'video/mp4'
-    // Safari e Chrome modernos suportam mp4
-    if (!MediaRecorder.isTypeSupported(mime)) {
-      mime = 'video/webm;codecs=vp9'
-      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm'
-    }
+    const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
+    const isSafari = /safari/i.test(ua) && !/chrome|chromium|crios|edg|opr|android/i.test(ua)
+    const candidates = isSafari
+      ? ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+      : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
+    const mime = candidates.find((t) => MediaRecorder.isTypeSupported(t)) || ''
+    if (!mime) throw new Error('Exportação de vídeo não suportada neste navegador.')
 
-    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 }) // 5 Mbps
+    const videoBitsPerSecond = mime.includes('vp9') ? 12_000_000 : 16_000_000
+    const audioBitsPerSecond = 192_000
+    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond, audioBitsPerSecond })
 
     return new Promise((resolve, reject) => {
       let rafId = 0
+
+      const restore = () => {
+        video.loop = prevLoop
+        video.muted = prevMuted
+        video.volume = prevVolume
+        if (prevLoop) video.play().catch(() => {})
+      }
       
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunks.push(e.data)
@@ -939,9 +957,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
       recorder.onstop = () => {
         cancelAnimationFrame(rafId)
-        video.loop = true
-        video.muted = true
-        video.play().catch(() => {})
+        restore()
         
         const blob = new Blob(chunks, { type: mime })
         const ext = mime.includes('mp4') ? 'mp4' : 'webm'
@@ -950,51 +966,90 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
       recorder.onerror = (e) => {
         cancelAnimationFrame(rafId)
+        restore()
         reject(e)
       }
 
-      // Configuração inicial do vídeo para gravação
-      video.pause()
-      video.currentTime = trimRange[0] // Start from trim start
-      video.loop = false
-      
-      recorder.start()
-      video.play().then(() => {
+      const fail = (err: any) => {
+        cancelAnimationFrame(rafId)
+        try {
+          if (recorder.state === 'recording') recorder.stop()
+        } catch {}
+        restore()
+        reject(err)
+      }
+
+      const drawFrame = () => {
+        const vw = video.videoWidth
+        const vh = video.videoHeight
+        if (!vw || !vh) throw new Error('Frame de vídeo indisponível.')
+        const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
+        const dw = vw * scale
+        const dh = vh * scale
+        const cx = (CANVAS_W - dw) / 2
+        const cy = (CANVAS_H - dh) / 2
+        ctx.drawImage(video, cx, cy, dw, dh)
+        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: null, metrics, layout, livePositions, transparentBg: true, skipClear: true })
+      }
+
+      const prepareAndRecord = async () => {
+        video.pause()
+        video.loop = false
+        video.currentTime = trimRange[0]
+
+        await new Promise<void>((resolveSeek) => {
+          if (!video.seeking && video.readyState >= 2) return resolveSeek()
+          let done = false
+          const onDone = () => {
+            if (done) return
+            done = true
+            clearTimeout(t)
+            resolveSeek()
+          }
+          const t = window.setTimeout(onDone, 1500)
+          video.addEventListener('seeked', onDone, { once: true })
+          video.addEventListener('error', onDone, { once: true })
+        })
+
+        await video.play()
+
+        await new Promise<void>((resolveFrame, rejectFrame) => {
+          let done = false
+          const finishOk = () => {
+            if (done) return
+            done = true
+            clearTimeout(t)
+            resolveFrame()
+          }
+          const finishBad = () => {
+            if (done) return
+            done = true
+            clearTimeout(t)
+            rejectFrame(new Error('Não foi possível ler frames do vídeo.'))
+          }
+          const t = window.setTimeout(finishBad, 2000)
+          const rvfc = (video as any).requestVideoFrameCallback
+          if (typeof rvfc === 'function') rvfc.call(video, finishOk)
+          else video.addEventListener('timeupdate', finishOk, { once: true })
+        })
+
+        drawFrame()
+        recorder.start()
+
         const draw = () => {
-          // Stop if reached end of trim or video ended
           if (video.paused || video.ended || video.currentTime >= trimRange[1]) {
             if (recorder.state === 'recording') recorder.stop()
             return
           }
-          
-          const vw = video.videoWidth
-          const vh = video.videoHeight
-          const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
-          const dw = vw * scale
-          const dh = vh * scale
-          const cx = (CANVAS_W - dw) / 2
-          const cy = (CANVAS_H - dh) / 2
-          ctx.drawImage(video, cx, cy, dw, dh)
-
-          drawStory({ 
-            ctx, 
-            canvasW: CANVAS_W, 
-            canvasH: CANVAS_H, 
-            backgroundImage: null, 
-            metrics, 
-            layout, 
-            livePositions, 
-            transparentBg: true 
-          })
-
+          try {
+            drawFrame()
+          } catch {}
           rafId = requestAnimationFrame(draw)
         }
         draw()
-      }).catch((err) => {
-         cancelAnimationFrame(rafId)
-         if (recorder.state === 'recording') recorder.stop()
-         reject(err)
-      })
+      }
+
+      prepareAndRecord().catch(fail)
     })
   }
 
@@ -1082,12 +1137,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       
       if (mediaKind === 'video') {
         if (!selectedFile) throw new Error('Selecione um vídeo primeiro.')
-        const maxBytes = 100 * 1024 * 1024 // 100MB Limit
-        if (Number(selectedFile.size) > maxBytes) throw new Error('Vídeo muito grande (máx 100MB).')
+        const maxBytes = 200 * 1024 * 1024
+        if (Number(selectedFile.size) > maxBytes) throw new Error('Vídeo muito grande (máx 200MB).')
         
         // Renderiza vídeo com layout
         const { blob, mime } = await createImageBlob({})
-        if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 100MB).')
+        if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 200MB).')
 
         const ext = mime.includes('mp4') ? '.mp4' : '.webm'
         const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`

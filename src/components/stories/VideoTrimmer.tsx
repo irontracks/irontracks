@@ -12,7 +12,7 @@ interface VideoTrimmerProps {
 }
 
 const MIN_DURATION = 1 // 1 second
-const MAX_DURATION = 15 // 15 seconds
+const MAX_DURATION = 60 // 60 seconds
 
 export default function VideoTrimmer({ duration, value, onChange, onPreview, currentTime }: VideoTrimmerProps) {
   const [zoom, setZoom] = useState(1)
@@ -78,10 +78,10 @@ export default function VideoTrimmer({ duration, value, onChange, onPreview, cur
             <span>Editor de Tempo</span>
         </div>
         <div className="flex items-center gap-2">
-            <span className={value[1] - value[0] > 15 ? 'text-red-500' : 'text-white'}>
+            <span className={value[1] - value[0] > 60 ? 'text-red-500' : 'text-white'}>
                 {fmt(value[1] - value[0])}s
             </span>
-            <span className="text-neutral-600">/ 15.0s</span>
+            <span className="text-neutral-600">/ 60.0s</span>
         </div>
       </div>
 
