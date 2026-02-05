@@ -185,6 +185,10 @@ export default function ActiveWorkout(props) {
 
   useEffect(() => {
     const id = setInterval(() => setTicker(Date.now()), 1000);
+    // Scroll to top on mount
+    try {
+      window.scrollTo(0, 0);
+    } catch {}
     return () => clearInterval(id);
   }, []);
 
@@ -1006,7 +1010,7 @@ export default function ActiveWorkout(props) {
         )}
 
         <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha Ativação e Minis no modal para registrar e usar o timer.</div>
-        {isNotesOpen && (
+        {isNotesOpen || hasNotes ? (
           <textarea
             value={notesValue}
             onChange={(e) => {
@@ -1017,7 +1021,7 @@ export default function ActiveWorkout(props) {
             rows={2}
             className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
           />
-        )}
+        ) : null}
       </div>
     );
   };
@@ -1129,7 +1133,7 @@ export default function ActiveWorkout(props) {
             <Pencil size={14} />
             <span className="text-xs font-black">Abrir</span>
           </button>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
             <span className="inline-flex items-center rounded-full px-2 py-1 text-[10px] uppercase tracking-wide font-black text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 shrink-0 whitespace-nowrap">
               CLUSTER
             </span>
@@ -1190,7 +1194,7 @@ export default function ActiveWorkout(props) {
             Preencha os blocos no modal para registrar kg, reps e descanso.
           </div>
         ) : null}
-        {isNotesOpen && (
+        {isNotesOpen || hasNotes ? (
           <textarea
             value={notesValue}
             onChange={(e) => {
@@ -1201,7 +1205,7 @@ export default function ActiveWorkout(props) {
             rows={2}
             className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
           />
-        )}
+        ) : null}
       </div>
     );
   };
@@ -1562,7 +1566,7 @@ export default function ActiveWorkout(props) {
               <Dumbbell size={16} className="text-yellow-500" />
               <h3 className="font-black text-white truncate">{name}</h3>
             </div>
-            <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-400">
               <span className="font-mono">{setsCount} sets</span>
               <span className="opacity-30">•</span>
               <span className="font-mono">{restTime ? `${restTime}s` : '-'}</span>
@@ -1642,6 +1646,7 @@ export default function ActiveWorkout(props) {
                 workoutId={workout?.id || null}
                 exerciseId={ex?.id || ex?.exercise_id || null}
                 exerciseLibraryId={ex?.exercise_library_id || null}
+                label="Enviar Execução"
               />
               <button
                 type="button"

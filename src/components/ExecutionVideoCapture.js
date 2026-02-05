@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Video } from 'lucide-react';
+import { Video, X, StopCircle, Check, Loader2, Upload, AlertCircle } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 
@@ -151,11 +151,14 @@ export default function ExecutionVideoCapture(props) {
             pickFile();
           }}
           disabled={uploading}
-          className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-black/30 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 active:scale-95 transition-transform disabled:opacity-60"
+          className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-black/30 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 active:scale-95 transition-transform disabled:opacity-60 relative"
           title={uploading ? 'Enviando...' : 'Enviar vídeo ao professor'}
           aria-label={uploading ? 'Enviando vídeo' : 'Enviar vídeo ao professor'}
         >
-          <Video size={16} className="text-yellow-500" />
+          <div className="relative">
+            <Video size={16} className="text-yellow-500" />
+            <Upload size={10} className="absolute -top-1 -right-1 text-black bg-yellow-500 rounded-full p-[1px]" />
+          </div>
           <span className="text-sm">{uploading ? 'Enviando...' : label}</span>
         </button>
       ) : (
