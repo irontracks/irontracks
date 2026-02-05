@@ -5,7 +5,6 @@ import { buildReportHTML } from '@/utils/report/buildHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { createClient } from '@/utils/supabase/client';
-// @ts-ignore
 import StoryComposer from '@/components/StoryComposer';
 import CoachChatModal from '@/components/CoachChatModal';
 import { getKcalEstimate } from '@/utils/calories/kcalClient';

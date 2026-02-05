@@ -54,6 +54,7 @@ type ApiPayload = ApiPayloadWeek | ApiPayloadDay
 
 type Props = {
   onOpenWizard?: () => void
+  defaultViewMode?: 'day' | 'week'
 }
 
 const localIsoDate = () => {
@@ -94,7 +95,7 @@ const isWeekPayload = (data: ApiPayload | null): data is ApiPayloadWeek => {
 const PREFILL_KEY = 'irontracks_wizard_prefill_v1'
 
 export default function MuscleMapCard(props: Props) {
-  const [period, setPeriod] = useState<'day' | 'week'>('day')
+  const [period, setPeriod] = useState<'day' | 'week'>(props.defaultViewMode || 'week')
   const [selectedDate, setSelectedDate] = useState(localIsoDate)
   const [view, setView] = useState<'front' | 'back'>('front')
   const [selected, setSelected] = useState<MuscleId | null>(null)

@@ -1463,14 +1463,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         {busy ? 'PROCESSANDO...' : 'POSTAR NO IRONTRACKS'}
                     </button>
                     
-                    {/* <button
+                    <button
                         onClick={shareImage}
                         disabled={busy}
                         className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
                     >
                         <Share2 size={14} />
                         BAIXAR / COMPARTILHAR
-                    </button> */}
+                    </button>
                 </div>
 
             </div>

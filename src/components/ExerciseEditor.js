@@ -1253,6 +1253,27 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                                     {setIdx === 0 && 'Série de Aquecimento'}
                                                                 </label>
                                                             </div>
+                                                            <select
+                                                                value={isDropCfg ? 'Drop-set' : (config?.type === 'sst' ? 'SST' : (isRestPauseCfg ? 'Rest-Pause' : 'Normal'))}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    if (val === 'Normal') {
+                                                                        updateConfig(null);
+                                                                    } else if (val === 'Drop-set') {
+                                                                        updateConfig([{ weight: null, reps: '' }]);
+                                                                    } else if (val === 'SST') {
+                                                                        updateConfig({ type: 'sst', initial_reps: 10, mini_sets: 2, rest_time_sec: 10 });
+                                                                    } else if (val === 'Rest-Pause') {
+                                                                        updateConfig({ initial_reps: 10, mini_sets: 2, rest_time_sec: 20 });
+                                                                    }
+                                                                }}
+                                                                className="bg-neutral-800 text-[10px] font-bold text-neutral-300 border border-neutral-700 rounded-md px-2 py-1 outline-none focus:border-yellow-500"
+                                                            >
+                                                                <option value="Normal">Normal</option>
+                                                                <option value="Drop-set">Drop Set</option>
+                                                                <option value="SST">SST</option>
+                                                                <option value="Rest-Pause">Rest-Pause</option>
+                                                            </select>
                                                         </div>
 
 												{(!isDropCfg && !isClusterCfg && !isRestPauseCfg && (safeMethod === 'Normal' || safeMethod === 'Bi-Set' || safeMethod === 'Rest-Pause' || safeMethod === 'Drop-set' || safeMethod === 'Cluster')) && (
@@ -1350,8 +1371,13 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-													{(isRestPauseCfg || safeMethod === 'Rest-Pause') && !isDropCfg && config && typeof config === 'object' && (
+													{(isRestPauseCfg || safeMethod === 'Rest-Pause' || config?.type === 'sst') && !isDropCfg && config && typeof config === 'object' && (
 														<div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                            <div className="col-span-full mb-1">
+                                                                <span className="text-[10px] uppercase font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded">
+                                                                    Configuração {config?.type === 'sst' ? 'SST' : 'Rest-Pause'}
+                                                                </span>
+                                                            </div>
 															<div>
 																<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
 																<input

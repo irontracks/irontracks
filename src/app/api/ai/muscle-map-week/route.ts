@@ -36,6 +36,33 @@ const extractJsonFromModelText = (text: string) => {
 
 const toStr = (v: any) => String(v || '').trim()
 
+const normalizeMuscleId = (raw: any, allowed: Set<string>) => {
+  const id = String(raw || '').trim().toLowerCase()
+  if (!id) return ''
+  if (allowed.has(id)) return id
+  if (id === 'abdominal' || id === 'abdominals' || id === 'abdomen' || id === 'core' || id === 'obliques' || id === 'oblique') return 'abs'
+  return ''
+}
+
+const DEFAULT_MUSCLE_ID_SET = new Set(MUSCLE_GROUPS.map((m) => m.id))
+
+const normalizeContributions = (mapping: any, allowed: Set<string>) => {
+  const raw = mapping && typeof mapping === 'object' ? mapping : null
+  const contributionsRaw = Array.isArray((raw as any)?.contributions) ? (raw as any).contributions : []
+  return contributionsRaw
+    .map((c: any) => {
+      const id = normalizeMuscleId(c?.muscleId, allowed)
+      const weight = Number(c?.weight)
+      if (!id || !Number.isFinite(weight) || weight <= 0) return null
+      return { muscleId: id, weight }
+    })
+    .filter(Boolean)
+}
+
+const hasValidMapping = (mapping: any, allowed: Set<string>) => {
+  return normalizeContributions(mapping, allowed).length > 0
+}
+
 const startOfWeekUtc = (d: Date) => {
   const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
   const day = date.getUTCDay()
@@ -76,6 +103,18 @@ const parseEffortFactor = (log: any) => {
     return 0.6
   }
   return 1
+}
+
+const parseNumber = (raw: any) => {
+  const n = Number(String(raw ?? '').replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+const isSetDone = (log: any) => {
+  if (!log || typeof log !== 'object') return false
+  if (Boolean((log as any)?.done)) return true
+  const reps = parseNumber((log as any)?.reps)
+  return reps != null && reps > 0
 }
 
 const plannedSetsCount = (exercise: any) => {
@@ -351,7 +390,8 @@ export async function POST(req: Request) {
     for (const row of Array.isArray(maps) ? maps : []) {
       const k = toStr(row?.exercise_key)
       if (!k) continue
-      mapByKey.set(k, row?.mapping && typeof row.mapping === 'object' ? row.mapping : null)
+      const mapping = row?.mapping && typeof row.mapping === 'object' ? row.mapping : null
+      mapByKey.set(k, hasValidMapping(mapping, DEFAULT_MUSCLE_ID_SET) ? mapping : null)
     }
 
     const missingPairs: { key: string; canonical: string }[] = []
@@ -398,6 +438,7 @@ export async function POST(req: Request) {
     }
 
     const muscleIds = MUSCLE_GROUPS.map((m) => m.id)
+    const muscleIdSet = new Set(muscleIds)
     const volumes: Record<string, number> = Object.fromEntries(muscleIds.map((id) => [id, 0]))
     const unknownExercises: string[] = []
     const byMuscleByExercise = new Map<string, Map<string, number>>()
@@ -432,26 +473,31 @@ export async function POST(req: Request) {
         const exIdx = Number(keyParts[0])
         if (!Number.isFinite(exIdx)) continue
         const setIdx = Number(keyParts[1])
+        const exName = toStr(exs?.[exIdx]?.name)
+        if (!exName) continue
+        const isWarmup = Boolean(log?.is_warmup ?? log?.isWarmup)
+        if (isWarmup) continue
+        const done = isSetDone(log)
+        if (!done) continue
         if (Number.isFinite(setIdx)) {
           const set = loggedSetsByExerciseIdx.get(exIdx) || new Set<number>()
           set.add(setIdx)
           loggedSetsByExerciseIdx.set(exIdx, set)
         }
-        const exName = toStr(exs?.[exIdx]?.name)
-        if (!exName) continue
-        const isWarmup = Boolean(log?.is_warmup ?? log?.isWarmup)
-        if (isWarmup) continue
-        const w = Number(String(log?.weight ?? '').replace(',', '.'))
-        const r = Number(String(log?.reps ?? '').replace(',', '.'))
-        const hasNumbers = Number.isFinite(w) && Number.isFinite(r) && w > 0 && r > 0
-        const done = Boolean(log?.done) || hasNumbers
-        if (!done) continue
         const effort = parseEffortFactor(log)
 
         const canonical = resolveCanonicalExerciseName(exName)?.canonical || exName
         const exKey = normalizeExerciseName(canonical)
         const mapping = exKey ? mapByKey.get(exKey) : null
-        const contributions = Array.isArray(mapping?.contributions) ? mapping.contributions : []
+        const contributionsRaw = Array.isArray(mapping?.contributions) ? mapping.contributions : []
+        const contributions = contributionsRaw
+          .map((c: any) => {
+            const id = normalizeMuscleId(c?.muscleId, muscleIdSet)
+            const weight = Number(c?.weight)
+            if (!id || !Number.isFinite(weight) || weight <= 0) return null
+            return { muscleId: id, weight }
+          })
+          .filter(Boolean)
         if (!contributions.length) {
           unknownExercises.push(canonical || exName)
           diagnostics.exercisesWithoutMapping.add(canonical || exName)
@@ -461,7 +507,6 @@ export async function POST(req: Request) {
           const id = toStr((c as any)?.muscleId)
           const weight = Number((c as any)?.weight)
           if (!id || !Number.isFinite(weight) || weight <= 0) continue
-          if (volumes[id] == null) continue
           const value = effort * weight
           volumes[id] += value
           addContribution(id, canonical || exName, value)
@@ -480,7 +525,15 @@ export async function POST(req: Request) {
         const canonical = resolveCanonicalExerciseName(exName)?.canonical || exName
         const exKey = normalizeExerciseName(canonical)
         const mapping = exKey ? mapByKey.get(exKey) : null
-        const contributions = Array.isArray(mapping?.contributions) ? mapping.contributions : []
+        const contributionsRaw = Array.isArray(mapping?.contributions) ? mapping.contributions : []
+        const contributions = contributionsRaw
+          .map((c: any) => {
+            const id = normalizeMuscleId(c?.muscleId, muscleIdSet)
+            const weight = Number(c?.weight)
+            if (!id || !Number.isFinite(weight) || weight <= 0) return null
+            return { muscleId: id, weight }
+          })
+          .filter(Boolean)
         if (!contributions.length) {
           unknownExercises.push(canonical || exName)
           diagnostics.exercisesWithoutMapping.add(canonical || exName)
@@ -493,7 +546,6 @@ export async function POST(req: Request) {
           const id = toStr((c as any)?.muscleId)
           const weight = Number((c as any)?.weight)
           if (!id || !Number.isFinite(weight) || weight <= 0) continue
-          if (volumes[id] == null) continue
           const value = remaining * effort * weight
           volumes[id] += value
           addContribution(id, canonical || exName, value)

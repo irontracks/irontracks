@@ -342,76 +342,9 @@ export default function ActiveWorkout(props) {
     }
   };
 
-  const validateWorkout = async () => {
-    const errors = [];
-    const title = String(workout?.title || '').trim();
-    if (!title) {
-      errors.push('O treino precisa de um título.');
-    }
-
-    if (!exercises || exercises.length === 0) {
-      errors.push('O treino não tem exercícios.');
-    }
-
-    let totalDone = 0;
-
-    exercises.forEach((ex, exIdx) => {
-      const exName = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
-      if (!String(ex?.name || '').trim()) {
-        errors.push(`Exercício ${exIdx + 1}: Nome não preenchido.`);
-      }
-
-      const setsHeader = Math.max(0, Number(ex?.sets) || 0);
-      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
-      const setsCount = Math.max(setsHeader, sdArr.length);
-
-      for (let i = 0; i < setsCount; i++) {
-        const key = `${exIdx}-${i}`;
-        const log = getLog(key);
-        
-        // Se a série foi marcada como feita, TEM QUE ter peso e reps
-        if (log?.done) {
-          totalDone++;
-          const w = String(log?.weight ?? '').trim();
-          const r = String(log?.reps ?? '').trim();
-          const cfg = getPlanConfig(ex, i); // Fallback to plan config if needed? No, log should have it if edited.
-          // Actually renderNormalSet uses: const weightValue = String(log?.weight ?? cfg?.weight ?? '');
-          // So we should check the effective value
-          const effWeight = w || String(cfg?.weight ?? '').trim();
-          
-          const isCardio = String(ex?.method || '').trim() === 'Cardio' || ex?.type === 'cardio';
-          if (!isCardio && !effWeight && effWeight !== '0') {
-             errors.push(`${exName} (Série ${i + 1}): Peso não preenchido.`);
-          }
-          // Para cardio, o peso pode ser ignorado (exceto se for bike/elíptico onde é carga, mas vamos deixar opcional para não travar outdoor)
-          
-          if (!r && r !== '0') {
-             errors.push(`${exName} (Série ${i + 1}): ${isCardio ? 'Tempo' : 'Repetições'} não preenchido(a).`);
-          }
-        }
-      }
-    });
-
-    if (exercises.length > 0 && totalDone === 0) {
-       errors.push('Nenhuma série foi concluída. Marque "Feito" nas séries realizadas.');
-    }
-
-    if (errors.length > 0) {
-      const list = errors.map(e => `• ${e}`).join('\n');
-      await alert(`Para finalizar, verifique os seguintes campos:\n\n${list}`, 'Campos obrigatórios');
-      return false;
-    }
-
-    return true;
-  };
-
   const finishWorkout = async () => {
     if (!session || !workout) return;
     if (finishing) return;
-
-    // Validação obrigatória
-    const isValid = await validateWorkout();
-    if (!isValid) return;
 
     const minSecondsForFullSession = 30 * 60;
     const elapsedSafe = Number(elapsedSeconds) || 0;
@@ -1330,178 +1263,6 @@ export default function ActiveWorkout(props) {
     );
   };
 
-  const renderCardioSet = (ex, exIdx, setIdx) => {
-    const key = `${exIdx}-${setIdx}`;
-    const log = getLog(key);
-    const cfg = getPlanConfig(ex, setIdx);
-    const plannedSet = getPlannedSet(ex, setIdx);
-    const name = String(ex?.name || '').toLowerCase();
-    
-    // Mapeamento de campos
-    const timeValue = String(log?.reps ?? cfg?.reps ?? plannedSet?.reps ?? ex?.reps ?? '');
-    const intensityValue = String(log?.rpe ?? cfg?.rpe ?? plannedSet?.rpe ?? ex?.rpe ?? '');
-    const distanceValue = String(log?.distance ?? '');
-    const inclineValue = String(log?.incline ?? '');
-    const resistanceValue = String(log?.weight ?? cfg?.weight ?? ''); // Usamos weight como resistência/carga
-    const notesValue = String(log?.notes ?? '');
-    const done = !!log?.done;
-
-    const isHeaderRow = setIdx === 0;
-    const isNotesOpen = openNotesKeys.has(key);
-    const hasNotes = notesValue.trim().length > 0;
-
-    // Configuração de campos por modalidade
-    const showIncline = name.includes('esteira') || name.includes('treadmill');
-    const showDistance = !name.includes('escada'); // Geralmente escada se mede em tempo/degraus, mas distancia ok. Vamos manter padrão sim.
-    const showResistance = name.includes('bike') || name.includes('bicicleta') || name.includes('elíptico') || name.includes('eliptico') || name.includes('spinning');
-    
-    // Se for outdoor, resistance não faz sentido (peso), a não ser que seja colete. Vamos ocultar resistance se for outdoor.
-    const isOutdoor = name.includes('outdoor') || name.includes('rua') || name.includes('caminhada') || name.includes('corrida');
-    if (isOutdoor) {
-        // Force hide resistance for pure outdoor cardio unless specifically needed
-    }
-
-    const toggleNotes = () => {
-      setOpenNotesKeys((prev) => {
-        const next = new Set(prev);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return next;
-      });
-    };
-
-    return (
-      <div className="space-y-1" key={key}>
-        <div className="rounded-lg bg-neutral-900/40 border border-neutral-800 px-3 py-3">
-            <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                    <div className="px-2 py-1 rounded bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-400 uppercase tracking-wider">
-                        Cardio
-                    </div>
-                    <div className="text-xs text-neutral-400 font-mono">
-                        Meta: {plannedSet?.reps || ex?.reps || '-'} min
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={toggleNotes}
-                        className={
-                            isNotesOpen || hasNotes
-                            ? 'p-2 rounded-lg text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 transition-colors'
-                            : 'p-2 rounded-lg text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800 transition-colors'
-                        }
-                    >
-                        <MessageSquare size={16} />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            const nextDone = !done;
-                            updateLog(key, { done: nextDone });
-                        }}
-                        className={
-                            done
-                            ? 'inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 text-white font-bold shadow-lg shadow-blue-500/20 active:scale-95 transition-all'
-                            : 'inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition-all'
-                        }
-                    >
-                        <Check size={16} />
-                        <span>{done ? 'Concluído' : 'Concluir'}</span>
-                    </button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Tempo */}
-                <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Tempo (min)</label>
-                    <div className="relative">
-                        <input
-                            inputMode="decimal"
-                            value={timeValue}
-                            onChange={(e) => updateLog(key, { reps: e.target.value })}
-                            placeholder="0"
-                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white font-bold outline-none focus:ring-1 ring-blue-500 transition-all"
-                        />
-                        <Clock size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-600" />
-                    </div>
-                </div>
-
-                {/* Intensidade */}
-                <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-neutral-500 uppercase">Intensidade</label>
-                    <div className="relative">
-                        <input
-                            inputMode="decimal"
-                            value={intensityValue}
-                            onChange={(e) => updateLog(key, { rpe: e.target.value })}
-                            placeholder="1-10"
-                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white font-bold outline-none focus:ring-1 ring-blue-500 transition-all"
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-neutral-600 font-black">RPE</div>
-                    </div>
-                </div>
-
-                {/* Distância */}
-                {showDistance && (
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase">Distância (km)</label>
-                        <input
-                            inputMode="decimal"
-                            value={distanceValue}
-                            onChange={(e) => updateLog(key, { distance: e.target.value })}
-                            placeholder="0.0"
-                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white font-bold outline-none focus:ring-1 ring-blue-500 transition-all"
-                        />
-                    </div>
-                )}
-
-                {/* Inclinação (Esteira) */}
-                {showIncline && (
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase">Inclinação (%)</label>
-                        <input
-                            inputMode="decimal"
-                            value={inclineValue}
-                            onChange={(e) => updateLog(key, { incline: e.target.value })}
-                            placeholder="0"
-                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white font-bold outline-none focus:ring-1 ring-blue-500 transition-all"
-                        />
-                    </div>
-                )}
-
-                {/* Resistência/Carga (Bike/Elíptico) */}
-                {showResistance && !isOutdoor && (
-                    <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-neutral-500 uppercase">Carga/Nível</label>
-                        <input
-                            inputMode="decimal"
-                            value={resistanceValue}
-                            onChange={(e) => updateLog(key, { weight: e.target.value })}
-                            placeholder="0"
-                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white font-bold outline-none focus:ring-1 ring-blue-500 transition-all"
-                        />
-                    </div>
-                )}
-            </div>
-        </div>
-
-        {isNotesOpen && (
-          <div className="px-1">
-            <textarea
-              value={notesValue}
-              onChange={(e) => updateLog(key, { notes: e.target.value })}
-              placeholder="Como foi o cardio? (ex: intervalado, contínuo...)"
-              rows={2}
-              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-blue-500 shadow-sm transition duration-200"
-            />
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const renderSet = (ex, exIdx, setIdx) => {
     const plannedSet = getPlannedSet(ex, setIdx);
     const rawCfg = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
@@ -1514,7 +1275,6 @@ export default function ActiveWorkout(props) {
     const method = String(ex?.method || '').trim();
     const isCluster = method === 'Cluster' || isClusterConfig(cfg);
     const isRestPause = method === 'Rest-Pause' || isRestPauseConfig(cfg);
-    if (method === 'Cardio' || ex?.type === 'cardio') return renderCardioSet(ex, exIdx, setIdx);
     if (isCluster) return renderClusterSet(ex, exIdx, setIdx);
     if (isRestPause) return renderRestPauseSet(ex, exIdx, setIdx);
     return renderNormalSet(ex, exIdx, setIdx);
@@ -1869,7 +1629,7 @@ export default function ActiveWorkout(props) {
 
   return (
     <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
-      <div className="sticky top-0 z-50 bg-neutral-950/95 backdrop-blur-md border-b border-neutral-800 px-4 md:px-6 py-4 pt-safe shadow-sm transition-all duration-200">
+      <div className="sticky top-0 z-40 bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 py-4 pt-safe">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
@@ -1925,9 +1685,9 @@ export default function ActiveWorkout(props) {
               </button>
             ) : null}
             </div>
-            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 shrink-0 bg-neutral-900/50 px-3 py-1.5 rounded-lg border border-neutral-800">
+            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2">
               <Clock size={14} className="text-yellow-500" />
-              <span className="font-mono text-yellow-500 font-bold">{formatElapsed(elapsedSeconds)}</span>
+              <span className="font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
             </div>
           </div>
           {teamworkV2Enabled && teamSession?.id ? (
