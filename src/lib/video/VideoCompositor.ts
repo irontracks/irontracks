@@ -29,6 +29,7 @@ export class VideoCompositor {
     private sourceNode: MediaElementAudioSourceNode | null = null;
     private recorder: MediaRecorder | null = null;
     private isCancelled = false;
+    private manualTimer: number | null = null;
 
     constructor() {
         if (typeof window !== 'undefined') {
@@ -44,6 +45,10 @@ export class VideoCompositor {
     }
 
     private cleanup() {
+        if (this.manualTimer) {
+            try { clearTimeout(this.manualTimer); } catch {}
+        }
+        this.manualTimer = null;
         if (this.sourceNode) {
             try { this.sourceNode.disconnect(); } catch {}
         }
@@ -60,6 +65,51 @@ export class VideoCompositor {
         this.destNode = null;
         this.audioCtx = null;
         this.recorder = null;
+    }
+
+    private async assembleBlob(chunks: Blob[], mimeType: string): Promise<Blob> {
+        try {
+            const safeChunks = Array.isArray(chunks) ? chunks : [];
+            if (typeof Worker === 'undefined' || safeChunks.length === 0) {
+                return new Blob(safeChunks, { type: mimeType });
+            }
+            const workerCode = `self.onmessage=(e)=>{try{const d=e.data||{};const list=Array.isArray(d.chunks)?d.chunks:[];const blob=new Blob(list,{type:d.type||''});self.postMessage({ok:true,blob});}catch(err){self.postMessage({ok:false,error:String(err&&err.message?err.message:err)});}};`;
+            const url = URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' }));
+            const worker = new Worker(url);
+            try { URL.revokeObjectURL(url); } catch {}
+            return await new Promise<Blob>((resolve) => {
+                let settled = false;
+                const done = (blob: Blob) => {
+                    if (settled) return;
+                    settled = true;
+                    try { worker.terminate(); } catch {}
+                    resolve(blob);
+                };
+                const fallback = () => done(new Blob(safeChunks, { type: mimeType }));
+                const timer = setTimeout(() => fallback(), 3000);
+                worker.onmessage = (ev) => {
+                    try { clearTimeout(timer); } catch {}
+                    const data = ev?.data || {};
+                    if (data?.ok && data?.blob) {
+                        done(data.blob);
+                        return;
+                    }
+                    fallback();
+                };
+                worker.onerror = () => {
+                    try { clearTimeout(timer); } catch {}
+                    fallback();
+                };
+                try {
+                    worker.postMessage({ chunks: safeChunks, type: mimeType });
+                } catch {
+                    try { clearTimeout(timer); } catch {}
+                    fallback();
+                }
+            });
+        } catch {
+            return new Blob(Array.isArray(chunks) ? chunks : [], { type: mimeType });
+        }
     }
 
     /**
@@ -176,19 +226,23 @@ export class VideoCompositor {
         const recordingPromise = new Promise<ExportResult>((resolve, reject) => {
             if (!this.recorder) return reject(new Error('Recorder not initialized'));
 
-            this.recorder.onstop = () => {
+            this.recorder.onstop = async () => {
                 if (this.isCancelled) {
                     reject(new Error('Renderização cancelada'));
                     return;
                 }
-                const blob = new Blob(chunks, { type: mimeType });
-                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                resolve({
-                    blob,
-                    filename: `story-${Date.now()}.${ext}`,
-                    mime: mimeType,
-                    duration: (trimRange[1] - trimRange[0])
-                });
+                try {
+                    const blob = await this.assembleBlob(chunks, mimeType);
+                    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                    resolve({
+                        blob,
+                        filename: `story-${Date.now()}.${ext}`,
+                        mime: mimeType,
+                        duration: (trimRange[1] - trimRange[0])
+                    });
+                } catch (e) {
+                    reject(e);
+                }
             };
             this.recorder.onerror = (e) => reject(e);
         });
@@ -222,11 +276,22 @@ export class VideoCompositor {
 
         // Iniciar gravação com timeslice para melhor gerenciamento de memória
         this.recorder.start(1000); // 1 segundo chunks
-        await videoElement.play();
+        try {
+            await videoElement.play();
+        } catch (e) {
+            try {
+                if (this.recorder && this.recorder.state === 'recording') this.recorder.stop();
+            } catch {}
+            throw e;
+        }
 
         // Loop principal
         const duration = trimRange[1] - trimRange[0];
         
+        const useManualFps = !(videoElement as any)?.requestVideoFrameCallback;
+        const frameIntervalMs = fps > 0 ? (1000 / fps) : 33.3333333333;
+        let lastManualTs = 0;
+
         const processFrame = () => {
             if (this.isCancelled) return;
 
@@ -259,13 +324,48 @@ export class VideoCompositor {
             }
         };
 
+        const processFrameManual = () => {
+            if (this.isCancelled) return;
+
+            if (videoElement.ended || videoElement.currentTime >= trimRange[1]) {
+                if (this.recorder && this.recorder.state === 'recording') {
+                    this.recorder.stop();
+                }
+                return;
+            }
+
+            if (this.ctx) {
+                onDrawFrame(this.ctx, videoElement);
+            }
+
+            if (onProgress) {
+                const current = Math.max(0, videoElement.currentTime - trimRange[0]);
+                onProgress(Math.min(1, current / duration));
+            }
+
+            const now = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+            const elapsed = lastManualTs ? (now - lastManualTs) : 0;
+            const delay = Math.max(0, frameIntervalMs - elapsed);
+            lastManualTs = now;
+            try {
+                this.manualTimer = setTimeout(processFrameManual, delay) as unknown as number;
+            } catch {
+                this.manualTimer = null;
+            }
+        };
+
         // Iniciar loop
-        // @ts-ignore
-        if (videoElement.requestVideoFrameCallback) {
+        if (useManualFps) {
+            processFrameManual();
+        }
+        if (!useManualFps) {
             // @ts-ignore
-            videoElement.requestVideoFrameCallback(processFrame);
-        } else {
-            requestAnimationFrame(processFrame);
+            if (videoElement.requestVideoFrameCallback) {
+                // @ts-ignore
+                videoElement.requestVideoFrameCallback(processFrame);
+            } else {
+                requestAnimationFrame(processFrame);
+            }
         }
 
         // Aguardar fim
