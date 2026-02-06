@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors } from 'lucide-react'
+import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 // @ts-ignore
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
@@ -577,6 +577,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const [backgroundUrl, setBackgroundUrl] = useState('')
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null)
   const [busy, setBusy] = useState(false)
+  const [busyAction, setBusyAction] = useState<'post' | 'share' | null>(null)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [showSafeGuide, setShowSafeGuide] = useState(true)
@@ -671,6 +672,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       setError('')
       setInfo('')
       setBusy(false)
+      setBusyAction(null)
       setShowSafeGuide(true)
       setLivePositions(DEFAULT_LIVE_POSITIONS)
       setDraggingKey(null)
@@ -683,6 +685,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     setError('')
     setInfo('')
     setBusy(false)
+    setBusyAction(null)
     setShowSafeGuide(true)
     setLivePositions(DEFAULT_LIVE_POSITIONS)
     setDraggingKey(null)
@@ -1038,6 +1041,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
   const shareImage = async () => {
     setBusy(true)
+    setBusyAction('share')
     setError('')
     setInfo('')
     try {
@@ -1054,6 +1058,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           // If user cancelled, stop here
           if (name === 'AbortError') {
              setBusy(false)
+             setBusyAction(null)
              return
           }
           // If not allowed or other error, fall through to download
@@ -1072,11 +1077,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       setError(msg || 'Não foi possível compartilhar.')
     } finally {
       setBusy(false)
+      setBusyAction(null)
     }
   }
 
   const postToIronTracks = async () => {
     setBusy(true)
+    setBusyAction('post')
     setError('')
     setInfo('')
     try {
@@ -1175,6 +1182,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       setError(msg || 'Falha ao publicar story.')
     } finally {
       setBusy(false)
+      setBusyAction(null)
     }
   }
 
@@ -1473,7 +1481,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         disabled={busy}
                         className="h-14 w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
                     >
-                        {busy ? 'PROCESSANDO...' : 'POSTAR NO IRONTRACKS'}
+                        {busyAction === 'post' ? (
+                            <>
+                                <Loader2 className="animate-spin" size={18} />
+                                PROCESSANDO...
+                            </>
+                        ) : 'POSTAR NO IRONTRACKS'}
                     </button>
                     
                     <button
@@ -1481,7 +1494,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         disabled={busy}
                         className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
                     >
-                        {busy ? 'PROCESSANDO...' : (
+                        {busyAction === 'share' ? (
+                            <>
+                                <Loader2 className="animate-spin" size={14} />
+                                PROCESSANDO...
+                            </>
+                        ) : (
                             <>
                                 <Share2 size={14} />
                                 BAIXAR / COMPARTILHAR

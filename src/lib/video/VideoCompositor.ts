@@ -150,12 +150,23 @@ export class VideoCompositor {
 
         // 4. Setup Gravador
         const mimeType = this.getBestMimeType();
-        const videoBitsPerSecond = 5_000_000; // 5 Mbps para boa qualidade 1080p
         
-        this.recorder = new MediaRecorder(canvasStream, {
-            mimeType,
-            videoBitsPerSecond
-        });
+        // Configurações otimizadas para mobile (evita travamento e arquivos gigantes)
+        // 2.5 Mbps é suficiente para 1080p H.264 em telas de celular
+        const videoBitsPerSecond = 2_500_000; 
+        const audioBitsPerSecond = 128_000;
+        
+        try {
+            this.recorder = new MediaRecorder(canvasStream, {
+                mimeType,
+                videoBitsPerSecond,
+                audioBitsPerSecond
+            });
+        } catch (e) {
+            // Fallback se o navegador não aceitar controle de bitrate
+            console.warn('Bitrate control not supported, using defaults', e);
+            this.recorder = new MediaRecorder(canvasStream, { mimeType });
+        }
 
         const chunks: Blob[] = [];
         this.recorder.ondataavailable = (e) => {
