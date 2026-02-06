@@ -1145,9 +1145,28 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     try {
       const result = await createImageBlob({ type: 'jpg' })
       const file = new File([result.blob], result.filename, { type: result.mime })
-      const canShareFile = !!(typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] }))
-      if (canShareFile) await navigator.share({ files: [file], title: 'Story IronTracks' })
-      else downloadBlob(result.blob, result.filename)
+      
+      let shared = false
+      if (typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Story IronTracks' })
+          shared = true
+        } catch (shareErr: any) {
+          const name = String(shareErr?.name || '').trim()
+          // If user cancelled, stop here
+          if (name === 'AbortError') {
+             setBusy(false)
+             return
+          }
+          // If not allowed or other error, fall through to download
+          console.warn('Share API failed, falling back to download:', shareErr)
+        }
+      }
+
+      if (!shared) {
+        downloadBlob(result.blob, result.filename)
+        setInfo('Baixado com sucesso!')
+      }
     } catch (e: any) {
       const name = String(e?.name || '').trim()
       if (name === 'AbortError') return
