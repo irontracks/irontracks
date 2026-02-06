@@ -97,6 +97,7 @@ type Props = {
   onDeleteWorkout: (id?: string, title?: string) => MaybePromise<void>
   onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
   currentUserId?: string
+  newRecordsReloadKey?: number
   exportingAll?: boolean
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
@@ -608,7 +609,7 @@ export default function StudentDashboard(props: Props) {
           )}
 
           {showNewRecordsCard ? (
-            <RecentAchievements userId={props.currentUserId} badges={props.streakStats?.badges ?? []} showBadges={showBadges} />
+            <RecentAchievements userId={props.currentUserId} badges={props.streakStats?.badges ?? []} showBadges={showBadges} reloadKey={props.newRecordsReloadKey} />
           ) : null}
 
           {(showIronRank || showBadges) && (

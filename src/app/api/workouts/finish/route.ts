@@ -9,6 +9,19 @@ const parseTrainingNumberOrZero = (v: any) => {
   return Number.isFinite(n) ? n : 0
 }
 
+const normalizeExerciseKey = (v: any) => {
+  try {
+    return String(v ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+  } catch {
+    return String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+  }
+}
+
 const getExercisePlannedSetsCount = (ex: any) => {
   try {
     const bySets = Math.max(0, Number(ex?.sets) || 0)
@@ -23,12 +36,14 @@ const buildBestByExerciseFromSession = (session: any, onlyNames?: Set<string>) =
   const base = session && typeof session === 'object' ? session : null
   const logs = base?.logs && typeof base.logs === 'object' ? base.logs : {}
   const exercises = Array.isArray(base?.exercises) ? base.exercises : []
-  const out = new Map<string, { weight: number; reps: number; volume: number }>()
+  const out = new Map<string, { exercise: string; weight: number; reps: number; volume: number }>()
 
   exercises.forEach((ex: any, exIdx: number) => {
     const name = String(ex?.name || '').trim()
     if (!name) return
-    if (onlyNames && !onlyNames.has(name)) return
+    const norm = normalizeExerciseKey(name)
+    if (!norm) return
+    if (onlyNames && !onlyNames.has(norm)) return
 
     const setsCount = getExercisePlannedSetsCount(ex)
     let bestWeight = 0
@@ -48,8 +63,9 @@ const buildBestByExerciseFromSession = (session: any, onlyNames?: Set<string>) =
       if (Number.isFinite(vol) && vol > bestVolume) bestVolume = vol
     }
 
-    const prev = out.get(name) || { weight: 0, reps: 0, volume: 0 }
-    out.set(name, {
+    const prev = out.get(norm) || { exercise: name, weight: 0, reps: 0, volume: 0 }
+    out.set(norm, {
+      exercise: prev.exercise || name,
       weight: Math.max(prev.weight, bestWeight),
       reps: Math.max(prev.reps, bestReps),
       volume: Math.max(prev.volume, bestVolume),
@@ -338,27 +354,23 @@ export async function POST(request: Request) {
                 else if (row?.notes && typeof row.notes === 'object') sess = row.notes
                 if (!sess || typeof sess !== 'object') continue
                 const best = buildBestByExerciseFromSession(sess, onlyNames)
-                best.forEach((v, exName) => {
-                  const prev = historyBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
-                  historyBest.set(exName, {
-                    weight: Math.max(prev.weight, v.weight),
-                    reps: Math.max(prev.reps, v.reps),
-                    volume: Math.max(prev.volume, v.volume),
-                  })
+                best.forEach((v, key) => {
+                  const prev = historyBest.get(key) || { weight: 0, reps: 0, volume: 0 }
+                  historyBest.set(key, { weight: Math.max(prev.weight, v.weight), reps: Math.max(prev.reps, v.reps), volume: Math.max(prev.volume, v.volume) })
                 })
               } catch {}
             }
 
             const prs: { exercise: string; label: string; value: string; score: number }[] = []
-            currentBest.forEach((cur, exName) => {
-              const hist = historyBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
+            currentBest.forEach((cur, key) => {
+              const hist = historyBest.get(key) || { weight: 0, reps: 0, volume: 0 }
               const volumePr = cur.volume > 0 && cur.volume > hist.volume
               const weightPr = cur.weight > 0 && cur.weight > hist.weight
               const repsPr = cur.reps > 0 && cur.reps > hist.reps
               if (!volumePr && !weightPr && !repsPr) return
               if (volumePr) {
                 prs.push({
-                  exercise: exName,
+                  exercise: cur.exercise,
                   label: 'Volume',
                   value: `${cur.volume.toLocaleString('pt-BR')}kg`,
                   score: cur.volume,
@@ -367,7 +379,7 @@ export async function POST(request: Request) {
               }
               if (weightPr) {
                 prs.push({
-                  exercise: exName,
+                  exercise: cur.exercise,
                   label: 'Carga',
                   value: `${cur.weight.toLocaleString('pt-BR')}kg`,
                   score: cur.weight,
@@ -375,7 +387,7 @@ export async function POST(request: Request) {
                 return
               }
               prs.push({
-                exercise: exName,
+                exercise: cur.exercise,
                 label: 'Reps',
                 value: `${Math.round(cur.reps)} reps`,
                 score: cur.reps,
