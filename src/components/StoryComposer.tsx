@@ -934,30 +934,44 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     const prevMuted = video.muted
     const prevLoop = video.loop
     const prevVolume = video.volume
+    const prevCurrentTime = video.currentTime
+    
+    // Prepare video for recording
     video.muted = false
     video.volume = 1
+    video.loop = false
+    video.currentTime = trimRange[0]
 
     const canvas = document.createElement('canvas')
     canvas.width = CANVAS_W
     canvas.height = CANVAS_H
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })
     if (!ctx) throw new Error('Erro no Canvas')
 
     const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
     const isIOS = isIOSUserAgent(ua)
-    const fps = isIOS ? 24 : 30
+    const isSafari = /safari/i.test(ua) && !/chrome|chromium|crios|edg|opr|android/i.test(ua)
+    
+    // Use conservative FPS for mobile stability
+    const fps = isIOS ? 30 : 30
     const stream = canvas.captureStream(fps)
     
-    // Tenta capturar áudio (se disponível e não mudo)
+    // Capture audio from video element
     // @ts-ignore
     const vidStream = video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null
     if (vidStream) {
-      const audioTrack = vidStream.getAudioTracks()[0]
-      if (audioTrack) stream.addTrack(audioTrack)
+      const audioTracks = vidStream.getAudioTracks()
+      if (audioTracks.length > 0) {
+        const audioTrack = audioTracks[0]
+        audioTrack.enabled = true
+        stream.addTrack(audioTrack)
+      } else {
+        console.warn('No audio track found in video stream')
+      }
     }
 
     const chunks: Blob[] = []
-    const isSafari = /safari/i.test(ua) && !/chrome|chromium|crios|edg|opr|android/i.test(ua)
+    
     const mp4Candidates = [
       'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
       'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
@@ -970,18 +984,41 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     if (!mime) throw new Error('Exportação de vídeo não suportada neste navegador.')
     if (isIOS && mime.includes('webm')) throw new Error('Seu iPhone não suporta exportar este vídeo com layout. Use o desktop ou atualize o iOS/Safari.')
 
-    const videoBitsPerSecond = isIOS ? 5_000_000 : mime.includes('vp9') ? 10_000_000 : 12_000_000
-    const audioBitsPerSecond = isIOS ? 96_000 : 192_000
-    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond, audioBitsPerSecond })
+    // Adjust bitrate based on resolution/fps
+    const videoBitsPerSecond = isIOS ? 4_000_000 : 8_000_000
+    const audioBitsPerSecond = 128_000
+    
+    let recorder: MediaRecorder
+    try {
+        recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond, audioBitsPerSecond })
+    } catch (e) {
+        // Fallback without specific bitrates if failed
+        recorder = new MediaRecorder(stream, { mimeType: mime })
+    }
 
     return new Promise((resolve, reject) => {
       let rafId = 0
+      let frameCallbackId = 0
+      let stopping = false
 
-      const restore = () => {
-        video.loop = prevLoop
+      const cleanup = () => {
+        stopping = true
+        if (frameCallbackId && (video as any).cancelVideoFrameCallback) {
+            (video as any).cancelVideoFrameCallback(frameCallbackId)
+        }
+        cancelAnimationFrame(rafId)
+        
+        // Restore video state
         video.muted = prevMuted
         video.volume = prevVolume
-        if (prevLoop) video.play().catch(() => {})
+        video.loop = prevLoop
+        if (prevLoop) {
+            video.currentTime = prevCurrentTime
+            video.play().catch(() => {})
+        } else {
+            video.pause()
+            video.currentTime = prevCurrentTime
+        }
       }
       
       recorder.ondataavailable = (e) => {
@@ -989,100 +1026,98 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       }
 
       recorder.onstop = () => {
-        cancelAnimationFrame(rafId)
-        restore()
-        
+        cleanup()
         const blob = new Blob(chunks, { type: mime })
         const ext = mime.includes('mp4') ? 'mp4' : 'webm'
         resolve({ blob, filename: `irontracks-story-${Date.now()}.${ext}`, mime })
       }
 
       recorder.onerror = (e) => {
-        cancelAnimationFrame(rafId)
-        restore()
+        cleanup()
         reject(e)
       }
 
-      const fail = (err: any) => {
-        cancelAnimationFrame(rafId)
-        try {
-          if (recorder.state === 'recording') recorder.stop()
-        } catch {}
-        restore()
-        reject(err)
-      }
-
       const drawFrame = () => {
+        if (stopping) return
+        
         const vw = video.videoWidth
         const vh = video.videoHeight
-        if (!vw || !vh) throw new Error('Frame de vídeo indisponível.')
+        if (!vw || !vh) return
+
         const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
         const dw = vw * scale
         const dh = vh * scale
         const cx = (CANVAS_W - dw) / 2
         const cy = (CANVAS_H - dh) / 2
+        
         ctx.drawImage(video, cx, cy, dw, dh)
-        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: null, metrics, layout, livePositions, transparentBg: true, skipClear: true })
+        drawStory({ 
+            ctx, 
+            canvasW: CANVAS_W, 
+            canvasH: CANVAS_H, 
+            backgroundImage: null, 
+            metrics, 
+            layout, 
+            livePositions, 
+            transparentBg: true, 
+            skipClear: true 
+        })
       }
 
-      const prepareAndRecord = async () => {
-        video.pause()
-        video.loop = false
-        video.currentTime = trimRange[0]
-
-        await new Promise<void>((resolveSeek) => {
-          if (!video.seeking && video.readyState >= 2) return resolveSeek()
-          let done = false
-          const onDone = () => {
-            if (done) return
-            done = true
-            clearTimeout(t)
-            resolveSeek()
-          }
-          const t = window.setTimeout(onDone, 1500)
-          video.addEventListener('seeked', onDone, { once: true })
-          video.addEventListener('error', onDone, { once: true })
-        })
-
-        await video.play()
-
-        await new Promise<void>((resolveFrame, rejectFrame) => {
-          let done = false
-          const finishOk = () => {
-            if (done) return
-            done = true
-            clearTimeout(t)
-            resolveFrame()
-          }
-          const finishBad = () => {
-            if (done) return
-            done = true
-            clearTimeout(t)
-            rejectFrame(new Error('Não foi possível ler frames do vídeo.'))
-          }
-          const t = window.setTimeout(finishBad, 2000)
-          const rvfc = (video as any).requestVideoFrameCallback
-          if (typeof rvfc === 'function') rvfc.call(video, finishOk)
-          else video.addEventListener('timeupdate', finishOk, { once: true })
-        })
-
-        drawFrame()
-        recorder.start()
-
-        const draw = () => {
-          if (video.paused || video.ended || video.currentTime >= trimRange[1]) {
+      const loop = () => {
+        if (stopping) return
+        
+        if (video.paused || video.ended || video.currentTime >= trimRange[1]) {
             if (recorder.state === 'recording') recorder.stop()
             return
-          }
-          try {
-            drawFrame()
-          } catch {}
-          rafId = requestAnimationFrame(draw)
         }
-        draw()
+
+        drawFrame()
+
+        // Use requestVideoFrameCallback if available for perfect sync
+        // @ts-ignore
+        if (video.requestVideoFrameCallback) {
+            // @ts-ignore
+            frameCallbackId = video.requestVideoFrameCallback(loop)
+        } else {
+            // Fallback for older browsers
+            rafId = requestAnimationFrame(loop)
+        }
       }
 
-      prepareAndRecord().catch(fail)
+      const startRecording = async () => {
+        try {
+            // Wait for seek to finish
+            await new Promise<void>((res) => {
+                if (!video.seeking) return res()
+                const onSeek = () => {
+                    video.removeEventListener('seeked', onSeek)
+                    res()
+                }
+                video.addEventListener('seeked', onSeek)
+            })
+
+            // Start playing first
+            await video.play()
+            
+            // Wait a tiny bit for audio to engage
+            await new Promise(r => setTimeout(r, 100))
+
+            // Initial draw
+            drawFrame()
+            
+            // Start recording
+            recorder.start(100) // Request data every 100ms
+            
+            // Start loop
+            loop()
+        } catch (err) {
+            cleanup()
+            reject(err)
+        }
+      }
+
+      startRecording()
     })
   }
 

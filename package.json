@@ -10,8 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "deploy": "git config user.email \"djmkapple@gmail.com\" && npx vercel --prod",
-    "postversion": "git config user.email \"djmkapple@gmail.com\" && npx vercel --prod",
+    "deploy": "echo '⛔️ PARE! O deploy agora é automático via GitHub. Faça commit e push na main.' && exit 1",
+    "postversion": "git push && git push --tags",
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open ios"
   },
