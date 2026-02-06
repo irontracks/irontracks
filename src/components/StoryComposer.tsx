@@ -1087,6 +1087,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
       const startRecording = async () => {
         try {
+            // Safety timeout - if recording takes too long, abort
+            const timeoutId = setTimeout(() => {
+                if (!stopping && recorder.state === 'recording') {
+                    console.warn('Recording timed out')
+                    cleanup()
+                    reject(new Error('Tempo limite de gravação excedido'))
+                }
+            }, 15000) // 15s max
+
             // Wait for seek to finish
             await new Promise<void>((res) => {
                 if (!video.seeking) return res()
@@ -1111,6 +1120,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             
             // Start loop
             loop()
+            
+            // Clear timeout on success (handled in onstop)
         } catch (err) {
             cleanup()
             reject(err)
@@ -1618,8 +1629,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         disabled={busy}
                         className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
                     >
-                        <Share2 size={14} />
-                        BAIXAR / COMPARTILHAR
+                        {busy ? 'PROCESSANDO...' : (
+                            <>
+                                <Share2 size={14} />
+                                BAIXAR / COMPARTILHAR
+                            </>
+                        )}
                     </button>
                 </div>
 
