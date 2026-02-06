@@ -12,6 +12,9 @@ interface RenderOptions {
     outputWidth?: number;
     outputHeight?: number;
     fps?: number;
+    mimeTypeOverride?: string;
+    videoBitsPerSecond?: number;
+    audioBitsPerSecond?: number;
 }
 
 interface ExportResult {
@@ -155,7 +158,10 @@ export class VideoCompositor {
         onProgress,
         outputWidth = 1080,
         outputHeight = 1920,
-        fps = 30
+        fps = 30,
+        mimeTypeOverride,
+        videoBitsPerSecond: userVideoBps,
+        audioBitsPerSecond: userAudioBps
     }: RenderOptions): Promise<ExportResult> {
         this.isCancelled = false;
         
@@ -199,12 +205,16 @@ export class VideoCompositor {
         }
 
         // 4. Setup Gravador
-        const mimeType = this.getBestMimeType();
-        
-        // Configurações "Premium" conforme solicitado: 5 Mbps para máxima qualidade
-        // A estabilidade é garantida pelo processamento síncrono (requestVideoFrameCallback)
-        const videoBitsPerSecond = 5_000_000; 
-        const audioBitsPerSecond = 128_000;
+        let mimeType = this.getBestMimeType();
+        if (mimeTypeOverride) {
+            try {
+                if (MediaRecorder.isTypeSupported(mimeTypeOverride)) {
+                    mimeType = mimeTypeOverride;
+                }
+            } catch {}
+        }
+        const videoBitsPerSecond = typeof userVideoBps === 'number' && userVideoBps > 0 ? userVideoBps : 5_000_000;
+        const audioBitsPerSecond = typeof userAudioBps === 'number' && userAudioBps > 0 ? userAudioBps : 128_000;
         
         try {
             this.recorder = new MediaRecorder(canvasStream, {
