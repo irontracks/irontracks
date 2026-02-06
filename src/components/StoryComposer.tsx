@@ -3,10 +3,14 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-// @ts-ignore - Ignoring type check for js file
+// @ts-ignore
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
+import { VideoCompositor } from '@/lib/video/VideoCompositor'
+
+// --- Types ---
+
 
 // --- Types ---
 
@@ -646,9 +650,16 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     }
   }, [metrics])
 
+  // Compositor Ref
+  const compositorRef = useRef<VideoCompositor | null>(null)
+
   // Reset state on open/close
   useEffect(() => {
     if (!open) {
+      if (compositorRef.current) {
+        compositorRef.current.cancel()
+        compositorRef.current = null
+      }
       try {
         const url = String(backgroundUrlRef.current || '')
         if (url) URL.revokeObjectURL(url)
@@ -927,209 +938,50 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
   const renderVideo = async (): Promise<{ blob: Blob; filename: string; mime: string }> => {
     if (!videoRef.current) throw new Error('Vídeo não disponível')
-    const video = videoRef.current
-    const duration = video.duration
-    if (!duration || !Number.isFinite(duration)) throw new Error('Duração inválida')
-
-    const prevMuted = video.muted
-    const prevLoop = video.loop
-    const prevVolume = video.volume
-    const prevCurrentTime = video.currentTime
     
-    // Prepare video for recording
-    video.muted = false
-    video.volume = 1
-    video.loop = false
-    video.currentTime = trimRange[0]
-
-    const canvas = document.createElement('canvas')
-    canvas.width = CANVAS_W
-    canvas.height = CANVAS_H
-    const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })
-    if (!ctx) throw new Error('Erro no Canvas')
-
-    const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
-    const isIOS = isIOSUserAgent(ua)
-    const isSafari = /safari/i.test(ua) && !/chrome|chromium|crios|edg|opr|android/i.test(ua)
+    // Initialize compositor
+    compositorRef.current = new VideoCompositor()
     
-    // Use conservative FPS for mobile stability
-    const fps = isIOS ? 30 : 30
-    const stream = canvas.captureStream(fps)
-    
-    // Capture audio from video element
-    // @ts-ignore
-    const vidStream = video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null
-    if (vidStream) {
-      const audioTracks = vidStream.getAudioTracks()
-      if (audioTracks.length > 0) {
-        const audioTrack = audioTracks[0]
-        audioTrack.enabled = true
-        stream.addTrack(audioTrack)
-      } else {
-        console.warn('No audio track found in video stream')
-      }
-    }
-
-    const chunks: Blob[] = []
-    
-    const mp4Candidates = [
-      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-      'video/mp4;codecs="avc1,mp4a.40.2"',
-      'video/mp4',
-    ]
-    const webmCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-    const candidates = isIOS ? [...mp4Candidates, ...webmCandidates] : isSafari ? [...mp4Candidates, ...webmCandidates] : [...webmCandidates, ...mp4Candidates]
-    const mime = pickFirstSupportedMime(candidates)
-    if (!mime) throw new Error('Exportação de vídeo não suportada neste navegador.')
-    if (isIOS && mime.includes('webm')) throw new Error('Seu iPhone não suporta exportar este vídeo com layout. Use o desktop ou atualize o iOS/Safari.')
-
-    // Adjust bitrate based on resolution/fps
-    const videoBitsPerSecond = isIOS ? 4_000_000 : 8_000_000
-    const audioBitsPerSecond = 128_000
-    
-    let recorder: MediaRecorder
     try {
-        recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond, audioBitsPerSecond })
-    } catch (e) {
-        // Fallback without specific bitrates if failed
-        recorder = new MediaRecorder(stream, { mimeType: mime })
-    }
+        const result = await compositorRef.current.render({
+            videoElement: videoRef.current,
+            trimRange,
+            outputWidth: CANVAS_W,
+            outputHeight: CANVAS_H,
+            fps: 30,
+            onDrawFrame: (ctx, video) => {
+                const vw = video.videoWidth
+                const vh = video.videoHeight
+                if (!vw || !vh) return
 
-    return new Promise((resolve, reject) => {
-      let rafId = 0
-      let frameCallbackId = 0
-      let stopping = false
-
-      const cleanup = () => {
-        stopping = true
-        if (frameCallbackId && (video as any).cancelVideoFrameCallback) {
-            (video as any).cancelVideoFrameCallback(frameCallbackId)
-        }
-        cancelAnimationFrame(rafId)
-        
-        // Restore video state
-        video.muted = prevMuted
-        video.volume = prevVolume
-        video.loop = prevLoop
-        if (prevLoop) {
-            video.currentTime = prevCurrentTime
-            video.play().catch(() => {})
-        } else {
-            video.pause()
-            video.currentTime = prevCurrentTime
-        }
-      }
-      
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data)
-      }
-
-      recorder.onstop = () => {
-        cleanup()
-        const blob = new Blob(chunks, { type: mime })
-        const ext = mime.includes('mp4') ? 'mp4' : 'webm'
-        resolve({ blob, filename: `irontracks-story-${Date.now()}.${ext}`, mime })
-      }
-
-      recorder.onerror = (e) => {
-        cleanup()
-        reject(e)
-      }
-
-      const drawFrame = () => {
-        if (stopping) return
-        
-        const vw = video.videoWidth
-        const vh = video.videoHeight
-        if (!vw || !vh) return
-
-        const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
-        const dw = vw * scale
-        const dh = vh * scale
-        const cx = (CANVAS_W - dw) / 2
-        const cy = (CANVAS_H - dh) / 2
-        
-        ctx.drawImage(video, cx, cy, dw, dh)
-        drawStory({ 
-            ctx, 
-            canvasW: CANVAS_W, 
-            canvasH: CANVAS_H, 
-            backgroundImage: null, 
-            metrics, 
-            layout, 
-            livePositions, 
-            transparentBg: true, 
-            skipClear: true 
+                const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
+                const dw = vw * scale
+                const dh = vh * scale
+                const cx = (CANVAS_W - dw) / 2
+                const cy = (CANVAS_H - dh) / 2
+                
+                ctx.drawImage(video, cx, cy, dw, dh)
+                
+                drawStory({ 
+                    ctx, 
+                    canvasW: CANVAS_W, 
+                    canvasH: CANVAS_H, 
+                    backgroundImage: null, 
+                    metrics, 
+                    layout, 
+                    livePositions, 
+                    transparentBg: true, 
+                    skipClear: true 
+                })
+            }
         })
-      }
-
-      const loop = () => {
-        if (stopping) return
-        
-        if (video.paused || video.ended || video.currentTime >= trimRange[1]) {
-            if (recorder.state === 'recording') recorder.stop()
-            return
-        }
-
-        drawFrame()
-
-        // Use requestVideoFrameCallback if available for perfect sync
-        // @ts-ignore
-        if (video.requestVideoFrameCallback) {
-            // @ts-ignore
-            frameCallbackId = video.requestVideoFrameCallback(loop)
-        } else {
-            // Fallback for older browsers
-            rafId = requestAnimationFrame(loop)
-        }
-      }
-
-      const startRecording = async () => {
-        try {
-            // Safety timeout - if recording takes too long, abort
-            const timeoutId = setTimeout(() => {
-                if (!stopping && recorder.state === 'recording') {
-                    console.warn('Recording timed out')
-                    cleanup()
-                    reject(new Error('Tempo limite de gravação excedido'))
-                }
-            }, 15000) // 15s max
-
-            // Wait for seek to finish
-            await new Promise<void>((res) => {
-                if (!video.seeking) return res()
-                const onSeek = () => {
-                    video.removeEventListener('seeked', onSeek)
-                    res()
-                }
-                video.addEventListener('seeked', onSeek)
-            })
-
-            // Start playing first
-            await video.play()
-            
-            // Wait a tiny bit for audio to engage
-            await new Promise(r => setTimeout(r, 100))
-
-            // Initial draw
-            drawFrame()
-            
-            // Start recording
-            recorder.start(100) // Request data every 100ms
-            
-            // Start loop
-            loop()
-            
-            // Clear timeout on success (handled in onstop)
-        } catch (err) {
-            cleanup()
-            reject(err)
-        }
-      }
-
-      startRecording()
-    })
+        return result
+    } catch (e) {
+        console.error('Render failed', e)
+        throw e
+    } finally {
+        compositorRef.current = null
+    }
   }
 
   const createImageBlob = async ({ type = 'jpg', quality = 0.95 }): Promise<{ blob: Blob; filename: string; mime: string }> => {
