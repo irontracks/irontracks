@@ -93,17 +93,23 @@ export async function POST(req: Request) {
             id: userId,
             email: request.email,
             display_name: request.full_name,
-            role: 'student', // Default role
-            // Add other fields if necessary based on schema
+            role: 'student',
         })
 
       if (profileError) {
-          // Rollback auth user if profile fails? 
-          // Ideally yes, but Supabase doesn't support cross-service transactions easily.
-          // We'll just report error.
-          console.error('Profile creation failed:', profileError)
-          await admin.auth.admin.deleteUser(userId) // Attempt rollback
-          throw profileError
+          const code = profileError && (profileError as any).code ? String((profileError as any).code) : ''
+          if (code === '23505') {
+              console.warn('Profile already exists for user, treating as success:', {
+                userId,
+                email: request.email,
+              })
+          } else {
+              console.error('Profile creation failed:', profileError)
+              try {
+                  await admin.auth.admin.deleteUser(userId)
+              } catch {}
+              throw profileError
+          }
       }
 
       // 3. Update Request
