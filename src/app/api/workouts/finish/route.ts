@@ -98,20 +98,79 @@ export async function POST(request: Request) {
     const body = await request.json()
     const session = body?.session
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
+    const idempotencyKey = String(body?.idempotencyKey || session?.idempotencyKey || session?.finishIdempotencyKey || '').trim()
+    const reqId =
+      (() => {
+        try {
+          if (typeof crypto !== 'undefined' && 'randomUUID' in crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+        } catch {}
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+      })()
 
-    const { data, error } = await supabase
-      .from('workouts')
-      .insert({
+    try {
+      const admin = createAdminClient()
+      await admin.from('user_activity_events').insert({
         user_id: user.id,
-        created_by: user.id,
-        name: normalizeWorkoutTitle(session.workoutTitle || 'Treino Realizado'),
-        date: new Date(session?.date ?? new Date()),
-        completed_at: new Date().toISOString(),
-        is_template: false,
-        notes: JSON.stringify(session),
+        event_name: 'workout_finish_api',
+        event_type: 'api',
+        path: '/api/workouts/finish',
+        metadata: {
+          stage: 'start',
+          reqId,
+          idempotencyKey: idempotencyKey || null,
+          exercisesCount: Array.isArray(session?.exercises) ? session.exercises.length : null,
+        },
+        client_ts: session?.date ? new Date(session.date).toISOString() : null,
+        user_agent: request.headers.get('user-agent') || null,
       })
-      .select('id, created_at')
-      .single()
+    } catch {}
+
+    const baseInsert = {
+      user_id: user.id,
+      created_by: user.id,
+      name: normalizeWorkoutTitle(session.workoutTitle || 'Treino Realizado'),
+      date: new Date(session?.date ?? new Date()),
+      completed_at: new Date().toISOString(),
+      is_template: false,
+      notes: JSON.stringify(session),
+    } as any
+
+    let saved = null as any
+    let idempotent = false
+
+    const tryInsert = async (withIdempotencyKey: boolean) => {
+      const payload = withIdempotencyKey && idempotencyKey ? { ...baseInsert, finish_idempotency_key: idempotencyKey } : baseInsert
+      return await supabase.from('workouts').insert(payload).select('id, created_at').single()
+    }
+
+    let insertRes = await tryInsert(true)
+    if (insertRes?.error) {
+      const code = String((insertRes.error as any)?.code || '')
+      const msg = String(insertRes.error.message || '')
+      if (code === '23505' && idempotencyKey) {
+        try {
+          const { data: existing } = await supabase
+            .from('workouts')
+            .select('id, created_at')
+            .eq('user_id', user.id)
+            .eq('is_template', false)
+            .eq('finish_idempotency_key', idempotencyKey)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (existing?.id) {
+            saved = existing
+            idempotent = true
+            insertRes = { data: existing, error: null } as any
+          }
+        } catch {}
+      } else if (msg.toLowerCase().includes('finish_idempotency_key') && msg.toLowerCase().includes('does not exist')) {
+        insertRes = await tryInsert(false)
+      }
+    }
+
+    const { data, error } = insertRes as any
+    saved = saved || data
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
@@ -302,8 +361,26 @@ export async function POST(request: Request) {
       } catch {}
     } catch {}
 
-    return NextResponse.json({ ok: true, saved: data })
+    try {
+      const admin = createAdminClient()
+      await admin.from('user_activity_events').insert({
+        user_id: user.id,
+        event_name: 'workout_finish_api',
+        event_type: 'api',
+        path: '/api/workouts/finish',
+        metadata: {
+          stage: 'success',
+          reqId,
+          idempotent,
+          savedId: saved?.id ?? null,
+        },
+        user_agent: request.headers.get('user-agent') || null,
+      })
+    } catch {}
+
+    return NextResponse.json({ ok: true, saved, idempotent })
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const msg = e?.message ? String(e.message) : 'unknown_error'
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
 }
