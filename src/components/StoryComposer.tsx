@@ -74,6 +74,31 @@ const safeString = (v: any): string => {
   }
 }
 
+const isIOSUserAgent = (ua: string): boolean => {
+  const s = String(ua || '')
+  if (/(iPad|iPhone|iPod)/i.test(s)) return true
+  try {
+    const nav: any = typeof navigator !== 'undefined' ? navigator : null
+    if (nav && nav.platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1) return true
+  } catch {
+  }
+  return false
+}
+
+const pickFirstSupportedMime = (candidates: string[]): string => {
+  try {
+    return (Array.isArray(candidates) ? candidates : []).find((t) => {
+      try {
+        return !!(t && typeof (MediaRecorder as any)?.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(t))
+      } catch {
+        return false
+      }
+    }) || ''
+  } catch {
+    return ''
+  }
+}
+
 const parseExt = (rawName: string): string => {
   const n = safeString(rawName).toLowerCase()
   const i = n.lastIndexOf('.')
@@ -918,7 +943,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     const ctx = canvas.getContext('2d')
     if (!ctx) throw new Error('Erro no Canvas')
 
-    const stream = canvas.captureStream(30)
+    const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
+    const isIOS = isIOSUserAgent(ua)
+    const fps = isIOS ? 24 : 30
+    const stream = canvas.captureStream(fps)
     
     // Tenta capturar áudio (se disponível e não mudo)
     // @ts-ignore
@@ -929,16 +957,21 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     }
 
     const chunks: Blob[] = []
-    const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
     const isSafari = /safari/i.test(ua) && !/chrome|chromium|crios|edg|opr|android/i.test(ua)
-    const candidates = isSafari
-      ? ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
-      : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4']
-    const mime = candidates.find((t) => MediaRecorder.isTypeSupported(t)) || ''
+    const mp4Candidates = [
+      'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4;codecs="avc1,mp4a.40.2"',
+      'video/mp4',
+    ]
+    const webmCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
+    const candidates = isIOS ? [...mp4Candidates, ...webmCandidates] : isSafari ? [...mp4Candidates, ...webmCandidates] : [...webmCandidates, ...mp4Candidates]
+    const mime = pickFirstSupportedMime(candidates)
     if (!mime) throw new Error('Exportação de vídeo não suportada neste navegador.')
+    if (isIOS && mime.includes('webm')) throw new Error('Seu iPhone não suporta exportar este vídeo com layout. Use o desktop ou atualize o iOS/Safari.')
 
-    const videoBitsPerSecond = mime.includes('vp9') ? 12_000_000 : 16_000_000
-    const audioBitsPerSecond = 192_000
+    const videoBitsPerSecond = isIOS ? 5_000_000 : mime.includes('vp9') ? 10_000_000 : 12_000_000
+    const audioBitsPerSecond = isIOS ? 96_000 : 192_000
     const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond, audioBitsPerSecond })
 
     return new Promise((resolve, reject) => {
@@ -1115,8 +1148,11 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       const canShareFile = !!(typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] }))
       if (canShareFile) await navigator.share({ files: [file], title: 'Story IronTracks' })
       else downloadBlob(result.blob, result.filename)
-    } catch {
-      setError('Não foi possível compartilhar.')
+    } catch (e: any) {
+      const name = String(e?.name || '').trim()
+      if (name === 'AbortError') return
+      const msg = String(e?.message || '').trim()
+      setError(msg || 'Não foi possível compartilhar.')
     } finally {
       setBusy(false)
     }
@@ -1143,6 +1179,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         // Renderiza vídeo com layout
         const { blob, mime } = await createImageBlob({})
         if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 200MB).')
+        if (String(mime || '').toLowerCase().includes('webm')) {
+          const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
+          if (isIOSUserAgent(ua)) throw new Error('No iPhone, o vídeo com layout precisa ser MP4. Atualize o iOS/Safari ou poste via desktop.')
+        }
 
         const ext = mime.includes('mp4') ? '.mp4' : '.webm'
         const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
@@ -1214,7 +1254,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
     } catch (err: any) {
       console.error(err)
-      setError(err?.message || 'Falha ao publicar story.')
+      const msg = String(err?.message || '').trim()
+      setError(msg || 'Falha ao publicar story.')
     } finally {
       setBusy(false)
     }
