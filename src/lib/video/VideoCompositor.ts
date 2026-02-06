@@ -298,7 +298,7 @@ export class VideoCompositor {
         // Loop principal
         const duration = trimRange[1] - trimRange[0];
         
-        const useManualFps = !(videoElement as any)?.requestVideoFrameCallback;
+        const useManualFps = false;
         const frameIntervalMs = fps > 0 ? (1000 / fps) : 33.3333333333;
         let lastManualTs = 0;
 
