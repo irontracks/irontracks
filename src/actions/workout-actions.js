@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/client'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 
 const safeString = (v) => {
   const s = String(v ?? '').trim()
@@ -76,6 +77,9 @@ export async function createWorkout(workout) {
     const title = safeString(workout?.title ?? workout?.name ?? 'Treino')
     const exercisesPayload = buildExercisesPayload(workout)
     const notes = workout?.notes != null ? safeString(workout.notes) : ''
+    try {
+      trackUserEvent('workout_create', { type: 'workout', metadata: { title, exercisesCount: exercisesPayload.length } })
+    } catch {}
 
     const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', {
       p_workout_id: null,
@@ -88,8 +92,14 @@ export async function createWorkout(workout) {
     })
     if (error) return { ok: false, error: error.message }
     if (!workoutId) return { ok: false, error: 'Falha ao criar treino' }
+    try {
+      trackUserEvent('workout_create_ok', { type: 'workout', metadata: { id: workoutId, title } })
+    } catch {}
     return { ok: true, id: workoutId }
   } catch (e) {
+    try {
+      trackUserEvent('workout_create_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+    } catch {}
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
@@ -108,6 +118,9 @@ export async function updateWorkout(id, workout) {
     const title = safeString(workout?.title ?? workout?.name ?? 'Treino')
     const exercisesPayload = buildExercisesPayload(workout)
     const notes = workout?.notes != null ? safeString(workout.notes) : ''
+    try {
+      trackUserEvent('workout_update', { type: 'workout', metadata: { id: workoutId, title, exercisesCount: exercisesPayload.length } })
+    } catch {}
 
     const { data: savedId, error } = await supabase.rpc('save_workout_atomic', {
       p_workout_id: workoutId,
@@ -119,8 +132,14 @@ export async function updateWorkout(id, workout) {
       p_exercises: exercisesPayload,
     })
     if (error) return { ok: false, error: error.message }
+    try {
+      trackUserEvent('workout_update_ok', { type: 'workout', metadata: { id: savedId || workoutId, title } })
+    } catch {}
     return { ok: true, id: savedId || workoutId }
   } catch (e) {
+    try {
+      trackUserEvent('workout_update_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+    } catch {}
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
@@ -130,10 +149,19 @@ export async function deleteWorkout(id) {
     const supabase = createClient()
     const workoutId = safeString(id)
     if (!workoutId) return { ok: false, error: 'missing id' }
+    try {
+      trackUserEvent('workout_delete', { type: 'workout', metadata: { id: workoutId } })
+    } catch {}
     const { error } = await supabase.from('workouts').delete().eq('id', workoutId)
     if (error) return { ok: false, error: error.message }
+    try {
+      trackUserEvent('workout_delete_ok', { type: 'workout', metadata: { id: workoutId } })
+    } catch {}
     return { ok: true }
   } catch (e) {
+    try {
+      trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+    } catch {}
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }

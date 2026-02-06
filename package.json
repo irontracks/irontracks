@@ -6,7 +6,7 @@
     "predev": "node scripts/ensure-next-compiled-commander.mjs",
     "prebuild": "node scripts/ensure-next-compiled-commander.mjs",
     "prestart": "node scripts/ensure-next-compiled-commander.mjs",
-    "dev": "next dev --webpack --port 3000",
+    "dev": "next dev --webpack --hostname 0.0.0.0 --port 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

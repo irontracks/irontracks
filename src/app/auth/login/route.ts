@@ -13,11 +13,25 @@ export async function GET(request: Request) {
   const nextCookieMaxAgeSeconds = 60 * 5
 
   const originFromUrl = url.origin
+  const hostHeader = (request.headers.get('host') || '').trim()
   const forwardedHost = (request.headers.get('x-forwarded-host') || '').trim()
-  const forwardedProto = (request.headers.get('x-forwarded-proto') || 'https').trim()
+  const forwardedProto = (request.headers.get('x-forwarded-proto') || '').trim()
   const isLocalEnv = process.env.NODE_ENV === 'development'
-  const baseOrigin = forwardedHost && !isLocalEnv ? `${forwardedProto}://${forwardedHost}` : originFromUrl
+  const protoFromUrl = url.protocol ? url.protocol.replace(':', '') : ''
+  const effectiveProto = forwardedProto || protoFromUrl || (isLocalEnv ? 'http' : 'https')
+  const baseOrigin =
+    isLocalEnv && (hostHeader || url.host)
+      ? `${effectiveProto}://${hostHeader || url.host}`
+      : forwardedHost && !isLocalEnv
+        ? `${effectiveProto}://${forwardedHost}`
+        : originFromUrl
   let safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
+  const configuredOriginRaw = (process.env.IRONTRACKS_PUBLIC_ORIGIN || '').trim()
+  if (configuredOriginRaw) {
+    try {
+      safeOrigin = new URL(configuredOriginRaw).origin
+    } catch {}
+  }
   if (!isLocalEnv) {
     try {
       const u = new URL(safeOrigin)

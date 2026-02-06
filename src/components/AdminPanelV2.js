@@ -119,6 +119,21 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const [systemExporting, setSystemExporting] = useState(false);
     const [systemImporting, setSystemImporting] = useState(false);
     const systemFileInputRef = useRef(null);
+    const [userActivityQuery, setUserActivityQuery] = useState('');
+    const [userActivityRole, setUserActivityRole] = useState('all');
+    const [userActivityUsers, setUserActivityUsers] = useState([]);
+    const [userActivityLoading, setUserActivityLoading] = useState(false);
+    const [userActivityError, setUserActivityError] = useState('');
+    const [userActivitySelected, setUserActivitySelected] = useState(null);
+    const [userActivityDays, setUserActivityDays] = useState(7);
+    const [userActivitySummary, setUserActivitySummary] = useState(null);
+    const [userActivitySummaryLoading, setUserActivitySummaryLoading] = useState(false);
+    const [userActivityEvents, setUserActivityEvents] = useState([]);
+    const [userActivityEventsLoading, setUserActivityEventsLoading] = useState(false);
+    const [userActivityEventsBefore, setUserActivityEventsBefore] = useState(null);
+    const [userActivityErrors, setUserActivityErrors] = useState([]);
+    const [userActivityErrorsLoading, setUserActivityErrorsLoading] = useState(false);
+    const userActivityQueryDebounceRef = useRef(null);
     const [dangerOpen, setDangerOpen] = useState(false);
     const [moreTabsOpen, setMoreTabsOpen] = useState(false);
     const [dangerStudentsConfirm, setDangerStudentsConfirm] = useState('');
@@ -1573,6 +1588,138 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setSendingBroadcast(false);
         }
     };
+
+    const loadUserActivityUsers = useCallback(async ({ q, role } = {}) => {
+        if (!isAdmin) return;
+        setUserActivityLoading(true);
+        setUserActivityError('');
+        try {
+            const qs = new URLSearchParams();
+            const qq = String(q ?? '').trim();
+            const rr = String(role ?? '').trim();
+            if (qq) qs.set('q', qq);
+            if (rr && rr !== 'all') qs.set('role', rr);
+            qs.set('limit', '200');
+            const res = await fetch(`/api/admin/user-activity/users?${qs.toString()}`);
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.ok) {
+                setUserActivityUsers([]);
+                setUserActivityError(String(json?.error || `Falha ao carregar usuários (${res.status})`));
+                return;
+            }
+            setUserActivityUsers(Array.isArray(json?.users) ? json.users : []);
+        } catch (e) {
+            setUserActivityUsers([]);
+            setUserActivityError(e?.message ? String(e.message) : String(e));
+        } finally {
+            setUserActivityLoading(false);
+        }
+    }, [isAdmin]);
+
+    const loadUserActivitySummary = useCallback(async ({ userId, days } = {}) => {
+        if (!isAdmin) return;
+        const uid = String(userId || '').trim();
+        if (!uid) return;
+        const d = Math.min(90, Math.max(1, Number(days) || 7));
+        setUserActivitySummaryLoading(true);
+        try {
+            const qs = new URLSearchParams({ user_id: uid, days: String(d) });
+            const res = await fetch(`/api/admin/user-activity/summary?${qs.toString()}`);
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.ok) {
+                setUserActivitySummary(null);
+                return;
+            }
+            setUserActivitySummary(json);
+        } catch {
+            setUserActivitySummary(null);
+        } finally {
+            setUserActivitySummaryLoading(false);
+        }
+    }, [isAdmin]);
+
+    const loadUserActivityEvents = useCallback(async ({ userId, before, reset = false } = {}) => {
+        if (!isAdmin) return;
+        const uid = String(userId || '').trim();
+        if (!uid) return;
+        setUserActivityEventsLoading(true);
+        try {
+            const qs = new URLSearchParams({ user_id: uid, limit: '80' });
+            if (before) qs.set('before', String(before));
+            const res = await fetch(`/api/admin/user-activity/events?${qs.toString()}`);
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.ok) {
+                if (reset) setUserActivityEvents([]);
+                return;
+            }
+            const list = Array.isArray(json?.events) ? json.events : [];
+            setUserActivityEventsBefore(json?.nextBefore ?? null);
+            setUserActivityEvents((prev) => (reset ? list : [...prev, ...list]));
+        } catch {
+            if (reset) setUserActivityEvents([]);
+        } finally {
+            setUserActivityEventsLoading(false);
+        }
+    }, [isAdmin]);
+
+    const loadUserActivityErrors = useCallback(async ({ userId } = {}) => {
+        if (!isAdmin) return;
+        const uid = String(userId || '').trim();
+        if (!uid) return;
+        setUserActivityErrorsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('error_reports')
+                .select('id, created_at, message, pathname, url, status, app_version, source')
+                .eq('user_id', uid)
+                .order('created_at', { ascending: false })
+                .limit(10);
+            if (error) {
+                setUserActivityErrors([]);
+                return;
+            }
+            setUserActivityErrors(Array.isArray(data) ? data : []);
+        } catch {
+            setUserActivityErrors([]);
+        } finally {
+            setUserActivityErrorsLoading(false);
+        }
+    }, [isAdmin, supabase]);
+
+    useEffect(() => {
+        if (!isAdmin) return;
+        if (tab !== 'system') return;
+        try {
+            if (userActivityQueryDebounceRef.current) clearTimeout(userActivityQueryDebounceRef.current);
+        } catch {}
+        userActivityQueryDebounceRef.current = setTimeout(() => {
+            loadUserActivityUsers({ q: userActivityQuery, role: userActivityRole });
+        }, 400);
+        return () => {
+            try {
+                if (userActivityQueryDebounceRef.current) clearTimeout(userActivityQueryDebounceRef.current);
+            } catch {}
+        };
+    }, [isAdmin, tab, userActivityQuery, userActivityRole, loadUserActivityUsers]);
+
+    const openUserActivityUser = useCallback(async (u) => {
+        const id = String(u?.id || u?.userId || '').trim();
+        if (!id) return;
+        setUserActivitySelected(u);
+        setUserActivityEvents([]);
+        setUserActivityEventsBefore(null);
+        setUserActivitySummary(null);
+        setUserActivityErrors([]);
+        try {
+            await loadUserActivitySummary({ userId: id, days: userActivityDays });
+        } catch {}
+        try {
+            await loadUserActivityEvents({ userId: id, reset: true });
+        } catch {}
+        try {
+            await loadUserActivityErrors({ userId: id });
+        } catch {}
+    }, [loadUserActivityErrors, loadUserActivityEvents, loadUserActivitySummary, userActivityDays]);
 
     const handleEditStudent = () => {
         if (!selectedStudent) return;
@@ -3154,6 +3301,230 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
                 {tab === 'system' && !selectedStudent && (
                     <div className="space-y-8">
+                        <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-white flex items-center gap-2">
+                                        <FileText size={20} className="text-yellow-500"/> RELATÓRIO DE USUÁRIOS
+                                    </h3>
+                                    <div className="mt-1 text-xs text-neutral-400 font-semibold">
+                                        {userActivitySelected ? `Selecionado: ${String(userActivitySelected?.displayName || userActivitySelected?.email || userActivitySelected?.id || '').trim() || 'Usuário'}` : 'Selecione um usuário para ver o histórico.'}
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => loadUserActivityUsers({ q: userActivityQuery, role: userActivityRole })}
+                                    disabled={userActivityLoading}
+                                    className="min-h-[40px] px-4 py-2 rounded-xl font-black text-[11px] uppercase tracking-widest bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 disabled:opacity-50 inline-flex items-center gap-2"
+                                >
+                                    <RefreshCw size={14} />
+                                    {userActivityLoading ? 'Atualizando...' : 'Atualizar'}
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                <div className="space-y-3">
+                                    <div className="flex flex-col sm:flex-row gap-2">
+                                        <div className="flex-1 relative">
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500">
+                                                <Search size={16} />
+                                            </div>
+                                            <input
+                                                value={userActivityQuery}
+                                                onChange={(e) => setUserActivityQuery(e.target.value)}
+                                                placeholder="Buscar por nome ou email"
+                                                className="w-full pl-10 pr-3 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-bold outline-none focus:border-yellow-500"
+                                            />
+                                        </div>
+                                        <select
+                                            value={userActivityRole}
+                                            onChange={(e) => setUserActivityRole(e.target.value)}
+                                            className="min-h-[44px] px-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-bold outline-none focus:border-yellow-500"
+                                        >
+                                            <option value="all">Todos</option>
+                                            <option value="user">Aluno</option>
+                                            <option value="teacher">Professor</option>
+                                            <option value="admin">Admin</option>
+                                        </select>
+                                    </div>
+
+                                    {userActivityError ? (
+                                        <div className="bg-neutral-900 border border-red-500/30 rounded-xl p-3 text-sm text-red-300">
+                                            {userActivityError}
+                                        </div>
+                                    ) : null}
+
+                                    <div className="space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar pr-1">
+                                        {(Array.isArray(userActivityUsers) ? userActivityUsers : []).map((u) => {
+                                            const id = String(u?.id || '').trim();
+                                            const isSel = userActivitySelected && String(userActivitySelected?.id || '').trim() === id;
+                                            const name = String(u?.displayName || u?.display_name || u?.email || '').trim() || `Usuário ${id.slice(0, 6)}`;
+                                            const role = String(u?.role || '').trim();
+                                            return (
+                                                <button
+                                                    key={id}
+                                                    type="button"
+                                                    onClick={() => openUserActivityUser(u)}
+                                                    className={`w-full text-left rounded-xl border p-3 flex items-center gap-3 hover:bg-neutral-900/60 ${
+                                                        isSel ? 'border-yellow-500/40 bg-neutral-900/70' : 'border-neutral-700 bg-neutral-900/30'
+                                                    }`}
+                                                >
+                                                    <div className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 overflow-hidden flex items-center justify-center shrink-0">
+                                                        {String(u?.photoUrl || u?.photo_url || '').trim() ? (
+                                                            <Image src={String(u.photoUrl || u.photo_url)} alt={name} width={40} height={40} className="w-10 h-10 object-cover" />
+                                                        ) : (
+                                                            <UserCog size={18} className="text-neutral-400" />
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="text-sm font-black text-white truncate">{name}</div>
+                                                        <div className="text-[11px] text-neutral-400 font-bold truncate">
+                                                            {role ? role.toUpperCase() : '—'} {String(u?.email || '').trim() ? `· ${String(u.email)}` : ''}
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                        {!userActivityLoading && (!userActivityUsers || userActivityUsers.length === 0) ? (
+                                            <div className="text-sm text-neutral-400 font-semibold">Nenhum usuário encontrado.</div>
+                                        ) : null}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    {!userActivitySelected ? (
+                                        <div className="bg-neutral-900/30 border border-neutral-700 rounded-xl p-4 text-sm text-neutral-400 font-semibold">
+                                            Selecione um usuário para ver o relatório.
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="bg-neutral-900/30 border border-neutral-700 rounded-xl p-4 space-y-3">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Resumo</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setUserActivityDays(7);
+                                                                loadUserActivitySummary({ userId: userActivitySelected?.id, days: 7 });
+                                                            }}
+                                                            className={`min-h-[34px] px-3 rounded-xl text-[11px] font-black uppercase tracking-widest border ${
+                                                                userActivityDays === 7 ? 'bg-yellow-500 text-black border-yellow-400' : 'bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800'
+                                                            }`}
+                                                        >
+                                                            7d
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setUserActivityDays(30);
+                                                                loadUserActivitySummary({ userId: userActivitySelected?.id, days: 30 });
+                                                            }}
+                                                            className={`min-h-[34px] px-3 rounded-xl text-[11px] font-black uppercase tracking-widest border ${
+                                                                userActivityDays === 30 ? 'bg-yellow-500 text-black border-yellow-400' : 'bg-neutral-900 text-neutral-200 border-neutral-700 hover:bg-neutral-800'
+                                                            }`}
+                                                        >
+                                                            30d
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                loadUserActivitySummary({ userId: userActivitySelected?.id, days: userActivityDays });
+                                                                loadUserActivityEvents({ userId: userActivitySelected?.id, reset: true });
+                                                                loadUserActivityErrors({ userId: userActivitySelected?.id });
+                                                            }}
+                                                            className="min-h-[34px] px-3 rounded-xl text-[11px] font-black uppercase tracking-widest bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 inline-flex items-center gap-2"
+                                                        >
+                                                            <RefreshCw size={14} />
+                                                            Recarregar
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {userActivitySummaryLoading ? (
+                                                    <div className="text-sm text-neutral-400 font-semibold">Carregando resumo...</div>
+                                                ) : userActivitySummary?.ok ? (
+                                                    <div className="space-y-2">
+                                                        <div className="text-[11px] text-neutral-500 font-bold">
+                                                            Eventos no período: <span className="text-neutral-200">{Number(userActivitySummary?.total || 0)}</span>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            {(Array.isArray(userActivitySummary?.topEvents) ? userActivitySummary.topEvents : []).slice(0, 10).map((it) => (
+                                                                <div key={it.name} className="flex items-center justify-between gap-3 text-[11px]">
+                                                                    <div className="text-neutral-300 font-bold truncate">{it.name}</div>
+                                                                    <div className="text-neutral-400 font-black tabular-nums">{it.count}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm text-neutral-400 font-semibold">Sem dados no período.</div>
+                                                )}
+                                            </div>
+
+                                            <div className="bg-neutral-900/30 border border-neutral-700 rounded-xl p-4 space-y-3">
+                                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Timeline</div>
+                                                {userActivityEventsLoading && (!userActivityEvents || userActivityEvents.length === 0) ? (
+                                                    <div className="text-sm text-neutral-400 font-semibold">Carregando eventos...</div>
+                                                ) : (
+                                                    <div className="space-y-2 max-h-[45vh] overflow-y-auto custom-scrollbar pr-1">
+                                                        {(Array.isArray(userActivityEvents) ? userActivityEvents : []).map((ev) => (
+                                                            <div key={ev.id} className="rounded-xl border border-neutral-800 bg-black/30 p-3">
+                                                                <div className="flex items-center justify-between gap-3">
+                                                                    <div className="min-w-0">
+                                                                        <div className="text-sm font-black text-white truncate">{String(ev?.name || '')}</div>
+                                                                        <div className="text-[11px] text-neutral-400 font-bold truncate">
+                                                                            {String(ev?.type || '').trim() ? String(ev.type) : 'evento'} {String(ev?.screen || '').trim() ? `· ${String(ev.screen)}` : ''} {String(ev?.path || '').trim() ? `· ${String(ev.path)}` : ''}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="text-[11px] text-neutral-500 font-bold tabular-nums whitespace-nowrap">
+                                                                        {String(ev?.createdAt || '').trim() ? new Date(String(ev.createdAt)).toLocaleString('pt-BR') : ''}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {!userActivityEventsLoading && (!userActivityEvents || userActivityEvents.length === 0) ? (
+                                                            <div className="text-sm text-neutral-400 font-semibold">Sem eventos registrados.</div>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                                {userActivityEventsBefore ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={userActivityEventsLoading}
+                                                        onClick={() => loadUserActivityEvents({ userId: userActivitySelected?.id, before: userActivityEventsBefore })}
+                                                        className="w-full min-h-[40px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-[11px] uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
+                                                    >
+                                                        {userActivityEventsLoading ? 'Carregando...' : 'Carregar mais'}
+                                                    </button>
+                                                ) : null}
+                                            </div>
+
+                                            <div className="bg-neutral-900/30 border border-neutral-700 rounded-xl p-4 space-y-3">
+                                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Erros recentes</div>
+                                                {userActivityErrorsLoading ? (
+                                                    <div className="text-sm text-neutral-400 font-semibold">Carregando erros...</div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {(Array.isArray(userActivityErrors) ? userActivityErrors : []).slice(0, 8).map((er) => (
+                                                            <div key={er.id} className="rounded-xl border border-neutral-800 bg-black/30 p-3">
+                                                                <div className="text-sm font-black text-white truncate">{String(er?.message || '').trim() || 'Erro'}</div>
+                                                                <div className="text-[11px] text-neutral-400 font-bold truncate">
+                                                                    {String(er?.status || '').trim() ? String(er.status) : ''} {String(er?.pathname || '').trim() ? `· ${String(er.pathname)}` : ''} {String(er?.created_at || '').trim() ? `· ${new Date(String(er.created_at)).toLocaleString('pt-BR')}` : ''}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {!userActivityErrorsLoading && (!userActivityErrors || userActivityErrors.length === 0) ? (
+                                                            <div className="text-sm text-neutral-400 font-semibold">Nenhum erro reportado.</div>
+                                                        ) : null}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                         <div className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 space-y-4">
                             <h3 className="font-bold text-white flex items-center gap-2"><Download size={20} className="text-yellow-500"/> BACKUP DO SISTEMA</h3>
                             <div className="flex gap-2">

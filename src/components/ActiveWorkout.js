@@ -10,6 +10,7 @@ import InviteManager from '@/components/InviteManager';
 import TeamRoomCard from '@/components/TeamRoomCard';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
@@ -584,6 +585,12 @@ export default function ActiveWorkout(props) {
           const json = await resp.json();
           if (!json?.ok) throw new Error(json?.error || 'Falha ao salvar no histórico');
           savedId = json?.saved?.id ?? null;
+          try {
+            trackUserEvent('workout_finish_ok', {
+              type: 'workout',
+              metadata: { id: savedId, title: payload?.workoutTitle || null, durationSeconds: payload?.totalTime || null, idempotent: !!json?.idempotent },
+            })
+          } catch {}
         } catch (e) {
           const msg = e?.message ? String(e.message) : String(e);
           const offline = (() => {
@@ -606,12 +613,21 @@ export default function ActiveWorkout(props) {
                 await alert('Sem internet. O treino foi salvo e será sincronizado automaticamente quando a conexão voltar.', 'Finalização pendente')
               } catch {}
               savedId = null
+              try {
+                trackUserEvent('workout_finish_offline_queued', {
+                  type: 'workout',
+                  metadata: { title: payload?.workoutTitle || null, durationSeconds: payload?.totalTime || null },
+                })
+              } catch {}
             }
             try {
             } catch {}
           } else {
             await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
             savedId = null;
+            try {
+              trackUserEvent('workout_finish_error', { type: 'workout', metadata: { message: msg || null } })
+            } catch {}
           }
         }
       }
