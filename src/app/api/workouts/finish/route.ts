@@ -95,36 +95,15 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await request.json()
-    const session = body?.session
+    const body = await request.json().catch(() => ({}))
+    const session = body && typeof body === 'object' ? body.session ?? body : null
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
-
-    const idempotencyKeyRaw = body?.idempotencyKey ?? body?.idempotency_key ?? session?.idempotencyKey ?? session?.idempotency_key
-    const idempotencyKey = typeof idempotencyKeyRaw === 'string' ? idempotencyKeyRaw.trim() : String(idempotencyKeyRaw ?? '').trim()
-
-    if (idempotencyKey) {
-      try {
-        const { data: existing } = await supabase
-          .from('workouts')
-          .select('id, created_at')
-          .eq('user_id', user.id)
-          .eq('idempotency_key', idempotencyKey)
-          .maybeSingle()
-
-        if (existing?.id) {
-          return NextResponse.json({ ok: true, saved: existing, idempotent: true })
-        }
-      } catch {
-        // If idempotency check fails (e.g. migration not applied yet), continue without blocking.
-      }
-    }
 
     const { data, error } = await supabase
       .from('workouts')
       .insert({
         user_id: user.id,
         created_by: user.id,
-        idempotency_key: idempotencyKey || null,
         name: normalizeWorkoutTitle(session.workoutTitle || 'Treino Realizado'),
         date: new Date(session?.date ?? new Date()),
         completed_at: new Date().toISOString(),
@@ -134,92 +113,7 @@ export async function POST(request: Request) {
       .select('id, created_at')
       .single()
 
-    if (error) {
-      const isDuplicate = (error as any)?.code === '23505' || /duplicate key value/i.test(String(error?.message || ''))
-
-      if (isDuplicate && idempotencyKey) {
-        try {
-          const { data: existing } = await supabase
-            .from('workouts')
-            .select('id, created_at')
-            .eq('user_id', user.id)
-            .eq('idempotency_key', idempotencyKey)
-            .maybeSingle()
-
-          if (existing?.id) {
-            return NextResponse.json({ ok: true, saved: existing, idempotent: true })
-          }
-        } catch {}
-      }
-
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
-    }
-
-    try {
-      const originWorkoutId = session?.originWorkoutId ? String(session.originWorkoutId) : ''
-      if (originWorkoutId) {
-        const baseMs = (() => {
-          try {
-            const d = session?.date ? new Date(session.date) : null
-            const ms = d && !Number.isNaN(d.getTime()) ? d.getTime() : Date.now()
-            return ms
-          } catch {
-            return Date.now()
-          }
-        })()
-        const windowStartIso = new Date(baseMs - 12 * 60 * 60 * 1000).toISOString()
-        const windowEndIso = new Date(baseMs + 2 * 60 * 60 * 1000).toISOString()
-
-        const { data: latestPre, error: preError } = await supabase
-          .from('workout_checkins')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('kind', 'pre')
-          .eq('planned_workout_id', originWorkoutId)
-          .gte('created_at', windowStartIso)
-          .lte('created_at', windowEndIso)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (preError) throw preError
-        if (latestPre?.id) {
-          const { error: updError } = await supabase
-            .from('workout_checkins')
-            .update({ workout_id: data?.id ?? null, active_session_user_id: null })
-            .eq('id', latestPre.id)
-          if (updError) throw updError
-        }
-      }
-    } catch (e: any) {
-      console.warn('Falha ao vincular check-in pré ao treino salvo:', e?.message || String(e || ''))
-    }
-
-    try {
-      const raw = session?.postCheckin
-      const pc = raw && typeof raw === 'object' ? raw : null
-      if (pc) {
-        const sorenessN = parseTrainingNumberOrZero((pc as any)?.soreness)
-        const satisfactionN = parseTrainingNumberOrZero((pc as any)?.satisfaction)
-        const rpeN = parseTrainingNumberOrZero((pc as any)?.rpe)
-        const notesRaw = String((pc as any)?.notes || '').trim()
-
-        const { error: checkinError } = await supabase.from('workout_checkins').insert({
-          user_id: user.id,
-          kind: 'post',
-          workout_id: data?.id ?? null,
-          planned_workout_id: session?.originWorkoutId ?? null,
-          soreness: Number.isFinite(sorenessN) && sorenessN >= 0 && sorenessN <= 10 ? Math.round(sorenessN) : null,
-          mood: Number.isFinite(satisfactionN) && satisfactionN >= 1 && satisfactionN <= 5 ? Math.round(satisfactionN) : null,
-          notes: notesRaw ? notesRaw : null,
-          answers: {
-            rpe: Number.isFinite(rpeN) && rpeN >= 1 && rpeN <= 10 ? Math.round(rpeN) : null,
-          },
-        })
-        if (checkinError) throw checkinError
-      }
-    } catch (e: any) {
-      console.warn('Falha ao salvar check-in pós-treino:', e?.message || String(e || ''))
-    }
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     try {
       await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)
@@ -246,7 +140,7 @@ export async function POST(request: Request) {
             read: false,
             is_read: false,
             metadata: { workout_id: data?.id ?? null, workout_title: workoutTitle, sender_id: user.id },
-          }))
+          })),
         )
       }
 
@@ -278,7 +172,7 @@ export async function POST(request: Request) {
                   read: false,
                   is_read: false,
                   metadata: { streak, sender_id: user.id },
-                }))
+                })),
               )
             }
           }
@@ -308,7 +202,7 @@ export async function POST(request: Request) {
                   read: false,
                   is_read: false,
                   metadata: { total_workouts: total, sender_id: user.id },
-                }))
+                })),
               )
             }
           }
@@ -399,7 +293,7 @@ export async function POST(request: Request) {
                     read: false,
                     is_read: false,
                     metadata: { prs: top, workout_id: data?.id ?? null, sender_id: user.id },
-                  }))
+                  })),
                 )
               }
             }
@@ -413,3 +307,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
+

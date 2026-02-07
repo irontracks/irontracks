@@ -348,6 +348,7 @@ export default function ActiveWorkout(props) {
 
   const validateWorkout = async () => {
     const errors = [];
+    const warnings = [];
     const title = String(workout?.title || '').trim();
     if (!title) {
       errors.push('O treino precisa de um título.');
@@ -372,38 +373,52 @@ export default function ActiveWorkout(props) {
       for (let i = 0; i < setsCount; i++) {
         const key = `${exIdx}-${i}`;
         const log = getLog(key);
-        
-        // Se a série foi marcada como feita, TEM QUE ter peso e reps
+
         if (log?.done) {
           totalDone++;
           const w = String(log?.weight ?? '').trim();
           const r = String(log?.reps ?? '').trim();
-          const cfg = getPlanConfig(ex, i); // Fallback to plan config if needed? No, log should have it if edited.
-          // Actually renderNormalSet uses: const weightValue = String(log?.weight ?? cfg?.weight ?? '');
-          // So we should check the effective value
+          const cfg = getPlanConfig(ex, i);
           const effWeight = w || String(cfg?.weight ?? '').trim();
-          
+
           const isCardio = String(ex?.method || '').trim() === 'Cardio' || ex?.type === 'cardio';
           if (!isCardio && !effWeight && effWeight !== '0') {
-             errors.push(`${exName} (Série ${i + 1}): Peso não preenchido.`);
+            warnings.push(`${exName} (Série ${i + 1}): Peso não preenchido.`);
           }
-          // Para cardio, o peso pode ser ignorado (exceto se for bike/elíptico onde é carga, mas vamos deixar opcional para não travar outdoor)
-          
+
           if (!r && r !== '0') {
-             errors.push(`${exName} (Série ${i + 1}): ${isCardio ? 'Tempo' : 'Repetições'} não preenchido(a).`);
+            warnings.push(`${exName} (Série ${i + 1}): ${isCardio ? 'Tempo' : 'Repetições'} não preenchido(a).`);
           }
         }
       }
     });
 
     if (exercises.length > 0 && totalDone === 0) {
-       errors.push('Nenhuma série foi concluída. Marque "Feito" nas séries realizadas.');
+      warnings.push('Nenhuma série foi concluída. Marque "Feito" nas séries realizadas.');
     }
 
     if (errors.length > 0) {
-      const list = errors.map(e => `• ${e}`).join('\n');
+      const list = errors.map((e) => `• ${e}`).join('\n');
       await alert(`Para finalizar, verifique os seguintes campos:\n\n${list}`, 'Campos obrigatórios');
       return false;
+    }
+
+    if (warnings.length > 0) {
+      const list = warnings.map((e) => `• ${e}`).join('\n');
+      try {
+        const proceed =
+          typeof confirm === 'function'
+            ? await confirm(
+                `Existem séries incompletas ou campos em branco:\n\n${list}\n\nDeseja finalizar mesmo assim?`,
+                'Finalizar com pendências?',
+                {
+                  confirmText: 'Finalizar',
+                  cancelText: 'Voltar',
+                },
+              )
+            : true;
+        if (!proceed) return false;
+      } catch {}
     }
 
     return true;
