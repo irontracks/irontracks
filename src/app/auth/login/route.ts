@@ -1,5 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,30 +9,59 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const sp = url.searchParams
   const next = sp.get('next') ?? '/dashboard'
+  const providerRaw = String(sp.get('provider') || 'google').toLowerCase()
+  const provider = providerRaw === 'apple' ? 'apple' : 'google'
+  const nextCookieName = 'it.auth.next'
+  const nextCookieMaxAgeSeconds = 60 * 5
 
   const originFromUrl = url.origin
+  const hostHeader = (request.headers.get('host') || '').trim()
   const forwardedHost = (request.headers.get('x-forwarded-host') || '').trim()
-  const forwardedProto = (request.headers.get('x-forwarded-proto') || 'https').trim()
+  const forwardedProto = (request.headers.get('x-forwarded-proto') || '').trim()
   const isLocalEnv = process.env.NODE_ENV === 'development'
-  const baseOrigin = forwardedHost && !isLocalEnv ? `${forwardedProto}://${forwardedHost}` : originFromUrl
-  const safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
+  const protoFromUrl = url.protocol ? url.protocol.replace(':', '') : ''
+  const effectiveProto = forwardedProto || protoFromUrl || (isLocalEnv ? 'http' : 'https')
+  const baseOrigin =
+    isLocalEnv && (hostHeader || url.host)
+      ? `${effectiveProto}://${hostHeader || url.host}`
+      : forwardedHost && !isLocalEnv
+        ? `${effectiveProto}://${forwardedHost}`
+        : originFromUrl
+  let safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
+  const configuredOriginRaw = (process.env.IRONTRACKS_PUBLIC_ORIGIN || '').trim()
+  if (configuredOriginRaw) {
+    try {
+      safeOrigin = new URL(configuredOriginRaw).origin
+    } catch {}
+  }
+  if (!isLocalEnv) {
+    try {
+      const u = new URL(safeOrigin)
+      u.protocol = 'https:'
+      safeOrigin = u.origin
+    } catch {}
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
-    return NextResponse.redirect(new URL('/auth/auth-code-error?error=missing_env', safeOrigin))
+    return NextResponse.redirect(new URL('/auth/error?error=missing_env', safeOrigin))
   }
 
   const rawNext = String(next || '/dashboard')
   const safeNext = rawNext.startsWith('/') ? rawNext : '/dashboard'
   const redirectTo = `${safeOrigin}/auth/callback?next=${encodeURIComponent(safeNext)}`
+  const baseCookieOptions = getSupabaseCookieOptions()
+  const nextCookieExpires = new Date(Date.now() + nextCookieMaxAgeSeconds * 1000)
 
   let cookiesToApply: Array<{ name: string; value: string; options?: any }> = []
+  const cookieStore = await cookies()
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
-        return []
+        return cookieStore.getAll()
       },
       setAll(cookiesToSet) {
         cookiesToApply = cookiesToSet.map((c) => ({
@@ -45,23 +76,23 @@ export async function GET(request: Request) {
   let oauthUrl: string | null = null
   try {
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: { redirectTo },
     })
     if (error) {
       return NextResponse.redirect(
-        new URL(`/auth/auth-code-error?error=${encodeURIComponent(error.message || 'oauth_failed')}`, safeOrigin),
+        new URL(`/auth/error?error=${encodeURIComponent(error.message || 'oauth_failed')}`, safeOrigin),
       )
     }
     oauthUrl = data?.url || null
   } catch (e: any) {
     return NextResponse.redirect(
-      new URL(`/auth/auth-code-error?error=${encodeURIComponent(e?.message || 'oauth_failed')}`, safeOrigin),
+      new URL(`/auth/error?error=${encodeURIComponent(e?.message || 'oauth_failed')}`, safeOrigin),
     )
   }
 
   if (!oauthUrl) {
-    return NextResponse.redirect(new URL('/auth/auth-code-error?error=oauth_url_missing', safeOrigin))
+    return NextResponse.redirect(new URL('/auth/error?error=oauth_url_missing', safeOrigin))
   }
 
   const redirectResp = NextResponse.redirect(oauthUrl)
@@ -74,6 +105,17 @@ export async function GET(request: Request) {
       } catch {}
     }
   })
+  try {
+    redirectResp.cookies.set(nextCookieName, safeNext, {
+      ...(baseCookieOptions || {}),
+      expires: nextCookieExpires,
+      maxAge: nextCookieMaxAgeSeconds,
+    })
+  } catch {
+    try {
+      redirectResp.cookies.set(nextCookieName, safeNext)
+    } catch {}
+  }
 
   return redirectResp
 }

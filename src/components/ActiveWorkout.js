@@ -7,6 +7,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import InviteManager from '@/components/InviteManager';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
+import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync';
 
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
@@ -342,19 +343,65 @@ export default function ActiveWorkout(props) {
 
       let savedId = null;
       if (shouldSaveHistory) {
+        // Generate idempotency key to prevent duplicates on retry
+        const idempotencyKey = `finish_${workout?.id || 'unknown'}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const submission = { session: payload, idempotencyKey };
+        
         try {
-          const resp = await fetch('/api/workouts/finish', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session: payload }),
-          });
-          const json = await resp.json();
-          if (!json?.ok) throw new Error(json?.error || 'Falha ao salvar no histórico');
-          savedId = json?.saved?.id ?? null;
+          // Attempt online save first if network appears available
+          let onlineSuccess = false;
+          if (isOnline()) {
+             try {
+                const resp = await fetch('/api/workouts/finish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(submission),
+                });
+                
+                if (resp.ok) {
+                    const json = await resp.json();
+                    savedId = json?.saved?.id ?? null;
+                    onlineSuccess = true;
+                } else {
+                    // Check if validation error (400-499) or server error (500+)
+                    if (resp.status >= 400 && resp.status < 500) {
+                        const errText = await resp.text();
+                        throw new Error(`Erro de validação: ${errText}`);
+                    }
+                    // For 500+, we throw to trigger offline fallback
+                    throw new Error(`Erro do servidor: ${resp.status}`);
+                }
+             } catch (fetchErr) {
+                 // If it's a validation error, rethrow to stop process
+                 if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
+                 // Otherwise (network fail, 500), fall through to offline queue
+                 console.warn('Online save failed, attempting offline queue', fetchErr);
+             }
+          }
+
+          if (!onlineSuccess) {
+              // Fallback to offline queue
+              await queueFinishWorkout(submission);
+              await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline');
+              savedId = 'offline-pending';
+          }
+
         } catch (e) {
           const msg = e?.message ? String(e.message) : String(e);
-          await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
-          savedId = null;
+          // If it was a validation error, we show it and abort finish
+          if (msg.includes('Erro de validação')) {
+              await alert(msg);
+              setFinishing(false);
+              return;
+          }
+          
+          // If queue failed too
+          await alert('CRÍTICO: Erro ao salvar treino: ' + (msg || 'erro inesperado'));
+          // We do NOT set savedId, so report logic below might fail or be skipped?
+          // Actually, if we fail to save, we probably shouldn't finish the workout state locally?
+          // The user asked to ensure history is saved.
+          setFinishing(false);
+          return;
         }
       }
 

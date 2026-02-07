@@ -1,26 +1,44 @@
 import React, { useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-const RealtimeNotificationBridge = ({ setNotification }) => {
+const RealtimeNotificationBridge = ({ userId, setNotification }) => {
+  const safeSetNotification = typeof setNotification === 'function' ? setNotification : null
+
   useEffect(() => {
-    const supabase = createClient()
+    if (!safeSetNotification) return
+    let supabase
+    try {
+      supabase = createClient()
+    } catch {
+      return
+    }
     let channel
     let mounted = true
     ;(async () => {
       try {
-        const { data, error } = await supabase.auth.getUser()
-        if (error) return
-        const user = data?.user ?? null
-        const userId = user?.id ? String(user.id) : ''
-        if (!userId) return
+        const resolvedUserId = String(userId || '').trim() || (() => {
+          try {
+            return ''
+          } catch {
+            return ''
+          }
+        })()
+        let uid = resolvedUserId
+        if (!uid) {
+          const { data, error } = await supabase.auth.getUser()
+          if (error) return
+          const user = data?.user ?? null
+          uid = user?.id ? String(user.id) : ''
+        }
+        if (!uid) return
 
         channel = supabase
-          .channel(`notifications-bridge:${userId}`)
+          .channel(`notifications-bridge:${uid}`)
           .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'notifications',
-            filter: `user_id=eq.${userId}`
+            filter: `user_id=eq.${uid}`
           }, (payload) => {
             try {
               if (!mounted) return
@@ -32,7 +50,14 @@ const RealtimeNotificationBridge = ({ setNotification }) => {
               const message = String(n?.message ?? '').trim()
               if (!title || !message) return
 
-              setNotification({
+              if (rawType === 'story_posted') {
+                try {
+                  window.dispatchEvent(new Event('irontracks:stories:refresh'))
+                } catch {}
+              }
+
+              safeSetNotification({
+                id: n?.id ?? null,
                 text: message,
                 displayName: title,
                 photoURL: null,
@@ -57,7 +82,7 @@ const RealtimeNotificationBridge = ({ setNotification }) => {
         return
       }
     }
-  }, [setNotification])
+  }, [safeSetNotification, userId])
 
   return null
 }

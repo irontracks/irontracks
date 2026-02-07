@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -13,7 +13,8 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { TrendingUp, Calendar, User, Calculator, X } from 'lucide-react';
+import { TrendingUp, Calendar, User, Calculator, X, Upload } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import { DialogProvider } from '@/contexts/DialogContext';
@@ -88,11 +89,68 @@ const getBmrKcal = (assessment: any): number | null => {
 };
 
 const getMeasurementCm = (assessment: any, key: string): number | null => {
-  return toPositiveNumberOrNull(assessment?.measurements?.[key]);
+  // Tenta buscar no objeto aninhado antigo
+  const nested = toPositiveNumberOrNull(assessment?.measurements?.[key]);
+  if (nested) return nested;
+
+  // Tenta mapear para as colunas planas novas
+  const keyMap: Record<string, string> = {
+    'arm': 'arm_circ',
+    'chest': 'chest_circ',
+    'waist': 'waist_circ',
+    'hip': 'hip_circ',
+    'thigh': 'thigh_circ',
+    'calf': 'calf_circ'
+  };
+
+  const flatKey = keyMap[key];
+  if (flatKey) {
+    return toPositiveNumberOrNull(assessment?.[flatKey]);
+  }
+
+  return null;
+};
+
+const getSkinfoldMm = (assessment: any, key: string): number | null => {
+  // Tenta buscar no objeto aninhado antigo
+  const nested = toPositiveNumberOrNull(assessment?.skinfolds?.[key]);
+  if (nested) return nested;
+
+  // Tenta mapear para as colunas planas novas
+  const keyMap: Record<string, string> = {
+    'triceps': 'triceps_skinfold',
+    'biceps': 'biceps_skinfold',
+    'subscapular': 'subscapular_skinfold',
+    'suprailiac': 'suprailiac_skinfold',
+    'abdominal': 'abdominal_skinfold',
+    'thigh': 'thigh_skinfold',
+    'calf': 'calf_skinfold'
+  };
+
+  const flatKey = keyMap[key];
+  if (flatKey) {
+    return toPositiveNumberOrNull(assessment?.[flatKey]);
+  }
+
+  return null;
 };
 
 const getSum7Mm = (assessment: any): number | null => {
-  return toPositiveNumberOrNull(assessment?.sum7 ?? assessment?.measurements?.sum7);
+  // Tenta buscar valor pronto antigo
+  const stored = toPositiveNumberOrNull(assessment?.sum7 ?? assessment?.measurements?.sum7);
+  if (stored) return stored;
+
+  // Calcula somatório das colunas planas
+  const t = Number(assessment?.triceps_skinfold) || 0;
+  const b = Number(assessment?.biceps_skinfold) || 0;
+  const s = Number(assessment?.subscapular_skinfold) || 0;
+  const si = Number(assessment?.suprailiac_skinfold) || 0;
+  const a = Number(assessment?.abdominal_skinfold) || 0;
+  const th = Number(assessment?.thigh_skinfold) || 0;
+  const c = Number(assessment?.calf_skinfold) || 0;
+
+  const sum = t + b + s + si + a + th + c;
+  return sum > 0 ? sum : null;
 };
 
 const safeJsonParse = (raw: any): any | null => {
@@ -196,6 +254,7 @@ interface AssessmentHistoryProps {
 
 export default function AssessmentHistory({ studentId: propStudentId }: AssessmentHistoryProps) {
   const studentId = propStudentId;
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { getStudentAssessments } = useAssessment();
   const [assessments, setAssessments] = useState<any[]>([]);
@@ -207,7 +266,120 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   const [showHistory, setShowHistory] = useState(false);
   const [studentName, setStudentName] = useState<string>('Aluno');
   const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
-  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, { loading: boolean; error: string | null; plan: any | null; usedAi: boolean }>>({});
+  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, { loading: boolean; error: string | null; plan: any | null; usedAi: boolean; reason?: string }>>({});
+  const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [planModalAssessment, setPlanModalAssessment] = useState<any | null>(null);
+  const [importing, setImporting] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const mergeImportedFormData = (base: any, incoming: any) => {
+    const out: any = { ...(base && typeof base === 'object' ? base : {}) };
+    const keys = [
+      'assessment_date',
+      'weight',
+      'height',
+      'age',
+      'gender',
+      'arm_circ',
+      'chest_circ',
+      'waist_circ',
+      'hip_circ',
+      'thigh_circ',
+      'calf_circ',
+      'triceps_skinfold',
+      'biceps_skinfold',
+      'subscapular_skinfold',
+      'suprailiac_skinfold',
+      'abdominal_skinfold',
+      'thigh_skinfold',
+      'calf_skinfold',
+      'observations',
+    ];
+    keys.forEach((k) => {
+      const nextVal = incoming?.[k];
+      if (nextVal === undefined || nextVal === null || nextVal === '') return;
+      const prevVal = out?.[k];
+      if (prevVal === undefined || prevVal === null || prevVal === '') {
+        out[k] = nextVal;
+      }
+    });
+    return out;
+  };
+
+  const handleScanClick = () => {
+    if (!studentId) return;
+    if (!scanInputRef.current) return;
+    scanInputRef.current.click();
+  };
+
+  const handleScanFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const files = event.target.files ? Array.from(event.target.files) : [];
+      if (!files.length) return;
+      if (!studentId) return;
+      if (importing) return;
+
+      setImporting(true);
+
+      let mergedFormData: any = {};
+
+      for (const file of files) {
+        const form = new FormData();
+        form.append('file', file);
+
+        const res = await fetch('/api/assessment-scanner', {
+          method: 'POST',
+          body: form,
+        });
+
+        const data = await res.json().catch(() => null);
+        if (!data || !data.ok) {
+          const msg = String(data?.error || 'Falha ao processar arquivo');
+          if (typeof window !== 'undefined') window.alert(msg);
+          return;
+        }
+
+        const nextForm = data?.formData && typeof data.formData === 'object' ? data.formData : null;
+        if (nextForm) mergedFormData = mergeImportedFormData(mergedFormData, nextForm);
+      }
+
+      const hasCoreField =
+        mergedFormData &&
+        typeof mergedFormData === 'object' &&
+        ('weight' in mergedFormData || 'height' in mergedFormData || 'assessment_date' in mergedFormData);
+
+      if (!hasCoreField) {
+        if (typeof window !== 'undefined') {
+          window.alert('Não foi possível extrair dados suficientes da avaliação.');
+        }
+        return;
+      }
+
+      if (typeof window !== 'undefined') {
+        try {
+          const storageKey = `assessment_import_${studentId}`;
+          window.sessionStorage.setItem(storageKey, JSON.stringify({ formData: mergedFormData }));
+        } catch (error) {
+          console.error('Erro ao salvar avaliação importada na sessão', error);
+          window.alert('Não foi possível preparar os dados importados. Tente novamente.');
+          return;
+        }
+      }
+
+      router.push(`/assessments/new/${studentId}`);
+    } catch (error) {
+      console.error('Erro ao importar avaliação por imagem/PDF', error);
+      if (typeof window !== 'undefined') {
+        window.alert('Falha ao importar avaliação por imagem/PDF.');
+      }
+    } finally {
+      setImporting(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
 
   const measurementFields = [
     { key: 'arm', label: 'Braço' },
@@ -286,10 +458,11 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     };
   }, [studentId, getStudentAssessments, supabase]);
 
-  const handleGenerateAssessmentPlan = async (assessment: any) => {
+  const handleGenerateAssessmentPlan = async (assessment: any, opts?: { openDetails?: boolean }) => {
     try {
       const id = String(assessment?.id || '');
       if (!id) return;
+      if (opts?.openDetails) setSelectedAssessment(id);
 
       setAiPlanByAssessmentId((prev) => ({
         ...prev,
@@ -298,6 +471,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           error: null,
           plan: prev[id]?.plan ?? null,
           usedAi: prev[id]?.usedAi ?? false,
+          reason: prev[id]?.reason,
         },
       }));
 
@@ -316,6 +490,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
             error: res?.error ? String(res.error) : 'Falha ao gerar plano tático',
             plan: prev[id]?.plan ?? null,
             usedAi: false,
+            reason: res?.reason ? String(res.reason) : 'ai_failed',
           },
         }));
         return;
@@ -328,8 +503,14 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           error: null,
           plan: res.plan ?? null,
           usedAi: !!res.usedAi,
+          reason: res?.reason ? String(res.reason) : (res?.usedAi ? 'ai' : 'fallback'),
         },
       }));
+      setTimeout(() => {
+        try {
+          planAnchorRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch {}
+      }, 50);
     } catch (e: any) {
       const id = String(assessment?.id || '');
       if (!id) return;
@@ -340,9 +521,20 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           error: e?.message ? String(e.message) : 'Erro inesperado ao gerar plano tático',
           plan: prev[id]?.plan ?? null,
           usedAi: false,
+          reason: 'ai_failed',
         },
       }));
     }
+  };
+
+  const handleOpenAssessmentPlanModal = async (assessment: any) => {
+    try {
+      const id = String(assessment?.id || '');
+      if (!id) return;
+      setPlanModalAssessment(assessment);
+      setPlanModalOpen(true);
+      await handleGenerateAssessmentPlan(assessment, { openDetails: false });
+    } catch {}
   };
 
   const sortedAssessments = useMemo(() => {
@@ -788,6 +980,57 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   if (assessments.length === 0) {
     return (
       <div className="p-6 bg-neutral-900">
+        <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6 mb-6">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center">
+              <User className="w-8 h-8 text-yellow-500 mr-3" />
+              <div>
+                <h1 className="text-xl font-black text-white">Avaliações Físicas</h1>
+                <p className="text-neutral-400 text-sm">Gerencie as avaliações e acompanhe a evolução</p>
+              </div>
+            </div>
+            <button
+              onClick={() => { if (typeof window !== 'undefined') window.history.back(); }}
+              className="shrink-0 w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition-all duration-300 active:scale-95 flex items-center justify-center"
+              title="Fechar"
+              type="button"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              onClick={() => studentId && router.push(`/assessments/new/${studentId}`)}
+              className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95"
+            >
+              + Nova Avaliação
+            </button>
+            <button
+              onClick={handleScanClick}
+              disabled={importing || !studentId}
+              className={
+                importing || !studentId
+                  ? "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 text-neutral-500 border border-dashed border-neutral-800 cursor-not-allowed font-bold"
+                  : "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-dashed border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 hover:border-yellow-500 hover:text-yellow-500 transition-all duration-300 active:scale-95"
+              }
+            >
+              <span className="inline-flex items-center justify-center gap-2">
+                <Upload className="w-4 h-4" />
+                {importing ? "Importando..." : "Importar Foto/PDF"}
+              </span>
+            </button>
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={handleScanFileChange}
+            />
+          </div>
+        </div>
+
         <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-8 text-center">
           <TrendingUp className="w-16 h-16 text-neutral-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white mb-2">Nenhuma avaliação encontrada</h2>
@@ -812,7 +1055,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
             </div>
           </div>
           <div className="w-full sm:w-auto flex items-center gap-2">
-            <div className="grid grid-cols-2 gap-2 flex-1 sm:flex-none">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 sm:flex-none">
               <button
                 onClick={() => setShowForm(true)}
                 className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95"
@@ -825,6 +1068,20 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
               >
                 Ver Histórico
               </button>
+              <button
+                onClick={handleScanClick}
+                disabled={importing || !studentId}
+                className={
+                  importing || !studentId
+                    ? "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 text-neutral-500 border border-dashed border-neutral-800 cursor-not-allowed font-bold"
+                    : "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-dashed border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 hover:border-yellow-500 hover:text-yellow-500 transition-all duration-300 active:scale-95"
+                }
+              >
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  {importing ? "Importando..." : "Importar Foto/PDF"}
+                </span>
+              </button>
             </div>
             <button
               onClick={() => { if (typeof window !== 'undefined') window.history.back(); }}
@@ -834,6 +1091,14 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
             >
               <X className="w-5 h-5" />
             </button>
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={handleScanFileChange}
+            />
           </div>
         </div>
         {latestAssessment && previousAssessment && (
@@ -1049,19 +1314,19 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                       height: String(assessment.height || ''),
                       age: String(assessment.age || ''),
                       gender: safeGender(assessment.gender),
-                      arm_circ: String(assessment.measurements?.arm || ''),
-                      chest_circ: String(assessment.measurements?.chest || ''),
-                      waist_circ: String(assessment.measurements?.waist || ''),
-                      hip_circ: String(assessment.measurements?.hip || ''),
-                      thigh_circ: String(assessment.measurements?.thigh || ''),
-                      calf_circ: String(assessment.measurements?.calf || ''),
-                      triceps_skinfold: String(assessment.skinfolds?.triceps || ''),
-                      biceps_skinfold: String(assessment.skinfolds?.biceps || ''),
-                      subscapular_skinfold: String(assessment.skinfolds?.subscapular || ''),
-                      suprailiac_skinfold: String(assessment.skinfolds?.suprailiac || ''),
-                      abdominal_skinfold: String(assessment.skinfolds?.abdominal || ''),
-                      thigh_skinfold: String(assessment.skinfolds?.thigh || ''),
-                      calf_skinfold: String(assessment.skinfolds?.calf || ''),
+                      arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
+                      chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
+                      waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
+                      hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
+                      thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
+                      calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
+                      triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
+                      biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
+                      subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
+                      suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
+                      abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
+                      thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
+                      calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
                       observations: ''
                     }}
                     studentName={assessment.student_name}
@@ -1070,7 +1335,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                   />
                   <button
                     type="button"
-                    onClick={() => handleGenerateAssessmentPlan(assessment)}
+                    onClick={() => handleOpenAssessmentPlanModal(assessment)}
+                    disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
                     className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95"
                   >
                     {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando plano…' : 'Plano Tático (AI)'}
@@ -1084,11 +1350,11 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                       <h4 className="font-bold text-white mb-2">Dobras Cutâneas (mm)</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         {skinfoldFields.map(({ key, label }) => {
-                          const value = (assessment.skinfolds || {})[key];
+                          const value = getSkinfoldMm(assessment, key);
                           return (
                             <div key={key} className="flex justify-between">
                               <span className="text-neutral-400">{label}:</span>
-                              <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                              <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                             </div>
                           );
                         })}
@@ -1098,11 +1364,11 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                       <h4 className="font-bold text-white mb-2">Circunferências (cm)</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         {measurementFields.map(({ key, label }) => {
-                          const value = (assessment.measurements || {})[key];
+                          const value = getMeasurementCm(assessment, key);
                           return (
                             <div key={key} className="flex justify-between">
                               <span className="text-neutral-400">{label}:</span>
-                              <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                              <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                             </div>
                           );
                         })}
@@ -1114,10 +1380,33 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                     if (!s) return null;
                     const plan = s.plan && typeof s.plan === 'object' ? s.plan : null;
                     if (!plan && !s.loading && !s.error) return null;
+                    const badge = (() => {
+                      if (s.loading) return null;
+                      if (s.error) return null;
+                      if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
+                      if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                      if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                      if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                      return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                    })();
                     return (
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div
+                        className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4"
+                        ref={(el) => {
+                          try {
+                            planAnchorRefs.current[String(assessment.id)] = el;
+                          } catch {}
+                        }}
+                      >
                         <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
-                          <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2">Resumo Tático</div>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+                            {badge ? (
+                              <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
+                                {badge.text}
+                              </div>
+                            ) : null}
+                          </div>
                           {s.loading ? (
                             <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
                           ) : s.error ? (
@@ -1186,6 +1475,140 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
         </div>
       </div>
 
+      {planModalOpen && planModalAssessment ? (
+        <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPlanModalOpen(false)}>
+          <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold truncate">Plano Tático</div>
+                <div className="text-white font-black truncate">
+                  {formatDateCompact(planModalAssessment?.date || planModalAssessment?.assessment_date)}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlanModalOpen(false)}
+                className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                aria-label="Fechar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
+              {(() => {
+                const id = String(planModalAssessment?.id || '');
+                const s = id ? aiPlanByAssessmentId[id] : null;
+                const plan = s?.plan && typeof s.plan === 'object' ? s.plan : null;
+                const badge = (() => {
+                  if (!s || s.loading) return null;
+                  if (s.error) return null;
+                  if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
+                  if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                  if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                  if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                  return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                })();
+
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+                      {badge ? (
+                        <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
+                          {badge.text}
+                        </div>
+                      ) : null}
+                    </div>
+                    {s?.loading ? (
+                      <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
+                    ) : s?.error ? (
+                      <div className="text-sm text-red-400">{s.error}</div>
+                    ) : plan ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
+                          <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                            {Array.isArray(plan.summary) && plan.summary.length > 0
+                              ? plan.summary.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))
+                              : null}
+                          </ul>
+                        </div>
+                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
+                          {Array.isArray(plan.training) && plan.training.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
+                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                {plan.training.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {Array.isArray(plan.nutrition) && plan.nutrition.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
+                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                {plan.nutrition.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {Array.isArray(plan.habits) && plan.habits.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
+                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                {plan.habits.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {Array.isArray(plan.warnings) && plan.warnings.length > 0 && (
+                            <div>
+                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
+                              <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
+                                {plan.warnings.map((item: any, idx: number) => (
+                                  <li key={idx}>{String(item || '')}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-neutral-400">Nenhum plano disponível.</div>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await handleGenerateAssessmentPlan(planModalAssessment, { openDetails: false });
+                          } catch {}
+                        }}
+                        disabled={!!s?.loading}
+                        className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95 disabled:opacity-60"
+                      >
+                        {s?.loading ? 'Gerando…' : 'Gerar novamente'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPlanModalOpen(false)}
+                        className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+                      >
+                        Fechar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* Modal do Formulário */}
       {showForm && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
@@ -1243,19 +1666,19 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                           height: String(a.height || ''),
                           age: String(a.age || ''),
                           gender: safeGender(a.gender),
-                          arm_circ: String(a.measurements?.arm || ''),
-                          chest_circ: String(a.measurements?.chest || ''),
-                          waist_circ: String(a.measurements?.waist || ''),
-                          hip_circ: String(a.measurements?.hip || ''),
-                          thigh_circ: String(a.measurements?.thigh || ''),
-                          calf_circ: String(a.measurements?.calf || ''),
-                          triceps_skinfold: String(a.skinfolds?.triceps || ''),
-                          biceps_skinfold: String(a.skinfolds?.biceps || ''),
-                          subscapular_skinfold: String(a.skinfolds?.subscapular || ''),
-                          suprailiac_skinfold: String(a.skinfolds?.suprailiac || ''),
-                          abdominal_skinfold: String(a.skinfolds?.abdominal || ''),
-                          thigh_skinfold: String(a.skinfolds?.thigh || ''),
-                          calf_skinfold: String(a.skinfolds?.calf || ''),
+                          arm_circ: String(getMeasurementCm(a, 'arm') || ''),
+                          chest_circ: String(getMeasurementCm(a, 'chest') || ''),
+                          waist_circ: String(getMeasurementCm(a, 'waist') || ''),
+                          hip_circ: String(getMeasurementCm(a, 'hip') || ''),
+                          thigh_circ: String(getMeasurementCm(a, 'thigh') || ''),
+                          calf_circ: String(getMeasurementCm(a, 'calf') || ''),
+                          triceps_skinfold: String(getSkinfoldMm(a, 'triceps') || ''),
+                          biceps_skinfold: String(getSkinfoldMm(a, 'biceps') || ''),
+                          subscapular_skinfold: String(getSkinfoldMm(a, 'subscapular') || ''),
+                          suprailiac_skinfold: String(getSkinfoldMm(a, 'suprailiac') || ''),
+                          abdominal_skinfold: String(getSkinfoldMm(a, 'abdominal') || ''),
+                          thigh_skinfold: String(getSkinfoldMm(a, 'thigh') || ''),
+                          calf_skinfold: String(getSkinfoldMm(a, 'calf') || ''),
                           observations: ''
                         }}
                         studentName={studentName}
@@ -1271,11 +1694,11 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                           <h4 className="font-bold text-white mb-2">Dobras Cutâneas (mm)</h4>
                           <div className="grid grid-cols-2 gap-2">
                           {skinfoldFields.map(({ key, label }) => {
-                            const value = (a.skinfolds || {})[key];
+                            const value = getSkinfoldMm(a, key);
                             return (
                               <div key={key} className="flex justify-between">
                                 <span className="text-neutral-400">{label}:</span>
-                                <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                                <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                               </div>
                             );
                           })}
@@ -1285,11 +1708,11 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                           <h4 className="font-bold text-white mb-2">Circunferências (cm)</h4>
                           <div className="grid grid-cols-2 gap-2">
                           {measurementFields.map(({ key, label }) => {
-                            const value = (a.measurements || {})[key];
+                            const value = getMeasurementCm(a, key);
                             return (
                               <div key={key} className="flex justify-between">
                                 <span className="text-neutral-400">{label}:</span>
-                                <span className="font-medium text-white">{value === null || value === undefined || value === '' ? '-' : String(value)}</span>
+                                <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
                               </div>
                             );
                           })}
@@ -1308,4 +1731,3 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     </DialogProvider>
   );
 }
-

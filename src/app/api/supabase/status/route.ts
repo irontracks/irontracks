@@ -6,8 +6,9 @@ import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
 export async function GET(req: Request) {
   const hasUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
   const hasAnon = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const isDev = process.env.NODE_ENV === 'development'
   const isInternal = hasValidInternalSecret(req)
-  if (!isInternal) {
+  if (!isInternal && !isDev) {
     const auth = await requireRole(['admin'])
     if (!auth.ok) return auth.response
   }
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
         { status: 401 }
       )
     }
-    if (isInternal) {
+    if (isInternal || isDev) {
       const cookieStore = await cookies()
       const cookieNames = (cookieStore.getAll() || []).map((c) => c?.name).filter(Boolean).sort()
       return NextResponse.json({

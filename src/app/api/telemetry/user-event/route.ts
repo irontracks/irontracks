@@ -1,0 +1,96 @@
+import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/utils/supabase/admin'
+import { requireUser } from '@/utils/auth/route'
+
+export const dynamic = 'force-dynamic'
+
+type IncomingEvent = {
+  name?: unknown
+  type?: unknown
+  screen?: unknown
+  path?: unknown
+  metadata?: unknown
+  clientTs?: unknown
+  appVersion?: unknown
+}
+
+const safeStr = (v: unknown, max = 200) => {
+  const s = typeof v === 'string' ? v.trim() : String(v ?? '').trim()
+  if (!s) return ''
+  return s.length > max ? s.slice(0, max) : s
+}
+
+const safeJson = (v: unknown) => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  return v as Record<string, any>
+}
+
+const safeTs = (v: unknown) => {
+  try {
+    if (!v) return null
+    const s = String(v).trim()
+    if (!s) return null
+    const d = new Date(s)
+    const t = d.getTime()
+    if (!Number.isFinite(t)) return null
+    return d.toISOString()
+  } catch {
+    return null
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const auth = await requireUser()
+    if (!auth.ok) return auth.response
+
+    const body = await req.json().catch(() => ({}))
+    const rawEvents = Array.isArray((body as any)?.events) ? (body as any).events : (body ? [body] : [])
+    const events: IncomingEvent[] = rawEvents.filter(Boolean).slice(0, 50)
+
+    if (!events.length) return NextResponse.json({ ok: true, inserted: 0 })
+
+    const admin = createAdminClient()
+    const uid = auth.user.id
+
+    let displayName: string | null = null
+    let role: string | null = null
+    try {
+      const { data: p } = await admin.from('profiles').select('display_name, role').eq('id', uid).maybeSingle()
+      displayName = p?.display_name != null ? String(p.display_name) : null
+      role = p?.role != null ? String(p.role) : null
+    } catch {}
+
+    const ua = safeStr(req.headers.get('user-agent') || '', 400)
+
+    const rows = events
+      .map((e) => {
+        const name = safeStr(e?.name, 80)
+        if (!name) return null
+        return {
+          user_id: uid,
+          role: role,
+          display_name: displayName,
+          event_name: name,
+          event_type: safeStr(e?.type, 40) || null,
+          screen: safeStr(e?.screen, 120) || null,
+          path: safeStr(e?.path, 300) || null,
+          metadata: safeJson(e?.metadata),
+          client_ts: safeTs(e?.clientTs),
+          user_agent: ua || null,
+          app_version: safeStr(e?.appVersion, 80) || null,
+        }
+      })
+      .filter(Boolean) as any[]
+
+    if (!rows.length) return NextResponse.json({ ok: true, inserted: 0 })
+
+    const { error } = await admin.from('user_activity_events').insert(rows)
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+
+    return NextResponse.json({ ok: true, inserted: rows.length })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  }
+}
+

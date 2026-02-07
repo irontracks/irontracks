@@ -39,12 +39,31 @@ export async function GET(req: Request) {
       ? students.filter((s) => s && s.user_id)
       : []
 
-    const studentItems = studentsList.map((s) => ({
-      id: s.user_id,
-      displayName: s.name || s.email || 'Atleta',
-      photoURL: null,
-      lastSeen: null,
-    }))
+    // Fetch profile data (last_seen, photo) for these students
+    let studentProfilesMap = new Map<string, any>()
+    if (studentsList.length > 0) {
+      const ids = studentsList.map(s => s.user_id)
+      const { data: spData } = await supabase
+        .from('profiles')
+        .select('id, last_seen, photo_url')
+        .in('id', ids)
+      
+      if (spData) {
+        spData.forEach((p: any) => {
+          if (p && p.id) studentProfilesMap.set(String(p.id), p)
+        })
+      }
+    }
+
+    const studentItems = studentsList.map((s) => {
+        const p = studentProfilesMap.get(String(s.user_id))
+        return {
+            id: s.user_id,
+            displayName: s.name || s.email || 'Atleta',
+            photoURL: p?.photo_url || null,
+            lastSeen: p?.last_seen || null,
+        }
+    })
 
     items = studentItems
 

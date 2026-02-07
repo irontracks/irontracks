@@ -1,7 +1,10 @@
 import React from 'react';
-import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Play, X, Image as ImageIcon } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
+import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
+import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
+import { parseExerciseNotesToSetOverrides } from '@/utils/training/notesMethodParser';
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
@@ -15,17 +18,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
     const fileInputRef = React.useRef(null);
     const scannerFileInputRef = React.useRef(null);
 
-	React.useEffect(() => {
-		if (!Array.isArray(workout?.exercises)) return;
-		const validExercises = workout.exercises.filter(e => e && typeof e === 'object');
-		if (validExercises.length !== workout.exercises.length) {
-			onChange?.({ ...workout, exercises: validExercises });
-		}
-	}, [workout, onChange]);
-
-	if (!workout) return null;
-
-    const normalizeMethod = (method) => {
+    const normalizeMethod = React.useCallback((method) => {
         const raw = String(method || '').trim();
         const lower = raw.toLowerCase();
         if (!raw) return 'Normal';
@@ -36,7 +29,122 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         if (lower === 'cluster' || lower === 'cluster set' || lower === 'clusterset') return 'Cluster';
         if (lower === 'cardio') return 'Cardio';
         return raw;
-    };
+    }, []);
+
+    const buildDefaultSetDetail = React.useCallback((exercise, setNumber) => {
+        const reps = (exercise?.reps ?? '')
+        const rpeNum = Number(exercise?.rpe)
+        return {
+            set_number: setNumber,
+            reps: reps === '' ? null : String(reps),
+            rpe: Number.isFinite(rpeNum) ? rpeNum : null,
+            weight: null,
+            is_warmup: false,
+            advanced_config: null
+        };
+    }, []);
+
+    const ensureSetDetails = React.useCallback((exercise, desiredCount) => {
+        const existing = Array.isArray(exercise?.setDetails) ? exercise.setDetails : [];
+        const next = [];
+        for (let i = 0; i < desiredCount; i++) {
+            const setNumber = i + 1;
+            const current = existing[i];
+            next.push({
+                ...buildDefaultSetDetail(exercise, setNumber),
+                ...(current && typeof current === 'object' ? current : null),
+                set_number: (current?.set_number ?? setNumber)
+            });
+        }
+        return next;
+    }, [buildDefaultSetDetail]);
+
+	React.useEffect(() => {
+		if (!Array.isArray(workout?.exercises)) return;
+		const validExercises = workout.exercises.filter(e => e && typeof e === 'object');
+		if (validExercises.length !== workout.exercises.length) {
+			onChange?.({ ...workout, exercises: validExercises });
+		}
+    }, [workout, onChange]);
+    React.useEffect(() => {
+        if (!Array.isArray(workout?.exercises)) return;
+        let changed = false;
+        const nextExercises = workout.exercises.map((ex) => {
+            if (!ex || typeof ex !== 'object') return ex;
+
+            const existingDetailsRaw = Array.isArray(ex?.setDetails) ? ex.setDetails : [];
+            const setsFromField = Math.max(0, parseInt(ex?.sets) || 0);
+            const setsFromDetails = Array.isArray(existingDetailsRaw) ? existingDetailsRaw.length : 0;
+            const desiredCount = Math.max(setsFromField, setsFromDetails);
+            if (!desiredCount) return ex;
+
+            const nextDetails = ensureSetDetails(ex, desiredCount);
+            let next = ex;
+
+            if (setsFromField !== desiredCount || ex?.sets === '' || ex?.sets == null) {
+                next = { ...next, sets: desiredCount };
+                changed = true;
+            }
+
+            const detailsString = JSON.stringify(existingDetailsRaw || []);
+            const nextDetailsString = JSON.stringify(nextDetails || []);
+            if (detailsString !== nextDetailsString) {
+                next = { ...next, setDetails: nextDetails };
+                changed = true;
+            }
+
+            const method = normalizeMethod(next?.method);
+            if (method !== 'Rest-Pause') return next;
+
+            const findRpConfig = () => {
+                for (const s of nextDetails) {
+                    const cfg = s?.advanced_config ?? s?.advancedConfig ?? null;
+                    if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) continue;
+                    const hasAny =
+                        Object.prototype.hasOwnProperty.call(cfg, 'initial_reps') ||
+                        Object.prototype.hasOwnProperty.call(cfg, 'mini_sets') ||
+                        Object.prototype.hasOwnProperty.call(cfg, 'rest_time_sec');
+                    if (hasAny) return cfg;
+                }
+                return null;
+            };
+
+            const template = findRpConfig();
+            const repsNum = Number.parseInt(String(next?.reps ?? ''), 10);
+            const fallbackTemplate = {
+                initial_reps: Number.isFinite(repsNum) ? repsNum : null,
+                mini_sets: null,
+                rest_time_sec: REST_PAUSE_DEFAULT_PAUSE_SEC,
+            };
+
+            const rp = template || fallbackTemplate;
+
+            const propagated = nextDetails.map((s) => {
+                const cfg = s?.advanced_config ?? s?.advancedConfig ?? null;
+                const baseCfg = cfg && typeof cfg === 'object' && !Array.isArray(cfg) ? cfg : {};
+                const nextCfg = {
+                    ...baseCfg,
+                    initial_reps: baseCfg?.initial_reps ?? rp.initial_reps,
+                    mini_sets: baseCfg?.mini_sets ?? rp.mini_sets,
+                    rest_time_sec: baseCfg?.rest_time_sec ?? rp.rest_time_sec,
+                };
+                return { ...s, advanced_config: nextCfg };
+            });
+
+            const propagatedString = JSON.stringify(propagated || []);
+            if (propagatedString !== nextDetailsString) {
+                next = { ...next, setDetails: propagated };
+                changed = true;
+            }
+
+            return next;
+        });
+
+        if (!changed) return;
+        onChange?.({ ...workout, exercises: nextExercises });
+    }, [ensureSetDetails, normalizeMethod, workout, onChange]);
+	if (!workout) return null;
+
 
     const detectRestPauseConfig = (name, reps, notes) => {
         const text = `${String(name || '')} ${String(reps || '')} ${String(notes || '')}`.toLowerCase();
@@ -147,34 +255,6 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         return targets;
     };
 
-    const buildDefaultSetDetail = (exercise, setNumber) => {
-        const reps = (exercise?.reps ?? '')
-        const rpeNum = Number(exercise?.rpe)
-        return {
-            set_number: setNumber,
-            reps: reps === '' ? null : String(reps),
-            rpe: Number.isFinite(rpeNum) ? rpeNum : null,
-            weight: null,
-            is_warmup: false,
-            advanced_config: null
-        };
-    };
-
-    const ensureSetDetails = (exercise, desiredCount) => {
-        const existing = Array.isArray(exercise?.setDetails) ? exercise.setDetails : [];
-        const next = [];
-        for (let i = 0; i < desiredCount; i++) {
-            const setNumber = i + 1;
-            const current = existing[i];
-            next.push({
-                ...buildDefaultSetDetail(exercise, setNumber),
-                ...(current && typeof current === 'object' ? current : null),
-                set_number: (current?.set_number ?? setNumber)
-            });
-        }
-        return next;
-    };
-
     const updateSetDetail = (exerciseIndex, setIndex, patch) => {
         const newExercises = [...(workout.exercises || [])];
         const ex = newExercises[exerciseIndex] || {};
@@ -266,6 +346,50 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     return s;
                 });
                 newExercises[index] = { ...ex, [field]: value, setDetails: updatedDetails };
+            } else if (field === 'notes') {
+                const setsCount = Math.max(0, parseInt(ex?.sets) || 0);
+                const existingDetails = ensureSetDetails(ex, setsCount);
+                const parsed = parseExerciseNotesToSetOverrides({ notes: value, setsCount });
+                const overrides = Array.isArray(parsed?.overrides) ? parsed.overrides : [];
+                const hash = String(parsed?.hash || '').trim();
+
+                const updatedDetails = existingDetails.map((sd, setIdx) => {
+                    const current = sd && typeof sd === 'object' ? sd : buildDefaultSetDetail(ex, setIdx + 1);
+                    const auto = current?.it_auto && typeof current.it_auto === 'object' ? current.it_auto : null;
+                    const isAuto = String(auto?.source || '') === 'notes';
+                    const override = overrides?.[setIdx] && typeof overrides[setIdx] === 'object' ? overrides[setIdx] : null;
+
+                    if (!override) {
+                        if (!isAuto) return current;
+                        return { ...current, it_auto: null, advanced_config: null };
+                    }
+
+                    const canOverwrite = isAuto || current?.advanced_config == null;
+                    if (!canOverwrite) return current;
+
+                    const nextAuto = {
+                        source: 'notes',
+                        kind: String(override.kind || ''),
+                        label: String(override.label || ''),
+                        hash,
+                    };
+
+                    const next = {
+                        ...current,
+                        it_auto: nextAuto,
+                        advanced_config: override.advanced_config ?? null,
+                    };
+
+                    const plannedReps = String(override.plannedReps || '').trim();
+                    if (plannedReps) {
+                        const existingReps = current?.reps == null ? '' : String(current.reps).trim();
+                        if (!existingReps || isAuto) next.reps = plannedReps;
+                    }
+
+                    return next;
+                });
+
+                newExercises[index] = { ...ex, notes: value, setDetails: updatedDetails };
             } else {
                 newExercises[index] = { ...ex, [field]: value };
             }
@@ -369,6 +493,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             setScannerLoading(true);
 
             const allRawExercises = [];
+            let detectedTitle = '';
 
             for (let i = 0; i < selectedFiles.length; i += 1) {
                 const file = selectedFiles[i];
@@ -388,6 +513,8 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     return;
                 }
 
+                const titleCandidate = String(json?.workoutTitle ?? '').trim();
+                if (!detectedTitle && titleCandidate) detectedTitle = titleCandidate;
                 const list = Array.isArray(json.exercises) ? json.exercises : [];
                 if (list.length === 0) {
                     const msg = 'Não encontramos exercícios válidos em uma das imagens.';
@@ -408,7 +535,9 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
             const mappedExercises = allRawExercises
                 .map((item) => {
-                    const name = String(item?.name || '').trim();
+                    const rawName = String(item?.name || '').trim();
+                    const canonical = resolveCanonicalExerciseName(rawName);
+                    const name = String(canonical?.canonical || rawName).trim();
                     const setsRaw = item?.sets;
                     const setsNum = typeof setsRaw === 'number' ? setsRaw : parseInt(String(setsRaw || '0')) || 0;
                     const repsRaw = String(item?.reps ?? '').trim();
@@ -488,8 +617,26 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                 return;
             }
 
+            let titleToApply = '';
+            if (detectedTitle) {
+                try {
+                    const ok = await confirm(`Definir título como "${detectedTitle}"?`, 'Scanner');
+                    if (ok) titleToApply = detectedTitle;
+                } catch {}
+            }
+
+            try {
+                const preview = mappedExercises.slice(0, 10).map((x) => `• ${String(x?.name || '').trim()}`).join('\n');
+                const ok = await confirm(
+                    `Importar ${mappedExercises.length} exercício(s)?\n\n${preview}${mappedExercises.length > 10 ? '\n…' : ''}`,
+                    'Scanner'
+                );
+                if (!ok) return;
+            } catch {}
+
             const nextWorkout = {
                 ...(workout || {}),
+                ...(titleToApply ? { title: titleToApply } : {}),
                 exercises: mappedExercises
             };
 
@@ -521,7 +668,8 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                 sets: 1,
                 name: CARDIO_OPTIONS.includes(ex.name) ? ex.name : DEFAULT_CARDIO_OPTION,
                 reps: ex.reps || '20',
-                rpe: ex.rpe || 5
+                rpe: ex.rpe || 5,
+                setDetails: [] // Force reset details to clear old strength configs
             };
         } else {
             newExercises[index] = {
@@ -618,7 +766,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             const imported = { title, exercises: mapped };
             onChange?.(imported);
             if (await confirm('Importar e salvar este treino agora?', 'Salvar')) {
-                await onSave?.(imported);
+                const res = await onSave?.(imported);
+                if (res && typeof res === 'object' && res.ok === false) {
+                    await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
+                }
             }
         } catch (err) {
             const msg = (err && typeof err === 'object' && 'message' in err) ? err.message : String(err || '');
@@ -648,6 +799,15 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
 			if (onSave) {
 				 const res = await onSave({ ...workout, created_by: user.id, user_id: user.id });
+                 if (res && typeof res === 'object' && res.ok === false) {
+                    await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
+                    return;
+                 }
+                 if (res && typeof res === 'object' && res.deferred === true) {
+                    await alert('Exercício adicionado ao treino ativo.\nAo finalizar o treino, você poderá escolher se deseja salvar essa mudança no modelo.', 'Exercício adicionado');
+                    if (typeof onSaved === 'function') onSaved();
+                    return;
+                 }
 				 const sync = res?.sync || null;
 				 if (sync) {
 					const created = Number(sync?.created || 0);
@@ -697,7 +857,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     p_user_id: user.id,
                     p_created_by: user.id,
                     p_is_template: true,
-                    p_name: workout.title,
+                    p_name: normalizeWorkoutTitle(workout.title),
                     p_notes: workout.notes,
                     p_exercises: exercisesPayload
                  });
@@ -725,19 +885,41 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 	return (
 		<div className="h-full flex flex-col bg-neutral-900">
 			<div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between bg-neutral-950 sticky top-0 z-30 pt-safe">
-				<div className="w-full flex items-center justify-between gap-3 min-h-[48px]">
-					<h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap">
-						Editar Treino
-					</h2>
-					<div className="flex items-center gap-2">
+				<div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-[48px]">
+					<div className="flex items-center justify-between gap-3 min-w-0">
+						<h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap truncate min-w-0">
+							Editar Treino
+						</h2>
+						<div className="shrink-0 flex items-center gap-2">
+							<button
+								type="button"
+								onClick={handleSave}
+								disabled={saving}
+								className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
+							>
+								<Save size={18} />
+								<span className="hidden sm:inline">{saving ? 'SALVANDO...' : 'SALVAR'}</span>
+							</button>
+							<button
+								type="button"
+								onClick={() => onCancel?.()}
+								className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors"
+								title="Fechar"
+							>
+								<X size={16} />
+							</button>
+						</div>
+					</div>
+					<div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 						<button
 							onClick={handleScannerFileClick}
 							disabled={scannerLoading}
-							className="flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
+							className="shrink-0 flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
 							title="Importar treino via IA (foto/PDF)"
 						>
 							<ImageIcon size={18} />
-							<span className="text-sm font-bold">Importar Treino (Foto/PDF)</span>
+							<span className="text-sm font-bold hidden sm:inline">Importar Treino (Foto/PDF)</span>
+							<span className="text-sm font-bold sm:hidden">Importar</span>
 						</button>
 						<input
 							ref={scannerFileInputRef}
@@ -749,21 +931,14 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 						/>
 						<button
 							onClick={handleImportJsonClick}
-							className="flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
+							className="shrink-0 flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
 							title="Carregar JSON"
 						>
 							<Upload size={18} />
-							<span className="text-sm font-bold">Carregar JSON</span>
+							<span className="text-sm font-bold hidden sm:inline">Carregar JSON</span>
+							<span className="text-sm font-bold sm:hidden">JSON</span>
 						</button>
 						<input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportJson} />
-						<button
-							onClick={handleSave}
-							disabled={saving}
-							className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
-						>
-							<Save size={18} />
-							<span>{saving ? 'SALVANDO...' : 'SALVAR'}</span>
-						</button>
 					</div>
 				</div>
 			</div>
@@ -792,14 +967,6 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                             </button>
                             <label className="text-xs font-bold text-neutral-500 uppercase">Nome do Treino</label>
                         </div>
-                        <button
-                            onClick={handleImportJsonClick}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 text-blue-400 hover:text-white rounded-full hover:bg-blue-500/10 transition-colors text-xs"
-                            title="Importar JSON"
-                        >
-                            <Upload size={16} />
-                            <span>Importar JSON</span>
-                        </button>
                     </div>
                     <input
                         value={workout.title || ''}
@@ -825,7 +992,9 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                         const nextExercise = hasNext ? (workout.exercises || [])[index + 1] : null;
                         const nextType = nextExercise ? getExerciseType(nextExercise) : null;
                         const canShowLinkButton = hasNext && exerciseType !== 'cardio' && nextType !== 'cardio';
-                        const setsCount = Math.max(0, parseInt(exercise?.sets) || 0);
+                        const setsFromField = Math.max(0, parseInt(exercise?.sets) || 0);
+                        const setsFromDetails = Array.isArray(exercise?.setDetails) ? exercise.setDetails.length : 0;
+                        const setsCount = Math.max(setsFromField, setsFromDetails);
                         const setDetails = ensureSetDetails(exercise, setsCount);
 
                         return (
@@ -880,15 +1049,31 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                             </select>
                                         </div>
                                     ) : (
-                                        <input
-                                            value={exercise.name || ''}
-                                            onChange={e => updateExercise(index, 'name', e.target.value)}
-                                            className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
-                                            placeholder="Nome do exercício"
-                                        />
+                                        <div>
+                                            <input
+                                                value={exercise.name || ''}
+                                                onChange={e => updateExercise(index, 'name', e.target.value)}
+                                                className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
+                                                placeholder="Nome do exercício"
+                                            />
+                                            {(() => {
+                                                const info = resolveCanonicalExerciseName(exercise.name || '')
+                                                if (!info?.changed || !info?.canonical) return null
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updateExercise(index, 'name', info.canonical)}
+                                                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-bold text-xs hover:bg-yellow-500/15"
+                                                    >
+                                                        Padronizar: {info.canonical}
+                                                    </button>
+                                                )
+                                            })()}
+                                        </div>
                                     )}
 
 									{exerciseType === 'cardio' ? (
+                                        <>
 										<div className="grid grid-cols-2 gap-4">
 											<div>
 												<label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
@@ -917,6 +1102,171 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Cardio Advanced Config (HIT / Incline / Speed) */}
+                                        {(() => {
+                                            const cardioSet = setDetails[0];
+                                            const config = cardioSet?.advanced_config || {};
+                                            const isHIT = !!config?.isHIT;
+                                            
+                                            const updateCardioConfig = (field, val) => {
+                                                const newConfig = { ...config, [field]: val };
+                                                if (val === '' || val === null || val === undefined) delete newConfig[field];
+                                                
+                                                // If turning off HIT, clean up HIT fields
+                                                if (field === 'isHIT' && !val) {
+                                                    delete newConfig.workSec;
+                                                    delete newConfig.restSec;
+                                                    delete newConfig.rounds;
+                                                    delete newConfig.hitIntensity;
+                                                }
+
+                                                updateSetDetail(index, 0, { 
+                                                    advanced_config: Object.keys(newConfig).length > 0 ? newConfig : null 
+                                                });
+                                            };
+
+                                            const workSec = Number(config?.workSec) || 0;
+                                            const restSec = Number(config?.restSec) || 0;
+                                            const hitInvalid = isHIT && (workSec <= 0 || restSec >= workSec);
+
+                                            return (
+                                                <div className="mt-4 pt-4 border-t border-neutral-800">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <label className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</label>
+                                                        <div className="flex items-center gap-2">
+                                                            <label className="text-[10px] font-bold text-white uppercase cursor-pointer select-none flex items-center gap-2">
+                                                                Modo HIT
+                                                                <input 
+                                                                    type="checkbox"
+                                                                    checked={isHIT}
+                                                                    onChange={(e) => updateCardioConfig('isHIT', e.target.checked)}
+                                                                    className="accent-yellow-500 w-4 h-4"
+                                                                />
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    {isHIT && (
+                                                        <div className="bg-neutral-900/50 p-3 rounded-xl border border-neutral-800 mb-3 animate-in slide-in-from-top-2">
+                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                                <div>
+                                                                    <label className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={config.workSec ?? ''}
+                                                                        onChange={e => updateCardioConfig('workSec', Number(e.target.value))}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700"
+                                                                        placeholder="30"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={config.restSec ?? ''}
+                                                                        onChange={e => updateCardioConfig('restSec', Number(e.target.value))}
+                                                                        className={`w-full bg-neutral-900 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 ${hitInvalid ? 'border-red-500/50' : 'border-neutral-700'}`}
+                                                                        placeholder="10"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={config.rounds ?? ''}
+                                                                        onChange={e => updateCardioConfig('rounds', Number(e.target.value))}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                        placeholder="10"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</label>
+                                                                    <select
+                                                                        value={config.hitIntensity ?? 'high'}
+                                                                        onChange={e => updateCardioConfig('hitIntensity', e.target.value)}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 h-[38px]"
+                                                                    >
+                                                                        <option value="low">Baixa</option>
+                                                                        <option value="medium">Média</option>
+                                                                        <option value="high">Alta</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                            {hitInvalid && (
+                                                                <div className="mt-2 text-[10px] text-red-400 font-bold">
+                                                                    ⚠️ O tempo de descanso deve ser menor que o tempo de trabalho.
+                                                                </div>
+                                                            )}
+                                                            {!hitInvalid && workSec > 0 && (
+                                                                <div className="mt-2 text-[10px] text-neutral-500 font-mono text-center">
+                                                                    Resumo: {config.rounds || '?'} rounds de {workSec}s ativo / {restSec}s descanso
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <details className="group">
+                                                        <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
+                                                            <span>Parâmetros de Equipamento</span>
+                                                            <span className="group-open:rotate-180 transition-transform">▼</span>
+                                                        </summary>
+                                                        
+                                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
+                                                            {/* Inclinação */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={config.incline ?? ''}
+                                                                    onChange={e => updateCardioConfig('incline', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+
+                                                            {/* Velocidade */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</label>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.1"
+                                                                    value={config.speed ?? ''}
+                                                                    onChange={e => updateCardioConfig('speed', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                    placeholder="km/h"
+                                                                />
+                                                            </div>
+
+                                                            {/* Resistência / Carga */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={config.resistance ?? ''}
+                                                                    onChange={e => updateCardioConfig('resistance', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                    placeholder="Nível"
+                                                                />
+                                                            </div>
+
+                                                            {/* Frequência Cardíaca Alvo */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={config.heart_rate ?? ''}
+                                                                    onChange={e => updateCardioConfig('heart_rate', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-red-400 font-bold outline-none focus:border-red-500 placeholder-neutral-700"
+                                                                    placeholder="♥"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </details>
+                                                </div>
+                                            );
+                                        })()}
+                                        </>
                                     ) : (
                                         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                                             <div>
@@ -924,7 +1274,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 <div className="flex items-center gap-1">
                                                     <input
                                                         type="number"
-                                                        value={exercise.sets || ''}
+                                                        value={setsCount || ''}
                                                         onChange={e => updateExercise(index, 'sets', e.target.value)}
                                                         className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
                                                     />
@@ -993,7 +1343,28 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
                                     <div className="space-y-3 pt-2">
                                         <div>
-                                            <label className="text-[10px] text-blue-400 uppercase font-bold mb-1 block">Vídeo Demonstração (URL)</label>
+                                            <div className="flex items-center justify-between gap-3 mb-1">
+                                                <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
+                                                {String(exercise.videoUrl || '').trim() ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            try {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                            } catch {}
+                                                            try {
+                                                                window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
+                                                            } catch {}
+                                                        }}
+                                                        className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
+                                                        title="Ver vídeo"
+                                                    >
+                                                        <Play size={14} />
+                                                        Ver vídeo
+                                                    </button>
+                                                ) : null}
+                                            </div>
                                             <input
                                                 value={exercise.videoUrl || ''}
                                                 onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
@@ -1023,6 +1394,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 const isWarmup = !!(s?.is_warmup ?? s?.isWarmup)
                                                 const borderClass = isWarmup ? 'border-yellow-500/60' : 'border-neutral-700'
                                                 const config = s?.advanced_config ?? s?.advancedConfig ?? null
+                                                const isObj = config && typeof config === 'object' && !Array.isArray(config)
+                                                const isDropCfg = Array.isArray(config)
+                                                const isClusterCfg = isObj && (config?.cluster_size != null || config?.intra_rest_sec != null || config?.total_reps != null)
+                                                const isRestPauseCfg = isObj && (config?.mini_sets != null || config?.rest_time_sec != null || config?.initial_reps != null)
 
                                                 const updateConfig = (nextConfig) => {
                                                     updateSetDetail(index, setIdx, { advanced_config: nextConfig })
@@ -1045,9 +1420,30 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                                     {setIdx === 0 && 'Série de Aquecimento'}
                                                                 </label>
                                                             </div>
+                                                            <select
+                                                                value={isDropCfg ? 'Drop-set' : (config?.type === 'sst' ? 'SST' : (isRestPauseCfg ? 'Rest-Pause' : 'Normal'))}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value;
+                                                                    if (val === 'Normal') {
+                                                                        updateConfig(null);
+                                                                    } else if (val === 'Drop-set') {
+                                                                        updateConfig([{ weight: null, reps: '' }]);
+                                                                    } else if (val === 'SST') {
+                                                                        updateConfig({ type: 'sst', initial_reps: 10, mini_sets: 2, rest_time_sec: 10 });
+                                                                    } else if (val === 'Rest-Pause') {
+                                                                        updateConfig({ initial_reps: 10, mini_sets: 2, rest_time_sec: 20 });
+                                                                    }
+                                                                }}
+                                                                className="bg-neutral-800 text-[10px] font-bold text-neutral-300 border border-neutral-700 rounded-md px-2 py-1 outline-none focus:border-yellow-500"
+                                                            >
+                                                                <option value="Normal">Normal</option>
+                                                                <option value="Drop-set">Drop Set</option>
+                                                                <option value="SST">SST</option>
+                                                                <option value="Rest-Pause">Rest-Pause</option>
+                                                            </select>
                                                         </div>
 
-												{(safeMethod === 'Normal' || safeMethod === 'Bi-Set' || (safeMethod === 'Rest-Pause' && !config)) && (
+												{(!isDropCfg && !isClusterCfg && !isRestPauseCfg && (safeMethod === 'Normal' || safeMethod === 'Bi-Set' || safeMethod === 'Rest-Pause' || safeMethod === 'Drop-set' || safeMethod === 'Cluster')) && (
 													<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
 														<div>
 															<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</label>
@@ -1079,7 +1475,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-                                                        {safeMethod === 'Drop-set' && (
+                                                        {(isDropCfg || safeMethod === 'Drop-set') && (
                                                             <div className="mt-3 space-y-2">
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="text-[10px] text-neutral-500 uppercase font-bold">Drop Set</div>
@@ -1142,8 +1538,13 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-													{safeMethod === 'Rest-Pause' && config && typeof config === 'object' && (
+													{(isRestPauseCfg || safeMethod === 'Rest-Pause' || config?.type === 'sst') && !isDropCfg && config && typeof config === 'object' && (
 														<div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                            <div className="col-span-full mb-1">
+                                                                <span className="text-[10px] uppercase font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded">
+                                                                    Configuração {config?.type === 'sst' ? 'SST' : 'Rest-Pause'}
+                                                                </span>
+                                                            </div>
 															<div>
 																<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
 																<input
@@ -1183,7 +1584,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                             </div>
                                                         )}
 
-                                                        {safeMethod === 'Cluster' && (
+                                                        {(isClusterCfg || safeMethod === 'Cluster') && !isDropCfg && (
                                                             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                                                                 <div>
                                                                     <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>

@@ -3,11 +3,51 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
-const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS = {
   units: 'kg',
   dashboardDensity: 'comfortable',
+  uiMode: 'beginner',
+  moduleSocial: true,
+  moduleCommunity: true,
+  moduleMarketplace: true,
+  promptPreWorkoutCheckin: true,
+  promptPostWorkoutCheckin: true,
+  showStoriesBar: true,
+  showNewRecordsCard: true,
+  showIronRank: true,
+  showBadges: true,
+  whatsNewLastSeenId: '',
+  whatsNewLastSeenAt: 0,
+  whatsNewAutoOpen: true,
+  whatsNewRemind24h: true,
   enableSounds: true,
   allowTeamInvites: true,
+  allowSocialFollows: true,
+  allowDirectMessages: true,
+  notifyDirectMessages: true,
+  notifyAppointments: true,
+  notifySocialFollows: true,
+  notifyFriendOnline: true,
+  notifyFriendWorkoutEvents: true,
+  notifyFriendPRs: true,
+  notifyFriendStreaks: true,
+  notifyFriendGoals: true,
+  soundVolume: 100,
+  inAppToasts: true,
+  notificationPermissionPrompt: true,
+  restTimerNotify: true,
+  restTimerVibrate: true,
+  restTimerRepeatAlarm: true,
+  restTimerRepeatIntervalMs: 1500,
+  restTimerTickCountdown: true,
+  restTimerDefaultSeconds: 90,
+  autoRestTimerWhenMissing: false,
+  programTitleStartDay: 'monday',
+  featuresKillSwitch: false,
+  featureTeamworkV2: false,
+  featureStoriesV2: false,
+  featureWeeklyReportCTA: false,
+  featureOfflineSyncV2: false,
 }
 
 const STORAGE_KEY = 'irontracks.userSettings.v1'
@@ -22,7 +62,13 @@ const safeJsonParse = (raw) => {
 }
 
 export function useUserSettings(userId) {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => {
+    try {
+      return createClient()
+    } catch {
+      return null
+    }
+  }, [])
   const safeUserId = userId ? String(userId) : ''
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -32,6 +78,10 @@ export function useUserSettings(userId) {
 
   useEffect(() => {
     if (!safeUserId) return
+    if (!supabase) {
+      setLoaded(true)
+      return
+    }
     let cancelled = false
 
     try {
@@ -95,6 +145,7 @@ export function useUserSettings(userId) {
   const save = useCallback(async (overrideSettings) => {
     if (!safeUserId) return { ok: false, error: 'missing_user' }
     if (saving) return { ok: false, error: 'saving' }
+    if (!supabase) return { ok: false, error: 'missing_supabase' }
     setSaving(true)
     try {
       const nextSettings = overrideSettings && typeof overrideSettings === 'object' ? overrideSettings : settings
