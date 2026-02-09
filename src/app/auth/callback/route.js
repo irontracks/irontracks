@@ -9,10 +9,10 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? ''
+  const type = String(searchParams.get('type') || '').trim().toLowerCase()
   const errorParam = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
   const nextCookieName = 'it.auth.next'
-  const setCookieNames = []
 
   const originFromUrl = new URL(request.url).origin
   const url = new URL(request.url)
@@ -56,7 +56,7 @@ export async function GET(request) {
 
   let nextFromCookie = ''
   try {
-    nextFromCookie = String(request.cookies.get(nextCookieName)?.value || '')
+    nextFromCookie = String(request?.cookies?.get?.(nextCookieName)?.value || '')
   } catch {}
   const rawNext = String(next || '')
   const fallbackNext = nextFromCookie || '/dashboard'
@@ -72,17 +72,22 @@ export async function GET(request) {
     return NextResponse.redirect(new URL('/auth/error?error=missing_code', safeOrigin))
   }
 
+  if (type === 'recovery') {
+    const u = new URL('/auth/recovery', safeOrigin)
+    u.searchParams.set('code', code)
+    u.searchParams.set('next', safeNext)
+    u.searchParams.set('type', 'recovery')
+    return NextResponse.redirect(u)
+  }
+
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
-        return request.cookies.getAll()
+        return request?.cookies?.getAll?.() || []
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          try {
-            setCookieNames.push(String(name || ''))
-          } catch {}
           response.cookies.set(name, value, { ...(options || {}) })
         })
       },
@@ -92,21 +97,23 @@ export async function GET(request) {
   try {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
-      return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin))
+      const msg = String(error.message || '').toLowerCase()
+      if (msg.includes('code challenge') || msg.includes('code verifier')) {
+        const u = new URL('/auth/recovery', safeOrigin)
+        u.searchParams.set('code', code)
+        u.searchParams.set('next', safeNext)
+        return NextResponse.redirect(u)
+      }
+      return NextResponse.redirect(
+        new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin),
+      )
     }
     try {
       await supabase.auth.getUser()
     } catch {}
-  } catch (e) {
+  } catch {
     return NextResponse.redirect(new URL('/auth/error?error=exchange_failed', safeOrigin))
   }
-
-  try {
-    if (process.env.NODE_ENV === 'development') {
-      const uniq = Array.from(new Set(setCookieNames.filter(Boolean))).sort()
-      response.headers.set('x-it-set-cookie-names', uniq.join(',').slice(0, 900))
-    }
-  } catch {}
 
   return response
 }

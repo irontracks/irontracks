@@ -2,6 +2,9 @@
   "name": "iron-tracks",
   "version": "4.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20 <23"
+  },
   "scripts": {
     "predev": "node scripts/ensure-next-compiled-commander.mjs",
     "prebuild": "node scripts/ensure-next-compiled-commander.mjs",
