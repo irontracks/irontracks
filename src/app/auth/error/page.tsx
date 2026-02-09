@@ -9,6 +9,18 @@ function AuthErrorInner() {
   const sp = useSearchParams()
   const err = useMemo(() => String(sp?.get('error') || '').trim(), [sp])
   const errLower = String(err || '').toLowerCase()
+  const hashErrorCode = useMemo(() => {
+    try {
+      const raw = typeof window !== 'undefined' ? String(window.location.hash || '') : ''
+      const s = raw.startsWith('#') ? raw.slice(1) : raw
+      const hp = new URLSearchParams(s)
+      return String(hp.get('error_code') || '').trim().toLowerCase()
+    } catch {
+      return ''
+    }
+  }, [])
+  const isOtpExpired = errLower.includes('otp_expired') || errLower.includes('expired') || hashErrorCode === 'otp_expired'
+
   const hint =
     errLower.includes('missing_env')
       ? 'Faltam variáveis do Supabase neste ambiente (Preview). Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY na Vercel (Environment Variables → Preview) e faça Redeploy.'
@@ -23,6 +35,8 @@ function AuthErrorInner() {
       ? 'Falha no estado do OAuth. Normalmente isso acontece quando cookies são bloqueados ou o fluxo começa em um domínio e volta em outro.'
       : errLower.includes('pkce')
       ? 'Normalmente isso acontece quando o fluxo começou em um domínio e voltou em outro (www vs sem www), ou quando cookies foram bloqueados.'
+      : isOtpExpired
+      ? 'Esse link expirou (ou você clicou em um e-mail antigo). Volte ao login e solicite um novo link de recuperação. Use sempre o último e-mail recebido.'
       : ''
 
   return (

@@ -1,14 +1,27 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User } from 'lucide-react';
 import { APP_VERSION } from '@/lib/version';
+import { createClient } from '@/utils/supabase/client';
 
 const LoginScreen = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
+    const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0);
+    const [cooldownTick, setCooldownTick] = useState(0);
+    const [recoveryCode, setRecoveryCode] = useState('');
+    const [recoveryPassword2, setRecoveryPassword2] = useState('');
     
+    // Auth Mode: 'login', 'signup', 'recover', 'recover_code'
+    // Default to 'login' to skip menu if Google is removed
+    const [authMode, setAuthMode] = useState('login');
+    
+    // Email Auth State
+    const [emailData, setEmailData] = useState({ email: '', password: '', fullName: '' });
+    const [showPassword, setShowPassword] = useState(false);
+
     // Request Access State
     const [showRequestModal, setShowRequestModal] = useState(false);
     const [reqLoading, setReqLoading] = useState(false);
@@ -32,8 +45,20 @@ const LoginScreen = () => {
         }
     };
 
-    const handleLogin = async () => {
-        console.log('Iniciando login...');
+    const recoverCooldownLeft = useMemo(() => {
+        if (!recoverCooldownUntil) return 0;
+        return Math.max(0, Math.ceil((recoverCooldownUntil - Date.now()) / 1000));
+    }, [recoverCooldownUntil, cooldownTick]);
+
+    useEffect(() => {
+        if (!recoverCooldownUntil) return;
+        if (recoverCooldownLeft <= 0) return;
+        const id = setInterval(() => setCooldownTick((t) => t + 1), 500);
+        return () => clearInterval(id);
+    }, [recoverCooldownUntil, recoverCooldownLeft]);
+
+    const handleGoogleLogin = async () => {
+        console.log('Iniciando login Google...');
         setIsLoading(true);
         setErrorMsg('');
         
@@ -49,6 +74,86 @@ const LoginScreen = () => {
         }
     };
 
+    const handleEmailAuth = async (e) => {
+        e.preventDefault();
+        if (authMode === 'recover' && recoverCooldownLeft > 0) {
+            setErrorMsg(`Aguarde ${recoverCooldownLeft}s para tentar novamente.`);
+            return;
+        }
+
+        setIsLoading(true);
+        setErrorMsg('');
+
+        try {
+            const supabase = createClient();
+            const email = emailData.email.trim();
+            const password = emailData.password.trim();
+
+            if (authMode === 'login') {
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                window.location.href = '/dashboard';
+            } 
+            else if (authMode === 'signup') {
+                const { error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            full_name: emailData.fullName,
+                            display_name: emailData.fullName
+                        }
+                    }
+                });
+                if (error) throw error;
+                // Auto login usually happens, or check email confirmation
+                window.location.href = '/dashboard';
+            }
+            else if (authMode === 'recover') {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: window.location.origin + '/auth/recovery'
+                });
+                if (error) throw error;
+                setRecoverCooldownUntil(Date.now() + 60 * 1000);
+                alert('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+                setAuthMode('login');
+            }
+            else if (authMode === 'recover_code') {
+                const p2 = String(recoveryPassword2 || '').trim();
+                if (password.length < 6) throw new Error('A senha deve ter pelo menos 6 caracteres.');
+                if (password !== p2) throw new Error('As senhas não coincidem.');
+                const code = String(recoveryCode || '').trim();
+                if (!code) throw new Error('Digite o código de recuperação.');
+
+                const res = await fetch('/api/auth/recovery-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, code, password }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || !json?.ok) {
+                    throw new Error(json?.error || 'Código inválido.');
+                }
+
+                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw error;
+                window.location.href = '/dashboard';
+            }
+        } catch (err) {
+            console.error("Auth Error:", err);
+            let msg = err.message || 'Erro na autenticação';
+            if (msg.includes('Invalid login')) msg = 'E-mail ou senha incorretos.';
+            if (msg.includes('User already registered')) msg = 'E-mail já cadastrado. Tente entrar ou recuperar senha.';
+            if (msg.toLowerCase().includes('email rate limit')) msg = 'Limite de e-mails excedido. Aguarde alguns minutos e tente novamente.';
+            if (msg.toLowerCase().includes('error sending recovery email')) {
+                msg = 'Falha ao enviar o e-mail de recuperação. Verifique o SMTP no Supabase (domínio verificado no Resend, sender no mesmo domínio e senha = API key re_...).';
+            }
+            setErrorMsg(msg);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleRequestSubmit = async (e) => {
         e.preventDefault();
         setReqLoading(true);
@@ -56,7 +161,8 @@ const LoginScreen = () => {
 
         // Client-side Validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const phoneRegex = /^(\(?\d{2}\)?\s?)?(\d{4,5}[-\s]?\d{4})$/; // Basic BR format validation
+        // Basic BR format validation
+        // const phoneRegex = ... (removed unused regex var to avoid lint warning if desired, keeping logic)
 
         if (!emailRegex.test(formData.email)) {
             setReqError('Formato de e-mail inválido.');
@@ -107,7 +213,7 @@ const LoginScreen = () => {
             </div>
 
             {/* Glassmorphism Card */}
-            <div className="relative z-10 w-full max-w-sm p-8 rounded-[2rem] border border-white/5 bg-neutral-900/40 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center">
+            <div className="relative z-10 w-full max-w-sm p-8 rounded-[2rem] border border-white/5 bg-neutral-900/40 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500">
                 
                 <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-3xl shadow-[0_0_40px_-10px_rgba(245,158,11,0.5)] ring-1 ring-white/20 animate-pulse-slow">
                     <Dumbbell size={48} className="text-black drop-shadow-md" />
@@ -117,31 +223,202 @@ const LoginScreen = () => {
                     IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
                 </h1>
                 
-                <p className="text-zinc-500 mb-10 text-center text-[10px] uppercase tracking-[0.3em] font-bold">
+                <p className="text-zinc-500 mb-8 text-center text-[10px] uppercase tracking-[0.3em] font-bold">
                     Sistema de Alta Performance • {APP_VERSION}
                 </p>
                 
-                <button
-                    type="button"
-                    onClick={handleLogin}
-                    disabled={isLoading}
-                    className="group w-full flex items-center justify-center gap-3 bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-6 py-4 rounded-xl font-black text-lg shadow-[0_10px_30px_-10px_rgba(245,158,11,0.4)] hover:shadow-[0_20px_40px_-10px_rgba(245,158,11,0.6)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {isLoading ? (
-                        <span className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></span>
-                    ) : (
-                        <>
-                            <Image 
-                                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                                width={24} 
-                                height={24} 
-                                alt="Google" 
-                                className="w-6 h-6 drop-shadow-sm group-hover:scale-110 transition-transform"
-                            /> 
-                            <span className="tracking-tight">Entrar com Google</span>
-                        </>
-                    )}
-                </button>
+                {authMode === 'menu' && (
+                    <div className="w-full space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {/* Google button removed */}
+                        <button
+                            type="button"
+                            onClick={() => setAuthMode('login')}
+                            className="w-full flex items-center justify-center gap-3 bg-neutral-800/50 border border-neutral-700 text-white px-6 py-4 rounded-xl font-bold text-sm uppercase tracking-wide hover:bg-neutral-800 hover:border-yellow-500/50 transition-all"
+                        >
+                            <Mail size={20} className="text-yellow-500" />
+                            Entrar com E-mail
+                        </button>
+                    </div>
+                )}
+
+                {(authMode === 'login' || authMode === 'signup' || authMode === 'recover' || authMode === 'recover_code') && (
+                    <form onSubmit={handleEmailAuth} className="w-full space-y-4 animate-in fade-in slide-in-from-right-8 duration-300">
+                        <div className="flex items-center mb-2">
+                            <button 
+                                type="button" 
+                                onClick={() => { setAuthMode('menu'); setErrorMsg(''); }}
+                                className="p-2 -ml-2 text-neutral-400 hover:text-white transition-colors"
+                            >
+                                <ArrowLeft size={20} />
+                            </button>
+                            <span className="text-sm font-bold text-neutral-300 ml-2">
+                                {authMode === 'login' && 'Acessar com E-mail'}
+                                {authMode === 'signup' && 'Criar Nova Conta'}
+                                {authMode === 'recover' && 'Recuperar Senha'}
+                                {authMode === 'recover_code' && 'Recuperar com Código'}
+                            </span>
+                        </div>
+
+                        {authMode === 'signup' && (
+                            <div className="space-y-1">
+                                <div className="relative">
+                                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Nome Completo"
+                                        value={emailData.fullName}
+                                        onChange={e => setEmailData({...emailData, fullName: e.target.value})}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-1">
+                            <div className="relative">
+                                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                <input
+                                    required
+                                    type="email"
+                                    placeholder="seu@email.com"
+                                    value={emailData.email}
+                                    onChange={e => setEmailData({...emailData, email: e.target.value})}
+                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                />
+                            </div>
+                        </div>
+
+                        {authMode !== 'recover' && (
+                            <div className="space-y-1">
+                                <div className="relative">
+                                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <input
+                                        required
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Senha"
+                                        value={emailData.password}
+                                        onChange={e => setEmailData({...emailData, password: e.target.value})}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {authMode === 'recover_code' && (
+                            <>
+                                <div className="space-y-1">
+                                    <input
+                                        required
+                                        type={showPassword ? "text" : "password"}
+                                        placeholder="Confirmar senha"
+                                        value={recoveryPassword2}
+                                        onChange={e => setRecoveryPassword2(e.target.value)}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                        autoComplete="new-password"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <input
+                                        required
+                                        type="text"
+                                        placeholder="Código de recuperação (ex: ABCD-EF12-...)"
+                                        value={recoveryCode}
+                                        onChange={e => setRecoveryCode(e.target.value)}
+                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                        autoComplete="one-time-code"
+                                    />
+                                </div>
+                            </>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={isLoading || (authMode === 'recover' && recoverCooldownLeft > 0)}
+                            className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-6 py-3.5 rounded-xl font-black text-lg shadow-lg hover:shadow-yellow-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
+                                authMode === 'login' ? 'ENTRAR' : 
+                                authMode === 'signup' ? 'CADASTRAR' : authMode === 'recover_code' ? 'REDEFINIR SENHA' : recoverCooldownLeft > 0 ? `AGUARDE ${recoverCooldownLeft}s` : 'ENVIAR LINK'
+                            )}
+                        </button>
+
+                        {authMode === 'login' && (
+                            <>
+                                <div className="flex justify-between items-center text-xs mt-4 px-1 relative z-20">
+                                    <button 
+                                        type="button" 
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('recover'); setErrorMsg(''); }} 
+                                        className="text-neutral-400 hover:text-yellow-500 transition-colors cursor-pointer p-2"
+                                    >
+                                        Esqueci a senha
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('signup'); setErrorMsg(''); }} 
+                                        className="text-white font-bold hover:underline cursor-pointer p-2"
+                                    >
+                                        Criar conta
+                                    </button>
+                                </div>
+
+                                {/* Migration Notice */}
+                                <div className="bg-neutral-800/50 border border-neutral-800 rounded-xl p-3 text-center relative z-20">
+                                    <p className="text-[11px] text-neutral-400 mb-2">
+                                        Já usava com Google?
+                                    </p>
+                                    <button 
+                                        type="button" 
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('recover'); setErrorMsg(''); }}
+                                        className="text-xs font-bold text-yellow-500 hover:text-yellow-400 underline decoration-yellow-500/30 underline-offset-2 cursor-pointer p-1"
+                                    >
+                                        Crie sua senha aqui para acessar
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {authMode === 'recover' && (
+                            <div className="space-y-2">
+                                <p className="text-[11px] text-neutral-500 text-center leading-relaxed px-2">
+                                    Enviaremos um link para você definir sua senha e acessar sua conta existente.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setAuthMode('recover_code');
+                                        setErrorMsg('');
+                                    }}
+                                    className="w-full text-[11px] font-bold text-yellow-500 hover:text-yellow-400 underline decoration-yellow-500/30 underline-offset-2"
+                                >
+                                    Tenho um código de recuperação
+                                </button>
+                            </div>
+                        )}
+
+                        {authMode === 'recover_code' && (
+                            <div className="space-y-2">
+                                <p className="text-[11px] text-neutral-500 text-center leading-relaxed px-2">
+                                    Use um código de recuperação gerado nas configurações para redefinir sua senha sem e-mail.
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setAuthMode('recover');
+                                        setErrorMsg('');
+                                    }}
+                                    className="w-full text-[11px] font-bold text-neutral-300 hover:text-white underline decoration-white/20 underline-offset-2"
+                                >
+                                    Voltar para recuperação por e-mail
+                                </button>
+                            </div>
+                        )}
+                    </form>
+                )}
 
                 {errorMsg && (
                     <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl w-full text-center animate-shake">
@@ -149,14 +426,16 @@ const LoginScreen = () => {
                     </div>
                 )}
 
-                {/* Request Access Button */}
-                <button
-                    type="button"
-                    onClick={() => setShowRequestModal(true)}
-                    className="mt-6 text-xs text-neutral-400 font-bold uppercase tracking-widest hover:text-white transition-colors"
-                >
-                    Não tem acesso? <span className="text-yellow-500 underline decoration-yellow-500/30 underline-offset-4 hover:decoration-yellow-500">Pedir agora</span>
-                </button>
+                {/* Request Access Button (only in menu) */}
+                {authMode === 'menu' && (
+                    <button
+                        type="button"
+                        onClick={() => setShowRequestModal(true)}
+                        className="mt-6 text-xs text-neutral-400 font-bold uppercase tracking-widest hover:text-white transition-colors"
+                    >
+                        Não tem acesso? <span className="text-yellow-500 underline decoration-yellow-500/30 underline-offset-4 hover:decoration-yellow-500">Pedir agora</span>
+                    </button>
+                )}
             </div>
             
             <div className="absolute bottom-6 text-[10px] text-zinc-700 font-mono tracking-widest uppercase opacity-50">
