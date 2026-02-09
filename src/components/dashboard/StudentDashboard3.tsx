@@ -10,6 +10,7 @@ import RecentAchievements from './RecentAchievements'
 import WorkoutCalendarModal from './WorkoutCalendarModal'
 import StoriesBar from './StoriesBar'
 import MuscleMapCard from './MuscleMapCard'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 
 function SortableWorkoutItem({
   item,
@@ -97,6 +98,7 @@ type Props = {
   onDeleteWorkout: (id?: string, title?: string) => MaybePromise<void>
   onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
   currentUserId?: string
+  newRecordsReloadKey?: number
   exportingAll?: boolean
   onExportAll: () => MaybePromise<void>
   onOpenJsonImport: () => void
@@ -608,7 +610,7 @@ export default function StudentDashboard(props: Props) {
           )}
 
           {showNewRecordsCard ? (
-            <RecentAchievements userId={props.currentUserId} badges={props.streakStats?.badges ?? []} showBadges={showBadges} />
+            <RecentAchievements userId={props.currentUserId} badges={props.streakStats?.badges ?? []} showBadges={showBadges} reloadKey={props.newRecordsReloadKey} />
           ) : null}
 
           {(showIronRank || showBadges) && (
@@ -628,6 +630,7 @@ export default function StudentDashboard(props: Props) {
             onClick={() => {
               setCreatingWorkout(true)
               try {
+                try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch {}
                 props.onCreateWorkout()
               } catch {
                 setCreatingWorkout(false)
@@ -661,6 +664,7 @@ export default function StudentDashboard(props: Props) {
                 ) : null}
                 <button
                   onClick={() => {
+                    try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch {}
                     const items = visibleWorkouts
                       .map((w, idx) => {
                         const id = String(w?.id || '').trim()

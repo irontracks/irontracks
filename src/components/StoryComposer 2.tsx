@@ -931,10 +931,6 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         transparentBg: mediaKind === 'video' 
       })
     }
-    if (isExporting) {
-        draw()
-        return
-    }
     // Only animate if LIVE and dragging, otherwise draw once to save battery
     if (layout === 'live' && draggingKey) {
         raf = requestAnimationFrame(draw)
@@ -942,14 +938,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         draw()
     }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey])
 
   const renderVideo = async (): Promise<{ blob: Blob; filename: string; mime: string }> => {
     if (!videoRef.current) throw new Error('Vídeo não disponível')
     
     // Initialize compositor
     compositorRef.current = new VideoCompositor()
-    setIsExporting(true)
     
     try {
         const result = await compositorRef.current.render({
@@ -990,7 +985,6 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         throw e
     } finally {
         compositorRef.current = null
-        setIsExporting(false)
     }
   }
 

@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { Heart, MessageCircle, X, ChevronLeft, ChevronRight, Eye, Trash2, Loader2 } from 'lucide-react'
+import { Heart, MessageCircle, X, ChevronLeft, ChevronRight, Eye, Trash2, Loader2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useDialog } from '@/contexts/DialogContext'
 import { Story, StoryGroup } from '@/types/social'
@@ -24,6 +24,16 @@ const formatAgo = (iso: string) => {
   if (diffH < 24) return `${diffH}h`
   const diffD = Math.floor(diffH / 24)
   return `${diffD}d`
+}
+
+const isIOSUserAgent = (ua: string) => {
+  const s = String(ua || '')
+  if (/(iPad|iPhone|iPod)/i.test(s)) return true
+  try {
+    const nav: any = typeof navigator !== 'undefined' ? navigator : null
+    if (nav && nav.platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1) return true
+  } catch {}
+  return false
 }
 
 // --- Componente Principal ---
@@ -65,26 +75,39 @@ export default function StoryViewer({
   const [holding, setHolding] = useState(false)
   const [hidden, setHidden] = useState(false)
   const [durationMs, setDurationMs] = useState(5000)
+  const [muted, setMuted] = useState(true)
+  const [videoError, setVideoError] = useState('')
   
   const rafRef = useRef<number | null>(null)
   const lastTsRef = useRef<number>(0)
   const elapsedRef = useRef<number>(0)
+  const lastProgressUpdateRef = useRef<number>(0)
   const closeRequestedRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const preloadRef = useRef<{ aborts: AbortController[] }>({ aborts: [] })
 
   const name = String(group.displayName || '').trim() || (group.authorId === myId ? 'Você' : 'Amigo')
   const isMine = String(group.authorId || '').trim() === String(myId || '').trim()
-  const mediaKind = useMemo(() => mediaKindFromUrl(story?.mediaUrl || null), [story?.mediaUrl])
+  const mediaKind = useMemo(() => {
+    const k = (story as any)?.mediaKind
+    if (k === 'video' || k === 'image') return k
+    return mediaKindFromUrl(story?.mediaUrl || null)
+  }, [story?.mediaUrl, (story as any)?.mediaKind])
   const isVideo = mediaKind === 'video'
   
   const videoSrc = useMemo(() => {
     const sid = String(story?.id || '').trim()
-    if (!sid) return String(story?.mediaUrl || '')
-    // Usar rota de proxy para evitar CORS/Issues de vídeo se necessário, ou URL direta
-    // Como o projeto usa Supabase Storage público, URL direta costuma funcionar.
-    // Mas o código original usava /api/social/stories/media, vamos manter para compatibilidade.
+    const direct = String(story?.mediaUrl || '').trim()
+    if (direct) return direct
+    if (!sid) return ''
     return `/api/social/stories/media?storyId=${encodeURIComponent(sid)}`
   }, [story?.id, story?.mediaUrl])
+  const isIOS = useMemo(() => {
+    const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
+    return isIOSUserAgent(ua)
+  }, [])
+  const isWebm = useMemo(() => String(videoSrc || '').toLowerCase().includes('.webm'), [videoSrc])
+  const needsVideoFallback = isVideo && ((isIOS && isWebm) || !!videoError)
 
   // Marcar como visto
   useEffect(() => {
@@ -118,15 +141,50 @@ export default function StoryViewer({
     setProgress(0)
     setCommentsOpen(false)
     setViewersOpen(false)
+    setMuted(true)
+    setVideoError('')
     setViewersError('')
     setViewers([])
     viewersStoryIdRef.current = ''
   }, [story?.id])
 
+  const toggleMuted = useCallback(() => {
+    setMuted((prev) => {
+      const next = !prev
+      const el = videoRef.current
+      if (el) {
+        el.muted = next
+        if (!next) {
+          const p = el.play()
+          if (p && typeof (p as any).catch === 'function') (p as any).catch(() => {})
+        }
+      }
+      return next
+    })
+  }, [])
+
   useEffect(() => {
     closeRequestedRef.current = false
-    setDurationMs(isVideo ? 15000 : 5000)
-  }, [isVideo, story?.id])
+    setDurationMs(isVideo ? (needsVideoFallback ? 5000 : 60000) : 5000)
+  }, [isVideo, needsVideoFallback, story?.id])
+
+  useEffect(() => {
+    for (const a of preloadRef.current.aborts) {
+      try {
+        a.abort()
+      } catch {}
+    }
+    preloadRef.current.aborts = []
+
+    const candidates = [stories[idx - 1] || null, stories[idx + 1] || null].filter(Boolean) as any[]
+    for (const s of candidates) {
+      const url = String(s?.mediaUrl || '').trim()
+      if (!url) continue
+      const a = new AbortController()
+      preloadRef.current.aborts.push(a)
+      fetch(url, { headers: { Range: 'bytes=0-0' }, signal: a.signal }).catch(() => {})
+    }
+  }, [idx, stories])
 
   // Detectar tab oculta
   useEffect(() => {
@@ -138,20 +196,11 @@ export default function StoryViewer({
   // Loop de Animação
   useEffect(() => {
     if (!story?.id) return
+    if (isVideo && !needsVideoFallback) return
     const tick = (ts: number) => {
       rafRef.current = requestAnimationFrame(tick)
       const paused = holding || commentsOpen || viewersOpen || hidden || deleting
       
-      if (isVideo) {
-        const v = videoRef.current
-        const d = Number(v?.duration || 0)
-        if (!v || !Number.isFinite(d) || d <= 0) return
-        if (paused) return
-        const next = Math.max(0, Math.min(1, Number(v.currentTime || 0) / d))
-        setProgress((prev) => (Math.abs(prev - next) < 0.005 ? prev : next))
-        return
-      }
-
       if (!lastTsRef.current) { lastTsRef.current = ts; return }
       const delta = ts - lastTsRef.current
       lastTsRef.current = ts
@@ -159,16 +208,39 @@ export default function StoryViewer({
       
       elapsedRef.current += delta
       const next = Math.max(0, Math.min(1, elapsedRef.current / durationMs))
-      setProgress((prev) => (Math.abs(prev - next) < 0.005 ? prev : next))
       if (next >= 1) {
         elapsedRef.current = 0
+        lastProgressUpdateRef.current = ts
         setProgress(0)
         goNext()
+        return
       }
+      if (ts - lastProgressUpdateRef.current < 50) return
+      lastProgressUpdateRef.current = ts
+      setProgress((prev) => (Math.abs(prev - next) < 0.005 ? prev : next))
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, story?.id, viewersOpen])
+  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, story?.id, viewersOpen, needsVideoFallback])
+
+  useEffect(() => {
+    if (!story?.id || !isVideo) return
+    const v = videoRef.current
+    if (!v) return
+    const update = () => {
+      const d = Number(v.duration || 0)
+      if (!Number.isFinite(d) || d <= 0) return
+      const next = Math.max(0, Math.min(1, Number(v.currentTime || 0) / d))
+      setProgress((prev) => (Math.abs(prev - next) < 0.01 ? prev : next))
+    }
+    v.addEventListener('timeupdate', update)
+    v.addEventListener('durationchange', update)
+    update()
+    return () => {
+      v.removeEventListener('timeupdate', update)
+      v.removeEventListener('durationchange', update)
+    }
+  }, [isVideo, story?.id])
 
   // Controle de Video Play/Pause
   useEffect(() => {
@@ -311,6 +383,15 @@ export default function StoryViewer({
                 {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               </button>
             )}
+            {isVideo && (
+              <button
+                onClick={toggleMuted}
+                className="w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60"
+                aria-label={muted ? 'Ativar som' : 'Desativar som'}
+              >
+                {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+              </button>
+            )}
             <button onClick={onClose} className="w-10 h-10 rounded-xl bg-black/40 text-white flex items-center justify-center hover:bg-black/60">
               <X size={18} />
             </button>
@@ -321,19 +402,39 @@ export default function StoryViewer({
         <div className="absolute inset-0 flex items-center justify-center bg-black">
           {story.mediaUrl ? (
             isVideo ? (
-              <video
-                ref={videoRef}
-                src={videoSrc}
-                className="w-full h-full object-contain"
-                playsInline
-                muted
-                autoPlay
-                onLoadedMetadata={(e) => {
-                  const d = Number((e.currentTarget as any)?.duration || 0)
-                  if (d > 0) setDurationMs(Math.max(3000, Math.min(30000, d * 1000)))
-                }}
-                onEnded={() => { setProgress(0); goNext(); }}
-              />
+              <>
+                {!((isIOS && isWebm) || videoError) ? (
+                  <video
+                    ref={videoRef}
+                    src={videoSrc}
+                    className="w-full h-full object-contain"
+                    playsInline
+                    muted={muted}
+                    autoPlay
+                    onLoadedMetadata={(e) => {
+                      const d = Number((e.currentTarget as any)?.duration || 0)
+                      if (d > 0) setDurationMs(Math.max(3000, Math.min(60000, d * 1000)))
+                    }}
+                    onEnded={() => { setProgress(0); goNext(); }}
+                    onError={() => setVideoError('Não foi possível reproduzir este vídeo.')}
+                    onStalled={() => setVideoError('Este vídeo não carregou no seu dispositivo.')}
+                  />
+                ) : (
+                  <div className="px-6 text-center">
+                    <div className="text-white font-black text-lg">Story indisponível</div>
+                    <div className="mt-2 text-sm text-neutral-300 font-semibold">
+                      {videoError || (isIOS && isWebm ? 'Este story foi publicado em WEBM e pode não funcionar no iPhone.' : 'Não foi possível carregar o vídeo.')}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setProgress(0); goNext(); }}
+                      className="mt-4 min-h-[44px] px-5 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest"
+                    >
+                      Próximo
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <Image src={story.mediaUrl} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" priority />
             )

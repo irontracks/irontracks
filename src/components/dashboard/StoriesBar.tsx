@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Plus } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import StoryViewer from '@/components/stories/StoryViewer'
+import StoryCreatorModal from '@/components/stories/StoryCreatorModal'
 import { Story, StoryGroup } from '@/types/social'
 import { parseExt, guessMediaKind, extFromMime } from '@/utils/mediaUtils'
 
@@ -22,7 +23,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
   const [openAuthorId, setOpenAuthorId] = useState<string>('')
-  const uploadRef = useRef<HTMLInputElement | null>(null)
+  const [isCreatorOpen, setIsCreatorOpen] = useState(false)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -41,7 +42,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     }
   }, [])
 
-  const uploadStory = async (file: File) => {
+  const uploadStory = async (file: File, metadata: any = {}) => {
     setUploading(true)
     setError('')
     try {
@@ -49,6 +50,11 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       const { data: authData } = await supabase.auth.getUser()
       const uid = String(authData?.user?.id || '').trim()
       if (!uid) throw new Error('unauthorized')
+
+      const MAX_BYTES = 200 * 1024 * 1024
+      if (file?.size && file.size > MAX_BYTES) {
+        throw new Error(`Vídeo muito grande (máx 200MB). Atual: ${(file.size / (1024 * 1024)).toFixed(1)}MB`)
+      }
 
       const rawName = String(file?.name || '').trim().toLowerCase()
       const ext0 = parseExt(rawName) || extFromMime(file.type)
@@ -68,6 +74,12 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       const signJson = await signResp.json().catch(() => null)
       if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
 
+      if (typeof signJson?.bucketLimitBytes === 'number' && Number.isFinite(signJson.bucketLimitBytes) && file.size > signJson.bucketLimitBytes) {
+        throw new Error(
+          `Arquivo maior que o limite do bucket (${(signJson.bucketLimitBytes / (1024 * 1024)).toFixed(0)}MB). Atual: ${(file.size / (1024 * 1024)).toFixed(1)}MB`
+        )
+      }
+
       const { error: upErr } = await supabase.storage
         .from('social-stories')
         .uploadToSignedUrl(path, String(signJson.token), file, { contentType: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg') })
@@ -76,7 +88,14 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       const createResp = await fetch('/api/social/stories/create', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ mediaPath: path, caption: null, meta: { source: 'upload' } }),
+        body: JSON.stringify({ 
+          mediaPath: path, 
+          caption: null, 
+          meta: { 
+            source: 'upload',
+            ...metadata // Pass filters/trim info to DB
+          } 
+        }),
       })
       const createJson = await createResp.json().catch(() => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
@@ -84,12 +103,15 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       await reload()
     } catch (e: any) {
       const msg = String(e?.message || e)
-      setError(msg === 'unauthorized' ? 'Faça login novamente para publicar.' : 'Não foi possível publicar seu story.')
+      console.error('Story upload error:', e)
+      const low = msg.toLowerCase()
+      if (low.includes('exceeded') && low.includes('maximum') && low.includes('size')) {
+        setError('Arquivo excede o limite de upload do Storage. Se o vídeo estiver <= 200MB, ajuste o “Global upload limit” no Supabase Storage.')
+        return
+      }
+      setError(msg === 'unauthorized' ? 'Faça login novamente para publicar.' : `Erro: ${msg}`)
     } finally {
       setUploading(false)
-      try {
-        if (uploadRef.current) uploadRef.current.value = ''
-      } catch {}
     }
   }
 
@@ -149,38 +171,10 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
 
   return (
     <div className="mb-4">
-      <input
-        ref={uploadRef}
-        type="file"
-        accept="image/*,video/*"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files && e.target.files[0] ? e.target.files[0] : null
-          if (!f) return
-          const ext0 = parseExt(String(f.name || '')) || extFromMime(f.type)
-          const kind = guessMediaKind(f.type, ext0)
-          if (kind !== 'image' && kind !== 'video') {
-            setError('Selecione uma imagem ou um vídeo.')
-            return
-          }
-          if (kind === 'video' && (ext0 === '.webm' || String(f?.type || '').toLowerCase() === 'video/webm')) {
-            setError('Formato WEBM pode não rodar no Safari. Prefira MP4/MOV.')
-            return
-          }
-          if (kind === 'video' && !ext0) {
-            setError('Formato de vídeo não suportado. Use MP4.')
-            return
-          }
-          if (kind === 'image' && f.size > 12 * 1024 * 1024) {
-            setError('Imagem muito grande (máx 12MB).')
-            return
-          }
-          if (kind === 'video' && f.size > 50 * 1024 * 1024) {
-            setError('Vídeo muito grande (máx 50MB).')
-            return
-          }
-          uploadStory(f)
-        }}
+      <StoryCreatorModal
+        isOpen={isCreatorOpen}
+        onClose={() => setIsCreatorOpen(false)}
+        onPost={uploadStory}
       />
       <div className="flex items-center justify-between px-1">
         <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Stories</div>
@@ -257,7 +251,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
                   type="button"
                   onClick={() => {
                     if (uploading) return
-                    if (uploadRef.current) uploadRef.current.click()
+                    setIsCreatorOpen(true)
                   }}
                   className="absolute left-[calc(50%+18px)] top-[44px] w-6 h-6 rounded-full bg-yellow-500 border-2 border-black flex items-center justify-center"
                   aria-label="Adicionar story (foto ou vídeo)"

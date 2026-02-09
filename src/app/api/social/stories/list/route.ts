@@ -13,6 +13,12 @@ type StoryRow = {
   caption: string | null
 }
 
+const mediaKindFromPath = (path: string): 'image' | 'video' => {
+  const p = String(path || '').toLowerCase()
+  if (p.endsWith('.mp4') || p.endsWith('.mov') || p.endsWith('.webm')) return 'video'
+  return 'image'
+}
+
 export async function GET(req: Request) {
   try {
     const auth = await requireUser()
@@ -98,19 +104,6 @@ export async function GET(req: Request) {
       profileById.set(id, p)
     }
 
-    const bucket = 'social-stories'
-    const signedUrlByPath = new Map<string, string>()
-    const sign = async (path: string) => {
-      const p = String(path || '').trim()
-      if (!p) return null
-      const cached = signedUrlByPath.get(p)
-      if (cached) return cached
-      const { data, error } = await admin.storage.from(bucket).createSignedUrl(p, signedSeconds)
-      if (error || !data?.signedUrl) return null
-      signedUrlByPath.set(p, data.signedUrl)
-      return data.signedUrl
-    }
-
     const byAuthor = new Map<string, any>()
     for (const authorId of authorIds) {
       const p = profileById.get(authorId) || null
@@ -126,13 +119,13 @@ export async function GET(req: Request) {
     for (const s of stories) {
       const authorId = String(s.author_id || '').trim()
       if (!authorId || !byAuthor.has(authorId)) continue
-      const urlSigned = await sign(s.media_path)
       byAuthor.get(authorId).stories.push({
         id: s.id,
         createdAt: s.created_at,
         expiresAt: s.expires_at,
         caption: s.caption ?? null,
-        mediaUrl: urlSigned,
+        mediaUrl: `/api/social/stories/media?storyId=${encodeURIComponent(String(s.id))}&signedSeconds=${encodeURIComponent(String(signedSeconds))}`,
+        mediaKind: mediaKindFromPath(s.media_path),
         viewed: viewedSet.has(s.id),
         likeCount: likeCountByStory.get(s.id) || 0,
         hasLiked: likedSet.has(s.id),

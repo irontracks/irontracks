@@ -57,42 +57,11 @@ export async function GET(req: Request) {
     const { data: signed, error: sErr } = await admin.storage.from(bucket).createSignedUrl(String(story.media_path), signedSeconds)
     if (sErr || !signed?.signedUrl) return new Response(sErr?.message || 'failed_to_sign', { status: 400 })
 
-    const range = req.headers.get('range') || req.headers.get('Range')
-    const upstream = await fetch(String(signed.signedUrl), {
-      headers: range ? { Range: range } : undefined,
-      redirect: 'follow',
-    })
-
-    if (!upstream.ok && upstream.status !== 206) {
-      const txt = await upstream.text().catch(() => '')
-      return new Response(txt || 'upstream_failed', { status: upstream.status || 502 })
-    }
-
     const headers = new Headers()
-
-    const contentType =
-      upstream.headers.get('content-type') ||
-      guessContentTypeFromPath(String(story.media_path)) ||
-      'application/octet-stream'
-    headers.set('Content-Type', contentType)
-
-    for (const h of ['content-length', 'content-range', 'accept-ranges', 'etag', 'last-modified'] as const) {
-      const v = upstream.headers.get(h)
-      if (v) headers.set(h, v)
-    }
-
-    if (!headers.get('accept-ranges')) headers.set('Accept-Ranges', 'bytes')
-
-    headers.set('Content-Disposition', 'inline')
-
-    headers.set('Cache-Control', 'private, max-age=60')
-
-    headers.set('Vary', 'Range')
-
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers,
-    })
+    headers.set('Location', String(signed.signedUrl))
+    headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
+    headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
+    return new Response(null, { status: 307, headers })
   } catch (e: any) {
     return new Response(e?.message ?? 'internal_error', { status: 500 })
   }

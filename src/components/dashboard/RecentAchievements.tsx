@@ -22,9 +22,10 @@ type RecentAchievementsProps = {
   userId?: string
   badges?: Badge[]
   showBadges?: boolean
+  reloadKey?: number
 }
 
-export default function RecentAchievements({ userId, badges, showBadges = false }: RecentAchievementsProps) {
+export default function RecentAchievements({ userId, badges, showBadges = false, reloadKey }: RecentAchievementsProps) {
   const [prs, setPrs] = useState<PrData[]>([])
   const [workoutTitle, setWorkoutTitle] = useState<string>('')
   const [workoutDateIso, setWorkoutDateIso] = useState<string>('')
@@ -33,14 +34,17 @@ export default function RecentAchievements({ userId, badges, showBadges = false 
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     if (!userId) {
       setLoading(false)
       return
     }
+    setLoading(true)
 
     const load = async () => {
       try {
         const res = await getLatestWorkoutPrs()
+        if (cancelled) return
         const dateIso = res?.workout?.date
         const title = res?.workout?.title
         if (dateIso) setWorkoutDateIso(String(dateIso))
@@ -55,12 +59,15 @@ export default function RecentAchievements({ userId, badges, showBadges = false 
       } catch (e) {
         console.error(e)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     load()
-  }, [userId])
+    return () => {
+      cancelled = true
+    }
+  }, [userId, reloadKey])
 
   if (loading) return null
 

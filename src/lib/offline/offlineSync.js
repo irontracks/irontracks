@@ -1,269 +1,180 @@
-'use client'
+import { kvGet, kvSet, queuePut, queueGetAll, queueDelete } from './idb';
 
-import { queueDelete, queueGetAll, queuePut, kvGet, kvSet } from './idb'
-
-const nowIso = () => new Date().toISOString()
-const nowMs = () => Date.now()
-
-const DAY_MS = 24 * 60 * 60 * 1000
-const JOB_TTL_MS = 14 * DAY_MS
-const FAILED_TTL_MS = 7 * DAY_MS
-const MAX_ATTEMPTS = 7
-const BACKOFF_BASE_MS = 5000
-const BACKOFF_MAX_MS = 5 * 60 * 1000
-
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n))
-
-const computeNextAttemptAt = (attempts) => {
-  const a = clamp(Number(attempts) || 0, 0, 30)
-  const exp = Math.pow(2, Math.max(0, a))
-  const base = clamp(BACKOFF_BASE_MS * exp, BACKOFF_BASE_MS, BACKOFF_MAX_MS)
-  const jitter = base * (0.15 * (Math.random() * 2 - 1))
-  return nowMs() + Math.max(1000, Math.round(base + jitter))
-}
-
-const uuid = () => {
-  try {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-  } catch {}
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}-${Math.random().toString(16).slice(2)}`
-}
-
-const dispatchChanged = () => {
-  try {
-    window.dispatchEvent(new Event('irontracks.offlineQueueChanged'))
-  } catch {}
-}
+const CACHE_KEY_WORKOUTS = 'offline_workouts_cache';
 
 export const isOnline = () => {
+  return typeof navigator !== 'undefined' && navigator.onLine;
+};
+
+export const cacheSetWorkouts = async (workouts) => {
   try {
-    return typeof navigator !== 'undefined' ? navigator.onLine !== false : true
-  } catch {
-    return true
+    await kvSet(CACHE_KEY_WORKOUTS, workouts);
+  } catch (e) {
+    console.error('Cache set failed', e);
   }
-}
+};
 
-export const enqueueWorkoutFinishJob = async ({ userId, session, idempotencyKey }) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return { ok: false, error: 'missing_user' }
-  const key = String(idempotencyKey || '').trim() || uuid()
-  const ts = nowIso()
-  const ms = nowMs()
-  const job = {
-    id: uuid(),
-    type: 'workout_finish',
-    userId: uid,
-    idempotencyKey: key,
-    session: session && typeof session === 'object' ? session : {},
-    status: 'pending',
-    createdAt: ts,
-    updatedAt: ts,
-    attempts: 0,
-    lastError: '',
-    lastAttemptAt: null,
-    nextAttemptAt: ms,
-    maxAttempts: MAX_ATTEMPTS,
+export const cacheGetWorkouts = async () => {
+  try {
+    return await kvGet(CACHE_KEY_WORKOUTS);
+  } catch (e) {
+    return null;
   }
-  await queuePut(job)
-  dispatchChanged()
-  return { ok: true, job }
-}
+};
 
-export const getPendingCount = async (userId) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return 0
-  const list = await queueGetAll()
-  return list.filter((j) => String(j?.userId || '') === uid && String(j?.status || 'pending') !== 'failed').length
-}
-
-export const listOfflineJobs = async ({ userId, includeFailed = true } = {}) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return []
-  const list = await queueGetAll()
-  const now = nowMs()
-  return list
-    .filter((j) => j && typeof j === 'object' && String(j.userId || '') === uid)
-    .filter((j) => (includeFailed ? true : String(j?.status || 'pending') !== 'failed'))
-    .filter((j) => {
-      const createdAt = String(j?.createdAt || '')
-      const createdMs = createdAt ? Date.parse(createdAt) : NaN
-      if (!Number.isFinite(createdMs)) return true
-      return now - createdMs <= JOB_TTL_MS + FAILED_TTL_MS
-    })
-    .sort((a, b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')))
-}
-
-export const clearOfflineJobs = async ({ userId, status } = {}) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return { ok: false, error: 'missing_user' }
-  const list = await queueGetAll()
-  const targets = list.filter((j) => String(j?.userId || '') === uid)
-    .filter((j) => (status ? String(j?.status || 'pending') === String(status) : true))
-  for (const j of targets) {
-    try { await queueDelete(j.id) } catch {}
+export const getPendingCount = async () => {
+  try {
+    const all = await queueGetAll();
+    return Array.isArray(all) ? all.length : 0;
+  } catch (e) {
+    return 0;
   }
-  dispatchChanged()
-  return { ok: true, removed: targets.length }
-}
-
-export const bumpOfflineJob = async ({ id } = {}) => {
-  const key = String(id || '').trim()
-  if (!key) return { ok: false, error: 'missing_id' }
-  const list = await queueGetAll()
-  const job = list.find((j) => String(j?.id || '') === key)
-  if (!job) return { ok: false, error: 'not_found' }
-  const ts = nowIso()
-  const next = { ...job, status: String(job?.status || 'pending') === 'failed' ? 'pending' : String(job?.status || 'pending'), updatedAt: ts, nextAttemptAt: nowMs() }
-  await queuePut(next)
-  dispatchChanged()
-  return { ok: true }
-}
+};
 
 export const getOfflineQueueSummary = async ({ userId } = {}) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return { ok: false, error: 'missing_user', online: isOnline(), pending: 0, failed: 0, due: 0, nextDueAt: null, jobs: [] }
-  const now = nowMs()
-  const jobs = await listOfflineJobs({ userId: uid, includeFailed: true })
-  const pendingJobs = jobs.filter((j) => String(j?.status || 'pending') !== 'failed')
-  const failedJobs = jobs.filter((j) => String(j?.status || '') === 'failed')
-  const dueJobs = pendingJobs.filter((j) => {
-    const nextAt = Number(j?.nextAttemptAt)
-    if (!Number.isFinite(nextAt) || nextAt <= 0) return true
-    return nextAt <= now
-  })
-  const nextDueAt = pendingJobs
-    .map((j) => Number(j?.nextAttemptAt))
-    .filter((n) => Number.isFinite(n) && n > 0)
-    .sort((a, b) => a - b)[0] ?? null
-  return {
-    ok: true,
-    online: isOnline(),
-    pending: pendingJobs.length,
-    failed: failedJobs.length,
-    due: dueJobs.length,
-    nextDueAt: nextDueAt && Number.isFinite(nextDueAt) ? nextDueAt : null,
-    jobs: jobs.slice(0, 25),
-  }
-}
+  try {
+    const all = await queueGetAll();
+    const jobs = Array.isArray(all) ? all : [];
+    
+    // Calculate stats
+    const now = Date.now();
+    const pending = jobs.filter(j => (j.status || 'pending') === 'pending').length;
+    const failed = jobs.filter(j => j.status === 'failed').length;
+    const due = jobs.filter(j => !j.nextAttemptAt || j.nextAttemptAt <= now).length;
+    
+    // Find next due
+    const future = jobs.filter(j => j.nextAttemptAt && j.nextAttemptAt > now).sort((a, b) => a.nextAttemptAt - b.nextAttemptAt);
+    const nextDueAt = future.length > 0 ? future[0].nextAttemptAt : null;
 
-const cleanupQueue = async () => {
-  const list = await queueGetAll()
-  const now = nowMs()
-  for (const j of list) {
+    return {
+      ok: true,
+      online: isOnline(),
+      pending,
+      failed,
+      due,
+      nextDueAt,
+      jobs
+    };
+  } catch (e) {
+    return { ok: false, online: isOnline(), jobs: [] };
+  }
+};
+
+export const clearOfflineJobs = async ({ userId } = {}) => {
     try {
-      const id = String(j?.id || '').trim()
-      const createdAt = String(j?.createdAt || '')
-      const createdMs = createdAt ? Date.parse(createdAt) : NaN
-      if (!id) continue
-      if (Number.isFinite(createdMs)) {
-        const age = now - createdMs
-        const status = String(j?.status || 'pending')
-        const ttl = status === 'failed' ? (JOB_TTL_MS + FAILED_TTL_MS) : JOB_TTL_MS
-        if (age > ttl) {
-          await queueDelete(id)
-          continue
+        const all = await queueGetAll();
+        if (Array.isArray(all)) {
+            for (const job of all) {
+                await queueDelete(job.id);
+            }
         }
-      }
-      const type = String(j?.type || '')
-      if (!type) {
-        await queueDelete(id)
-        continue
-      }
-    } catch {}
-  }
-}
-
-export const flushOfflineQueue = async ({ max = 6, force = false } = {}) => {
-  if (!isOnline()) return { ok: false, offline: true, flushed: 0 }
-  await cleanupQueue()
-  const list = await queueGetAll()
-  const now = nowMs()
-  const jobs = list
-    .filter((j) => j && typeof j === 'object' && String(j.type || '') === 'workout_finish')
-    .filter((j) => String(j?.status || 'pending') !== 'failed')
-    .filter((j) => {
-      if (force) return true
-      const nextAt = Number(j?.nextAttemptAt)
-      if (!Number.isFinite(nextAt) || nextAt <= 0) return true
-      return nextAt <= now
-    })
-    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
-    .slice(0, Math.max(1, Math.min(30, Number(max) || 6)))
-
-  let flushed = 0
-  let failed = 0
-  for (const job of jobs) {
-    try {
-      const resp = await fetch('/api/workouts/finish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session: job.session,
-          idempotencyKey: String(job.idempotencyKey || '').trim(),
-        }),
-      })
-      const json = await resp.json().catch(() => null)
-      if (!resp.ok || !json?.ok) throw new Error(String(json?.error || `http_${resp.status}`))
-      await queueDelete(job.id)
-      flushed += 1
-      dispatchChanged()
+        return { ok: true };
     } catch (e) {
-      const msg = e?.message ? String(e.message) : String(e)
-      const attemptsNext = Number(job.attempts || 0) + 1
-      const ts = nowIso()
-      const maxAttempts = Number(job?.maxAttempts) || MAX_ATTEMPTS
-      const isFailed = attemptsNext >= maxAttempts
-      const next = {
-        ...job,
-        status: isFailed ? 'failed' : 'pending',
-        updatedAt: ts,
-        attempts: attemptsNext,
-        lastAttemptAt: ts,
-        lastError: msg.slice(0, 400),
-        nextAttemptAt: isFailed ? null : computeNextAttemptAt(attemptsNext),
-        maxAttempts,
+        return { ok: false, error: e };
+    }
+};
+
+export const bumpOfflineJob = async ({ id }) => {
+    try {
+        const all = await queueGetAll();
+        const job = all.find(j => j.id === id);
+        if (job) {
+            job.nextAttemptAt = 0;
+            job.attempts = 0;
+            job.status = 'pending';
+            await queuePut(job);
+        }
+    } catch (e) {
+        console.error('Bump failed', e);
+    }
+};
+
+export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
+  if (!isOnline() && !force) return { processed: 0, errors: 0 };
+
+  let all = [];
+  try {
+    all = await queueGetAll();
+  } catch (e) {
+    return { processed: 0, errors: 0 };
+  }
+
+  if (!Array.isArray(all) || all.length === 0) return { processed: 0, errors: 0 };
+
+  let processed = 0;
+  let errors = 0;
+  const now = Date.now();
+
+  for (const job of all) {
+    // Check eligibility
+    if (!force) {
+        if (job.nextAttemptAt && job.nextAttemptAt > now) continue;
+        if (job.status === 'failed' && !force) continue; 
+    }
+
+    try {
+      if (job.type === 'finish_workout') {
+        await processFinishWorkout(job);
       }
-      await queuePut(next)
-      dispatchChanged()
-      failed += 1
-      if (!isOnline()) break
+      // Success
+      await queueDelete(job.id);
+      processed++;
+    } catch (err) {
+      console.error('Failed to process offline job:', job, err);
+      errors++;
+      
+      // Update job with failure info
+      job.attempts = (job.attempts || 0) + 1;
+      job.lastError = String(err?.message || err);
+      job.nextAttemptAt = now + (1000 * 60 * Math.pow(2, job.attempts)); // Exponential backoff
+      
+      if (job.attempts >= (job.maxAttempts || 7)) {
+          job.status = 'failed';
+      } else {
+          job.status = 'pending'; 
+      }
+      await queuePut(job);
     }
   }
-  return { ok: true, flushed, failed }
-}
 
-export const cacheSetWorkouts = async ({ userId, workouts }) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return false
-  const payload = { ts: Date.now(), workouts: Array.isArray(workouts) ? workouts : [] }
-  await kvSet(`workoutsCache.v1.${uid}`, payload)
-  return true
-}
+  return { processed, errors };
+};
 
-export const cacheGetWorkouts = async ({ userId }) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return null
-  const data = await kvGet(`workoutsCache.v1.${uid}`)
-  if (!data || typeof data !== 'object') return null
-  const list = Array.isArray(data.workouts) ? data.workouts : null
-  if (!list) return null
-  return { workouts: list, ts: Number(data.ts || 0) }
-}
+export const queueFinishWorkout = async (payload) => {
+  const id = `finish_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const job = {
+    id,
+    type: 'finish_workout',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: payload.workoutTitle || 'Treino Finalizado',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 10,
+    nextAttemptAt: 0 
+  };
+  await queuePut(job);
+  return id;
+};
 
-export const cacheSetTemplates = async ({ userId, templates }) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return false
-  const payload = { ts: Date.now(), templates: Array.isArray(templates) ? templates : [] }
-  await kvSet(`templatesCache.v1.${uid}`, payload)
-  return true
-}
+async function processFinishWorkout(job) {
+  const { payload } = job;
+  
+  const response = await fetch('/api/workouts/finish', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
 
-export const cacheGetTemplates = async ({ userId }) => {
-  const uid = String(userId || '').trim()
-  if (!uid) return null
-  const data = await kvGet(`templatesCache.v1.${uid}`)
-  if (!data || typeof data !== 'object') return null
-  const list = Array.isArray(data.templates) ? data.templates : null
-  if (!list) return null
-  return { templates: list, ts: Number(data.ts || 0) }
+  if (!response.ok) {
+    const status = response.status;
+    if (status >= 400 && status < 500) {
+        const text = await response.text();
+        throw new Error(`Validation error (4xx): ${text}`); 
+    }
+    const errorText = await response.text();
+    throw new Error(`API error: ${response.status} - ${errorText}`);
+  }
 }

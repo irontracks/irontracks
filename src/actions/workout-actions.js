@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/client'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 
 const safeString = (v) => {
   const s = String(v ?? '').trim()
@@ -76,6 +77,9 @@ export async function createWorkout(workout) {
     const title = safeString(workout?.title ?? workout?.name ?? 'Treino')
     const exercisesPayload = buildExercisesPayload(workout)
     const notes = workout?.notes != null ? safeString(workout.notes) : ''
+    try {
+      trackUserEvent('workout_create', { type: 'workout', metadata: { title, exercisesCount: exercisesPayload.length } })
+    } catch {}
 
     const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', {
       p_workout_id: null,
@@ -88,8 +92,14 @@ export async function createWorkout(workout) {
     })
     if (error) return { ok: false, error: error.message }
     if (!workoutId) return { ok: false, error: 'Falha ao criar treino' }
+    try {
+      trackUserEvent('workout_create_ok', { type: 'workout', metadata: { id: workoutId, title } })
+    } catch {}
     return { ok: true, id: workoutId }
   } catch (e) {
+    try {
+      trackUserEvent('workout_create_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+    } catch {}
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
@@ -108,6 +118,9 @@ export async function updateWorkout(id, workout) {
     const title = safeString(workout?.title ?? workout?.name ?? 'Treino')
     const exercisesPayload = buildExercisesPayload(workout)
     const notes = workout?.notes != null ? safeString(workout.notes) : ''
+    try {
+      trackUserEvent('workout_update', { type: 'workout', metadata: { id: workoutId, title, exercisesCount: exercisesPayload.length } })
+    } catch {}
 
     const { data: savedId, error } = await supabase.rpc('save_workout_atomic', {
       p_workout_id: workoutId,
@@ -119,8 +132,14 @@ export async function updateWorkout(id, workout) {
       p_exercises: exercisesPayload,
     })
     if (error) return { ok: false, error: error.message }
+    try {
+      trackUserEvent('workout_update_ok', { type: 'workout', metadata: { id: savedId || workoutId, title } })
+    } catch {}
     return { ok: true, id: savedId || workoutId }
   } catch (e) {
+    try {
+      trackUserEvent('workout_update_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+    } catch {}
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
@@ -130,10 +149,19 @@ export async function deleteWorkout(id) {
     const supabase = createClient()
     const workoutId = safeString(id)
     if (!workoutId) return { ok: false, error: 'missing id' }
+    try {
+      trackUserEvent('workout_delete', { type: 'workout', metadata: { id: workoutId } })
+    } catch {}
     const { error } = await supabase.from('workouts').delete().eq('id', workoutId)
     if (error) return { ok: false, error: error.message }
+    try {
+      trackUserEvent('workout_delete_ok', { type: 'workout', metadata: { id: workoutId } })
+    } catch {}
     return { ok: true }
   } catch (e) {
+    try {
+      trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+    } catch {}
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
@@ -310,6 +338,9 @@ const extractLogsStatsByExercise = (session) => {
     Object.entries(logs).forEach(([k, v]) => {
       const log = v && typeof v === 'object' ? v : null
       if (!log) return
+      const doneRaw = log?.done ?? log?.isDone ?? log?.completed ?? null
+      const done = doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
+      if (!done) return
       const parts = String(k || '').split('-')
       const exIdx = Number(parts[0])
       if (!Number.isFinite(exIdx)) return
@@ -317,10 +348,12 @@ const extractLogsStatsByExercise = (session) => {
       if (!exName) return
       const key = normalizeExerciseKey(exName)
       if (!key) return
-      const w = Number(String(log?.weight ?? '').replace(',', '.'))
-      const r = Number(String(log?.reps ?? '').replace(',', '.'))
-      if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return
-      const volume = w * r
+      const wRaw = Number(String(log?.weight ?? '').replace(',', '.'))
+      const rRaw = Number(String(log?.reps ?? '').replace(',', '.'))
+      const w = Number.isFinite(wRaw) && wRaw > 0 ? wRaw : 0
+      const r = Number.isFinite(rRaw) && rRaw > 0 ? rRaw : 0
+      if (!w && !r) return
+      const volume = w && r ? w * r : 0
       const cur = byKey.get(key) || { exercise: exName, weight: 0, reps: 0, volume: 0 }
       cur.exercise = exName
       cur.weight = Math.max(cur.weight, w)
@@ -427,11 +460,32 @@ export async function computeWorkoutStreakAndStats() {
       .order('created_at', { ascending: false })
       .limit(180)
 
+    const isDayKey = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '').trim())
+    const fmtDay = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' })
+    const toDayKey = (v) => {
+      try {
+        if (!v) return null
+        if (typeof v === 'string') {
+          const s = v.trim()
+          if (!s) return null
+          if (isDayKey(s)) return s
+          const d = new Date(s)
+          if (!Number.isFinite(d.getTime())) return null
+          return fmtDay.format(d)
+        }
+        const d = v instanceof Date ? v : new Date(v)
+        if (!Number.isFinite(d.getTime())) return null
+        return fmtDay.format(d)
+      } catch {
+        return null
+      }
+    }
+
     const daySet = new Set()
     for (const r of Array.isArray(recentRaw) ? recentRaw : []) {
-      const iso = safeIso(r?.date) || safeIso(r?.created_at)
-      if (!iso) continue
-      daySet.add(iso.slice(0, 10))
+      const dayKey = toDayKey(r?.date) || toDayKey(r?.created_at)
+      if (!dayKey) continue
+      daySet.add(dayKey)
     }
     const days = Array.from(daySet.values()).sort()
 
@@ -443,9 +497,9 @@ export async function computeWorkoutStreakAndStats() {
     let currentStreak = 0
     let bestStreak = 0
 
-    const todayKey = new Date().toISOString().slice(0, 10)
+    const todayKey = toDayKey(new Date())
     const hasToday = daySet.has(todayKey)
-    const startKey = hasToday ? todayKey : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const startKey = hasToday ? todayKey : toDayKey(new Date(Date.now() - 24 * 60 * 60 * 1000))
     if (daySet.has(startKey)) {
       let cursor = startKey
       while (daySet.has(cursor)) {

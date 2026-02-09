@@ -4,12 +4,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Clock, Dumbbell, Link2, MessageSquare, Pencil, Play, Plus, Save, Sparkles, UserPlus, X } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { BackButton } from '@/components/ui/BackButton';
-import { enqueueWorkoutFinishJob } from '@/lib/offline/offlineSync'
+import { clearLastWorkoutFinishDraft, enqueueWorkoutFinishJob, saveLastWorkoutFinishDraft } from '@/lib/offline/offlineSync'
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import InviteManager from '@/components/InviteManager';
 import TeamRoomCard from '@/components/TeamRoomCard';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 
 const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v);
 
@@ -505,14 +506,33 @@ export default function ActiveWorkout(props) {
           return `${Date.now()}-${Math.random().toString(16).slice(2)}`
         })()
         try {
+          try {
+            const uid = String(props?.user?.id || '').trim()
+            if (uid) await saveLastWorkoutFinishDraft({ userId: uid, idempotencyKey, session: { ...payload, idempotencyKey } })
+          } catch {}
           const resp = await fetch('/api/workouts/finish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session: { ...payload, idempotencyKey }, idempotencyKey }),
           });
-          const json = await resp.json();
-          if (!json?.ok) throw new Error(json?.error || 'Falha ao salvar no histórico');
+          const contentType = String(resp?.headers?.get?.('content-type') || '')
+          const json = contentType.includes('application/json') ? await resp.json().catch(() => null) : null
+          if (!resp.ok || !json?.ok) {
+            const httpMsg = !resp.ok ? `http_${resp.status}` : ''
+            const errMsg = String(json?.error || httpMsg || 'Falha ao salvar no histórico')
+            throw new Error(errMsg)
+          }
           savedId = json?.saved?.id ?? null;
+          try {
+            const uid = String(props?.user?.id || '').trim()
+            if (uid) await clearLastWorkoutFinishDraft({ userId: uid })
+          } catch {}
+          try {
+            trackUserEvent('workout_finish_ok', {
+              type: 'workout',
+              metadata: { id: savedId, title: payload?.workoutTitle || null, durationSeconds: payload?.totalTime || null, idempotent: !!json?.idempotent },
+            })
+          } catch {}
         } catch (e) {
           const msg = e?.message ? String(e.message) : String(e);
           const offline = (() => {
@@ -520,7 +540,7 @@ export default function ActiveWorkout(props) {
               if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
             } catch {}
             const lower = String(msg || '').toLowerCase()
-            return lower.includes('failed to fetch') || lower.includes('network') || lower.includes('fetch')
+            return lower.includes('failed to fetch') || lower.includes('network') || lower.includes('fetch') || lower.includes('load failed')
           })()
           if (offline) {
             const uid = String(props?.user?.id || '').trim()
@@ -535,12 +555,21 @@ export default function ActiveWorkout(props) {
                 await alert('Sem internet. O treino foi salvo e será sincronizado automaticamente quando a conexão voltar.', 'Finalização pendente')
               } catch {}
               savedId = null
+              try {
+                trackUserEvent('workout_finish_offline_queued', {
+                  type: 'workout',
+                  metadata: { title: payload?.workoutTitle || null, durationSeconds: payload?.totalTime || null },
+                })
+              } catch {}
             }
             try {
             } catch {}
           } else {
             await alert('Erro ao salvar no histórico: ' + (msg || 'erro inesperado'));
             savedId = null;
+            try {
+              trackUserEvent('workout_finish_error', { type: 'workout', metadata: { message: msg || null } })
+            } catch {}
           }
         }
       }

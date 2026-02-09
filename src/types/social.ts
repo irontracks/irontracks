@@ -43,6 +43,7 @@ export type Story = {
   expiresAt: string
   caption: string | null
   mediaUrl: string | null
+  mediaKind?: 'image' | 'video'
   viewed: boolean
   likeCount: number
   hasLiked: boolean

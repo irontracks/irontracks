@@ -668,7 +668,8 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                 sets: 1,
                 name: CARDIO_OPTIONS.includes(ex.name) ? ex.name : DEFAULT_CARDIO_OPTION,
                 reps: ex.reps || '20',
-                rpe: ex.rpe || 5
+                rpe: ex.rpe || 5,
+                setDetails: [] // Force reset details to clear old strength configs
             };
         } else {
             newExercises[index] = {
@@ -1072,6 +1073,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                     )}
 
 									{exerciseType === 'cardio' ? (
+                                        <>
 										<div className="grid grid-cols-2 gap-4">
 											<div>
 												<label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
@@ -1100,6 +1102,171 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Cardio Advanced Config (HIT / Incline / Speed) */}
+                                        {(() => {
+                                            const cardioSet = setDetails[0];
+                                            const config = cardioSet?.advanced_config || {};
+                                            const isHIT = !!config?.isHIT;
+                                            
+                                            const updateCardioConfig = (field, val) => {
+                                                const newConfig = { ...config, [field]: val };
+                                                if (val === '' || val === null || val === undefined) delete newConfig[field];
+                                                
+                                                // If turning off HIT, clean up HIT fields
+                                                if (field === 'isHIT' && !val) {
+                                                    delete newConfig.workSec;
+                                                    delete newConfig.restSec;
+                                                    delete newConfig.rounds;
+                                                    delete newConfig.hitIntensity;
+                                                }
+
+                                                updateSetDetail(index, 0, { 
+                                                    advanced_config: Object.keys(newConfig).length > 0 ? newConfig : null 
+                                                });
+                                            };
+
+                                            const workSec = Number(config?.workSec) || 0;
+                                            const restSec = Number(config?.restSec) || 0;
+                                            const hitInvalid = isHIT && (workSec <= 0 || restSec >= workSec);
+
+                                            return (
+                                                <div className="mt-4 pt-4 border-t border-neutral-800">
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <label className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</label>
+                                                        <div className="flex items-center gap-2">
+                                                            <label className="text-[10px] font-bold text-white uppercase cursor-pointer select-none flex items-center gap-2">
+                                                                Modo HIT
+                                                                <input 
+                                                                    type="checkbox"
+                                                                    checked={isHIT}
+                                                                    onChange={(e) => updateCardioConfig('isHIT', e.target.checked)}
+                                                                    className="accent-yellow-500 w-4 h-4"
+                                                                />
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    {isHIT && (
+                                                        <div className="bg-neutral-900/50 p-3 rounded-xl border border-neutral-800 mb-3 animate-in slide-in-from-top-2">
+                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                                <div>
+                                                                    <label className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={config.workSec ?? ''}
+                                                                        onChange={e => updateCardioConfig('workSec', Number(e.target.value))}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700"
+                                                                        placeholder="30"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={config.restSec ?? ''}
+                                                                        onChange={e => updateCardioConfig('restSec', Number(e.target.value))}
+                                                                        className={`w-full bg-neutral-900 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 ${hitInvalid ? 'border-red-500/50' : 'border-neutral-700'}`}
+                                                                        placeholder="10"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        value={config.rounds ?? ''}
+                                                                        onChange={e => updateCardioConfig('rounds', Number(e.target.value))}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                        placeholder="10"
+                                                                    />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</label>
+                                                                    <select
+                                                                        value={config.hitIntensity ?? 'high'}
+                                                                        onChange={e => updateCardioConfig('hitIntensity', e.target.value)}
+                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 h-[38px]"
+                                                                    >
+                                                                        <option value="low">Baixa</option>
+                                                                        <option value="medium">Média</option>
+                                                                        <option value="high">Alta</option>
+                                                                    </select>
+                                                                </div>
+                                                            </div>
+                                                            {hitInvalid && (
+                                                                <div className="mt-2 text-[10px] text-red-400 font-bold">
+                                                                    ⚠️ O tempo de descanso deve ser menor que o tempo de trabalho.
+                                                                </div>
+                                                            )}
+                                                            {!hitInvalid && workSec > 0 && (
+                                                                <div className="mt-2 text-[10px] text-neutral-500 font-mono text-center">
+                                                                    Resumo: {config.rounds || '?'} rounds de {workSec}s ativo / {restSec}s descanso
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    <details className="group">
+                                                        <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
+                                                            <span>Parâmetros de Equipamento</span>
+                                                            <span className="group-open:rotate-180 transition-transform">▼</span>
+                                                        </summary>
+                                                        
+                                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
+                                                            {/* Inclinação */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={config.incline ?? ''}
+                                                                    onChange={e => updateCardioConfig('incline', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                    placeholder="0"
+                                                                />
+                                                            </div>
+
+                                                            {/* Velocidade */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</label>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.1"
+                                                                    value={config.speed ?? ''}
+                                                                    onChange={e => updateCardioConfig('speed', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                    placeholder="km/h"
+                                                                />
+                                                            </div>
+
+                                                            {/* Resistência / Carga */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={config.resistance ?? ''}
+                                                                    onChange={e => updateCardioConfig('resistance', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                    placeholder="Nível"
+                                                                />
+                                                            </div>
+
+                                                            {/* Frequência Cardíaca Alvo */}
+                                                            <div>
+                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</label>
+                                                                <input
+                                                                    type="number"
+                                                                    value={config.heart_rate ?? ''}
+                                                                    onChange={e => updateCardioConfig('heart_rate', e.target.value)}
+                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-red-400 font-bold outline-none focus:border-red-500 placeholder-neutral-700"
+                                                                    placeholder="♥"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </details>
+                                                </div>
+                                            );
+                                        })()}
+                                        </>
                                     ) : (
                                         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                                             <div>

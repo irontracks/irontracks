@@ -260,7 +260,7 @@ const ChatScreen = ({ user, onClose }) => {
                     const payload = { type: 'image', media_url: pub.publicUrl, thumb_url: pubThumb.publicUrl }
                     await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
                 } else if (isVideo) {
-                    if (file.size > 50 * 1024 * 1024) { await alertRef.current('Vídeo acima de 50MB. Comprima antes.'); continue }
+                    if (file.size > 200 * 1024 * 1024) { await alertRef.current('Vídeo acima de 200MB. Comprima antes.'); continue }
                     const signVid = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}` }) }).then(r => r.json())
                     if (!signVid.ok) throw new Error(signVid.error || 'Falha ao assinar upload')
                     await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file)

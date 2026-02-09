@@ -67,6 +67,7 @@ import GuidedTour from '@/components/onboarding/GuidedTour'
 import { getTourSteps } from '@/utils/tourSteps'
 import { cacheGetWorkouts, cacheSetWorkouts, flushOfflineQueue, getOfflineQueueSummary, getPendingCount, isOnline } from '@/lib/offline/offlineSync'
 import OfflineSyncModal from '@/components/OfflineSyncModal'
+import { trackScreen, trackUserEvent } from '@/lib/telemetry/userActivity'
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
@@ -172,6 +173,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [user, setUser] = useState(initialUser ?? null);
     const [authLoading, setAuthLoading] = useState(false);
     const [view, setView] = useState('dashboard');
+    const lastTrackedViewRef = useRef('');
     const [directChat, setDirectChat] = useState(null);
     const [workouts, setWorkouts] = useState(() => {
         try {
@@ -187,6 +189,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     });
     const [stats, setStats] = useState({ workouts: 0, exercises: 0, activeStreak: 0 });
     const [streakStats, setStreakStats] = useState(null);
+    const streakRefreshRef = useRef({ inFlight: false, lastAt: 0 });
+    const [newRecordsReloadKey, setNewRecordsReloadKey] = useState(0);
     const [currentWorkout, setCurrentWorkout] = useState(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
     const [importCode, setImportCode] = useState('');
@@ -605,6 +609,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     }, []);
 
     const openAdminPanel = useCallback((tab) => {
+        try {
+            trackUserEvent('open_admin_panel', { type: 'admin', metadata: { tab: tab ? String(tab) : null } })
+        } catch {}
         setShowAdminPanel(true);
         try {
             if (typeof window !== 'undefined') {
@@ -1830,14 +1837,39 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     }, [user, workouts.length]);
 
-    useEffect(() => {
-        if (!user?.id) return;
-        computeWorkoutStreakAndStats()
-            .then(res => {
-                if (res?.ok && res?.data) setStreakStats(res.data)
-            })
-            .catch(err => console.error('Erro ao calcular streak:', err));
+    const refreshStreakStats = useCallback(async ({ force = false } = {}) => {
+        try {
+            if (!user?.id) return;
+            const now = Date.now();
+            const lastAt = Number(streakRefreshRef.current?.lastAt || 0);
+            if (!force && now - lastAt < 8000) return;
+            if (streakRefreshRef.current?.inFlight) return;
+            streakRefreshRef.current = { inFlight: true, lastAt: now };
+            const res = await computeWorkoutStreakAndStats();
+            if (res?.ok && res?.data) setStreakStats(res.data);
+        } catch (e) {
+            console.error('Erro ao calcular streak:', e);
+        } finally {
+            try {
+                streakRefreshRef.current = { ...(streakRefreshRef.current || {}), inFlight: false };
+            } catch {}
+        }
     }, [user?.id]);
+
+    useEffect(() => {
+        refreshStreakStats({ force: true });
+    }, [refreshStreakStats]);
+
+    useEffect(() => {
+        try {
+            const v = String(view || '').trim() || 'unknown';
+            const prev = String(lastTrackedViewRef.current || '').trim();
+            if (v && v !== prev) {
+                trackScreen(v, { from: prev || null });
+                lastTrackedViewRef.current = v;
+            }
+        } catch {}
+    }, [view]);
 
 
 
@@ -2009,6 +2041,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             localStorage.removeItem('activeSession');
         } catch {}
 		setActiveSession(null);
+        try {
+            if (user) await fetchWorkouts(user);
+        } catch {}
+        try {
+            await refreshStreakStats({ force: true });
+        } catch {}
+        try {
+            setNewRecordsReloadKey((v) => v + 1);
+        } catch {}
 		if (showReport === false) {
 			setView('dashboard');
 			return;
@@ -2859,6 +2900,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                             onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
                             onBulkEditWorkouts={handleBulkEditWorkouts}
                             currentUserId={user?.id || initialUser?.id}
+                            newRecordsReloadKey={newRecordsReloadKey}
                             exportingAll={Boolean(exportingAll)}
                             onExportAll={handleExportAllWorkouts}
                             streakStats={streakStats}

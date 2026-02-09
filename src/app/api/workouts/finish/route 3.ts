@@ -9,6 +9,19 @@ const parseTrainingNumberOrZero = (v: any) => {
   return Number.isFinite(n) ? n : 0
 }
 
+const normalizeExerciseKey = (v: any) => {
+  try {
+    return String(v ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+  } catch {
+    return String(v ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+  }
+}
+
 const getExercisePlannedSetsCount = (ex: any) => {
   try {
     const bySets = Math.max(0, Number(ex?.sets) || 0)
@@ -23,12 +36,14 @@ const buildBestByExerciseFromSession = (session: any, onlyNames?: Set<string>) =
   const base = session && typeof session === 'object' ? session : null
   const logs = base?.logs && typeof base.logs === 'object' ? base.logs : {}
   const exercises = Array.isArray(base?.exercises) ? base.exercises : []
-  const out = new Map<string, { weight: number; reps: number; volume: number }>()
+  const out = new Map<string, { exercise: string; weight: number; reps: number; volume: number }>()
 
   exercises.forEach((ex: any, exIdx: number) => {
     const name = String(ex?.name || '').trim()
     if (!name) return
-    if (onlyNames && !onlyNames.has(name)) return
+    const norm = normalizeExerciseKey(name)
+    if (!norm) return
+    if (onlyNames && !onlyNames.has(norm)) return
 
     const setsCount = getExercisePlannedSetsCount(ex)
     let bestWeight = 0
@@ -48,8 +63,9 @@ const buildBestByExerciseFromSession = (session: any, onlyNames?: Set<string>) =
       if (Number.isFinite(vol) && vol > bestVolume) bestVolume = vol
     }
 
-    const prev = out.get(name) || { weight: 0, reps: 0, volume: 0 }
-    out.set(name, {
+    const prev = out.get(norm) || { exercise: name, weight: 0, reps: 0, volume: 0 }
+    out.set(norm, {
+      exercise: prev.exercise || name,
       weight: Math.max(prev.weight, bestWeight),
       reps: Math.max(prev.reps, bestReps),
       volume: Math.max(prev.volume, bestVolume),
@@ -99,11 +115,32 @@ export async function POST(request: Request) {
     const session = body?.session
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
 
+    const idempotencyKeyRaw = body?.idempotencyKey ?? body?.idempotency_key ?? session?.idempotencyKey ?? session?.idempotency_key
+    const idempotencyKey = typeof idempotencyKeyRaw === 'string' ? idempotencyKeyRaw.trim() : String(idempotencyKeyRaw ?? '').trim()
+
+    if (idempotencyKey) {
+      try {
+        const { data: existing } = await supabase
+          .from('workouts')
+          .select('id, created_at')
+          .eq('user_id', user.id)
+          .eq('idempotency_key', idempotencyKey)
+          .maybeSingle()
+
+        if (existing?.id) {
+          return NextResponse.json({ ok: true, saved: existing, idempotent: true })
+        }
+      } catch {
+        // If idempotency check fails (e.g. migration not applied yet), continue without blocking.
+      }
+    }
+
     const { data, error } = await supabase
       .from('workouts')
       .insert({
         user_id: user.id,
         created_by: user.id,
+        idempotency_key: idempotencyKey || null,
         name: normalizeWorkoutTitle(session.workoutTitle || 'Treino Realizado'),
         date: new Date(session?.date ?? new Date()),
         completed_at: new Date().toISOString(),
@@ -113,7 +150,92 @@ export async function POST(request: Request) {
       .select('id, created_at')
       .single()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) {
+      const isDuplicate = (error as any)?.code === '23505' || /duplicate key value/i.test(String(error?.message || ''))
+
+      if (isDuplicate && idempotencyKey) {
+        try {
+          const { data: existing } = await supabase
+            .from('workouts')
+            .select('id, created_at')
+            .eq('user_id', user.id)
+            .eq('idempotency_key', idempotencyKey)
+            .maybeSingle()
+
+          if (existing?.id) {
+            return NextResponse.json({ ok: true, saved: existing, idempotent: true })
+          }
+        } catch {}
+      }
+
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    }
+
+    try {
+      const originWorkoutId = session?.originWorkoutId ? String(session.originWorkoutId) : ''
+      if (originWorkoutId) {
+        const baseMs = (() => {
+          try {
+            const d = session?.date ? new Date(session.date) : null
+            const ms = d && !Number.isNaN(d.getTime()) ? d.getTime() : Date.now()
+            return ms
+          } catch {
+            return Date.now()
+          }
+        })()
+        const windowStartIso = new Date(baseMs - 12 * 60 * 60 * 1000).toISOString()
+        const windowEndIso = new Date(baseMs + 2 * 60 * 60 * 1000).toISOString()
+
+        const { data: latestPre, error: preError } = await supabase
+          .from('workout_checkins')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('kind', 'pre')
+          .eq('planned_workout_id', originWorkoutId)
+          .gte('created_at', windowStartIso)
+          .lte('created_at', windowEndIso)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (preError) throw preError
+        if (latestPre?.id) {
+          const { error: updError } = await supabase
+            .from('workout_checkins')
+            .update({ workout_id: data?.id ?? null, active_session_user_id: null })
+            .eq('id', latestPre.id)
+          if (updError) throw updError
+        }
+      }
+    } catch (e: any) {
+      console.warn('Falha ao vincular check-in pré ao treino salvo:', e?.message || String(e || ''))
+    }
+
+    try {
+      const raw = session?.postCheckin
+      const pc = raw && typeof raw === 'object' ? raw : null
+      if (pc) {
+        const sorenessN = parseTrainingNumberOrZero((pc as any)?.soreness)
+        const satisfactionN = parseTrainingNumberOrZero((pc as any)?.satisfaction)
+        const rpeN = parseTrainingNumberOrZero((pc as any)?.rpe)
+        const notesRaw = String((pc as any)?.notes || '').trim()
+
+        const { error: checkinError } = await supabase.from('workout_checkins').insert({
+          user_id: user.id,
+          kind: 'post',
+          workout_id: data?.id ?? null,
+          planned_workout_id: session?.originWorkoutId ?? null,
+          soreness: Number.isFinite(sorenessN) && sorenessN >= 0 && sorenessN <= 10 ? Math.round(sorenessN) : null,
+          mood: Number.isFinite(satisfactionN) && satisfactionN >= 1 && satisfactionN <= 5 ? Math.round(satisfactionN) : null,
+          notes: notesRaw ? notesRaw : null,
+          answers: {
+            rpe: Number.isFinite(rpeN) && rpeN >= 1 && rpeN <= 10 ? Math.round(rpeN) : null,
+          },
+        })
+        if (checkinError) throw checkinError
+      }
+    } catch (e: any) {
+      console.warn('Falha ao salvar check-in pós-treino:', e?.message || String(e || ''))
+    }
 
     try {
       await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)
@@ -232,27 +354,23 @@ export async function POST(request: Request) {
                 else if (row?.notes && typeof row.notes === 'object') sess = row.notes
                 if (!sess || typeof sess !== 'object') continue
                 const best = buildBestByExerciseFromSession(sess, onlyNames)
-                best.forEach((v, exName) => {
-                  const prev = historyBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
-                  historyBest.set(exName, {
-                    weight: Math.max(prev.weight, v.weight),
-                    reps: Math.max(prev.reps, v.reps),
-                    volume: Math.max(prev.volume, v.volume),
-                  })
+                best.forEach((v, key) => {
+                  const prev = historyBest.get(key) || { weight: 0, reps: 0, volume: 0 }
+                  historyBest.set(key, { weight: Math.max(prev.weight, v.weight), reps: Math.max(prev.reps, v.reps), volume: Math.max(prev.volume, v.volume) })
                 })
               } catch {}
             }
 
             const prs: { exercise: string; label: string; value: string; score: number }[] = []
-            currentBest.forEach((cur, exName) => {
-              const hist = historyBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
+            currentBest.forEach((cur, key) => {
+              const hist = historyBest.get(key) || { weight: 0, reps: 0, volume: 0 }
               const volumePr = cur.volume > 0 && cur.volume > hist.volume
               const weightPr = cur.weight > 0 && cur.weight > hist.weight
               const repsPr = cur.reps > 0 && cur.reps > hist.reps
               if (!volumePr && !weightPr && !repsPr) return
               if (volumePr) {
                 prs.push({
-                  exercise: exName,
+                  exercise: cur.exercise,
                   label: 'Volume',
                   value: `${cur.volume.toLocaleString('pt-BR')}kg`,
                   score: cur.volume,
@@ -261,7 +379,7 @@ export async function POST(request: Request) {
               }
               if (weightPr) {
                 prs.push({
-                  exercise: exName,
+                  exercise: cur.exercise,
                   label: 'Carga',
                   value: `${cur.weight.toLocaleString('pt-BR')}kg`,
                   score: cur.weight,
@@ -269,7 +387,7 @@ export async function POST(request: Request) {
                 return
               }
               prs.push({
-                exercise: exName,
+                exercise: cur.exercise,
                 label: 'Reps',
                 value: `${Math.round(cur.reps)} reps`,
                 score: cur.reps,
