@@ -301,23 +301,6 @@ const LoginScreen = () => {
                             </span>
                         </div>
 
-                        {authMode === 'login' && (
-                            <button
-                                type="button"
-                                onClick={handleAppleLogin}
-                                disabled={isLoading}
-                                className="w-full flex items-center justify-center gap-3 bg-white text-black px-6 py-4 rounded-xl font-black text-sm uppercase tracking-wide hover:bg-neutral-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path
-                                        fill="currentColor"
-                                        d="M16.365 1.43c0 1.14-.444 2.21-1.21 2.97-.84.84-2.07 1.49-3.27 1.39-.14-1.2.43-2.4 1.2-3.2.85-.88 2.3-1.53 3.28-1.16zM20.79 17.18c-.58 1.33-.85 1.92-1.6 3.1-1.04 1.62-2.5 3.65-4.31 3.67-1.61.02-2.03-1.05-4.22-1.03-2.19.01-2.65 1.05-4.26 1.02-1.81-.02-3.2-1.83-4.24-3.45-2.9-4.5-3.2-9.78-1.41-12.54 1.28-1.97 3.3-3.12 5.2-3.12 1.94 0 3.15 1.06 4.75 1.06 1.55 0 2.49-1.06 4.74-1.06 1.69 0 3.48.92 4.75 2.5-4.18 2.3-3.5 8.3.6 9.85z"
-                                    />
-                                </svg>
-                                Continuar com Apple
-                            </button>
-                        )}
-
                         {authMode === 'signup' && (
                             <div className="space-y-1">
                                 <div className="relative">
@@ -424,6 +407,23 @@ const LoginScreen = () => {
                                 authMode === 'signup' ? 'CADASTRAR' : authMode === 'recover_code' ? 'REDEFINIR SENHA' : recoverCooldownLeft > 0 ? `AGUARDE ${recoverCooldownLeft}s` : 'ENVIAR LINK'
                             )}
                         </button>
+
+                        {authMode === 'login' && (
+                            <button
+                                type="button"
+                                onClick={handleAppleLogin}
+                                disabled={isLoading}
+                                className="w-full flex items-center justify-center gap-3 bg-white text-black px-6 py-4 rounded-xl font-black text-sm uppercase tracking-wide hover:bg-neutral-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path
+                                        fill="currentColor"
+                                        d="M16.365 1.43c0 1.14-.444 2.21-1.21 2.97-.84.84-2.07 1.49-3.27 1.39-.14-1.2.43-2.4 1.2-3.2.85-.88 2.3-1.53 3.28-1.16zM20.79 17.18c-.58 1.33-.85 1.92-1.6 3.1-1.04 1.62-2.5 3.65-4.31 3.67-1.61.02-2.03-1.05-4.22-1.03-2.19.01-2.65 1.05-4.26 1.02-1.81-.02-3.2-1.83-4.24-3.45-2.9-4.5-3.2-9.78-1.41-12.54 1.28-1.97 3.3-3.12 5.2-3.12 1.94 0 3.15 1.06 4.75 1.06 1.55 0 2.49-1.06 4.74-1.06 1.69 0 3.48.92 4.75 2.5-4.18 2.3-3.5 8.3.6 9.85z"
+                                    />
+                                </svg>
+                                Entrar com Apple
+                            </button>
+                        )}
 
                         {authMode === 'login' && (
                             <>
