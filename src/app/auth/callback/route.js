@@ -5,7 +5,7 @@ import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(request: Request) {
+export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? ''
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
   let nextFromCookie = ''
   try {
-    nextFromCookie = String((request as any).cookies?.get?.(nextCookieName)?.value || '')
+    nextFromCookie = String(request?.cookies?.get?.(nextCookieName)?.value || '')
   } catch {}
   const rawNext = String(next || '')
   const fallbackNext = nextFromCookie || '/dashboard'
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
     cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
-        return (request as any).cookies?.getAll?.() || []
+        return request?.cookies?.getAll?.() || []
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
