@@ -21,6 +21,18 @@ const LoginScreen = () => {
     // Email Auth State
     const [emailData, setEmailData] = useState({ email: '', password: '', fullName: '' });
     const [showPassword, setShowPassword] = useState(false);
+    const [rememberMe, setRememberMe] = useState(true);
+
+    // Carregar e-mail salvo
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const savedEmail = localStorage.getItem('it_remembered_email');
+            if (savedEmail) {
+                setEmailData(prev => ({ ...prev, email: savedEmail }));
+                setRememberMe(true);
+            }
+        }
+    }, []);
 
     // Request Access State
     const [showRequestModal, setShowRequestModal] = useState(false);
@@ -92,6 +104,14 @@ const LoginScreen = () => {
             if (authMode === 'login') {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
+                
+                // Salvar e-mail se rememberMe estiver ativo
+                if (rememberMe) {
+                    localStorage.setItem('it_remembered_email', email);
+                } else {
+                    localStorage.removeItem('it_remembered_email');
+                }
+
                 window.location.href = '/dashboard';
             } 
             else if (authMode === 'signup') {
@@ -106,6 +126,12 @@ const LoginScreen = () => {
                     }
                 });
                 if (error) throw error;
+
+                // Salvar e-mail se rememberMe estiver ativo
+                if (rememberMe) {
+                    localStorage.setItem('it_remembered_email', email);
+                }
+
                 // Auto login usually happens, or check email confirmation
                 window.location.href = '/dashboard';
             }
@@ -279,31 +305,54 @@ const LoginScreen = () => {
                             <div className="relative">
                                 <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                                 <input
-                                    required
-                                    type="email"
-                                    placeholder="seu@email.com"
-                                    value={emailData.email}
-                                    onChange={e => setEmailData({...emailData, email: e.target.value})}
-                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                />
-                            </div>
-                        </div>
-
-                        {authMode !== 'recover' && (
-                            <div className="space-y-1">
-                                <div className="relative">
-                                    <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
-                                    <input
                                         required
-                                        type={showPassword ? "text" : "password"}
-                                        placeholder="Senha"
-                                        value={emailData.password}
-                                        onChange={e => setEmailData({...emailData, password: e.target.value})}
+                                        type="email"
+                                        placeholder="seu@email.com"
+                                        autoComplete="username"
+                                        value={emailData.email}
+                                        onChange={e => setEmailData({...emailData, email: e.target.value})}
                                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
                                     />
                                 </div>
                             </div>
-                        )}
+
+                            {authMode !== 'recover' && (
+                                <div className="space-y-1">
+                                    <div className="relative">
+                                        <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                        <input
+                                            required
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Senha"
+                                            autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                                            value={emailData.password}
+                                            onChange={e => setEmailData({...emailData, password: e.target.value})}
+                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {authMode === 'login' && (
+                                <div className="flex items-center px-1">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className="relative flex items-center justify-center w-5 h-5">
+                                            <input
+                                                type="checkbox"
+                                                checked={rememberMe}
+                                                onChange={(e) => setRememberMe(e.target.checked)}
+                                                className="peer appearance-none w-5 h-5 bg-neutral-950 border border-neutral-800 rounded-md checked:bg-yellow-500 checked:border-yellow-500 transition-all cursor-pointer"
+                                            />
+                                            <div className="absolute opacity-0 peer-checked:opacity-100 pointer-events-none text-black">
+                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                                </svg>
+                                            </div>
+                                        </div>
+                                        <span className="text-[11px] font-bold text-neutral-500 group-hover:text-neutral-300 transition-colors uppercase tracking-wider">Lembrar meu e-mail</span>
+                                    </label>
+                                </div>
+                            )}
 
                         {authMode === 'recover_code' && (
                             <>
