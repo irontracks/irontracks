@@ -9,6 +9,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const sp = url.searchParams
   const next = sp.get('next') ?? '/dashboard'
+  const providerRaw = String(sp.get('provider') || '').trim().toLowerCase()
+  const provider = providerRaw === 'apple' ? 'apple' : 'google'
   const nextCookieName = 'it.auth.next'
   const nextCookieMaxAgeSeconds = 60 * 5
 
@@ -74,7 +76,7 @@ export async function GET(request: Request) {
   let oauthUrl: string | null = null
   try {
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: { redirectTo },
     })
     if (error) {
