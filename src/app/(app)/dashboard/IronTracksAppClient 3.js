@@ -235,6 +235,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         loaded: initialRole === 'admin' || initialRole === 'teacher',
         hasVip: initialRole === 'admin' || initialRole === 'teacher',
     }))
+    const [vipStatus, setVipStatus] = useState(null)
+
+    useEffect(() => {
+        if (!user?.id) return
+        fetch('/api/vip/status').then(r => r.json()).then(d => {
+            if (d?.ok) setVipStatus(d)
+        }).catch(() => {})
+    }, [user?.id])
+
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
     const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
     const [exportWorkout, setExportWorkout] = useState(null);
@@ -3023,6 +3032,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                             settings={userSettingsApi?.settings ?? null}
                             onViewReport={(s) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
                             onBack={() => setView('dashboard')}
+                            vipLimits={vipStatus?.limits}
+                            onUpgrade={() => setView('vip')}
                         />
                     )}
 

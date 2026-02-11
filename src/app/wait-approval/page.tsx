@@ -45,7 +45,7 @@ export default async function WaitApprovalPage() {
           Seu cadastro foi realizado com sucesso! Para garantir a segurança da
           plataforma, um administrador precisa liberar seu acesso.
           <br/><br/>
-          <span className="text-yellow-500/80 font-bold text-sm">Você receberá a liberação em breve.</span>
+          <span className="text-yellow-500/80 font-bold text-sm">Aguarde o e-mail de aprovação.</span>
         </p>
 
         <div className="space-y-3">

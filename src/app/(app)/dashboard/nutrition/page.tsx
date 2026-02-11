@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import NutritionMixer from '@/components/dashboard/nutrition/NutritionMixer'
 import { createClient } from '@/utils/supabase/server'
+import { checkVipFeatureAccess } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,5 +107,8 @@ export default async function NutritionPage() {
     goals = DEFAULT_GOALS
   }
 
-  return <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} />
+  // Check VIP Access for Macros
+  const { allowed: canViewMacros } = await checkVipFeatureAccess(supabase, authUserId, 'nutrition_macros')
+
+  return <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} />
 }

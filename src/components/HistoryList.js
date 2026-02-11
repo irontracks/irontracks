@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle, Download, Loader2 } from 'lucide-react';
+import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle, Download, Loader2, Lock } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import WorkoutReport from '@/components/WorkoutReport';
@@ -16,7 +16,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const PERIOD_SESSIONS_LIMIT = 30;
 const TOP_EXERCISES_LIMIT = 5;
 
-const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false }) => {
+const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false, vipLimits, onUpgrade }) => {
     const { confirm, alert } = useDialog();
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -152,13 +152,33 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         });
     }, [historyItems, range]);
 
+    const { visibleHistory, blockedCount } = useMemo(() => {
+        const days = vipLimits?.history_days;
+        if (typeof days !== 'number') return { visibleHistory: filteredHistory, blockedCount: 0 };
+
+        const cutoff = Date.now() - days * DAY_MS;
+        const visible = [];
+        let blocked = 0;
+
+        filteredHistory.forEach(item => {
+            const t = toDateMs(item?.dateMs) ?? toDateMs(item?.date);
+            if (Number.isFinite(t) && t >= cutoff) {
+                visible.push(item);
+            } else {
+                blocked++;
+            }
+        });
+
+        return { visibleHistory: visible, blockedCount: blocked };
+    }, [filteredHistory, vipLimits]);
+
     const summary = useMemo(() => {
-        const totalSeconds = filteredHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
+        const totalSeconds = visibleHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
         const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
-        const count = filteredHistory.length;
+        const count = visibleHistory.length;
         const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
         return { count, totalMinutes, avgMinutes };
-    }, [filteredHistory]);
+    }, [visibleHistory]);
 
     const calculateTotalVolumeFromLogs = (logs) => {
         try {
@@ -983,9 +1003,9 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                     </div>
                 )}
 
-                {!loading && filteredHistory.length > 0 && (
+                {!loading && (visibleHistory.length > 0 || blockedCount > 0) && (
                     <div className="space-y-3 pb-24">
-                        {filteredHistory.map((session) => {
+                        {visibleHistory.map((session) => {
                             const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
                             const isSelected = selectedIds.has(session.id);
                             return (
@@ -1046,6 +1066,29 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                                 </div>
                             );
                         })}
+
+                        {blockedCount > 0 && (
+                            <div className="bg-neutral-950/50 border border-yellow-500/20 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden group cursor-pointer" onClick={onUpgrade}>
+                                <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent pointer-events-none" />
+                                <div className="relative z-10 flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform duration-300">
+                                        <Lock className="text-yellow-500" size={20} />
+                                    </div>
+                                    <h3 className="text-lg font-black text-white">
+                                        {blockedCount} treinos antigos bloqueados
+                                    </h3>
+                                    <p className="text-sm text-neutral-400 max-w-xs mx-auto">
+                                        Seu plano atual permite visualizar apenas os últimos {vipLimits?.history_days} dias de histórico.
+                                    </p>
+                                    <button 
+                                        type="button"
+                                        className="mt-2 px-5 py-2 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-wider hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/10"
+                                    >
+                                        Desbloquear Histórico
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -1426,6 +1469,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                         previousSession={null}
                         user={user}
                         onClose={() => setSelectedSession(null)}
+                        onUpgrade={onUpgrade}
                     />
                 </div>
             </div>

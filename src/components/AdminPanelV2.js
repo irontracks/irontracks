@@ -18,6 +18,7 @@ import {
 	Legend
 } from 'chart.js';
 import { createClient } from '@/utils/supabase/client';
+import AdminVipReports from './admin/AdminVipReports';
 import AdminWorkoutEditor from './AdminWorkoutEditor';
 import RequestsTab from '@/components/admin/RequestsTab';
 import { workoutPlanHtml } from '@/utils/report/templates';
@@ -1812,7 +1813,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
 	let TAB_LABELS = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
 	if (isAdmin) {
-		TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', system: 'SISTEMA' };
+		TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', vip_reports: 'RELATÓRIOS VIP', system: 'SISTEMA' };
 	}
 	if (isTeacher && !isAdmin) {
 		TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
@@ -3297,6 +3298,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                             </div>
                         )}
                     </div>
+                )}
+
+                {tab === 'vip_reports' && !selectedStudent && (
+                    <AdminVipReports supabase={supabase} />
                 )}
 
                 {tab === 'system' && !selectedStudent && (

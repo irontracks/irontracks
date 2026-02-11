@@ -5,6 +5,7 @@ import { buildReportHTML } from '@/utils/report/buildHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { createClient } from '@/utils/supabase/client';
+import { useVipCredits } from '@/hooks/useVipCredits';
 import StoryComposer from '@/components/StoryComposer';
 import CoachChatModal from '@/components/CoachChatModal';
 import { getKcalEstimate } from '@/utils/calories/kcalClient';
@@ -184,7 +185,7 @@ const computeMatchKey = (s) => {
     return { originId: originId ? String(originId) : null, titleKey };
 };
 
-const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings }) => {
+const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings, onUpgrade }) => {
     const reportRef = useRef();
     const [isGenerating, setIsGenerating] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -213,6 +214,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         return { status: existing ? 'ready' : 'idle', ai: existing, saved: false, error: '' };
     });
     const [showCoachChat, setShowCoachChat] = useState(false);
+    const { credits } = useVipCredits();
 
     useEffect(() => {
         if (!storiesV2Enabled) {
@@ -727,6 +729,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 session
             });
             if (!res?.ok) {
+                if (res.upgradeRequired) {
+                    if (onUpgrade) onUpgrade();
+                    else alert('Upgrade necessário para usar esta função.');
+                }
                 setAiState((prev) => ({ ...(prev || {}), status: 'error', error: String(res?.error || 'Falha ao gerar insights') }));
                 return;
             }
@@ -1144,7 +1150,14 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
                             <div className="text-xs font-black uppercase tracking-widest text-neutral-400">IA</div>
-                            <div className="text-lg font-black text-white">Insights pós-treino</div>
+                            <div className="flex items-center gap-2">
+                                <div className="text-lg font-black text-white">Insights pós-treino</div>
+                                {credits?.insights && (
+                                    <div className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${credits.insights.used >= credits.insights.limit ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
+                                        {credits.insights.used}/{credits.insights.limit > 1000 ? '∞' : credits.insights.limit}
+                                    </div>
+                                )}
+                            </div>
                             <div className="text-xs text-neutral-300">Resumo + progressão + motivação com IA IronTracks</div>
                         </div>
                         <div className="flex items-center gap-2 w-full md:w-auto">
@@ -1152,10 +1165,17 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                 type="button"
                                 onClick={handleGenerateAi}
                                 disabled={aiState?.status === 'loading'}
-                                className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60"
+                                className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60 flex-col leading-none"
                             >
-                                {aiState?.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                                {aiState?.ai ? 'Regerar' : 'Gerar'}
+                                <div className="flex items-center gap-2">
+                                    {aiState?.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                                    {aiState?.ai ? 'Regerar' : 'Gerar'}
+                                </div>
+                                {credits?.insights && (
+                                    <span className="text-[9px] font-mono opacity-80">
+                                        ({credits.insights.used}/{credits.insights.limit > 1000 ? '∞' : credits.insights.limit})
+                                    </span>
+                                )}
                             </button>
                             <button
                                 type="button"
@@ -1555,6 +1575,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     session={session}
                     previousSession={effectivePreviousSession}
                     isVip={isVip}
+                    onUpgrade={onUpgrade}
                     onSaveToReport={(summary) => {
                         setAiState((prev) => ({
                             ...prev,

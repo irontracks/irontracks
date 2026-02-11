@@ -147,6 +147,12 @@ export default function ActiveWorkout(props) {
     return isObject(cfg) ? cfg : null;
   };
 
+  const getPlannedSet = (ex, setIdx) => {
+    const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
+    const sd = sdArr?.[setIdx] && typeof sdArr[setIdx] === 'object' ? sdArr[setIdx] : null;
+    return sd && typeof sd === 'object' ? sd : null;
+  };
+
   const getLog = (key) => {
     const v = logs?.[key];
     return v && typeof v === 'object' ? v : {};
@@ -427,12 +433,15 @@ export default function ActiveWorkout(props) {
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const cfg = getPlanConfig(ex, setIdx);
+    const plannedSet = getPlannedSet(ex, setIdx);
     const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
     const weightValue = String(log?.weight ?? cfg?.weight ?? '');
     const repsValue = String(log?.reps ?? '');
     const rpeValue = String(log?.rpe ?? '');
     const notesValue = String(log?.notes ?? '');
     const done = !!log?.done;
+    const plannedReps = String(plannedSet?.reps ?? ex?.reps ?? '').trim();
+    const plannedRpe = String(plannedSet?.rpe ?? ex?.rpe ?? '').trim();
 
     const isHeaderRow = setIdx === 0;
     const notesId = `notes-${key}`;
@@ -462,37 +471,6 @@ export default function ActiveWorkout(props) {
         <div className="rounded-lg bg-neutral-900/40 border border-neutral-800 px-2 py-2 space-y-2 sm:flex sm:items-center sm:gap-2 sm:space-y-0">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-            <div className="flex items-center gap-1 ml-auto sm:ml-0">
-              <button
-                type="button"
-                onClick={toggleNotes}
-                className={
-                  isNotesOpen || hasNotes
-                    ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                    : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-                }
-              >
-                <MessageSquare size={14} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextDone = !done;
-                  updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
-                  if (nextDone && restTime && restTime > 0) {
-                    startTimer(restTime, { kind: 'rest', key });
-                  }
-                }}
-                className={
-                  done
-                    ? 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black font-black shadow-yellow-500/20 shadow-sm active:scale-95 transition duration-150'
-                    : 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150'
-                }
-              >
-                <Check size={16} />
-                <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
-              </button>
-            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-2 sm:max-w-sm">
@@ -506,26 +484,71 @@ export default function ActiveWorkout(props) {
               placeholder="Peso (kg)"
               className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
             />
-            <input
-              inputMode="decimal"
-              value={repsValue}
-              onChange={(e) => {
-                const v = e?.target?.value ?? '';
-                updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+            <div className="relative">
+              <input
+                inputMode="decimal"
+                value={repsValue}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? '';
+                  updateLog(key, { reps: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                }}
+                placeholder="Reps"
+                className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 pr-10 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+              />
+              {plannedReps ? (
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-500/60">
+                  {plannedReps}
+                </div>
+              ) : null}
+            </div>
+            <div className="relative">
+              <input
+                inputMode="decimal"
+                value={rpeValue}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? '';
+                  updateLog(key, { rpe: v, advanced_config: cfg ?? log?.advanced_config ?? null });
+                }}
+                placeholder="RPE"
+                className="w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-1.5 pr-10 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
+              />
+              {plannedRpe ? (
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-yellow-500/45">
+                  {plannedRpe}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex items-center gap-1 sm:ml-auto">
+            <button
+              type="button"
+              onClick={toggleNotes}
+              className={
+                isNotesOpen || hasNotes
+                  ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+              }
+            >
+              <MessageSquare size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const nextDone = !done;
+                updateLog(key, { done: nextDone, advanced_config: cfg ?? log?.advanced_config ?? null });
+                if (nextDone && restTime && restTime > 0) {
+                  startTimer(restTime, { kind: 'rest', key });
+                }
               }}
-              placeholder="Reps"
-              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
-            />
-            <input
-              inputMode="decimal"
-              value={rpeValue}
-              onChange={(e) => {
-                const v = e?.target?.value ?? '';
-                updateLog(key, { rpe: v, advanced_config: cfg ?? log?.advanced_config ?? null });
-              }}
-              placeholder="RPE"
-              className="w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-1.5 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
-            />
+              className={
+                done
+                  ? 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black font-black shadow-yellow-500/20 shadow-sm active:scale-95 transition duration-150'
+                  : 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150'
+              }
+            >
+              <Check size={16} />
+              <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+            </button>
           </div>
         </div>
         {isNotesOpen && (

@@ -221,7 +221,7 @@ export async function generatePostWorkoutInsights(input) {
       body: JSON.stringify(body),
     })
     const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights' }
+    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired }
     return json
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }

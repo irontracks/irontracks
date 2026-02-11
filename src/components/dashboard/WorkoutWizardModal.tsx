@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, Sparkles } from 'lucide-react'
+import { useVipCredits } from '@/hooks/useVipCredits'
 
 export type WorkoutWizardGoal = 'hypertrophy' | 'strength' | 'conditioning' | 'maintenance'
 export type WorkoutWizardSplit = 'full_body' | 'upper_lower' | 'ppl'
@@ -71,6 +72,7 @@ const titleFocus = (f: WorkoutWizardFocus) =>
 const titleEquipment = (e: WorkoutWizardEquipment) => (e === 'gym' ? 'Academia' : e === 'home' ? 'Casa' : 'Mínimo (halteres/elástico)')
 
 export default function WorkoutWizardModal(props: Props) {
+  const { credits, loading: creditsLoading, error: creditsError } = useVipCredits()
   const isOpen = !!props.isOpen
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<GenerateMode>('single')
@@ -200,7 +202,14 @@ export default function WorkoutWizardModal(props: Props) {
       <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Criar Treino</div>
+            <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
+              Criar Treino
+              {credits?.wizard && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono text-white ${credits.wizard.used >= credits.wizard.limit ? 'bg-red-500/40' : 'bg-neutral-800'}`}>
+                  {credits.wizard.used}/{credits.wizard.limit > 1000 ? '∞' : credits.wizard.limit}
+                </span>
+              )}
+            </div>
             <div className="text-white font-black text-lg truncate">Wizard Automático</div>
             <div className="text-xs text-neutral-400">Responda rápido e gere um treino pronto para editar.</div>
           </div>
@@ -432,6 +441,28 @@ export default function WorkoutWizardModal(props: Props) {
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                 <div className="text-sm font-black text-white">Preview</div>
                 <div className="text-xs text-neutral-400 mt-1">Gere e depois abra no editor para ajustar.</div>
+                
+                {creditsLoading && (
+                  <div className="mt-3 flex items-center justify-center bg-neutral-900/60 p-2 rounded-lg border border-neutral-800">
+                    <div className="text-xs text-neutral-500 animate-pulse">Carregando créditos...</div>
+                  </div>
+                )}
+
+                {creditsError && (
+                  <div className="mt-3 flex items-center justify-center bg-red-900/20 p-2 rounded-lg border border-red-900/50">
+                    <div className="text-xs text-red-400">Erro: {creditsError}</div>
+                  </div>
+                )}
+
+                {credits?.wizard && (
+                  <div className="mt-3 flex items-center justify-between bg-neutral-900/60 p-2 rounded-lg border border-neutral-800">
+                    <div className="text-xs text-neutral-400 font-bold">Seus créditos semanais</div>
+                    <div className={`text-xs font-mono font-bold ${credits.wizard.used >= credits.wizard.limit ? 'text-red-400' : 'text-green-400'}`}>
+                      {credits.wizard.used} / {credits.wizard.limit > 1000 ? '∞' : credits.wizard.limit}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-3 flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"

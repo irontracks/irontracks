@@ -98,11 +98,13 @@ export default function NutritionMixer({
   initialTotals,
   goals,
   schemaMissing,
+  canViewMacros,
 }: {
   dateKey: string
   initialTotals: Totals
   goals: Totals
   schemaMissing?: boolean
+  canViewMacros?: boolean
 }) {
   const [totals, setTotals] = useState<Totals>({
     calories: safeNumber(initialTotals?.calories),
@@ -242,9 +244,29 @@ export default function NutritionMixer({
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Meter label="PROTEÍNA" unit="g" value={totals.protein} goal={safeGoals.protein} />
-            <Meter label="CARBO" unit="g" value={totals.carbs} goal={safeGoals.carbs} />
-            <Meter label="GORDURA" unit="g" value={totals.fat} goal={safeGoals.fat} />
+            {canViewMacros ? (
+              <>
+                <Meter label="PROTEÍNA" unit="g" value={totals.protein} goal={safeGoals.protein} />
+                <Meter label="CARBO" unit="g" value={totals.carbs} goal={safeGoals.carbs} />
+                <Meter label="GORDURA" unit="g" value={totals.fat} goal={safeGoals.fat} />
+              </>
+            ) : (
+              <div className="md:col-span-3 rounded-xl bg-neutral-800 border border-neutral-700 p-6 flex flex-col items-center justify-center text-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+                <div>
+                    <h3 className="text-white font-bold text-lg">Macros Bloqueados</h3>
+                    <p className="text-neutral-400 text-sm max-w-sm mx-auto mt-1">Assine o plano PRO para ver a divisão detalhada de Proteína, Carbo e Gordura.</p>
+                </div>
+                <button 
+                    onClick={() => window.location.href = '/marketplace'}
+                    className="mt-2 px-6 py-2 rounded-lg bg-yellow-500 text-black font-black text-sm uppercase tracking-wide hover:bg-yellow-400"
+                >
+                    Desbloquear Macros
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="mt-6 rounded-xl bg-neutral-800 border border-neutral-700 p-4 md:p-5">

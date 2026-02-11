@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     if (!isAllowedStoryPath(auth.user.id, safe.path)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
     const admin = createAdminClient()
-    const LIMIT = 200 * 1024 * 1024 // 200MB
+    const LIMIT = 200 * 1024 * 1024
     const b = await admin.storage.getBucket(bucket)
     if (!b?.data) {
       const created = await admin.storage.createBucket(bucket, { public: false, fileSizeLimit: LIMIT })

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -137,6 +138,19 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+    const supabase = auth.supabase
+    const userId = String(auth.user.id || '').trim()
+
+    // Check VIP Limits (Counts as Insights Weekly)
+    const { allowed, currentUsage, limit, tier } = await checkVipFeatureAccess(supabase, userId, 'insights_weekly');
+    if (!allowed) {
+        return NextResponse.json({ 
+            ok: false,
+            error: 'Limit Reached', 
+            message: `Você atingiu o limite semanal de ${limit} insights do seu plano ${tier}. Faça upgrade para continuar.`,
+            upgradeRequired: true
+        }, { status: 403 });
+    }
 
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
     if (!apiKey) {
@@ -156,7 +170,6 @@ export async function POST(req: Request) {
     const resolvedId = workoutId || (sessionFromBody?.id ? String(sessionFromBody.id) : '')
     if (!resolvedId) return NextResponse.json({ ok: false, error: 'workoutId required' }, { status: 400 })
 
-    const userId = String(auth.user.id || '').trim()
     const admin = createAdminClient()
 
     const { data: workout, error: wErr } = await admin
@@ -253,6 +266,9 @@ export async function POST(req: Request) {
     try {
       await admin.from('workouts').update({ notes: JSON.stringify(mergedSession) }).eq('id', String(workout.id)).eq('user_id', userId)
     } catch {}
+
+    // Increment Usage (Counts as Insights)
+    await incrementVipUsage(supabase, userId, 'insights');
 
     return NextResponse.json({ ok: true, ai, saved: true })
   } catch (e: any) {

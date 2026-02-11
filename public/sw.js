@@ -1,10 +1,12 @@
-const CACHE_NAME = 'irontracks-sw-v1'
+const CACHE_NAME = 'irontracks-sw-v2'
 const SHOULD_CACHE = (url) => {
   try {
     if (!url) return false
     const u = new URL(url)
     if (u.origin !== self.location.origin) return false
     if (u.pathname.startsWith('/api/')) return false
+    if (u.pathname.startsWith('/auth/')) return false
+    if (u.pathname.startsWith('/dashboard')) return false
     if (u.pathname.startsWith('/_next/webpack-hmr')) return false
     return true
   } catch {
@@ -19,7 +21,6 @@ self.addEventListener('install', (event) => {
       .then((cache) =>
         cache.addAll([
           '/',
-          '/dashboard',
           '/manifest.json',
           '/icone.png',
         ]),
@@ -49,8 +50,6 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => null)
           return res
         })
         .catch(() => caches.match(req).then((m) => m || caches.match('/'))),
@@ -71,4 +70,3 @@ self.addEventListener('fetch', (event) => {
     }),
   )
 })
-

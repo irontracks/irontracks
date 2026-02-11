@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.access_requests (
 ALTER TABLE public.access_requests ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Allow public to insert (anyone can request access)
+DROP POLICY IF EXISTS "Allow public insert to access_requests" ON public.access_requests;
 CREATE POLICY "Allow public insert to access_requests"
 ON public.access_requests
 FOR INSERT

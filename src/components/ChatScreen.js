@@ -16,7 +16,8 @@ import {
     Image as ImageIcon,
     Smile,
     Film,
-    Link2
+    Link2,
+    Trash2
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
@@ -231,6 +232,25 @@ const ChatScreen = ({ user, onClose }) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ channel_id: activeChannel.id, content: text })
         })
+    };
+
+    const handleDeleteMessage = async (msg) => {
+        const id = msg?.id ? String(msg.id) : '';
+        if (!id) return;
+        const ok = await confirmRef.current('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar' });
+        if (!ok) return;
+        try {
+            const res = await fetch('/api/chat/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messageId: id, scope: 'channel' })
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(json?.error || 'Erro ao deletar mensagem.');
+            setMessages((prev) => prev.filter((m) => String(m?.id || '') !== id));
+        } catch (e) {
+            await alertRef.current(e?.message || 'Erro ao deletar mensagem.');
+        }
     };
 
     const handleAttachClick = () => { fileInputRef.current?.click() }
@@ -480,7 +500,21 @@ const ChatScreen = ({ user, onClose }) => {
                                         {(!msg.kind || msg.kind === 'text') && (
                                             <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
                                         )}
-                                        <p className={`text-[9px] mt-1 text-right ${isMe ? 'text-black/50' : 'text-neutral-500'}`}>{timeLabel}</p>
+                                        <div className="flex items-center justify-between gap-2 mt-1">
+                                            {isMe ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteMessage(msg)}
+                                                    className={`p-1 rounded-md ${isMe ? 'text-black/60 hover:text-black' : 'text-neutral-400 hover:text-white'}`}
+                                                    aria-label="Deletar mensagem"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            ) : (
+                                                <span />
+                                            )}
+                                            <p className={`text-[9px] text-right ${isMe ? 'text-black/50' : 'text-neutral-500'}`}>{timeLabel}</p>
+                                        </div>
                                     </div>
                                 </div>
                             )

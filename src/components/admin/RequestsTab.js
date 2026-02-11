@@ -41,9 +41,9 @@ export default function RequestsTab() {
             if (!ok) return
         } else {
             const ok = await confirm(
-                `Aceitar solicitação de ${req.full_name}?\nIsso criará uma conta e enviará as credenciais.`,
+                `Aceitar solicitação de ${req.full_name}?\nIsso vai liberar o acesso e enviar um e-mail de aprovação.`,
                 'Aceitar Acesso',
-                { confirmText: 'Criar Conta', cancelText: 'Cancelar' }
+                { confirmText: 'Aprovar', cancelText: 'Cancelar' }
             )
             if (!ok) return
         }
@@ -125,11 +125,11 @@ export default function RequestsTab() {
                             </div>
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
                                 <Phone size={14} className="text-neutral-500" />
-                                <span className="select-all">{req.phone}</span>
+                                <span className="select-all">{req.phone || '-'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
                                 <Calendar size={14} className="text-neutral-500" />
-                                <span>{new Date(req.birth_date).toLocaleDateString()}</span>
+                                <span>{req.birth_date ? new Date(req.birth_date).toLocaleDateString() : '-'}</span>
                             </div>
                         </div>
 

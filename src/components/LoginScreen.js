@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User } from 'lucide-react';
+import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar } from 'lucide-react';
 import { APP_VERSION } from '@/lib/version';
 import { createClient } from '@/utils/supabase/client';
 
@@ -19,7 +19,14 @@ const LoginScreen = () => {
     const [authMode, setAuthMode] = useState('login');
     
     // Email Auth State
-    const [emailData, setEmailData] = useState({ email: '', password: '', fullName: '' });
+    const [emailData, setEmailData] = useState({ 
+        email: '', 
+        password: '', 
+        confirmPassword: '',
+        fullName: '',
+        phone: '',
+        birthDate: ''
+    });
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
 
@@ -131,13 +138,43 @@ const LoginScreen = () => {
                 window.location.href = '/dashboard';
             } 
             else if (authMode === 'signup') {
+                if (password !== emailData.confirmPassword) {
+                    throw new Error('As senhas não coincidem.');
+                }
+                
+                const cleanPhone = emailData.phone.replace(/\D/g, '');
+                if (cleanPhone.length < 10) {
+                    throw new Error('Telefone inválido (mínimo 10 dígitos com DDD).');
+                }
+
+                try {
+                    const res = await fetch('/api/access-request/create', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            email, 
+                            full_name: emailData.fullName,
+                            phone: emailData.phone,
+                            birth_date: emailData.birthDate
+                        }),
+                    });
+                    const json = await res.json().catch(() => ({}));
+                    if (!res.ok || !json?.ok) {
+                        throw new Error(json?.error || 'Não foi possível enviar sua solicitação.');
+                    }
+                } catch (e) {
+                    throw new Error(e?.message || 'Não foi possível enviar sua solicitação.');
+                }
+
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
                         data: {
                             full_name: emailData.fullName,
-                            display_name: emailData.fullName
+                            display_name: emailData.fullName,
+                            phone: emailData.phone,
+                            birth_date: emailData.birthDate
                         }
                     }
                 });
@@ -149,7 +186,7 @@ const LoginScreen = () => {
                 }
 
                 // Auto login usually happens, or check email confirmation
-                window.location.href = '/dashboard';
+                window.location.href = '/wait-approval';
             }
             else if (authMode === 'recover') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -302,7 +339,7 @@ const LoginScreen = () => {
                         </div>
 
                         {authMode === 'signup' && (
-                            <div className="space-y-1">
+                            <div className="space-y-4">
                                 <div className="relative">
                                     <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                                     <input
@@ -313,6 +350,36 @@ const LoginScreen = () => {
                                         onChange={e => setEmailData({...emailData, fullName: e.target.value})}
                                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
                                     />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="relative">
+                                        <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                        <input
+                                            required
+                                            type="date"
+                                            value={emailData.birthDate}
+                                            onChange={e => setEmailData({...emailData, birthDate: e.target.value})}
+                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs"
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                        <input
+                                            required
+                                            type="tel"
+                                            placeholder="(DDD) 99999-9999"
+                                            value={emailData.phone}
+                                            onChange={e => {
+                                                let val = e.target.value.replace(/\D/g, '');
+                                                if (val.length > 11) val = val.slice(0, 11);
+                                                if (val.length > 2) val = `(${val.slice(0, 2)}) ${val.slice(2)}`;
+                                                if (val.length > 9) val = `${val.slice(0, 10)}-${val.slice(10)}`;
+                                                setEmailData({...emailData, phone: val});
+                                            }}
+                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -333,7 +400,7 @@ const LoginScreen = () => {
                             </div>
 
                             {authMode !== 'recover' && (
-                                <div className="space-y-1">
+                                <div className="space-y-4">
                                     <div className="relative">
                                         <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                                         <input
@@ -346,6 +413,21 @@ const LoginScreen = () => {
                                             className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
                                         />
                                     </div>
+                                    
+                                    {authMode === 'signup' && (
+                                        <div className="relative">
+                                            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                            <input
+                                                required
+                                                type={showPassword ? "text" : "password"}
+                                                placeholder="Confirmar Senha"
+                                                autoComplete="new-password"
+                                                value={emailData.confirmPassword}
+                                                onChange={e => setEmailData({...emailData, confirmPassword: e.target.value})}
+                                                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

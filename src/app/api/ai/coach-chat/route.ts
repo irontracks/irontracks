@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { requireUser } from '@/utils/auth/route';
+import { createClient } from '@/utils/supabase/server';
+import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,8 +36,20 @@ const formatSession = (session: any): string => {
 
 export async function POST(req: Request) {
     try {
-        const user = await requireUser();
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const auth = await requireUser();
+        if (!auth.ok) return auth.response;
+        const user = auth.user;
+        const supabase = auth.supabase;
+
+        // Check VIP Limits
+        const { allowed, currentUsage, limit, tier } = await checkVipFeatureAccess(supabase, user.id, 'chat_daily');
+        if (!allowed) {
+            return NextResponse.json({ 
+                error: 'Limit Reached', 
+                message: `Você atingiu o limite diário de ${limit} mensagens do seu plano ${tier}. Faça upgrade para continuar.`,
+                upgradeRequired: true
+            }, { status: 403 });
+        }
 
         const body = await req.json();
         const { messages, context } = body;
@@ -135,6 +149,9 @@ RESUMO DA CONVERSA ATÉ AGORA:
 
         const result = await finalChat.sendMessage(lastMsg.parts[0].text);
         const responseText = result.response.text();
+
+        // Increment Usage
+        await incrementVipUsage(supabase, user.id, 'chat');
 
         return NextResponse.json({ 
             role: 'assistant', 

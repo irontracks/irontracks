@@ -1,0 +1,8 @@
+export const isOnline = () => {
+  try {
+    return typeof navigator !== 'undefined' ? navigator.onLine !== false : true
+  } catch {
+    return true
+  }
+}
+

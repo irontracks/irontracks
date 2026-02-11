@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
+import { createClient } from '@/utils/supabase/server'
+import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { generateWorkoutFromWizard } from '@/utils/workoutWizardGenerator'
 
 import validation from '@/utils/workoutWizardAiValidation'
@@ -270,6 +272,19 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+    const user = auth.user
+    const supabase = auth.supabase
+
+    // Check VIP Limits
+    const { allowed, currentUsage, limit, tier } = await checkVipFeatureAccess(supabase, user.id, 'wizard_weekly');
+    if (!allowed) {
+        return NextResponse.json({ 
+            ok: false,
+            error: 'Limit Reached', 
+            message: `Você atingiu o limite semanal de ${limit} gerações de treino do seu plano ${tier}. Faça upgrade para continuar.`,
+            upgradeRequired: true
+        }, { status: 403 });
+    }
 
     const body = await req.json().catch(() => ({}))
     const answers = normalizeAnswers(body?.answers)
@@ -417,14 +432,20 @@ export async function POST(req: Request) {
 
     if (isProgram) {
       const ai = await runProgram({ ...answers }, daysRequested)
-      if (ai.ok) return NextResponse.json({ ok: true, drafts: ai.drafts })
+      if (ai.ok) {
+        await incrementVipUsage(supabase, user.id, 'wizard');
+        return NextResponse.json({ ok: true, drafts: ai.drafts })
+      }
       const fallbackDrafts = makeFallbackProgramDrafts({ ...answers }, daysRequested)
       return NextResponse.json({ ok: false, error: ai.error, drafts: fallbackDrafts }, { status: 200 })
     }
 
     if (variants && variants.length) {
       const ai = await runVariants({ ...answers }, variants)
-      if (ai.ok) return NextResponse.json({ ok: true, drafts: ai.drafts })
+      if (ai.ok) {
+        await incrementVipUsage(supabase, user.id, 'wizard');
+        return NextResponse.json({ ok: true, drafts: ai.drafts })
+      }
       const fallbackDrafts = variants.map((lv: string) => {
         const base = generateWorkoutFromWizard({ ...(answers as any), level: lv } as any, 0)
         return applyFallbackFilter(base, answers.constraints)
@@ -433,7 +454,10 @@ export async function POST(req: Request) {
     }
 
     const ai = await runSingle({ ...answers })
-    if (ai.ok) return NextResponse.json({ ok: true, draft: ai.draft })
+    if (ai.ok) {
+      await incrementVipUsage(supabase, user.id, 'wizard');
+      return NextResponse.json({ ok: true, draft: ai.draft })
+    }
 
     const base = generateWorkoutFromWizard(answers as any, 0)
     const fallback = applyFallbackFilter(base, answers.constraints)

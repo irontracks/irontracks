@@ -8,7 +8,8 @@ import {
     Circle,
     Image as ImageIcon,
     Smile,
-    Link2
+    Link2,
+    Trash2
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
@@ -28,7 +29,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     
-    const { alert, prompt } = useDialog();
+    const { alert, prompt, confirm } = useDialog();
     const supabase = useMemo(() => createClient(), []);
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);
@@ -38,6 +39,25 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef(null);
     const [debugChat, setDebugChat] = useState(false);
+
+    const handleDeleteMessage = async (message) => {
+        const id = message?.id ? String(message.id) : '';
+        if (!id) return;
+        const ok = await confirm('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar' });
+        if (!ok) return;
+        try {
+            const res = await fetch('/api/chat/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ messageId: id, scope: 'direct' })
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(json?.error || 'Erro ao deletar mensagem.');
+            setMessages((prev) => prev.filter((m) => String(m?.id || '') !== id));
+        } catch (e) {
+            await alert(e?.message || 'Erro ao deletar mensagem.');
+        }
+    };
 
     const resolvedOtherUserId = targetUser?.id ?? otherUserId;
     const resolvedOtherUserName = targetUser?.display_name ?? targetUser?.name ?? otherUserName;
@@ -541,11 +561,25 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                             
                                             return <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{payload?.text ?? message.content}</p>;
                                         })()}
-										<p className={`text-[10px] mt-1 text-right tabular-nums ${
-											isMyMessage ? 'text-black/60' : 'text-neutral-500'
-										}`}>
-											{formatTime(message.created_at)}
-										</p>
+                                        <div className="flex items-center justify-between gap-2 mt-1">
+                                            {isMyMessage ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteMessage(message)}
+                                                    className="p-1 rounded-md text-black/60 hover:text-black"
+                                                    aria-label="Deletar mensagem"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            ) : (
+                                                <span />
+                                            )}
+                                            <p className={`text-[10px] text-right tabular-nums ${
+                                                isMyMessage ? 'text-black/60' : 'text-neutral-500'
+                                            }`}>
+                                                {formatTime(message.created_at)}
+                                            </p>
+                                        </div>
 									</div>
 								</div>
 							);

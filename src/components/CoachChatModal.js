@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } from 'lucide-react';
+import { useVipCredits } from '@/hooks/useVipCredits';
 
 export default function CoachChatModal({
     isOpen,
@@ -7,8 +8,10 @@ export default function CoachChatModal({
     session,
     previousSession,
     isVip,
-    onSaveToReport
+    onSaveToReport,
+    onUpgrade
 }) {
+    const { credits } = useVipCredits();
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -86,23 +89,6 @@ export default function CoachChatModal({
     const handleSend = async () => {
         if (!input.trim()) return;
 
-        if (!isVip) {
-            try {
-                const key = 'iron_coach_usage_count';
-                const count = parseInt(localStorage.getItem(key) || '0');
-                if (count >= 10) {
-                    setMessages(prev => [...prev, { 
-                        role: 'assistant', 
-                        content: "Você atingiu o limite de 10 perguntas gratuitas. Para continuar evoluindo com o Coach IA e ter acesso ilimitado, assine um plano VIP.",
-                        isBlock: true 
-                    }]);
-                    setInput('');
-                    return;
-                }
-                localStorage.setItem(key, (count + 1).toString());
-            } catch {}
-        }
-
         const userMsg = { role: 'user', content: input };
         const newMessages = [...messages, userMsg];
         setMessages(newMessages);
@@ -119,11 +105,22 @@ export default function CoachChatModal({
                 })
             });
 
+            const data = await res.json();
+
+            // Handle Limit Reached
+            if (res.status === 403 && data?.upgradeRequired) {
+                setMessages(prev => [...prev, { 
+                    role: 'assistant', 
+                    content: data.message || "Limite atingido. Faça upgrade para continuar.",
+                    isBlock: true 
+                }]);
+                return;
+            }
+
             if (!res.ok) throw new Error('Falha na comunicação');
 
-            const data = await res.json();
-            if (data.content) {
-                setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
+            if (data.content || data.text || data.answer) {
+                setMessages(prev => [...prev, { role: 'assistant', content: data.content || data.text || data.answer }]);
             }
         } catch (error) {
             console.error(error);
@@ -164,7 +161,14 @@ export default function CoachChatModal({
                         </div>
                         <div>
                             <div className="font-black text-white text-sm uppercase tracking-wide">Iron Coach</div>
-                            <div className="text-xs text-yellow-500 font-bold">IA Analysis</div>
+                            <div className="flex items-center gap-2">
+                                <div className="text-xs text-yellow-500 font-bold">IA Analysis</div>
+                                {credits?.chat && (
+                                    <div className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${credits.chat.used >= credits.chat.limit ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
+                                        {credits.chat.used}/{credits.chat.limit > 1000 ? '∞' : credits.chat.limit}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <button onClick={handleClose} className="p-2 hover:bg-neutral-800 rounded-full text-neutral-400 hover:text-white transition-colors">
@@ -187,7 +191,7 @@ export default function CoachChatModal({
                                     <div className="flex flex-col gap-3">
                                         <div>{msg.content}</div>
                                         <button 
-                                            onClick={() => window.location.href = '/marketplace'}
+                                            onClick={() => onUpgrade ? onUpgrade() : (window.location.href = '/marketplace')}
                                             className="bg-yellow-500 text-black font-black px-4 py-2 rounded-xl text-xs uppercase tracking-widest hover:bg-yellow-400 transition-colors w-full sm:w-auto"
                                         >
                                             Ver Planos VIP
@@ -242,6 +246,13 @@ export default function CoachChatModal({
 
                 {!showSavePrompt && (
                     <div className="p-4 border-t border-neutral-800 bg-neutral-950/50 rounded-b-2xl">
+                        {credits?.chat && (
+                            <div className="flex justify-end mb-2">
+                                <span className={`text-[10px] font-mono font-bold ${credits.chat.used >= credits.chat.limit ? 'text-red-400' : 'text-neutral-500'}`}>
+                                    Mensagens hoje: {credits.chat.used}/{credits.chat.limit > 1000 ? '∞' : credits.chat.limit}
+                                </span>
+                            </div>
+                        )}
                         <div className="flex gap-2">
                             <input
                                 ref={inputRef}

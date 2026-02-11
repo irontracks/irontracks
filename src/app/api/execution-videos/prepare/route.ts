@@ -63,11 +63,11 @@ export async function POST(req: Request) {
 
     try {
       const { data: existing } = await admin.storage.getBucket(bucketId)
-      const LIMIT = 200 * 1024 * 1024 // 200MB
+      const LIMIT = 200 * 1024 * 1024
       if (!existing?.id) {
-          await admin.storage.createBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
+        await admin.storage.createBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
       } else if (existing.file_size_limit !== LIMIT) {
-          await admin.storage.updateBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
+        await admin.storage.updateBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
       }
     } catch {}
 

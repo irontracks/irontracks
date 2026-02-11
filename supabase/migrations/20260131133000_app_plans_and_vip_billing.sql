@@ -145,6 +145,7 @@ alter table public.vip_usage_daily enable row level security;
 
 drop policy if exists "vip_usage_daily_select_own" on public.vip_usage_daily;
 drop policy if exists "vip_usage_daily_upsert_own" on public.vip_usage_daily;
+drop policy if exists "vip_usage_daily_upsert_own_update" on public.vip_usage_daily;
 
 create policy "vip_usage_daily_select_own"
 on public.vip_usage_daily for select
@@ -182,4 +183,3 @@ on conflict (id) do update set
   updated_at = now();
 
 commit;
-
