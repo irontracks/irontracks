@@ -384,9 +384,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col safe-area-inset-bottom">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col pb-safe">
       {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-50 p-4 pt-safe flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={onClose} className="p-2 bg-black/20 rounded-full backdrop-blur-md">
             <X className="text-white" />
         </button>

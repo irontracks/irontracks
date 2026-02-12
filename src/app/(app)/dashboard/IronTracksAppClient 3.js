@@ -3329,7 +3329,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 )}
 
                 {showNotifCenter && (
-                    <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowNotifCenter(false)}>
+                    <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setShowNotifCenter(false)}>
                         <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 flex justify-between items-center border-b border-neutral-800">
                                 <h3 className="font-bold text-white">Notificações</h3>

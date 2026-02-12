@@ -559,7 +559,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
 
   if (userId && userSettingsApi?.loaded && !communityEnabled) {
     return (
-      <div className={embedded ? '' : 'min-h-screen bg-neutral-950 text-white p-4'}>
+      <div className={embedded ? '' : 'min-h-screen bg-neutral-950 text-white p-4 pt-safe'}>
         <div className={embedded ? 'space-y-4' : 'max-w-3xl mx-auto space-y-4'}>
           {!embedded ? (
             <button
@@ -581,7 +581,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
   }
 
   return (
-    <div className={embedded ? '' : "min-h-screen bg-neutral-900 text-white p-4"}>
+    <div className={embedded ? '' : "min-h-screen bg-neutral-900 text-white p-4 pt-safe"}>
       <div className={embedded ? "space-y-4" : "max-w-4xl mx-auto space-y-4"}>
         <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
           <div className="flex items-center justify-between gap-3">

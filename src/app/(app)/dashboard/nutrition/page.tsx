@@ -51,7 +51,7 @@ export default async function NutritionPage() {
 
   if (!authUserId) {
     return (
-      <div className="min-h-screen bg-neutral-900 text-white p-6 md:p-10">
+      <div className="min-h-screen bg-neutral-900 text-white p-6 md:p-10 pt-safe">
         <div className="mx-auto w-full max-w-lg">
           <div className="rounded-xl bg-neutral-800 p-6 border border-neutral-700">
             <h1 className="text-2xl font-black text-white">Acesso restrito</h1>

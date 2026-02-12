@@ -447,7 +447,7 @@ export default function MarketplaceClient() {
   return (
     <div className="min-h-screen bg-neutral-950 text-white pb-safe-extra">
       {/* Header */}
-      <div className="bg-neutral-950 sticky top-0 z-10 px-4 py-4 flex items-center border-b border-neutral-900/50 backdrop-blur-md bg-neutral-950/80">
+      <div className="bg-neutral-950 sticky top-0 z-10 px-4 py-4 pt-safe flex items-center border-b border-neutral-900/50 backdrop-blur-md bg-neutral-950/80">
         <button onClick={goBack} className="w-10 h-10 flex items-center justify-center hover:bg-neutral-900 rounded-xl transition-colors text-white">
             <ArrowLeft size={24} />
         </button>
@@ -462,7 +462,7 @@ export default function MarketplaceClient() {
 
       {/* Checkout Modal */}
       {checkoutOpen && selectedPlan && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 pt-safe z-50 animate-in fade-in duration-200">
           <div className="w-full max-w-lg bg-neutral-900 rounded-3xl border border-neutral-800 overflow-hidden shadow-2xl">
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
               <div className="font-black text-lg">Checkout Seguro</div>
