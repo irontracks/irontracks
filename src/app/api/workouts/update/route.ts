@@ -8,8 +8,8 @@ const buildExercisesPayload = (workout: any) => {
   const w = workout && typeof workout === 'object' ? workout : {}
   const exercises = Array.isArray(w.exercises) ? w.exercises : []
   return exercises
-    .filter((ex) => ex && typeof ex === 'object')
-    .map((ex, idx) => {
+    .filter((ex: any) => ex && typeof ex === 'object')
+    .map((ex: any, idx: number) => {
       const setDetails =
         Array.isArray(ex.setDetails) ? ex.setDetails : Array.isArray(ex.set_details) ? ex.set_details : Array.isArray(ex.sets) ? ex.sets : null
       const headerSets = Number.parseInt(String(ex.sets ?? ''), 10) || 0

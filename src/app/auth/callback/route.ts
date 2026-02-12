@@ -33,7 +33,12 @@ export async function GET(request: Request) {
   const configuredOriginRaw = String(process.env.IRONTRACKS_PUBLIC_ORIGIN || '').trim()
   if (configuredOriginRaw) {
     try {
-      safeOrigin = new URL(configuredOriginRaw).origin
+      const conf = new URL(configuredOriginRaw)
+      const confHost = String(conf.host || '').split(':')[0].toLowerCase()
+      const candidates = [forwardedHost, hostHeader, url.host]
+        .map((h) => String(h || '').split(':')[0].toLowerCase())
+        .filter(Boolean)
+      if (confHost && candidates.includes(confHost)) safeOrigin = conf.origin
     } catch {}
   }
   if (!isLocalEnv) {
@@ -108,11 +113,8 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       const msg = String(error.message || '').toLowerCase()
-      if (msg.includes('code challenge') || msg.includes('code verifier')) {
-        const u = new URL('/auth/recovery', safeOrigin)
-        u.searchParams.set('code', code)
-        u.searchParams.set('next', safeNext)
-        return NextResponse.redirect(u)
+      if (msg.includes('code challenge') || msg.includes('code verifier') || msg.includes('pkce') || msg.includes('flow_state_not_found')) {
+        return NextResponse.redirect(new URL('/auth/error?error=pkce_failed', safeOrigin))
       }
       return NextResponse.redirect(
         new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin),

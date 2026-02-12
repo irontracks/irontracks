@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { ArrowLeft, Check, Copy, CreditCard, ExternalLink, QrCode, X, Zap, Crown, Star, AlertTriangle, ChevronRight, Sparkles, Calendar } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
+import { Purchases, CustomerInfo, PurchasesOfferings, PurchasesPackage } from '@revenuecat/purchases-capacitor'
 
 type AppPlan = {
   id: string
@@ -142,6 +144,13 @@ const TIERS = {
 export default function MarketplaceClient() {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
+  const isIosNative = useMemo(() => {
+    try {
+      return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
+    } catch {
+      return false
+    }
+  }, [])
 
   const [userId, setUserId] = useState<string>('')
   const [plans, setPlans] = useState<AppPlan[]>([])
@@ -158,6 +167,12 @@ export default function MarketplaceClient() {
   const [checkingOut, setCheckingOut] = useState(false)
   const [cardRedirecting, setCardRedirecting] = useState(false)
   const [checkoutResult, setCheckoutResult] = useState<CheckoutResponse | null>(null)
+  const [iapConfigured, setIapConfigured] = useState(false)
+  const [iapOfferings, setIapOfferings] = useState<PurchasesOfferings | null>(null)
+  const [iapCustomerInfo, setIapCustomerInfo] = useState<CustomerInfo | null>(null)
+  const [iapLoading, setIapLoading] = useState(false)
+  const [iapPurchasing, setIapPurchasing] = useState(false)
+  const [iapError, setIapError] = useState('')
 
   const goBack = useCallback(() => {
     if (selectedTier) {
@@ -176,12 +191,36 @@ export default function MarketplaceClient() {
     setSelectedPlan(null)
     setCheckoutResult(null)
     setCheckingOut(false)
+    setIapError('')
+    setIapLoading(false)
+    setIapPurchasing(false)
   }, [])
 
   const loadMe = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (user?.id) setUserId(user.id)
-  }, [supabase])
+    if (user?.id) {
+      setUserId(user.id)
+      if (isIosNative) {
+        const apiKey = String(
+          process.env.NEXT_PUBLIC_REVENUECAT_IOS_API_KEY ||
+            process.env.NEXT_PUBLIC_REVENUECAT_API_KEY ||
+            '',
+        ).trim()
+        if (apiKey) {
+          try {
+            await Purchases.configure({ apiKey, appUserID: user.id })
+            setIapConfigured(true)
+          } catch (e: any) {
+            setIapConfigured(false)
+            setIapError(e?.message ? String(e.message) : 'Falha ao iniciar compra pela App Store.')
+          }
+        } else {
+          setIapConfigured(false)
+          setIapError('Compra via App Store indisponível: chave do RevenueCat ausente.')
+        }
+      }
+    }
+  }, [isIosNative, supabase])
 
   const loadPlans = useCallback(async () => {
     setLoadingPlans(true)
@@ -223,7 +262,104 @@ export default function MarketplaceClient() {
     setCpfCnpj('')
     setMobilePhone('')
     setPayerName('')
+    setIapError('')
   }, [plans])
+
+  const loadIapState = useCallback(async () => {
+    if (!isIosNative) return
+    if (!iapConfigured) return
+    setIapLoading(true)
+    setIapError('')
+    try {
+      const offerings = await Purchases.getOfferings()
+      setIapOfferings(offerings)
+      const { customerInfo } = await Purchases.getCustomerInfo()
+      setIapCustomerInfo(customerInfo || null)
+    } catch (e: any) {
+      setIapError(e?.message ? String(e.message) : 'Falha ao carregar opções da App Store.')
+    } finally {
+      setIapLoading(false)
+    }
+  }, [iapConfigured, isIosNative])
+
+  useEffect(() => {
+    if (!checkoutOpen || !selectedPlan) return
+    if (!isIosNative) return
+    loadIapState()
+  }, [checkoutOpen, isIosNative, loadIapState, selectedPlan])
+
+  const getIapPackageForPlan = useCallback((offerings: PurchasesOfferings | null, plan: AppPlan | null) => {
+    if (!offerings || !plan) return null
+    const current = (offerings as any)?.current
+    const pkgs: PurchasesPackage[] = Array.isArray(current?.availablePackages) ? current.availablePackages : []
+    if (!pkgs.length) return null
+    const exact = pkgs.find((p) => String((p as any)?.product?.identifier || '').trim() === plan.id)
+    if (exact) return exact
+    const loose = pkgs.find((p) => String((p as any)?.product?.identifier || '').includes(plan.id))
+    return loose || pkgs[0]
+  }, [])
+
+  const syncIapToBackend = useCallback(async () => {
+    try {
+      const res = await fetch('/api/billing/revenuecat/sync', { method: 'POST' })
+      const json = await res.json().catch(() => ({}))
+      if (!json?.ok) {
+        throw new Error(String(json?.error || 'Falha ao validar assinatura.'))
+      }
+      return true
+    } catch (e: any) {
+      setIapError(e?.message ? String(e.message) : 'Falha ao validar assinatura.')
+      return false
+    }
+  }, [])
+
+  const startIapPurchase = useCallback(async () => {
+    if (!isIosNative) return
+    if (!selectedPlan) return
+    if (!iapConfigured) return
+    if (iapPurchasing) return
+    setIapPurchasing(true)
+    setIapError('')
+    try {
+      const pkg = getIapPackageForPlan(iapOfferings, selectedPlan)
+      if (!pkg) throw new Error('Produto indisponível na App Store para este plano.')
+      const result = await Purchases.purchasePackage({ aPackage: pkg })
+      const info = (result as any)?.customerInfo as CustomerInfo | undefined
+      if (info) setIapCustomerInfo(info)
+      const ok = await syncIapToBackend()
+      if (ok) {
+        window.alert('Assinatura ativada com sucesso.')
+        closeCheckout()
+      }
+    } catch (e: any) {
+      const msg = e?.message ? String(e.message) : String(e || '')
+      if (String(e?.userCancelled || '').toLowerCase() === 'true' || msg.toLowerCase().includes('cancel')) {
+        setIapError('Compra cancelada.')
+      } else {
+        setIapError(msg || 'Falha ao concluir compra.')
+      }
+    } finally {
+      setIapPurchasing(false)
+    }
+  }, [closeCheckout, getIapPackageForPlan, iapConfigured, iapOfferings, iapPurchasing, isIosNative, selectedPlan, syncIapToBackend])
+
+  const restoreIapPurchases = useCallback(async () => {
+    if (!isIosNative) return
+    if (!iapConfigured) return
+    if (iapLoading) return
+    setIapLoading(true)
+    setIapError('')
+    try {
+      const { customerInfo } = await Purchases.restorePurchases()
+      setIapCustomerInfo(customerInfo || null)
+      const ok = await syncIapToBackend()
+      if (ok) window.alert('Compras restauradas.')
+    } catch (e: any) {
+      setIapError(e?.message ? String(e.message) : 'Falha ao restaurar compras.')
+    } finally {
+      setIapLoading(false)
+    }
+  }, [iapConfigured, iapLoading, isIosNative, syncIapToBackend])
 
   const startCheckout = useCallback(async () => {
     if (!selectedPlan) return
@@ -482,108 +618,153 @@ export default function MarketplaceClient() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                <input
-                  className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
-                  placeholder="Nome completo"
-                  value={payerName}
-                  onChange={(e) => setPayerName(e.target.value)}
-                />
-                <input
-                  className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
-                  placeholder="Celular (DDD + número)"
-                  value={mobilePhone}
-                  onChange={(e) => setMobilePhone(e.target.value)}
-                />
-                <input
-                  className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
-                  placeholder="CPF ou CNPJ"
-                  value={cpfCnpj}
-                  onChange={(e) => setCpfCnpj(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <button
-                    onClick={startCheckout}
-                    disabled={checkingOut}
-                    className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-green-500 hover:bg-green-400 text-black font-black disabled:opacity-60 flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/20`}
-                >
-                    <QrCode size={20} />
-                    {checkingOut ? 'Gerando PIX...' : 'Pagar com PIX'}
-                </button>
-
-                <button
-                    onClick={startCardCheckout}
-                    disabled={cardRedirecting}
-                    className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2 transition-all`}
-                >
-                    <CreditCard size={20} />
-                    {cardRedirecting ? 'Redirecionando...' : 'Pagar com Cartão'}
-                </button>
-              </div>
-
-              {checkoutResult && !checkoutResult.ok ? (
-                <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200 flex items-start gap-2">
-                  <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                  {toCheckoutUserMessage(String(checkoutResult.error || ''))}
-                </div>
-              ) : null}
-
-              {canCancelPending ? (
-                <button
-                  type="button"
-                  onClick={cancelPendingAttempt}
-                  className="w-full text-center text-xs font-bold text-neutral-500 hover:text-white underline py-2"
-                >
-                  Cancelar tentativa pendente
-                </button>
-              ) : null}
-
-              {checkoutResult && checkoutResult.ok && checkoutResult.payment ? (
-                <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4 mt-2 animate-in slide-in-from-bottom-4 duration-300">
-                  <div className="font-bold text-green-400 flex items-center gap-2 mb-4">
-                    <Check size={18} />
-                    PIX Gerado com Sucesso
+              {isIosNative ? (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-100 flex items-start gap-2">
+                    <Sparkles size={16} className="mt-0.5 shrink-0 text-yellow-500" />
+                    <span>Assinatura realizada via App Store.</span>
                   </div>
 
-                  {checkoutResult.payment.pix_qr_code ? (
-                    <div className="flex justify-center mb-4 bg-white p-2 rounded-xl w-fit mx-auto">
-                      <Image
-                        src={normalizePixImageSrc(checkoutResult.payment.pix_qr_code)}
-                        width={PIX_QR_SIZE}
-                        height={PIX_QR_SIZE}
-                        alt="QR Code PIX"
-                        className="rounded-lg"
-                      />
+                  {iapError ? (
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200 flex items-start gap-2">
+                      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                      {iapError}
                     </div>
                   ) : null}
 
-                  {checkoutResult.payment.pix_payload ? (
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(checkoutResult.payment?.pix_payload || '')}
-                        className={`${minButtonClass} w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-white font-bold flex items-center justify-center gap-2`}
-                      >
-                        <Copy size={18} />
-                        Copiar Código PIX
-                      </button>
-                      {checkoutResult.payment.invoice_url ? (
-                        <a
-                          href={checkoutResult.payment.invoice_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={`${minButtonClass} w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-white font-bold flex items-center justify-center gap-2`}
-                        >
-                          <ExternalLink size={18} />
-                          Abrir Fatura
-                        </a>
+                  <button
+                    type="button"
+                    onClick={startIapPurchase}
+                    disabled={!iapConfigured || iapLoading || iapPurchasing}
+                    className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black disabled:opacity-60 flex items-center justify-center gap-2 transition-all shadow-lg shadow-yellow-500/20`}
+                  >
+                    <CreditCard size={20} />
+                    {iapPurchasing ? 'Processando...' : 'Assinar com Apple'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={restoreIapPurchases}
+                    disabled={!iapConfigured || iapLoading || iapPurchasing}
+                    className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2 transition-all`}
+                  >
+                    <ChevronRight size={20} />
+                    {iapLoading ? 'Carregando...' : 'Restaurar Compras'}
+                  </button>
+
+                  {iapCustomerInfo && (iapCustomerInfo as any)?.entitlements?.active && Object.keys((iapCustomerInfo as any).entitlements.active).length ? (
+                    <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200 flex items-start gap-2">
+                      <Check size={16} className="mt-0.5 shrink-0" />
+                      <span>Assinatura ativa detectada.</span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-3">
+                    <input
+                      className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
+                      placeholder="Nome completo"
+                      value={payerName}
+                      onChange={(e) => setPayerName(e.target.value)}
+                    />
+                    <input
+                      className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
+                      placeholder="Celular (DDD + número)"
+                      value={mobilePhone}
+                      onChange={(e) => setMobilePhone(e.target.value)}
+                    />
+                    <input
+                      className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
+                      placeholder="CPF ou CNPJ"
+                      value={cpfCnpj}
+                      onChange={(e) => setCpfCnpj(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <button
+                        onClick={startCheckout}
+                        disabled={checkingOut}
+                        className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-green-500 hover:bg-green-400 text-black font-black disabled:opacity-60 flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/20`}
+                    >
+                        <QrCode size={20} />
+                        {checkingOut ? 'Gerando PIX...' : 'Pagar com PIX'}
+                    </button>
+
+                    <button
+                        onClick={startCardCheckout}
+                        disabled={cardRedirecting}
+                        className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2 transition-all`}
+                    >
+                        <CreditCard size={20} />
+                        {cardRedirecting ? 'Redirecionando...' : 'Pagar com Cartão'}
+                    </button>
+                  </div>
+
+                  {checkoutResult && !checkoutResult.ok ? (
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200 flex items-start gap-2">
+                      <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                      {toCheckoutUserMessage(String(checkoutResult.error || ''))}
+                    </div>
+                  ) : null}
+
+                  {canCancelPending ? (
+                    <button
+                      type="button"
+                      onClick={cancelPendingAttempt}
+                      className="w-full text-center text-xs font-bold text-neutral-500 hover:text-white underline py-2"
+                    >
+                      Cancelar tentativa pendente
+                    </button>
+                  ) : null}
+
+                  {checkoutResult && checkoutResult.ok && checkoutResult.payment ? (
+                    <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4 mt-2 animate-in slide-in-from-bottom-4 duration-300">
+                      <div className="font-bold text-green-400 flex items-center gap-2 mb-4">
+                        <Check size={18} />
+                        PIX Gerado com Sucesso
+                      </div>
+
+                      {checkoutResult.payment.pix_qr_code ? (
+                        <div className="flex justify-center mb-4 bg-white p-2 rounded-xl w-fit mx-auto">
+                          <Image
+                            src={normalizePixImageSrc(checkoutResult.payment.pix_qr_code)}
+                            width={PIX_QR_SIZE}
+                            height={PIX_QR_SIZE}
+                            alt="QR Code PIX"
+                            className="rounded-lg"
+                          />
+                        </div>
+                      ) : null}
+
+                      {checkoutResult.payment.pix_payload ? (
+                        <div className="space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(checkoutResult.payment?.pix_payload || '')}
+                            className={`${minButtonClass} w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-white font-bold flex items-center justify-center gap-2`}
+                          >
+                            <Copy size={18} />
+                            Copiar Código PIX
+                          </button>
+                          {checkoutResult.payment.invoice_url ? (
+                            <a
+                              href={checkoutResult.payment.invoice_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`${minButtonClass} w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-white font-bold flex items-center justify-center gap-2`}
+                            >
+                              <ExternalLink size={18} />
+                              Abrir Fatura
+                            </a>
+                          ) : null}
+                        </div>
                       ) : null}
                     </div>
                   ) : null}
-                </div>
-              ) : null}
+                </>
+              )}
             </div>
           </div>
         </div>

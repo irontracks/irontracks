@@ -278,7 +278,7 @@ export async function POST(req: Request) {
     const missingCanonicals = missingPairs.filter((it) => !mapByKey.get(it.key)).map((it) => it.canonical)
     const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean)))
 
-    const ai = { requested: refreshAi, status: refreshAi ? (apiKey ? 'pending' : 'missing_api_key') : 'skipped', mapped: 0, remaining: missingUnique.length }
+    const ai = { requested: refreshAi, status: refreshAi ? (apiKey ? 'pending' : 'missing_api_key') : 'skipped', mapped: 0, remaining: missingUnique.length, error: '' }
 
     if (refreshAi && apiKey && missingUnique.length && maxAi > 0) {
       let cursor = 0

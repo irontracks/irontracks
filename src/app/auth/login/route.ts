@@ -31,7 +31,12 @@ export async function GET(request: Request) {
   const configuredOriginRaw = (process.env.IRONTRACKS_PUBLIC_ORIGIN || '').trim()
   if (configuredOriginRaw) {
     try {
-      safeOrigin = new URL(configuredOriginRaw).origin
+      const conf = new URL(configuredOriginRaw)
+      const confHost = String(conf.host || '').split(':')[0].toLowerCase()
+      const candidates = [forwardedHost, hostHeader, url.host]
+        .map((h) => String(h || '').split(':')[0].toLowerCase())
+        .filter(Boolean)
+      if (confHost && candidates.includes(confHost)) safeOrigin = conf.origin
     } catch {}
   }
   if (!isLocalEnv) {
