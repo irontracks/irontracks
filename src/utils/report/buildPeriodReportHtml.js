@@ -78,7 +78,8 @@ export function buildPeriodReportHtml(input) {
   const type = String(data.type || '').trim()
   const stats = data.stats && typeof data.stats === 'object' ? data.stats : {}
   const ai = data.ai && typeof data.ai === 'object' ? data.ai : null
-  const baseUrl = String(data.baseUrl || '').trim()
+  const rawBaseUrl = String(data.baseUrl || '').trim()
+  const baseUrl = /^https?:\/\//i.test(rawBaseUrl) ? rawBaseUrl : ''
   const userName = String(data.userName || '').trim()
   const generatedAt = data.generatedAt ? data.generatedAt : new Date()
 

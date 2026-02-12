@@ -6,11 +6,16 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { email, phone, full_name, birth_date } = body
+    const { email, phone, full_name, birth_date, role_requested, cref } = body
 
     // 1. Validation
     if (!email || !full_name) {
       return NextResponse.json({ ok: false, error: 'Nome e e-mail são obrigatórios.' }, { status: 400 })
+    }
+
+    // Teacher specific validation
+    if (role_requested === 'teacher' && !cref) {
+      return NextResponse.json({ ok: false, error: 'CREF é obrigatório para cadastro de professor.' }, { status: 400 })
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -58,6 +63,8 @@ export async function POST(req: Request) {
           full_name,
           phone: phone ?? null,
           birth_date: birth_date ?? null,
+          role_requested: role_requested || 'student',
+          cref: cref || null,
           status: 'pending',
           updated_at: new Date().toISOString(),
         })
@@ -78,6 +85,8 @@ export async function POST(req: Request) {
         phone: phone ?? null,
         full_name,
         birth_date: birth_date ?? null,
+        role_requested: role_requested || 'student',
+        cref: cref || null,
         status: 'pending',
       })
       .select('id')

@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { generateWorkoutFromWizard } from '@/utils/workoutWizardGenerator'
 
-import validation from '@/utils/workoutWizardAiValidation'
+import * as validation from '@/utils/workoutWizardAiValidation'
 
 export const dynamic = 'force-dynamic'
 

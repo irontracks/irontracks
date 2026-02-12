@@ -72,7 +72,7 @@ const titleFocus = (f: WorkoutWizardFocus) =>
 const titleEquipment = (e: WorkoutWizardEquipment) => (e === 'gym' ? 'Academia' : e === 'home' ? 'Casa' : 'Mínimo (halteres/elástico)')
 
 export default function WorkoutWizardModal(props: Props) {
-  const { credits, loading: creditsLoading, error: creditsError } = useVipCredits()
+  const { credits, loading: creditsLoading, error: creditsError } = useVipCredits() as { credits: any; loading: boolean; error: string | null }
   const isOpen = !!props.isOpen
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<GenerateMode>('single')
@@ -527,11 +527,12 @@ export default function WorkoutWizardModal(props: Props) {
                     {(() => {
                       const d = drafts[Math.max(0, Math.min(drafts.length - 1, draftIdx))]
                       if (!d) return null
+                      const safeExercises = Array.isArray(d?.exercises) ? d.exercises : []
                       return (
                         <div className="mt-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
                           <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{d.title}</div>
                           <div className="mt-2 space-y-2">
-                            {d.exercises.slice(0, 10).map((ex, idx) => (
+                            {safeExercises.slice(0, 10).map((ex, idx) => (
                               <div key={String(ex?.name || idx)} className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="text-sm font-bold text-white truncate">{String(ex?.name || 'Exercício')}</div>
@@ -541,7 +542,7 @@ export default function WorkoutWizardModal(props: Props) {
                                 </div>
                               </div>
                             ))}
-                            {d.exercises.length > 10 ? <div className="text-xs text-neutral-500">+ mais {d.exercises.length - 10}</div> : null}
+                            {safeExercises.length > 10 ? <div className="text-xs text-neutral-500">+ mais {safeExercises.length - 10}</div> : null}
                           </div>
                         </div>
                       )
@@ -551,7 +552,7 @@ export default function WorkoutWizardModal(props: Props) {
                   <div className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{draft.title}</div>
                     <div className="mt-2 space-y-2">
-                      {draft.exercises.slice(0, 10).map((ex, idx) => (
+                      {(Array.isArray(draft?.exercises) ? draft.exercises : []).slice(0, 10).map((ex, idx) => (
                         <div key={String(ex?.name || idx)} className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-sm font-bold text-white truncate">{String(ex?.name || 'Exercício')}</div>
@@ -561,7 +562,9 @@ export default function WorkoutWizardModal(props: Props) {
                           </div>
                         </div>
                       ))}
-                      {draft.exercises.length > 10 ? <div className="text-xs text-neutral-500">+ mais {draft.exercises.length - 10}</div> : null}
+                      {(Array.isArray(draft?.exercises) ? draft.exercises : []).length > 10 ? (
+                        <div className="text-xs text-neutral-500">+ mais {(Array.isArray(draft?.exercises) ? draft.exercises : []).length - 10}</div>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}

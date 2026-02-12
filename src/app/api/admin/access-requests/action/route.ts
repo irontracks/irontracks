@@ -121,13 +121,38 @@ export async function POST(req: Request) {
 
       const email = String(request.email || '').trim()
       const fullName = String(request.full_name || '').trim()
+      const roleRequested = String(request.role_requested || 'student').trim()
+      const cref = String(request.cref || '').trim()
 
       const { data: profile } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
       const userId = profile?.id ? String(profile.id) : ''
 
+      // If approved and requested to be teacher, promote
+      if (roleRequested === 'teacher') {
+        // 1. Create Teacher record if not exists
+        const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', email).maybeSingle()
+        if (!existingTeacher) {
+            await admin.from('teachers').insert({
+                email,
+                name: fullName || email.split('@')[0],
+                phone: request.phone || null,
+                user_id: userId || null,
+                status: 'active'
+            })
+        }
+        
+        // 2. Update Profile role if exists
+        if (userId) {
+            await admin.from('profiles').update({ role: 'teacher', is_approved: true }).eq('id', userId)
+        }
+      }
+
       if (userId) {
-        const { error: approveError } = await admin.from('profiles').update({ is_approved: true }).eq('id', userId)
-        if (approveError) throw approveError
+        // If not teacher (or fallback), ensure approved
+        if (roleRequested !== 'teacher') {
+            const { error: approveError } = await admin.from('profiles').update({ is_approved: true }).eq('id', userId)
+            if (approveError) throw approveError
+        }
 
         const { data: existingStudent } = await admin.from('students').select('id').ilike('email', email).maybeSingle()
         if (!existingStudent?.id) {

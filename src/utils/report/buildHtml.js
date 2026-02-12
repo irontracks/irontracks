@@ -550,6 +550,7 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
   }).filter(Boolean).join('')
 
   const logoUrl = String(reportData?.brand?.logoUrl || '')
+  const safeLogoUrl = /^https?:\/\//i.test(logoUrl) ? escapeHtml(logoUrl) : ''
   const aiSectionHtml = buildAiSection()
   const workoutTitleSafe = escapeHtml(reportData?.session?.workoutTitle || 'Treino')
   const studentNameSafe = escapeHtml(reportData?.athlete?.name || '')
@@ -639,7 +640,7 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
       <div class="container">
         <div class="header">
           <div style="display:flex; align-items:flex-end; gap:12px">
-            <img src="${logoUrl}" alt="IronTracks" style="width:40px; height:40px; border-radius:10px; object-fit:contain; border:1px solid rgba(245,158,11,.55); background:#000" />
+            <img src="${safeLogoUrl}" alt="IronTracks" style="width:40px; height:40px; border-radius:10px; object-fit:contain; border:1px solid rgba(245,158,11,.55); background:#000" />
             <div>
               <div class="brand">IRONTRACKS</div>
               <div class="muted">Relatório de Performance</div>

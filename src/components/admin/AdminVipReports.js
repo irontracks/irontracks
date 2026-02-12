@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
     Users, MessageSquare, Zap, Crown, Star, TrendingUp, 
     Download, RefreshCw, AlertCircle 
@@ -45,7 +45,7 @@ export default function AdminVipReports({ supabase }) {
     const [period, setPeriod] = useState('7d'); // 7d, 30d
     const [error, setError] = useState('');
 
-    const loadStats = async () => {
+    const loadStats = useCallback(async () => {
         setLoading(true);
         setError('');
         try {
@@ -66,11 +66,11 @@ export default function AdminVipReports({ supabase }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [period, supabase]);
 
     useEffect(() => {
         loadStats();
-    }, [period]);
+    }, [loadStats]);
 
     const aggregates = useMemo(() => {
         if (!stats.length) return null;

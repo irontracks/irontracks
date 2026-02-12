@@ -2,6 +2,18 @@ export const runtime = 'nodejs'
 
 import { createClient } from '@/utils/supabase/server'
 
+const sanitizeHtml = (value) => {
+  try {
+    let s = String(value ?? '')
+    s = s.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    s = s.replace(/\son\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    s = s.replace(/javascript:/gi, '')
+    return s
+  } catch {
+    return ''
+  }
+}
+
 export async function POST(req) {
   try {
     const { html, fileName } = await req.json()
@@ -34,13 +46,39 @@ export async function POST(req) {
       })
     }
 
+    const htmlSafe = sanitizeHtml(htmlText)
+    if (!String(htmlSafe || '').trim()) {
+      return new Response(JSON.stringify({ ok: false, error: 'html required' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
     const puppeteer = await import('puppeteer')
     let browser = null
     try {
       browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] })
       const page = await browser.newPage()
+      try {
+        await page.setJavaScriptEnabled(false)
+      } catch {}
+      try {
+        await page.setRequestInterception(true)
+        page.on('request', (request) => {
+          try {
+            const url = String(request?.url() || '')
+            if (url.startsWith('data:') || url.startsWith('about:') || url.startsWith('blob:')) {
+              request.continue()
+              return
+            }
+            request.abort()
+          } catch {
+            try { request.abort() } catch {}
+          }
+        })
+      } catch {}
       await page.emulateMediaType('screen')
-      await page.setContent(htmlText, { waitUntil: 'networkidle0' })
+      await page.setContent(htmlSafe, { waitUntil: 'domcontentloaded' })
 
       const footerTemplate = `
         <div style="width:100%; font-size:9px; padding: 0 10mm; color:#a3a3a3;">

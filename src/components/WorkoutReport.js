@@ -34,6 +34,19 @@ const normalizeExerciseKey = (v) => {
     }
 };
 
+const escapeHtml = (value) => {
+    try {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    } catch {
+        return '';
+    }
+};
+
 const remapPrevLogsByCanonical = (prevLogsByExercise, canonicalMap) => {
     try {
         const src = prevLogsByExercise && typeof prevLogsByExercise === 'object' ? prevLogsByExercise : {};
@@ -769,23 +782,23 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const handlePartnerPlan = (participant) => {
         try {
             if (!participant) return;
-            const exercises = Array.isArray(session.exercises) ? session.exercises : [];
+            const exercises = Array.isArray(session?.exercises) ? session.exercises : [];
             const workout = {
-                title: session.workoutTitle || 'Treino',
+                title: escapeHtml(session?.workoutTitle || 'Treino'),
                 exercises: exercises.map((ex) => ({
-                    name: ex.name,
+                    name: escapeHtml(ex?.name),
                     sets: Number(ex.sets) || 0,
-                    reps: ex.reps,
-                    rpe: ex.rpe,
-                    cadence: ex.cadence,
-                    restTime: ex.restTime,
-                    method: ex.method,
-                    notes: ex.notes
+                    reps: escapeHtml(ex?.reps),
+                    rpe: escapeHtml(ex?.rpe),
+                    cadence: escapeHtml(ex?.cadence),
+                    restTime: escapeHtml(ex?.restTime),
+                    method: escapeHtml(ex?.method),
+                    notes: escapeHtml(ex?.notes)
                 }))
             };
             const partnerUser = {
-                displayName: participant.name || participant.uid || '',
-                email: participant.email || ''
+                displayName: escapeHtml(participant?.name || participant?.uid || ''),
+                email: escapeHtml(participant?.email || '')
             };
             const html = workoutPlanHtml(workout, partnerUser);
             const win = window.open('', '_blank');

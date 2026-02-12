@@ -63,6 +63,19 @@ const AdminPanelV2 = ({ user, onClose }) => {
         return 0;
     };
 
+    const escapeHtml = (value) => {
+        try {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        } catch {
+            return '';
+        }
+    };
+
     const router = useRouter();
     const executionVideoEnabled = (() => {
         try {
@@ -398,19 +411,27 @@ const AdminPanelV2 = ({ user, onClose }) => {
 
     const handleExportPdf = async () => {
         try {
-            const html = workoutPlanHtml({
-                title: viewWorkout.name,
-                exercises: (viewWorkout.exercises || []).map(ex => ({
-                    name: ex.name,
+            const safeWorkout = {
+                title: escapeHtml(viewWorkout?.name || ''),
+                exercises: (Array.isArray(viewWorkout?.exercises) ? viewWorkout.exercises : []).map(ex => ({
+                    name: escapeHtml(ex?.name),
                     sets: getSetsCount(ex?.sets),
-                    reps: ex.reps ?? '10',
-                    rpe: ex.rpe ?? 8,
-                    cadence: ex.cadence || '2020',
-                    restTime: ex.rest_time ?? ex.restTime,
-                    method: ex.method,
-                    notes: ex.notes
+                    reps: escapeHtml(ex?.reps ?? '10'),
+                    rpe: escapeHtml(ex?.rpe ?? 8),
+                    cadence: escapeHtml(ex?.cadence || '2020'),
+                    restTime: escapeHtml(ex?.rest_time ?? ex?.restTime),
+                    method: escapeHtml(ex?.method),
+                    notes: escapeHtml(ex?.notes)
                 }))
-            }, user);
+            };
+            const baseUser = user && typeof user === 'object' ? user : {};
+            const safeUser = {
+                ...baseUser,
+                displayName: escapeHtml(baseUser.displayName ?? baseUser.name ?? ''),
+                name: escapeHtml(baseUser.name ?? baseUser.displayName ?? ''),
+                email: escapeHtml(baseUser.email ?? '')
+            };
+            const html = workoutPlanHtml(safeWorkout, safeUser);
             const win = window.open('', '_blank');
             if (!win) return;
             win.document.open();

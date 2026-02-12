@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { generateWorkoutFromWizard } from '@/utils/workoutWizardGenerator'
 
-import validation from '@/utils/workoutWizardAiValidation'
+import * as validation from '@/utils/workoutWizardAiValidation'
 
 export const dynamic = 'force-dynamic'
 

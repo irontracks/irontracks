@@ -53,7 +53,7 @@ export default function StoryViewer({
   onStoryDeleted,
 }: StoryViewerProps) {
   const { confirm, alert } = useDialog()
-  const stories = Array.isArray(group.stories) ? group.stories : []
+  const stories = useMemo(() => (Array.isArray(group.stories) ? group.stories : []), [group.stories])
   const [idx, setIdx] = useState(0)
   const story = stories[idx] || null
   
@@ -88,20 +88,24 @@ export default function StoryViewer({
 
   const name = String(group.displayName || '').trim() || (group.authorId === myId ? 'Você' : 'Amigo')
   const isMine = String(group.authorId || '').trim() === String(myId || '').trim()
+  const storyId = story?.id
+  const storyViewed = Boolean(story?.viewed)
+  const storyMediaUrl = story?.mediaUrl || ''
+  const storyMediaKind = (story as any)?.mediaKind
   const mediaKind = useMemo(() => {
-    const k = (story as any)?.mediaKind
+    const k = storyMediaKind
     if (k === 'video' || k === 'image') return k
-    return mediaKindFromUrl(story?.mediaUrl || null)
-  }, [story?.mediaUrl, (story as any)?.mediaKind])
+    return mediaKindFromUrl(storyMediaUrl || null)
+  }, [storyMediaKind, storyMediaUrl])
   const isVideo = mediaKind === 'video'
   
   const videoSrc = useMemo(() => {
-    const sid = String(story?.id || '').trim()
-    const direct = String(story?.mediaUrl || '').trim()
+    const sid = String(storyId || '').trim()
+    const direct = String(storyMediaUrl || '').trim()
     if (direct) return direct
     if (!sid) return ''
     return `/api/social/stories/media?storyId=${encodeURIComponent(sid)}`
-  }, [story?.id, story?.mediaUrl])
+  }, [storyId, storyMediaUrl])
   const isIOS = useMemo(() => {
     const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
     return isIOSUserAgent(ua)
@@ -111,14 +115,14 @@ export default function StoryViewer({
 
   // Marcar como visto
   useEffect(() => {
-    if (!story?.id || story.viewed) return
-    onStoryUpdated(story.id, { viewed: true })
+    if (!storyId || storyViewed) return
+    onStoryUpdated(storyId, { viewed: true })
     fetch('/api/social/stories/view', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ storyId: story.id }),
+      body: JSON.stringify({ storyId }),
     }).catch(() => {})
-  }, [story?.id, story?.viewed, onStoryUpdated])
+  }, [storyId, storyViewed, onStoryUpdated])
 
   // Navegação e Timer
   const goNext = useCallback(() => {
@@ -146,7 +150,7 @@ export default function StoryViewer({
     setViewersError('')
     setViewers([])
     viewersStoryIdRef.current = ''
-  }, [story?.id])
+  }, [storyId])
 
   const toggleMuted = useCallback(() => {
     setMuted((prev) => {
@@ -166,7 +170,7 @@ export default function StoryViewer({
   useEffect(() => {
     closeRequestedRef.current = false
     setDurationMs(isVideo ? (needsVideoFallback ? 5000 : 60000) : 5000)
-  }, [isVideo, needsVideoFallback, story?.id])
+  }, [isVideo, needsVideoFallback, storyId])
 
   useEffect(() => {
     for (const a of preloadRef.current.aborts) {
@@ -195,7 +199,7 @@ export default function StoryViewer({
 
   // Loop de Animação
   useEffect(() => {
-    if (!story?.id) return
+    if (!storyId) return
     if (isVideo && !needsVideoFallback) return
     const tick = (ts: number) => {
       rafRef.current = requestAnimationFrame(tick)
@@ -221,10 +225,10 @@ export default function StoryViewer({
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, story?.id, viewersOpen, needsVideoFallback])
+  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, storyId, viewersOpen, needsVideoFallback])
 
   useEffect(() => {
-    if (!story?.id || !isVideo) return
+    if (!storyId || !isVideo) return
     const v = videoRef.current
     if (!v) return
     const update = () => {
@@ -240,17 +244,17 @@ export default function StoryViewer({
       v.removeEventListener('timeupdate', update)
       v.removeEventListener('durationchange', update)
     }
-  }, [isVideo, story?.id])
+  }, [isVideo, storyId])
 
   // Controle de Video Play/Pause
   useEffect(() => {
-    if (!story?.id || !isVideo) return
+    if (!storyId || !isVideo) return
     const v = videoRef.current
     if (!v) return
     const paused = holding || commentsOpen || viewersOpen || hidden || deleting
     if (paused) v.pause()
     else v.play().catch(() => {})
-  }, [commentsOpen, deleting, hidden, holding, isVideo, story?.id, viewersOpen])
+  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
 
   // Carregar Dados
   const loadComments = async (storyId: string) => {
@@ -286,7 +290,7 @@ export default function StoryViewer({
 
   // Ações
   const toggleLike = async () => {
-    if (!story?.id) return
+    if (!storyId) return
     const nextLiked = !story.hasLiked
     onStoryUpdated(story.id, { hasLiked: nextLiked, likeCount: Math.max(0, story.likeCount + (nextLiked ? 1 : -1)) })
     try {
@@ -301,7 +305,7 @@ export default function StoryViewer({
   }
 
   const sendComment = async () => {
-    if (!story?.id || !commentText.trim()) return
+    if (!storyId || !commentText.trim()) return
     const text = commentText.trim()
     setCommentText('')
     try {
@@ -319,7 +323,7 @@ export default function StoryViewer({
   }
 
   const handleDelete = async () => {
-    if (!story?.id || deleting) return
+    if (!storyId || deleting) return
     const ok = await confirm('Tem certeza que deseja deletar este story?', 'Deletar story', { confirmText: 'Deletar', cancelText: 'Cancelar' })
     if (!ok) return
     setDeleting(true)

@@ -50,7 +50,9 @@ const LoginScreen = () => {
         full_name: '',
         email: '',
         phone: '',
-        birth_date: ''
+        birth_date: '',
+        is_teacher: false,
+        cref: ''
     });
 
     const getOAuthHref = (provider) => {
@@ -67,7 +69,8 @@ const LoginScreen = () => {
 
     const recoverCooldownLeft = useMemo(() => {
         if (!recoverCooldownUntil) return 0;
-        return Math.max(0, Math.ceil((recoverCooldownUntil - Date.now()) / 1000));
+        const now = Date.now() + cooldownTick;
+        return Math.max(0, Math.ceil((recoverCooldownUntil - now) / 1000));
     }, [recoverCooldownUntil, cooldownTick]);
 
     useEffect(() => {
@@ -257,11 +260,17 @@ const LoginScreen = () => {
              return;
         }
         
+        const payload = {
+            ...formData,
+            role_requested: formData.is_teacher ? 'teacher' : 'student',
+            cref: formData.is_teacher ? formData.cref : null
+        };
+
         try {
             const res = await fetch('/api/access-request/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
             
             const json = await res.json();
@@ -691,6 +700,37 @@ const LoginScreen = () => {
                                                 className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
                                             />
                                         </div>
+                                    </div>
+
+                                    <div className="pt-2">
+                                        <label className="flex items-center gap-3 cursor-pointer group">
+                                            <div className="relative flex items-center justify-center w-5 h-5">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.is_teacher}
+                                                    onChange={(e) => setFormData(prev => ({ ...prev, is_teacher: e.target.checked }))}
+                                                    className="peer appearance-none w-5 h-5 bg-neutral-950 border border-neutral-800 rounded-md checked:bg-yellow-500 checked:border-yellow-500 transition-all cursor-pointer"
+                                                />
+                                                <CheckCircle2 size={12} className="absolute text-black opacity-0 peer-checked:opacity-100 pointer-events-none" />
+                                            </div>
+                                            <span className="text-xs font-bold text-neutral-400 group-hover:text-white transition-colors uppercase tracking-wide">
+                                                Sou Personal Trainer / Professor
+                                            </span>
+                                        </label>
+
+                                        {formData.is_teacher && (
+                                            <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
+                                                <label className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
+                                                <input
+                                                    required
+                                                    name="cref"
+                                                    value={formData.cref}
+                                                    onChange={handleInputChange}
+                                                    className="w-full bg-neutral-950 border border-yellow-500/50 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                                    placeholder="Ex: 000000-G/SP"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
 
                                     <button

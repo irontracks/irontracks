@@ -135,7 +135,7 @@ const extractExercises = (draft: any): WizardExercise[] => {
         raw: e 
       }
     })
-    .filter((e): e is WizardExercise => e !== null)
+    .filter((e: WizardExercise | null): e is WizardExercise => e !== null)
 }
 
 export const normalizeDraft = (draft: any): WizardDraft => {

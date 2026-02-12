@@ -358,7 +358,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                 {/* Media Preview */}
                 <div className={`relative w-full h-full max-h-[80vh] flex items-center justify-center overflow-hidden transition-all duration-300 ${filter.class}`} id="preview-img">
                     {mediaType === 'image' ? (
-                        <img src={previewUrl || ''} className="w-full h-full object-contain" alt="Preview" />
+                        previewUrl ? (
+                          <Image src={previewUrl} alt="Preview" fill sizes="100vw" className="object-contain" unoptimized />
+                        ) : null
                     ) : (
                         <video 
                             ref={videoRef}
@@ -465,8 +467,10 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     className="flex flex-col items-center gap-2 shrink-0 snap-center"
                                 >
                                     <div className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${filter.name === f.name ? 'border-yellow-500' : 'border-transparent'}`}>
-                                        <div className={`w-full h-full bg-neutral-800 ${f.class}`}>
-                                            {mediaType === 'image' && <img src={previewUrl || ''} className="w-full h-full object-cover" />}
+                                        <div className={`relative w-full h-full bg-neutral-800 ${f.class}`}>
+                                            {mediaType === 'image' && previewUrl ? (
+                                              <Image src={previewUrl} alt="" fill sizes="64px" className="object-cover" unoptimized />
+                                            ) : null}
                                             {mediaType === 'video' && <div className="w-full h-full bg-neutral-700" />}
                                         </div>
                                     </div>

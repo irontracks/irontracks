@@ -51,6 +51,32 @@ const normalizePixImageSrc = (encodedImage: string) => {
   return `data:image/png;base64,${s}`
 }
 
+const renderFeatureText = (feature: string) => {
+  const raw = String(feature || '')
+  if (!raw) return null
+  const [left, ...rest] = raw.split(':')
+  const right = rest.join(':').trim()
+  const renderSegments = (value: string, keyPrefix: string) => {
+    const parts = String(value || '').split(/(Ilimitado)/i)
+    return parts.map((part, index) => {
+      if (!part) return null
+      const isUnlimited = part.toLowerCase() === 'ilimitado'
+      return isUnlimited ? (
+        <strong key={`${keyPrefix}-u-${index}`} className="text-white">{part}</strong>
+      ) : (
+        <span key={`${keyPrefix}-t-${index}`}>{part}</span>
+      )
+    })
+  }
+  if (!right) return <>{renderSegments(left, 'left')}</>
+  return (
+    <>
+      <span>{renderSegments(left, 'left')}</span>
+      <strong className="text-white ml-1">{right}</strong>
+    </>
+  )
+}
+
 const toCheckoutUserMessage = (raw: string) => {
   const s = String(raw || '').trim()
   if (!s) return 'Erro ao criar cobrança.'
@@ -409,7 +435,7 @@ export default function MarketplaceClient() {
                     {tier.features.map((feat, idx) => (
                         <li key={idx} className="flex items-start gap-3 text-sm text-neutral-300">
                             <Check size={16} className={`mt-0.5 ${tier.color}`} />
-                            <span dangerouslySetInnerHTML={{ __html: feat.replace(/:/g, ':<strong class="text-white ml-1">').replace(/Ilimitado/g, '<strong class="text-white">Ilimitado</strong>') }} />
+                            <span>{renderFeatureText(feat)}</span>
                         </li>
                     ))}
                 </ul>

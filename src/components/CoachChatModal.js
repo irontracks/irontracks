@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
 
@@ -34,9 +34,9 @@ export default function CoachChatModal({
         if (isOpen) {
             setTimeout(() => inputRef.current?.focus(), 100);
         }
-    }, [isOpen]);
+    }, [analyzeSession, isOpen, messages.length]);
 
-    const analyzeSession = () => {
+    const analyzeSession = useCallback(() => {
         setIsLoading(true);
         setTimeout(() => {
             if (!session && !previousSession) {
@@ -84,7 +84,7 @@ export default function CoachChatModal({
             setMessages([{ role: 'assistant', content: text }]);
             setIsLoading(false);
         }, 1000);
-    };
+    }, [session, previousSession]);
 
     const handleSend = async () => {
         if (!input.trim()) return;
