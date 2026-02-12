@@ -174,6 +174,10 @@ export default function MarketplaceClient() {
   const [iapPurchasing, setIapPurchasing] = useState(false)
   const [iapError, setIapError] = useState('')
 
+  useEffect(() => {
+    if (isIosNative) setBillingCycle('month')
+  }, [isIosNative])
+
   const goBack = useCallback(() => {
     if (selectedTier) {
         setSelectedTier(null)
@@ -530,7 +534,7 @@ export default function MarketplaceClient() {
             </div>
 
             {/* Billing Selection */}
-            <div className="grid grid-cols-2 gap-3 mt-8">
+            <div className={`grid ${isIosNative ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mt-8`}>
                 <button
                     onClick={() => setBillingCycle('month')}
                     className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'month' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
@@ -540,17 +544,19 @@ export default function MarketplaceClient() {
                     <div className="text-[10px] text-neutral-500 mt-1">Cobrado todo mês</div>
                 </button>
 
-                <button
-                    onClick={() => setBillingCycle('year')}
-                    className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'year' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
-                >
-                    <div className="absolute -top-3 right-4 bg-green-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full">
-                        ECONOMIZE 17%
-                    </div>
-                    <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Anual</div>
-                    <div className="text-xl font-black text-white">{formatMoney(yearlyMonthlyEquivalent)}</div>
-                    <div className="text-[10px] text-neutral-500 mt-1">Cobrado {formatMoney(yearlyPrice)}/ano</div>
-                </button>
+                {!isIosNative ? (
+                  <button
+                      onClick={() => setBillingCycle('year')}
+                      className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'year' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
+                  >
+                      <div className="absolute -top-3 right-4 bg-green-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full">
+                          ECONOMIZE 17%
+                      </div>
+                      <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Anual</div>
+                      <div className="text-xl font-black text-white">{formatMoney(yearlyMonthlyEquivalent)}</div>
+                      <div className="text-[10px] text-neutral-500 mt-1">Cobrado {formatMoney(yearlyPrice)}/ano</div>
+                  </button>
+                ) : null}
             </div>
 
             {/* Action Button */}
