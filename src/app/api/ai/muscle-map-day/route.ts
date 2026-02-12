@@ -283,11 +283,20 @@ export async function POST(req: Request) {
     if (refreshAi && apiKey && missingUnique.length && maxAi > 0) {
       let cursor = 0
       let aiBudgetUsed = 0
+      let aiError = ''
       while (cursor < missingUnique.length && aiBudgetUsed < maxAi) {
         const batchSize = Math.min(batchLimit, maxAi - aiBudgetUsed)
         const batch = missingUnique.slice(cursor, cursor + batchSize)
         if (!batch.length) break
-        const newlyMapped = await classifyExercisesWithAi(apiKey, batch)
+        let newlyMapped: any[] = []
+        try {
+          newlyMapped = await classifyExercisesWithAi(apiKey, batch)
+        } catch (e: any) {
+          aiError = e?.message ? String(e.message) : String(e)
+          ai.status = aiError.includes('429') ? 'rate_limited' : 'failed'
+          ai.error = aiError
+          break
+        }
         if (newlyMapped.length) {
           const rows = newlyMapped.map((it: any) => ({
             user_id: userId,
@@ -304,7 +313,7 @@ export async function POST(req: Request) {
         aiBudgetUsed += batch.length
         cursor += batch.length
       }
-      ai.status = 'ok'
+      if (!aiError && ai.status === 'pending') ai.status = 'ok'
     }
 
     const muscleIds = MUSCLE_GROUPS.map((m) => m.id)
@@ -430,4 +439,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

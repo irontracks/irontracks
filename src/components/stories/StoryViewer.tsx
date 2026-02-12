@@ -115,6 +115,13 @@ export default function StoryViewer({
     if (!sid) return ''
     return `/api/social/stories/media?storyId=${encodeURIComponent(sid)}`
   }, [storyId, storyMediaUrl])
+  const imageSrc = useMemo(() => {
+    const sid = String(storyId || '').trim()
+    const direct = String(storyMediaUrl || '').trim()
+    if (direct) return direct
+    if (!sid) return ''
+    return `/api/social/stories/media?storyId=${encodeURIComponent(sid)}`
+  }, [storyId, storyMediaUrl])
   const isIOS = useMemo(() => {
     const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
     return isIOSUserAgent(ua)
@@ -544,7 +551,7 @@ export default function StoryViewer({
                     )}
                   </>
                 ) : (
-                  <Image src={story.mediaUrl} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" priority />
+                  <Image src={imageSrc} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" priority unoptimized />
                 )
               ) : (
                 <div className="text-neutral-500 font-bold">Mídia indisponível</div>

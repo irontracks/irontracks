@@ -14,6 +14,7 @@
     "start": "next start",
     "lint": "eslint",
     "deploy": "echo '⛔️ PARE! O deploy agora é automático via GitHub. Faça commit e push na main.' && exit 1",
+    "e2e:deload": "node scripts/e2e/deload.e2e.js",
     "postversion": "git push && git push --tags",
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open ios"

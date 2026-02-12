@@ -271,13 +271,6 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
         </div>
       ) : null}
 
-      {ordered.length > 0 && ordered.every((g) => !Array.isArray(g.stories) || g.stories.length === 0) && !error ? (
-        <div className="mt-2 px-1 text-[11px] text-neutral-400 font-bold">
-          Sem stories por enquanto. Para postar: abra a <span className="text-neutral-200">Foto</span> no relatório do treino e toque em{' '}
-          <span className="text-neutral-200">Postar no IronTracks (24h)</span> ou clique no <span className="text-neutral-200">+</span> do seu avatar.
-        </div>
-      ) : null}
-
       {open && currentGroup ? (
         <StoryViewer
           group={currentGroup}

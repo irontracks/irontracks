@@ -229,6 +229,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     }, [preCheckinOpen, user?.id])
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [whatsNewOpen, setWhatsNewOpen] = useState(false)
+    const [pendingUpdate, setPendingUpdate] = useState(null)
     const [isCoach, setIsCoach] = useState(false);
     const initialRole = String(initialProfile?.role || '').toLowerCase()
     const [vipAccess, setVipAccess] = useState(() => ({
@@ -564,35 +565,53 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         const uid = user?.id ? String(user.id) : ''
         if (!uid) return
         if (!userSettingsApi?.loaded) return
-        const entry = getLatestWhatsNew()
-        if (!entry?.id) return
         const prefs = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
         if (prefs?.whatsNewAutoOpen === false) return
-        const lastSeenId = String(prefs?.whatsNewLastSeenId || '')
-        const lastSeenAt = Number(prefs?.whatsNewLastSeenAt || 0) || 0
-        const remind24h = prefs?.whatsNewRemind24h !== false
-        const within24h = lastSeenAt > 0 && Date.now() - lastSeenAt < 24 * 60 * 60 * 1000
-        if (lastSeenId === String(entry.id)) {
-            if (!remind24h) return
-            if (within24h) return
-        }
-        whatsNewShownRef.current = true
-        setWhatsNewOpen(true)
+        ;(async () => {
+            try {
+                const res = await fetch(`/api/updates/unseen?limit=1`)
+                const data = await res.json().catch(() => ({}))
+                const updates = Array.isArray(data?.updates) ? data.updates : []
+                const first = updates[0] || null
+                if (!first) return
+                try {
+                    await fetch('/api/updates/mark-prompted', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ updateId: String(first.id) })
+                    })
+                } catch {}
+                whatsNewShownRef.current = true
+                setWhatsNewOpen(true)
+                setPendingUpdate(first)
+            } catch {}
+        })()
     }, [user?.id, userSettingsApi?.loaded, userSettingsApi?.settings])
 
     const closeWhatsNew = useCallback(async () => {
         try {
             setWhatsNewOpen(false)
+            const updateId = pendingUpdate?.id ? String(pendingUpdate.id) : ''
+            if (updateId) {
+                try {
+                    await fetch('/api/updates/mark-viewed', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ updateId })
+                    })
+                } catch {}
+                setPendingUpdate(null)
+                return
+            }
             const entry = getLatestWhatsNew()
             if (!entry?.id) return
             const prev = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
-            const prevSeenId = String(prev?.whatsNewLastSeenId || '')
             const nextSeenAt = Date.now()
             const next = { ...(prev || {}), whatsNewLastSeenId: String(entry.id), whatsNewLastSeenAt: nextSeenAt }
             try { userSettingsApi?.setSettings?.(next) } catch {}
             try { await userSettingsApi?.save?.(next) } catch {}
         } catch {}
-    }, [userSettingsApi])
+    }, [userSettingsApi, pendingUpdate])
     const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
 
     const setUrlTabParam = useCallback((nextTab) => {
@@ -3405,7 +3424,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 {whatsNewOpen && (
                     <WhatsNewModal
                         isOpen={whatsNewOpen}
-                        entry={getLatestWhatsNew()}
+                        entry={pendingUpdate ? null : getLatestWhatsNew()}
+                        update={pendingUpdate ? {
+                            id: String(pendingUpdate?.id || ''),
+                            version: pendingUpdate?.version || null,
+                            title: String(pendingUpdate?.title || ''),
+                            description: String(pendingUpdate?.description || ''),
+                            release_date: String(pendingUpdate?.release_date || pendingUpdate?.releaseDate || '') || null,
+                        } : null}
                         onClose={closeWhatsNew}
                     />
                 )}
@@ -3545,8 +3571,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                         settings={userSettingsApi?.settings ?? null}
                         userRole={user?.role || ''}
                         saving={Boolean(userSettingsApi?.saving)}
-                        onOpenWhatsNew={() => {
+                        onOpenWhatsNew={async () => {
                             setSettingsOpen(false)
+                            if (!pendingUpdate) {
+                                try {
+                                    const res = await fetch(`/api/updates/unseen?limit=1`)
+                                    const data = await res.json().catch(() => ({}))
+                                    const updates = Array.isArray(data?.updates) ? data.updates : []
+                                    const first = updates[0] || null
+                                    if (first) {
+                                        try {
+                                            await fetch('/api/updates/mark-prompted', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ updateId: String(first.id) })
+                                            })
+                                        } catch {}
+                                        setPendingUpdate(first)
+                                    }
+                                } catch {}
+                            }
                             setWhatsNewOpen(true)
                         }}
                         onSave={async (next) => {

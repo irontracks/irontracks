@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
@@ -93,6 +93,35 @@ const isWeekPayload = (data: ApiPayload | null): data is ApiPayloadWeek => {
 }
 
 const PREFILL_KEY = 'irontracks_wizard_prefill_v1'
+const CACHE_PREFIX = 'irontracks_muscle_map_cache_v1'
+const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000
+const MIN_FETCH_INTERVAL_MS = 60 * 1000
+const CACHE_TTL_MS = 10 * 60 * 1000
+
+const buildCacheKey = (period: 'day' | 'week', date: string) => `${CACHE_PREFIX}_${period}_${period === 'day' ? date : 'week'}`
+
+const readCache = (key: string) => {
+  try {
+    if (typeof window === 'undefined') return null
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const cachedAt = Number(parsed?.cachedAt || 0)
+    const data = parsed?.data
+    if (!cachedAt || !data) return null
+    const stale = Date.now() - cachedAt > CACHE_TTL_MS
+    return { data, cachedAt, stale }
+  } catch {
+    return null
+  }
+}
+
+const writeCache = (key: string, data: ApiPayload) => {
+  try {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(key, JSON.stringify({ cachedAt: Date.now(), data }))
+  } catch {}
+}
 
 export default function MuscleMapCard(props: Props) {
   const [period, setPeriod] = useState<'day' | 'week'>(props.defaultViewMode || 'week')
@@ -106,32 +135,103 @@ export default function MuscleMapCard(props: Props) {
     data: null,
     error: '',
   })
+  const [autoSync, setAutoSync] = useState<{ status: 'idle' | 'loading' | 'error'; error: string; lastAt: number }>({
+    status: 'idle',
+    error: '',
+    lastAt: 0,
+  })
+  const [dataUpdatedAt, setDataUpdatedAt] = useState(0)
 
-  const load = useCallback(async (opts?: { refreshCache?: boolean; refreshAi?: boolean }) => {
-    setState((p) => ({ ...p, status: 'loading', error: '' }))
-    const res =
-      period === 'day'
-        ? await getMuscleMapDay({
-            date: selectedDate,
-            tzOffsetMinutes: new Date().getTimezoneOffset(),
-            refreshAi: !!opts?.refreshAi,
-            maxAi: 400,
-            batchLimit: 40,
-          })
-        : await getMuscleMapWeek({ refreshCache: !!opts?.refreshCache, refreshAi: !!opts?.refreshAi })
-    if (!res?.ok) {
-      setState({ status: 'error', data: null, error: String(res?.error || 'Falha ao carregar mapa muscular') })
-      return
-    }
-    setState({ status: 'ready', data: res as ApiPayload, error: '' })
-  }, [period, selectedDate])
+  const inflightRef = useRef(false)
+  const lastFetchRef = useRef(0)
+  const autoErrorCountRef = useRef(0)
+
+  const load = useCallback(
+    async (opts?: { refreshCache?: boolean; refreshAi?: boolean; silent?: boolean; source?: 'init' | 'manual' | 'auto' }) => {
+      const now = Date.now()
+      if (inflightRef.current) return
+      if (opts?.source === 'auto' && now - lastFetchRef.current < MIN_FETCH_INTERVAL_MS) return
+      inflightRef.current = true
+      lastFetchRef.current = now
+      if (opts?.silent) {
+        setAutoSync((p) => ({ ...p, status: 'loading', error: '' }))
+      } else {
+        setState((p) => ({ ...p, status: 'loading', error: '' }))
+      }
+      try {
+        const res =
+          period === 'day'
+            ? await getMuscleMapDay({
+                date: selectedDate,
+                tzOffsetMinutes: new Date().getTimezoneOffset(),
+                refreshAi: !!opts?.refreshAi,
+                maxAi: 400,
+                batchLimit: 40,
+              })
+            : await getMuscleMapWeek({ refreshCache: !!opts?.refreshCache, refreshAi: !!opts?.refreshAi })
+        if (!res?.ok) {
+          const msg = String(res?.error || 'Falha ao carregar mapa muscular')
+          if (opts?.silent) {
+            autoErrorCountRef.current += 1
+            setAutoSync((p) => ({ ...p, status: 'error', error: 'Falha ao sincronizar mapa muscular. Tentando novamente em breve.' }))
+          } else {
+            setState((prev) => ({ ...prev, status: 'error', error: msg }))
+          }
+          return
+        }
+        autoErrorCountRef.current = 0
+        const payload = res as ApiPayload
+        setState({ status: 'ready', data: payload, error: '' })
+        setAutoSync({ status: 'idle', error: '', lastAt: now })
+        setDataUpdatedAt(now)
+        const cacheKey = buildCacheKey(period, selectedDate)
+        writeCache(cacheKey, payload)
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e || 'Falha ao carregar mapa muscular')
+        if (opts?.silent) {
+          autoErrorCountRef.current += 1
+          setAutoSync((p) => ({ ...p, status: 'error', error: 'Falha ao sincronizar mapa muscular. Tentando novamente em breve.' }))
+        } else {
+          setState((prev) => ({ ...prev, status: 'error', error: msg }))
+        }
+      } finally {
+        inflightRef.current = false
+      }
+    },
+    [period, selectedDate]
+  )
+
+  const cacheKey = useMemo(() => buildCacheKey(period, selectedDate), [period, selectedDate])
 
   useEffect(() => {
+    const cached = readCache(cacheKey)
+    if (cached?.data) {
+      setState((prev) => {
+        if (prev?.data && dataUpdatedAt && cached.cachedAt <= dataUpdatedAt) return prev
+        return { status: 'ready', data: cached.data as ApiPayload, error: '' }
+      })
+      if (!dataUpdatedAt || cached.cachedAt > dataUpdatedAt) setDataUpdatedAt(cached.cachedAt)
+      if (cached.stale) {
+        load({ silent: true, source: 'auto' }).catch(() => setAutoSync((p) => ({ ...p, status: 'error', error: 'Falha ao sincronizar mapa muscular. Tentando novamente em breve.' })))
+      }
+      return
+    }
     const t = window.setTimeout(() => {
-      load().catch(() => setState({ status: 'error', data: null, error: 'Falha ao carregar mapa muscular' }))
+      load({ source: 'init' }).catch(() => setState({ status: 'error', data: null, error: 'Falha ao carregar mapa muscular' }))
     }, 0)
     return () => {
       window.clearTimeout(t)
+    }
+  }, [cacheKey, dataUpdatedAt, load])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      load({ silent: true, source: 'auto' }).catch(() => setAutoSync((p) => ({ ...p, status: 'error', error: 'Falha ao sincronizar mapa muscular. Tentando novamente em breve.' })))
+    }, AUTO_SYNC_INTERVAL_MS)
+    return () => {
+      window.clearInterval(intervalId)
     }
   }, [load])
 
@@ -227,7 +327,7 @@ export default function MuscleMapCard(props: Props) {
           `Ainda sem mapa: ${Number((res?.remainingUnmapped || []).length || 0).toLocaleString('pt-BR')}`
       )
     } catch {}
-    await load({ refreshCache: true, refreshAi: false })
+    await load({ refreshCache: true, refreshAi: false, source: 'manual' })
   }, [backfill.status, load])
 
   return (
@@ -254,6 +354,19 @@ export default function MuscleMapCard(props: Props) {
               </span>
               <span className="text-neutral-600">•</span>
               <span>{aiLabel}</span>
+              <span className="text-neutral-600">•</span>
+              <span className="inline-flex items-center gap-1 text-neutral-500">
+                {autoSync.status === 'loading' ? <Loader2 size={12} className="animate-spin" /> : null}
+                {autoSync.status === 'error' ? 'Sync falhou' : 'Sync ativo'}
+              </span>
+              {autoSync.lastAt ? (
+                <>
+                  <span className="text-neutral-600">•</span>
+                  <span className="text-neutral-500">
+                    Atualizado {new Date(autoSync.lastAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </>
+              ) : null}
               {weakMuscles.length ? (
                 <>
                   <span className="text-neutral-600">•</span>
@@ -284,6 +397,7 @@ export default function MuscleMapCard(props: Props) {
       </div>
 
       {state.status === 'error' ? <div className="mt-3 text-sm font-semibold text-red-300">{state.error}</div> : null}
+      {autoSync.status === 'error' ? <div className="mt-2 text-xs font-semibold text-amber-300">{autoSync.error}</div> : null}
 
       <AnimatePresence initial={false}>
         {expanded && (
@@ -374,7 +488,7 @@ export default function MuscleMapCard(props: Props) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    load({ refreshCache: true, refreshAi: false })
+                    load({ refreshCache: true, refreshAi: false, source: 'manual' })
                   }}
                   disabled={state.status === 'loading'}
                   className="min-h-[40px] px-3 rounded-xl bg-black border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-950 disabled:opacity-60 inline-flex items-center gap-2"
@@ -386,7 +500,7 @@ export default function MuscleMapCard(props: Props) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation()
-                    load({ refreshCache: true, refreshAi: true })
+                    load({ refreshCache: true, refreshAi: true, source: 'manual' })
                   }}
                   disabled={state.status === 'loading'}
                   className="min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-60 inline-flex items-center gap-2"
@@ -422,7 +536,13 @@ export default function MuscleMapCard(props: Props) {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3">
+        <motion.div
+          key={`map-${dataUpdatedAt}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.25 }}
+          className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3"
+        >
           <BodyMapSvg
             view={view}
             muscles={musclesForView}
@@ -445,9 +565,9 @@ export default function MuscleMapCard(props: Props) {
               <div className="h-2 rounded-full mt-1" style={{ background: '#ef4444' }} />
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="lg:col-span-2 space-y-3">
+        <motion.div key={`details-${dataUpdatedAt}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="lg:col-span-2 space-y-3">
           <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Detalhes</div>
@@ -563,7 +683,7 @@ export default function MuscleMapCard(props: Props) {
                 ))}
             </div>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">

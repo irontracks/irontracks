@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar } from 'lucide-react';
 import { APP_VERSION } from '@/lib/version';
 import { createClient } from '@/utils/supabase/client';
-import LoadingScreen from '@/components/LoadingScreen';
 
 const LoginScreen = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -26,9 +25,7 @@ const LoginScreen = () => {
         confirmPassword: '',
         fullName: '',
         phone: '',
-        birthDate: '',
-        isTeacher: false,
-        cref: ''
+        birthDate: ''
     });
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
@@ -53,14 +50,11 @@ const LoginScreen = () => {
         full_name: '',
         email: '',
         phone: '',
-        birth_date: '',
-        is_teacher: false,
-        cref: ''
+        birth_date: ''
     });
 
     const getOAuthHref = (provider) => {
         const safeProvider = String(provider || '').trim().toLowerCase() === 'apple' ? 'apple' : 'google';
-        let holdLoading = false;
         try {
             const url = new URL(window.location.href);
             const fromQuery = String(url.searchParams.get('next') || '').trim();
@@ -73,8 +67,7 @@ const LoginScreen = () => {
 
     const recoverCooldownLeft = useMemo(() => {
         if (!recoverCooldownUntil) return 0;
-        const now = Date.now() + cooldownTick;
-        return Math.max(0, Math.ceil((recoverCooldownUntil - now) / 1000));
+        return Math.max(0, Math.ceil((recoverCooldownUntil - Date.now()) / 1000));
     }, [recoverCooldownUntil, cooldownTick]);
 
     useEffect(() => {
@@ -126,8 +119,6 @@ const LoginScreen = () => {
         setIsLoading(true);
         setErrorMsg('');
 
-        let holdLoading = false;
-
         try {
             const supabase = createClient();
             const email = emailData.email.trim();
@@ -144,18 +135,11 @@ const LoginScreen = () => {
                     localStorage.removeItem('it_remembered_email');
                 }
 
-                holdLoading = true;
                 window.location.href = '/dashboard';
             } 
             else if (authMode === 'signup') {
                 if (password !== emailData.confirmPassword) {
                     throw new Error('As senhas não coincidem.');
-                }
-
-                const isTeacher = emailData.isTeacher === true
-                const cref = String(emailData.cref || '').trim()
-                if (isTeacher && !cref) {
-                    throw new Error('CREF é obrigatório para cadastro de professor.');
                 }
                 
                 const cleanPhone = emailData.phone.replace(/\D/g, '');
@@ -171,9 +155,7 @@ const LoginScreen = () => {
                             email, 
                             full_name: emailData.fullName,
                             phone: emailData.phone,
-                            birth_date: emailData.birthDate,
-                            role_requested: isTeacher ? 'teacher' : 'student',
-                            cref: isTeacher ? cref : null
+                            birth_date: emailData.birthDate
                         }),
                     });
                     const json = await res.json().catch(() => ({}));
@@ -192,9 +174,7 @@ const LoginScreen = () => {
                             full_name: emailData.fullName,
                             display_name: emailData.fullName,
                             phone: emailData.phone,
-                            birth_date: emailData.birthDate,
-                            role_requested: isTeacher ? 'teacher' : 'student',
-                            cref: isTeacher ? cref : null
+                            birth_date: emailData.birthDate
                         }
                     }
                 });
@@ -206,7 +186,6 @@ const LoginScreen = () => {
                 }
 
                 // Auto login usually happens, or check email confirmation
-                holdLoading = true;
                 window.location.href = '/wait-approval';
             }
             else if (authMode === 'recover') {
@@ -237,7 +216,6 @@ const LoginScreen = () => {
 
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                holdLoading = true;
                 window.location.href = '/dashboard';
             }
         } catch (err) {
@@ -251,7 +229,7 @@ const LoginScreen = () => {
             }
             setErrorMsg(msg);
         } finally {
-            if (!holdLoading) setIsLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -279,17 +257,11 @@ const LoginScreen = () => {
              return;
         }
         
-        const payload = {
-            ...formData,
-            role_requested: formData.is_teacher ? 'teacher' : 'student',
-            cref: formData.is_teacher ? formData.cref : null
-        };
-
         try {
             const res = await fetch('/api/access-request/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(formData)
             });
             
             const json = await res.json();
@@ -313,7 +285,6 @@ const LoginScreen = () => {
 
     return (
         <div className="relative flex flex-col items-center justify-center min-h-[100dvh] overflow-hidden bg-neutral-950 text-white p-6">
-            {isLoading && <LoadingScreen />}
             {/* Spotlight Gradient Background */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] opacity-60" />
@@ -354,7 +325,7 @@ const LoginScreen = () => {
                         <div className="flex items-center mb-2">
                             <button 
                                 type="button" 
-                                onClick={() => { setAuthMode('login'); setErrorMsg(''); }}
+                                onClick={() => { setAuthMode('menu'); setErrorMsg(''); }}
                                 className="p-2 -ml-2 text-neutral-400 hover:text-white transition-colors"
                             >
                                 <ArrowLeft size={20} />
@@ -409,36 +380,6 @@ const LoginScreen = () => {
                                             className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs"
                                         />
                                     </div>
-                                </div>
-                                <div className="pt-2">
-                                    <label className="flex items-center gap-3 cursor-pointer group">
-                                        <div className="relative flex items-center justify-center w-5 h-5">
-                                            <input
-                                                type="checkbox"
-                                                checked={emailData.isTeacher}
-                                                onChange={(e) => setEmailData(prev => ({ ...prev, isTeacher: e.target.checked }))}
-                                                className="peer appearance-none w-5 h-5 bg-neutral-950 border border-neutral-800 rounded-md checked:bg-yellow-500 checked:border-yellow-500 transition-all cursor-pointer"
-                                            />
-                                            <CheckCircle2 size={12} className="absolute text-black opacity-0 peer-checked:opacity-100 pointer-events-none" />
-                                        </div>
-                                        <span className="text-xs font-bold text-neutral-400 group-hover:text-white transition-colors uppercase tracking-wide">
-                                            Sou Personal Trainer / Professor
-                                        </span>
-                                    </label>
-
-                                    {emailData.isTeacher && (
-                                        <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
-                                            <label className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
-                                            <input
-                                                required
-                                                name="cref"
-                                                value={emailData.cref}
-                                                onChange={e => setEmailData({ ...emailData, cref: e.target.value })}
-                                                className="w-full bg-neutral-950 border border-yellow-500/50 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                                placeholder="Ex: 000000-G/SP"
-                                            />
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -750,37 +691,6 @@ const LoginScreen = () => {
                                                 className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
                                             />
                                         </div>
-                                    </div>
-
-                                    <div className="pt-2">
-                                        <label className="flex items-center gap-3 cursor-pointer group">
-                                            <div className="relative flex items-center justify-center w-5 h-5">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.is_teacher}
-                                                    onChange={(e) => setFormData(prev => ({ ...prev, is_teacher: e.target.checked }))}
-                                                    className="peer appearance-none w-5 h-5 bg-neutral-950 border border-neutral-800 rounded-md checked:bg-yellow-500 checked:border-yellow-500 transition-all cursor-pointer"
-                                                />
-                                                <CheckCircle2 size={12} className="absolute text-black opacity-0 peer-checked:opacity-100 pointer-events-none" />
-                                            </div>
-                                            <span className="text-xs font-bold text-neutral-400 group-hover:text-white transition-colors uppercase tracking-wide">
-                                                Sou Personal Trainer / Professor
-                                            </span>
-                                        </label>
-
-                                        {formData.is_teacher && (
-                                            <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
-                                                <label className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
-                                                <input
-                                                    required
-                                                    name="cref"
-                                                    value={formData.cref}
-                                                    onChange={handleInputChange}
-                                                    className="w-full bg-neutral-950 border border-yellow-500/50 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                                    placeholder="Ex: 000000-G/SP"
-                                                />
-                                            </div>
-                                        )}
                                     </div>
 
                                     <button

@@ -423,7 +423,12 @@ export async function POST(req: Request) {
     const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean)))
     const mappingBatchLimit = refreshAi ? 60 : 20
     const toMapWithAi = apiKey ? missingUnique.slice(0, mappingBatchLimit) : []
-    const newlyMapped = toMapWithAi.length ? await classifyExercisesWithAi(apiKey as string, toMapWithAi) : []
+    let newlyMapped: any[] = []
+    if (toMapWithAi.length) {
+      try {
+        newlyMapped = await classifyExercisesWithAi(apiKey as string, toMapWithAi)
+      } catch {}
+    }
     if (newlyMapped.length) {
       const rows = newlyMapped.map((it: any) => ({
         user_id: userId,
@@ -586,10 +591,26 @@ export async function POST(req: Request) {
       workoutsCount: sessions.length,
     }
 
-    const insightsFromAi = refreshAi && apiKey ? await generateWeeklyInsightsWithAi(apiKey, insightInput) : null
+    let insightsFromAi = null
+    let aiError = ''
+    if (refreshAi && apiKey) {
+      try {
+        insightsFromAi = await generateWeeklyInsightsWithAi(apiKey, insightInput)
+      } catch (e: any) {
+        aiError = e?.message ? String(e.message) : String(e)
+      }
+    }
     const cachedInsights = cachedPayload?.insights && typeof cachedPayload.insights === 'object' ? cachedPayload.insights : null
     const insights = insightsFromAi || cachedInsights || { summary: [], imbalanceAlerts: [], recommendations: [] }
-    const aiStatus = refreshAi ? (apiKey ? (insightsFromAi ? 'ok' : 'failed') : 'missing_api_key') : 'skipped'
+    const aiStatus = refreshAi
+      ? apiKey
+        ? insightsFromAi
+          ? 'ok'
+          : aiError.includes('429')
+            ? 'rate_limited'
+            : 'failed'
+        : 'missing_api_key'
+      : 'skipped'
     const insightsStale = !insightsFromAi && !!cachedInsights && !!cachedUpdatedAtMs
 
     const topExercisesByMuscle = Object.fromEntries(

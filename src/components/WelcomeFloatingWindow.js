@@ -3,20 +3,57 @@ import { X, Sparkles, Crown, ArrowRight } from 'lucide-react';
 
 export default function WelcomeFloatingWindow({ user, onClose }) {
     const [isVisible, setIsVisible] = useState(false);
+    const WELCOME_SEEN_KEY_VERSION = 1;
+    const WELCOME_DELAY_MS = 1000;
 
     useEffect(() => {
-        // Check if already seen
-        const seen = localStorage.getItem('welcome_window_seen_v1');
-        if (!seen) {
-            // Small delay for smooth entrance
-            const t = setTimeout(() => setIsVisible(true), 1000);
-            return () => clearTimeout(t);
+        let cancelled = false;
+        let timer = null;
+        const uid = user?.id ? String(user.id) : '';
+        if (!uid) return;
+        try {
+            if (typeof window === 'undefined') return;
+        } catch {
+            return;
         }
-    }, []);
+        const key = `irontracks.vipWelcome.seen.v${WELCOME_SEEN_KEY_VERSION}.${uid}`;
+        let seen = false;
+        try {
+            seen = window.localStorage.getItem(key) === '1';
+        } catch {}
+        if (seen) return;
+        (async () => {
+            try {
+                const res = await fetch('/api/vip/welcome-status');
+                const data = await res.json().catch(() => ({}));
+                if (!data?.ok || !data?.hasVip || !data?.shouldShow) return;
+                timer = window.setTimeout(() => {
+                    if (!cancelled) setIsVisible(true);
+                }, WELCOME_DELAY_MS);
+            } catch {}
+        })();
+        return () => {
+            cancelled = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, [user?.id]);
 
     const handleClose = () => {
         setIsVisible(false);
-        localStorage.setItem('welcome_window_seen_v1', 'true');
+        const uid = user?.id ? String(user.id) : '';
+        if (uid) {
+            const key = `irontracks.vipWelcome.seen.v${WELCOME_SEEN_KEY_VERSION}.${uid}`;
+            try {
+                localStorage.setItem(key, '1');
+            } catch {}
+        }
+        try {
+            fetch('/api/vip/welcome-seen', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            }).catch(() => {});
+        } catch {}
         if (onClose) onClose();
     };
 
