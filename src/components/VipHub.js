@@ -5,9 +5,11 @@ import { Crown, Sparkles, ArrowRight, Lock, MessageSquare, CalendarDays, Trendin
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { createWorkout } from '@/actions/workout-actions'
 import { vipPlaybooks } from '@/content/vipPlaybooks'
+import { isIosNative } from '@/utils/platform'
 
 export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab }) {
   const isLocked = !!locked
+  const hideVipCtas = useMemo(() => isIosNative(), [])
   const name = useMemo(() => String(user?.displayName || user?.name || '').trim(), [user?.displayName, user?.name])
   const [mode, setMode] = useState('coach')
   const [draft, setDraft] = useState('')
@@ -213,7 +215,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
             <div className="w-16 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
                 <div className={`h-full rounded-full ${isClose ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${pct}%` }} />
             </div>
-            {isClose && (
+            {isClose && !hideVipCtas && (
                 <button 
                     onClick={() => window.location.href = '/marketplace'}
                     className="text-[10px] font-black uppercase text-yellow-500 hover:text-yellow-400"
@@ -236,12 +238,18 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                 Desbloqueie o Coach IA, Nutrição Avançada, Histórico Ilimitado e muito mais.
             </p>
         </div>
-        <button
-            onClick={() => window.location.href = '/marketplace'}
-            className="px-8 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all scale-105"
-        >
-            Ver Planos e Assinar
-        </button>
+        {!hideVipCtas ? (
+          <button
+              onClick={() => window.location.href = '/marketplace'}
+              className="px-8 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all scale-105"
+          >
+              Ver Planos e Assinar
+          </button>
+        ) : (
+          <div className="text-xs font-bold text-neutral-400">
+            Planos indisponíveis no iOS no momento.
+          </div>
+        )}
       </div>
     )
   }
@@ -321,7 +329,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                                     : 'bg-yellow-500/10 border border-yellow-500/20 text-white'
                         }`}>
                             {m.text}
-                            {m.isLimit && (
+                            {m.isLimit && !hideVipCtas && (
                                 <button 
                                     onClick={() => window.location.href = '/marketplace'}
                                     className="block mt-2 text-xs font-black uppercase text-yellow-500 hover:underline"

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Bell, Calendar, Cog, Command, CreditCard, History, LogOut, MessageSquare, Sparkles, Users } from 'lucide-react'
+import { isIosNative } from '@/utils/platform'
 
 export default function HeaderActionsMenu({
   user,
@@ -22,6 +23,7 @@ export default function HeaderActionsMenu({
 }) {
   const [open, setOpen] = useState(false)
   const [cancellingVip, setCancellingVip] = useState(false)
+  const hideVipCtas = isIosNative()
 
   useEffect(() => {
     if (!open) return
@@ -206,15 +208,17 @@ export default function HeaderActionsMenu({
                 <span className="flex-1 text-neutral-200 group-hover:text-white">Configurações</span>
               </button>
 
-              <button
-                type="button"
-                disabled={cancellingVip}
-                onClick={cancelVip}
-                className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-60"
-              >
-                <CreditCard size={16} className="text-red-500" />
-                <span className="flex-1 text-neutral-200 group-hover:text-white">Cancelar assinatura VIP</span>
-              </button>
+              {!hideVipCtas ? (
+                <button
+                  type="button"
+                  disabled={cancellingVip}
+                  onClick={cancelVip}
+                  className="group w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-60"
+                >
+                  <CreditCard size={16} className="text-red-500" />
+                  <span className="flex-1 text-neutral-200 group-hover:text-white">Cancelar assinatura VIP</span>
+                </button>
+              ) : null}
 
               <div className="h-px bg-neutral-800 my-1" />
 

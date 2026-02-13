@@ -5,8 +5,8 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import { ArrowLeft, Check, Copy, CreditCard, ExternalLink, QrCode, X, Zap, Crown, Star, AlertTriangle, ChevronRight, Sparkles, Calendar } from 'lucide-react'
-import { Capacitor } from '@capacitor/core'
 import { Purchases, CustomerInfo, PurchasesOfferings, PurchasesPackage } from '@revenuecat/purchases-capacitor'
+import { isIosNative as getIsIosNative } from '@/utils/platform'
 
 type AppPlan = {
   id: string
@@ -144,13 +144,7 @@ const TIERS = {
 export default function MarketplaceClient() {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
-  const isIosNative = useMemo(() => {
-    try {
-      return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios'
-    } catch {
-      return false
-    }
-  }, [])
+  const isIosNative = useMemo(() => getIsIosNative(), [])
 
   const [userId, setUserId] = useState<string>('')
   const [plans, setPlans] = useState<AppPlan[]>([])

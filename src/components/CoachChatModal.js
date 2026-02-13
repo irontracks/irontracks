@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
+import { isIosNative } from '@/utils/platform';
 
 export default function CoachChatModal({
     isOpen,
@@ -150,6 +151,7 @@ export default function CoachChatModal({
     };
 
     if (!isOpen) return null;
+    const hideVipCtas = isIosNative();
 
     return (
         <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -190,12 +192,18 @@ export default function CoachChatModal({
                                 {msg.isBlock ? (
                                     <div className="flex flex-col gap-3">
                                         <div>{msg.content}</div>
-                                        <button 
-                                            onClick={() => onUpgrade ? onUpgrade() : (window.location.href = '/marketplace')}
-                                            className="bg-yellow-500 text-black font-black px-4 py-2 rounded-xl text-xs uppercase tracking-widest hover:bg-yellow-400 transition-colors w-full sm:w-auto"
-                                        >
-                                            Ver Planos VIP
-                                        </button>
+                                        {!hideVipCtas ? (
+                                            <button 
+                                                onClick={() => onUpgrade ? onUpgrade() : (window.location.href = '/marketplace')}
+                                                className="bg-yellow-500 text-black font-black px-4 py-2 rounded-xl text-xs uppercase tracking-widest hover:bg-yellow-400 transition-colors w-full sm:w-auto"
+                                            >
+                                                Ver Planos VIP
+                                            </button>
+                                        ) : (
+                                            <div className="text-xs font-bold text-neutral-400">
+                                                Planos indisponíveis no iOS no momento.
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     msg.content
