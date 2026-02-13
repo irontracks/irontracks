@@ -3063,7 +3063,7 @@ export default function ActiveWorkout(props) {
                           aria-label={`Iniciar descanso ${safeRestSec}s`}
                         >
                           <Clock size={14} className="text-yellow-500" />
-                          <span className="text-xs font-bold">{safeRestSec}s</span>
+                          <span className="text-xs font-black">{safeRestSec}s</span>
                         </button>
                       ) : null}
                       <div className="mt-2 grid grid-cols-2 gap-2">
