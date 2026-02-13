@@ -29,6 +29,7 @@ import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
 import { normalizeWorkoutTitle, workoutTitleKey } from '@/utils/workoutTitle';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
+import { adminFetchJson } from '@/utils/admin/adminFetch';
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
 const COACH_INBOX_DEFAULTS = {
@@ -47,6 +48,16 @@ const AdminPanelV2 = ({ user, onClose }) => {
     const supabaseRef = useRef(null);
     if (!supabaseRef.current) supabaseRef.current = createClient();
     const supabase = supabaseRef.current;
+    const getAdminAuthHeaders = useCallback(async () => {
+        try {
+            const { data } = await supabase.auth.getSession();
+            const token = data?.session?.access_token || '';
+            if (!token) return {};
+            return { Authorization: `Bearer ${token}` };
+        } catch {
+            return {};
+        }
+    }, [supabase]);
     
     // Permission Logic
     const isAdmin = user?.role === 'admin';
@@ -557,12 +568,12 @@ const AdminPanelV2 = ({ user, onClose }) => {
             try {
                 let list = [];
                 if (isAdmin) {
-                    const res = await fetch('/api/admin/students/list');
-                    const json = await res.json();
-                    if (json.ok) list = json.students || [];
-                    const legacyRes = await fetch('/api/admin/legacy-students');
-                    const legacyJson = await legacyRes.json();
-                    if (legacyJson.ok && legacyJson.students) {
+                    const authHeaders = await getAdminAuthHeaders();
+                    const json = await adminFetchJson(supabase, '/api/admin/students/list');
+                    if (json?.ok) list = json.students || [];
+
+                    const legacyJson = await adminFetchJson(supabase, '/api/admin/legacy-students');
+                    if (legacyJson?.ok && legacyJson.students) {
                         const existingIds = new Set(list.map(s => s.user_id || s.id));
                         const newLegacy = legacyJson.students.filter(s => !existingIds.has(s.id));
                         list = [...list, ...newLegacy];
@@ -587,9 +598,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                         // Fetch teachers via admin API to exclude
                         let teacherEmails = new Set();
                         try {
-                            const tRes = await fetch('/api/admin/teachers/list');
-                            const tJson = await tRes.json();
-                            if (tJson.ok) teacherEmails = new Set((tJson.teachers || []).map(t => (t.email || '').toLowerCase()));
+                            const tJson = await adminFetchJson(supabase, '/api/admin/teachers/list');
+                            if (tJson?.ok) teacherEmails = new Set((tJson.teachers || []).map(t => (t.email || '').toLowerCase()));
                         } catch {}
                         list = (profiles || [])
                             .filter(p => !p.email || !teacherEmails.has(p.email.toLowerCase()))
@@ -626,9 +636,11 @@ const AdminPanelV2 = ({ user, onClose }) => {
                     } catch { list = filtered; }
                     // Ensure dropdown has teachers (enriched with profiles.id mapping)
                     if (teachersList.length === 0) {
-                        const resT = await fetch('/api/admin/teachers/list');
-                        const jsonT = await resT.json();
-                        if (jsonT.ok) {
+                        let jsonT = null;
+                        try {
+                            jsonT = await adminFetchJson(supabase, '/api/admin/teachers/list');
+                        } catch {}
+                        if (jsonT?.ok) {
                             const base = jsonT.teachers || [];
                             try {
                                 const emails = base.map(t => t.email).filter(Boolean);
@@ -678,14 +690,19 @@ const AdminPanelV2 = ({ user, onClose }) => {
             } finally { setLoading(false); }
         };
         fetchStudents();
-    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, teachersList.length]);
+    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, teachersList.length, getAdminAuthHeaders]);
 
     useEffect(() => {
         if (tab === 'teachers' && isAdmin) {
             const fetchTeachers = async () => {
-                const res = await fetch('/api/admin/teachers/list');
-                const json = await res.json();
-                if (json.ok) {
+                const authHeaders = await getAdminAuthHeaders();
+                let json = null;
+                try {
+                    const res = await fetch('/api/admin/teachers/list', { headers: authHeaders });
+                    const raw = await res.text();
+                    json = raw ? JSON.parse(raw) : null;
+                } catch {}
+                if (json?.ok) {
                     const list = json.teachers || [];
                     const dedup = [];
                     const seen = new Set();
@@ -713,21 +730,22 @@ const AdminPanelV2 = ({ user, onClose }) => {
             };
             fetchTeachers();
         }
-    }, [tab, isAdmin, addingTeacher, editingTeacher, supabase]);
+    }, [tab, isAdmin, addingTeacher, editingTeacher, supabase, getAdminAuthHeaders]);
 
     const loadTeacherStudents = useCallback(async (teacher) => {
         const uid = String(teacher?.user_id || '').trim();
         if (!uid) { setTeacherStudents([]); return; }
         setTeacherStudentsLoading(true);
         try {
-            const res = await fetch(`/api/admin/teachers/students?teacher_user_id=${encodeURIComponent(uid)}`);
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch(`/api/admin/teachers/students?teacher_user_id=${encodeURIComponent(uid)}`, { headers: authHeaders });
             const json = await res.json().catch(() => ({}));
             if (!json?.ok) { setTeacherStudents([]); return; }
             setTeacherStudents(Array.isArray(json.students) ? json.students : []);
         } finally {
             setTeacherStudentsLoading(false);
         }
-    }, []);
+    }, [getAdminAuthHeaders]);
 
     const loadTeacherTemplates = useCallback(async (teacher, reset = false) => {
         const uid = String(teacher?.user_id || '').trim();
@@ -738,7 +756,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
             const cursor = reset ? '' : String(teacherTemplatesCursor || '');
             const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
             if (cursor) qs.set('cursor', cursor);
-            const res = await fetch(`/api/admin/teachers/workouts/templates?${qs.toString()}`);
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch(`/api/admin/teachers/workouts/templates?${qs.toString()}`, { headers: authHeaders });
             const json = await res.json().catch(() => ({}));
             if (!json?.ok) return;
             const rows = Array.isArray(json.rows) ? json.rows : [];
@@ -747,7 +766,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
         } finally {
             setTeacherTemplatesLoading(false);
         }
-    }, [teacherTemplatesCursor]);
+    }, [teacherTemplatesCursor, getAdminAuthHeaders]);
 
     const loadTeacherHistory = useCallback(async (teacher, reset = false) => {
         const uid = String(teacher?.user_id || '').trim();
@@ -759,7 +778,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
             const cur = reset ? null : teacherHistoryCursor;
             if (cur?.cursor_date) qs.set('cursor_date', String(cur.cursor_date));
             if (cur?.cursor_created_at) qs.set('cursor_created_at', String(cur.cursor_created_at));
-            const res = await fetch(`/api/admin/teachers/workouts/history?${qs.toString()}`);
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch(`/api/admin/teachers/workouts/history?${qs.toString()}`, { headers: authHeaders });
             const json = await res.json().catch(() => ({}));
             if (!json?.ok) return;
             const rows = Array.isArray(json.rows) ? json.rows : [];
@@ -768,21 +788,22 @@ const AdminPanelV2 = ({ user, onClose }) => {
         } finally {
             setTeacherHistoryLoading(false);
         }
-    }, [teacherHistoryCursor]);
+    }, [teacherHistoryCursor, getAdminAuthHeaders]);
 
     const loadTeacherInbox = useCallback(async (teacher) => {
         const uid = String(teacher?.user_id || '').trim();
         if (!uid) { setTeacherInboxItems([]); return; }
         setTeacherInboxLoading(true);
         try {
-            const res = await fetch(`/api/admin/teachers/inbox?teacher_user_id=${encodeURIComponent(uid)}&limit=80`);
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch(`/api/admin/teachers/inbox?teacher_user_id=${encodeURIComponent(uid)}&limit=80`, { headers: authHeaders });
             const json = await res.json().catch(() => ({}));
             if (!json?.ok) { setTeacherInboxItems([]); return; }
             setTeacherInboxItems(Array.isArray(json.items) ? json.items : []);
         } finally {
             setTeacherInboxLoading(false);
         }
-    }, []);
+    }, [getAdminAuthHeaders]);
 
     useEffect(() => {
         if (!selectedTeacher || !isAdmin) return;
@@ -839,7 +860,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                 let list = [];
                 if (isAdmin || isTeacher) {
                     try {
-                        const res = await fetch('/api/admin/workouts/mine');
+                        const authHeaders = await getAdminAuthHeaders();
+                        const res = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
                         const json = await res.json();
                         if (json.ok) {
                             list = (json.rows || []).filter((w) => w?.is_template === true && w?.user_id === currentUser.id);
@@ -909,7 +931,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             }
         };
         fetchTemplates();
-    }, [tab, isAdmin, isTeacher, supabase]);
+    }, [tab, isAdmin, isTeacher, supabase, getAdminAuthHeaders]);
 
     useEffect(() => {
         if (tab !== 'videos' || !isAdmin) return;
@@ -1068,7 +1090,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
             if (!currentUser) { setMyWorkoutsCount(0); return; }
             try {
                 if (isAdmin) {
-                    const res = await fetch('/api/admin/workouts/mine');
+                    const authHeaders = await getAdminAuthHeaders();
+                    const res = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
                     const json = await res.json();
                     if (json.ok) {
                         const byTitle = new Map();
@@ -1110,7 +1133,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             }
         };
         if (tab === 'dashboard') fetchMyWorkoutsCount();
-    }, [tab, isAdmin, supabase]);
+    }, [tab, isAdmin, supabase, getAdminAuthHeaders]);
 
     const fetchPriorities = useCallback(async () => {
         try {
@@ -1236,9 +1259,14 @@ const AdminPanelV2 = ({ user, onClose }) => {
             try {
                 const key = selectedStudent?.id || selectedStudent?.email || targetUserId;
                 if (key && !loadedStudentInfo.current.has(key)) {
-                    const resp = await fetch('/api/admin/students/list');
-                    const js = await resp.json();
-                    if (js.ok) {
+                    const authHeaders = await getAdminAuthHeaders();
+                    let js = null;
+                    try {
+                        const resp = await fetch('/api/admin/students/list', { headers: authHeaders });
+                        const raw = await resp.text();
+                        js = raw ? JSON.parse(raw) : null;
+                    } catch {}
+                    if (js?.ok) {
                         const row = (js.students || []).find(s => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || ((s.email || '').toLowerCase() === (selectedStudent.email || '').toLowerCase()));
                         if (row) {
                             const nextTeacher = row.teacher_id || null;
@@ -1292,7 +1320,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
             if (me) {
                 let my = [];
                 try {
-                    const resMine = await fetch('/api/admin/workouts/mine');
+                    const authHeaders = await getAdminAuthHeaders();
+                    const resMine = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
                     const jsonMine = await resMine.json();
                     if (jsonMine.ok) my = jsonMine.rows || [];
                     else {
@@ -1369,7 +1398,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             setLoading(false);
         };
         fetchDetails();
-    }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher]);
+    }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher, getAdminAuthHeaders]);
 
     useEffect(() => {
         if (!executionVideoEnabled) return;
@@ -1456,7 +1485,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
         if (!selectedStudent || !isAdmin) return;
         const loadTeachers = async () => {
             try {
-                const res = await fetch('/api/admin/teachers/list');
+                const authHeaders = await getAdminAuthHeaders();
+                const res = await fetch('/api/admin/teachers/list', { headers: authHeaders });
                 const json = await res.json();
                 if (json.ok) {
                     const base = json.teachers || [];
@@ -1494,7 +1524,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
             } catch {}
         };
         loadTeachers();
-    }, [selectedStudent, isAdmin, supabase]);
+    }, [selectedStudent, isAdmin, supabase, getAdminAuthHeaders]);
 
     const handleRegisterStudent = async () => {
         if (!newStudent.name || !newStudent.email) return await alert('Preencha nome e email.');
@@ -1622,7 +1652,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
             if (qq) qs.set('q', qq);
             if (rr && rr !== 'all') qs.set('role', rr);
             qs.set('limit', '200');
-            const res = await fetch(`/api/admin/user-activity/users?${qs.toString()}`);
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch(`/api/admin/user-activity/users?${qs.toString()}`, { headers: authHeaders });
             const json = await res.json().catch(() => null);
             if (!res.ok || !json?.ok) {
                 setUserActivityUsers([]);
@@ -1636,7 +1667,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
         } finally {
             setUserActivityLoading(false);
         }
-    }, [isAdmin]);
+    }, [isAdmin, getAdminAuthHeaders]);
 
     const loadUserActivitySummary = useCallback(async ({ userId, days } = {}) => {
         if (!isAdmin) return;
@@ -1646,7 +1677,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
         setUserActivitySummaryLoading(true);
         try {
             const qs = new URLSearchParams({ user_id: uid, days: String(d) });
-            const res = await fetch(`/api/admin/user-activity/summary?${qs.toString()}`);
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch(`/api/admin/user-activity/summary?${qs.toString()}`, { headers: authHeaders });
             const json = await res.json().catch(() => null);
             if (!res.ok || !json?.ok) {
                 setUserActivitySummary(null);
@@ -1658,7 +1690,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
         } finally {
             setUserActivitySummaryLoading(false);
         }
-    }, [isAdmin]);
+    }, [isAdmin, getAdminAuthHeaders]);
 
     const loadUserActivityEvents = useCallback(async ({ userId, before, reset = false } = {}) => {
         if (!isAdmin) return;
@@ -1668,7 +1700,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
         try {
             const qs = new URLSearchParams({ user_id: uid, limit: '80' });
             if (before) qs.set('before', String(before));
-            const res = await fetch(`/api/admin/user-activity/events?${qs.toString()}`);
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch(`/api/admin/user-activity/events?${qs.toString()}`, { headers: authHeaders });
             const json = await res.json().catch(() => null);
             if (!res.ok || !json?.ok) {
                 if (reset) setUserActivityEvents([]);
@@ -1682,7 +1715,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
         } finally {
             setUserActivityEventsLoading(false);
         }
-    }, [isAdmin]);
+    }, [isAdmin, getAdminAuthHeaders]);
 
     const loadUserActivityErrors = useCallback(async ({ userId } = {}) => {
         if (!isAdmin) return;
@@ -2603,7 +2636,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                             onChange={async (e) => {
                                                                 const newStatus = e.target.value;
                                                                 try {
-                                                                    const res = await fetch('/api/admin/students/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id, status: newStatus }) });
+                                                                    const authHeaders = await getAdminAuthHeaders();
+                                                                    const res = await fetch('/api/admin/students/status', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: s.id, status: newStatus }) });
                                                                     const json = await res.json();
                                                                     if (json.ok) setUsersList(prev => prev.map(x => x.id === s.id ? { ...x, status: newStatus } : x));
                                                                 } catch {}
@@ -2775,9 +2809,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 if (!(await confirm(`Gerar sugestões para até ${limit} exercícios sem vídeo?`, 'Gerar Sugestões (lote)'))) return;
                                                 setVideoLoading(true);
                                                 try {
+                                                    const authHeaders = await getAdminAuthHeaders();
                                                     const res = await fetch('/api/admin/exercise-videos/backfill', {
                                                         method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
+                                                        headers: { 'Content-Type': 'application/json', ...authHeaders },
                                                         body: JSON.stringify({ limit }),
                                                     });
                                                     const json = await res.json().catch(() => ({}));
@@ -2814,9 +2849,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 setVideoCycleStats({ processed: 0, created: 0, skipped: 0 });
                                                 try {
                                                     while (!videoCycleStopRef.current) {
+                                                        const authHeaders = await getAdminAuthHeaders();
                                                         const res = await fetch('/api/admin/exercise-videos/backfill', {
                                                             method: 'POST',
-                                                            headers: { 'Content-Type': 'application/json' },
+                                                            headers: { 'Content-Type': 'application/json', ...authHeaders },
                                                             body: JSON.stringify({ limit: perCycle }),
                                                         });
                                                         const json = await res.json().catch(() => ({}));
@@ -2878,9 +2914,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         if (!name) return;
                                         setVideoLoading(true);
                                         try {
+                                            const authHeaders = await getAdminAuthHeaders();
                                             const res = await fetch('/api/admin/exercise-videos/suggest', {
                                                 method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
+                                                headers: { 'Content-Type': 'application/json', ...authHeaders },
                                                 body: JSON.stringify({ name }),
                                             });
                                             const json = await res.json().catch(() => ({}));
@@ -2922,9 +2959,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                         if (!(await confirm(`Gerar sugestões em lote para até ${limit} exercícios sem vídeo?`, 'Backfill de Vídeos'))) return;
                                         setVideoLoading(true);
                                         try {
+                                            const authHeaders = await getAdminAuthHeaders();
                                             const res = await fetch('/api/admin/exercise-videos/backfill', {
                                                 method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
+                                                headers: { 'Content-Type': 'application/json', ...authHeaders },
                                                 body: JSON.stringify({ limit }),
                                             });
                                             const json = await res.json().catch(() => ({}));
@@ -3592,9 +3630,10 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                             setExerciseAliasesBackfillLoading(true);
                                             setExerciseAliasesNotice('');
                                             try {
+                                                const authHeaders = await getAdminAuthHeaders();
                                                 const res = await fetch('/api/admin/exercises/canonicalize/backfill', {
                                                     method: 'POST',
-                                                    headers: { 'content-type': 'application/json' },
+                                                    headers: { 'content-type': 'application/json', ...authHeaders },
                                                     body: JSON.stringify({ limit: 30 }),
                                                 });
                                                 const json = await res.json().catch(() => null);
@@ -3996,7 +4035,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 value={t.status || 'pendente'}
                                                 onChange={async (e) => {
                                                     const newStatus = e.target.value;
-                                                    const res = await fetch('/api/admin/teachers/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, status: newStatus }) });
+                                                    const authHeaders = await getAdminAuthHeaders();
+                                                    const res = await fetch('/api/admin/teachers/status', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: t.id, status: newStatus }) });
                                                     const json = await res.json();
                                                     if (json.ok) setTeachersList(prev => prev.map(x => x.id === t.id ? { ...x, status: newStatus } : x));
                                                 }}
@@ -4011,9 +4051,24 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 onClick={async () => {
                                                     if (await confirm(`Excluir professor ${t.name}?`)) {
                                                         try {
-                                                            const res = await fetch('/api/admin/teachers/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) });
-                                                            const json = await res.json();
-                                                            if (!json.ok) throw new Error(json.error || 'Falha ao excluir');
+                                                            const { data: sessionData } = await supabase.auth.getSession();
+                                                            const token = sessionData?.session?.access_token || '';
+                                                            if (!token) {
+                                                                await alert('Sessão expirada. Faça login novamente.');
+                                                                return;
+                                                            }
+                                                            const res = await fetch('/api/admin/teachers/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ id: t.id }) });
+                                                            let payload = null;
+                                                            try {
+                                                                const raw = await res.text();
+                                                                payload = raw ? JSON.parse(raw) : null;
+                                                            } catch (parseErr) {
+                                                                payload = null;
+                                                            }
+                                                            if (!payload || typeof payload !== 'object') {
+                                                                throw new Error(`Resposta inválida do servidor (${res.status})`);
+                                                            }
+                                                            if (!res.ok || !payload.ok) throw new Error(payload.error || `Falha ao excluir (${res.status})`);
                                                             setTeachersList(prev => prev.filter(x => x.id !== t.id));
                                                         } catch (err) {
                                                             await alert('Erro: ' + (err?.message ?? String(err)));
@@ -4028,7 +4083,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 <button
                                                     onClick={async () => {
                                                         try {
-                                                            const res = await fetch('/api/admin/teachers/status', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id, status: 'active' }) });
+                                                            const authHeaders = await getAdminAuthHeaders();
+                                                            const res = await fetch('/api/admin/teachers/status', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: t.id, status: 'active' }) });
                                                             const json = await res.json();
                                                             if (!json.ok) throw new Error(json.error || '');
                                                             setTeachersList(prev => prev.map(x => x.id === t.id ? { ...x, status: 'active' } : x));
@@ -4350,7 +4406,8 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                                 const raw = String(e.target.value || '').trim();
                                                                 const teacherUserId = raw.startsWith('uid:') ? raw.slice(4) : '';
                                                                 try {
-                                                                    const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null })});
+                                                                    const authHeaders = await getAdminAuthHeaders();
+                                                                    const res = await fetch('/api/admin/students/assign-teacher', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ student_id: selectedStudent.id || selectedStudent.user_id, email: selectedStudent.email || '', teacher_user_id: teacherUserId || null })});
                                                                     const json = await res.json();
                                                                     if (json.ok) {
                                                                         const nextTid = json.teacher_user_id || teacherUserId || null;
@@ -4362,9 +4419,13 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                                         ) ? { ...x, teacher_id: nextTid } : x));
                                                                         try { if (selectedStudent.email) localStorage.setItem('student_teacher_'+selectedStudent.email, nextTid || ''); } catch {}
                                                                         try {
-                                                                            const resp = await fetch('/api/admin/students/list');
-                                                                            const js = await resp.json();
-                                                                            if (js.ok) setUsersList(js.students || []);
+                                                                            let js = null;
+                                                                            try {
+                                                                                const resp = await fetch('/api/admin/students/list', { headers: authHeaders });
+                                                                                const raw = await resp.text();
+                                                                                js = raw ? JSON.parse(raw) : null;
+                                                                            } catch {}
+                                                                            if (js?.ok) setUsersList(js.students || []);
                                                                         } catch {}
                                                                     } else {
                                                                         await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));
@@ -4544,8 +4605,9 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 if (m2 && m2[1]) return m2[1];
                                                 return null;
                                             };
+                                            const authHeaders = await getAdminAuthHeaders();
                                             const res = await fetch('/api/admin/workouts/sync-templates', {
-                                                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders },
                                                 body: JSON.stringify({
                                                     id: payloadId,
                                                     email: payloadEmail,
@@ -4606,7 +4668,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16}/></button>
-                                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); setSyncedWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + (e?.message ?? String(e))); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
+                                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const authHeaders = await getAdminAuthHeaders(); const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); setSyncedWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + (e?.message ?? String(e))); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
                                                 </div>
                                             </div>
                                         ))}
@@ -4621,7 +4683,7 @@ const AdminPanelV2 = ({ user, onClose }) => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16}/></button>
-                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + (e?.message ?? String(e))); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
+                                    <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const authHeaders = await getAdminAuthHeaders(); const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: w.id }) }); const json = await res.json(); if (!json.ok) throw new Error(json.error || 'Falha ao remover'); setStudentWorkouts(prev => prev.filter(x => x.id !== w.id)); } catch (e) { await alert('Erro ao remover: ' + (e?.message ?? String(e))); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={18}/></button>
                         </div>
                     </div>
                 ))}

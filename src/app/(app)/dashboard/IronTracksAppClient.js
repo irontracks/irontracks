@@ -1,5 +1,5 @@
 'use client'
 
-import IronTracksAppClient from './IronTracksAppClient 3.js'
+import IronTracksAppClient from './IronTracksAppClientImpl.js'
 
 export default IronTracksAppClient

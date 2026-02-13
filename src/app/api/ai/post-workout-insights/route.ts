@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
+import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -140,6 +141,15 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response
     const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
+
+    const ip = getRequestIp(req)
+    const rl = checkRateLimit(`ai:post-workout-insights:${userId}:${ip}`, 15, 60_000)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'rate_limited' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+      )
+    }
 
     // Check VIP Limits (Counts as Insights Weekly)
     const { allowed, currentUsage, limit, tier } = await checkVipFeatureAccess(supabase, userId, 'insights_weekly');

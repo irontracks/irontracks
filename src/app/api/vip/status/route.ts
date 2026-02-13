@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const userId = auth.user.id
 
     // Get Plan Limits
-    const { tier, limits } = await getVipPlanLimits(supabase, userId)
+    const { tier, limits, source, debug } = await getVipPlanLimits(supabase, userId)
 
     // Get Usage
     const chatUsage = await checkVipFeatureAccess(supabase, userId, 'chat_daily')
@@ -22,6 +22,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       tier,
+      source,
+      debug: debug || null,
       limits,
       usage: {
         chat_daily: chatUsage.currentUsage,

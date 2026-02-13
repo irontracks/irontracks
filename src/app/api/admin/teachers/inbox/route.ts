@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, jsonError } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer, jsonError } from '@/utils/auth/route'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -54,8 +54,11 @@ const messageTemplate = (kind: string, studentName: string) => {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireRole(['admin'])
-  if (!auth.ok) return auth.response
+  let auth = await requireRole(['admin'])
+  if (!auth.ok) {
+    auth = await requireRoleWithBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
+  }
 
   try {
     const url = new URL(req.url)
@@ -315,4 +318,3 @@ export async function GET(req: Request) {
     return jsonError(500, e?.message ?? String(e))
   }
 }
-

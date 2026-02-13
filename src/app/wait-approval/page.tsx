@@ -20,11 +20,12 @@ export default async function WaitApprovalPage() {
   // Verifica se já foi aprovado (para evitar ficar preso aqui)
   const { data: profile } = await supabase
     .from("profiles")
-    .select("is_approved")
+    .select("is_approved, approval_status")
     .eq("id", user.id)
     .single();
 
-  if (profile?.is_approved) {
+  const approved = profile?.is_approved === true || String(profile?.approval_status || "").toLowerCase() === "approved"
+  if (approved) {
     redirect("/dashboard");
   }
 

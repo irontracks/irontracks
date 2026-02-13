@@ -14,8 +14,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       return children
     }
 
-    const { data: profile } = await supabase.from('profiles').select('is_approved').eq('id', user.id).maybeSingle()
-    if (profile?.is_approved !== true) redirect('/wait-approval')
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_approved, approval_status')
+      .eq('id', user.id)
+      .maybeSingle()
+    const approved = profile?.is_approved === true || String(profile?.approval_status || '').toLowerCase() === 'approved'
+    if (!approved) redirect('/wait-approval')
   }
 
   return children

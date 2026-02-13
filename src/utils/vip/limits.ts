@@ -11,6 +11,21 @@ export type VipTierLimits = {
   chef_ai: boolean
 }
 
+export type VipEntitlementSource =
+  | 'role'
+  | 'app_subscription'
+  | 'marketplace_subscription'
+  | 'free_no_subscription'
+  | 'app_subscription_missing_plan'
+  | 'marketplace_subscription_missing_plan'
+
+export type VipPlanResult = {
+  tier: string
+  limits: VipTierLimits
+  source: VipEntitlementSource
+  debug?: Record<string, any>
+}
+
 export const FREE_LIMITS: VipTierLimits = {
   chat_daily: 0,
   wizard_weekly: 0,
@@ -32,7 +47,7 @@ export const UNLIMITED_LIMITS: VipTierLimits = {
   chef_ai: true
 }
 
-export async function getVipPlanLimits(supabase: SupabaseClient, userId: string): Promise<{ tier: string, limits: VipTierLimits }> {
+export async function getVipPlanLimits(supabase: SupabaseClient, userId: string): Promise<VipPlanResult> {
   // 1. Check Admin/Teacher role
   const { data: profile } = await supabase
     .from('profiles')
@@ -41,13 +56,13 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     .single()
   
   if (profile?.role === 'admin' || profile?.role === 'teacher') {
-    return { tier: 'admin', limits: UNLIMITED_LIMITS }
+    return { tier: 'admin', limits: UNLIMITED_LIMITS, source: 'role' }
   }
 
   // 2. Check App Subscriptions (In-App Purchases)
   const { data: appSub } = await supabase
     .from('app_subscriptions')
-    .select('plan_id, status')
+    .select('id, plan_id, status')
     .eq('user_id', userId)
     .in('status', ['active', 'past_due', 'trialing'])
     .order('created_at', { ascending: false })
@@ -56,13 +71,32 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
 
   if (appSub?.plan_id) {
     const limits = await fetchPlanLimits(supabase, appSub.plan_id)
-    if (limits) return { tier: appSub.plan_id, limits }
+    if (limits) {
+      return {
+        tier: appSub.plan_id,
+        limits,
+        source: 'app_subscription',
+        debug: { app_subscription_id: appSub.id || null, app_subscription_status: appSub.status || null },
+      }
+    }
+    console.warn('vip_entitlement_missing_plan', {
+      source: 'app_subscription',
+      app_subscription_id: appSub.id || null,
+      plan_id: appSub.plan_id,
+      status: appSub.status || null,
+    })
+    return {
+      tier: 'free',
+      limits: FREE_LIMITS,
+      source: 'app_subscription_missing_plan',
+      debug: { app_subscription_id: appSub.id || null, plan_id: appSub.plan_id, app_subscription_status: appSub.status || null },
+    }
   }
 
   // 3. Check Marketplace Subscriptions (Stripe/Asaas)
   const { data: marketSub } = await supabase
     .from('marketplace_subscriptions')
-    .select('plan_id, status')
+    .select('id, plan_id, status')
     .eq('student_user_id', userId)
     .in('status', ['active', 'past_due', 'trialing'])
     .order('created_at', { ascending: false })
@@ -71,11 +105,34 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
 
   if (marketSub?.plan_id) {
     const limits = await fetchPlanLimits(supabase, marketSub.plan_id)
-    if (limits) return { tier: marketSub.plan_id, limits }
+    if (limits) {
+      return {
+        tier: marketSub.plan_id,
+        limits,
+        source: 'marketplace_subscription',
+        debug: { marketplace_subscription_id: marketSub.id || null, marketplace_subscription_status: marketSub.status || null },
+      }
+    }
+    console.warn('vip_entitlement_missing_plan', {
+      source: 'marketplace_subscription',
+      marketplace_subscription_id: marketSub.id || null,
+      plan_id: marketSub.plan_id,
+      status: marketSub.status || null,
+    })
+    return {
+      tier: 'free',
+      limits: FREE_LIMITS,
+      source: 'marketplace_subscription_missing_plan',
+      debug: {
+        marketplace_subscription_id: marketSub.id || null,
+        plan_id: marketSub.plan_id,
+        marketplace_subscription_status: marketSub.status || null,
+      },
+    }
   }
 
   // 4. Fallback to Free
-  return { tier: 'free', limits: FREE_LIMITS }
+  return { tier: 'free', limits: FREE_LIMITS, source: 'free_no_subscription' }
 }
 
 async function fetchPlanLimits(supabase: SupabaseClient, planId: string): Promise<VipTierLimits | null> {

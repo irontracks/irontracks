@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,8 +8,11 @@ const looksLikeUuid = (value: string) =>
 
 export async function GET(req: Request) {
   try {
-    const auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      if (!auth.ok) return auth.response
+    }
 
     const url = new URL(req.url)
     const id = url.searchParams.get('id') || undefined

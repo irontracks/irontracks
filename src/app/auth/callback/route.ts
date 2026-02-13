@@ -6,6 +6,32 @@ import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
+const resolvePublicOrigin = (request: Request) => {
+  const isLocalEnv = process.env.NODE_ENV === 'development'
+  const envOriginRaw = String(
+    process.env.IRONTRACKS_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || '',
+  ).trim()
+  if (envOriginRaw) {
+    try {
+      return new URL(envOriginRaw).origin
+    } catch {}
+  }
+
+  const host = String(request.headers.get('x-forwarded-host') || request.headers.get('host') || '').trim()
+  const proto = String(request.headers.get('x-forwarded-proto') || (isLocalEnv ? 'http' : 'https')).trim()
+  if (host) {
+    const base = `${proto}://${host}`
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+  }
+
+  try {
+    const base = new URL(request.url).origin
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+  } catch {
+    return isLocalEnv ? 'http://localhost:3000' : 'https://localhost'
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
@@ -14,40 +40,7 @@ export async function GET(request: Request) {
   const errorParam = searchParams.get('error')
   const errorDescription = searchParams.get('error_description')
   const nextCookieName = 'it.auth.next'
-
-  const originFromUrl = new URL(request.url).origin
-  const url = new URL(request.url)
-  const hostHeader = String(request.headers.get('host') || '').trim()
-  const forwardedHost = String(request.headers.get('x-forwarded-host') || '').trim()
-  const forwardedProto = String(request.headers.get('x-forwarded-proto') || '').trim()
-  const isLocalEnv = process.env.NODE_ENV === 'development'
-  const protoFromUrl = String(url.protocol || '').replace(':', '')
-  const effectiveProto = forwardedProto || protoFromUrl || (isLocalEnv ? 'http' : 'https')
-  const baseOrigin =
-    isLocalEnv && (hostHeader || url.host)
-      ? `${effectiveProto}://${hostHeader || url.host}`
-      : forwardedHost && !isLocalEnv
-        ? `${effectiveProto}://${forwardedHost}`
-        : originFromUrl
-  let safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
-  const configuredOriginRaw = String(process.env.IRONTRACKS_PUBLIC_ORIGIN || '').trim()
-  if (configuredOriginRaw) {
-    try {
-      const conf = new URL(configuredOriginRaw)
-      const confHost = String(conf.host || '').split(':')[0].toLowerCase()
-      const candidates = [forwardedHost, hostHeader, url.host]
-        .map((h) => String(h || '').split(':')[0].toLowerCase())
-        .filter(Boolean)
-      if (confHost && candidates.includes(confHost)) safeOrigin = conf.origin
-    } catch {}
-  }
-  if (!isLocalEnv) {
-    try {
-      const u = new URL(safeOrigin)
-      u.protocol = 'https:'
-      safeOrigin = u.origin
-    } catch {}
-  }
+  const safeOrigin = resolvePublicOrigin(request)
 
   const rawError = String(errorDescription || errorParam || '').trim()
   if (rawError && !code) {

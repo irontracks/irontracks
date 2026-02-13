@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { deleteTemplateFromSubscribers } from '@/lib/workoutSync'
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin'])
+      if (!auth.ok) return auth.response
+    }
 
     const body = await req.json()
     const id = String(body?.id || '').trim()
@@ -51,4 +54,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

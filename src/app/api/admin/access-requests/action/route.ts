@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,8 +39,11 @@ const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlrea
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin'])
+      if (!auth.ok) return auth.response
+    }
 
     const body = await req.json()
     const { requestId, action } = body
@@ -143,14 +146,25 @@ export async function POST(req: Request) {
         
         // 2. Update Profile role if exists
         if (userId) {
-            await admin.from('profiles').update({ role: 'teacher', is_approved: true }).eq('id', userId)
+            await admin.from('profiles').update({
+              role: 'teacher',
+              is_approved: true,
+              approval_status: 'approved',
+              approved_at: new Date().toISOString(),
+              approved_by: auth.user.id,
+            }).eq('id', userId)
         }
       }
 
       if (userId) {
         // If not teacher (or fallback), ensure approved
         if (roleRequested !== 'teacher') {
-            const { error: approveError } = await admin.from('profiles').update({ is_approved: true }).eq('id', userId)
+            const { error: approveError } = await admin.from('profiles').update({
+              is_approved: true,
+              approval_status: 'approved',
+              approved_at: new Date().toISOString(),
+              approved_by: auth.user.id,
+            }).eq('id', userId)
             if (approveError) throw approveError
         }
 

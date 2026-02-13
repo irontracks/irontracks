@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -60,8 +60,11 @@ async function resolveWithGemini(items: Array<{ normalized: string; alias: strin
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRole(['admin'])
-  if (!auth.ok) return auth.response
+  let auth = await requireRole(['admin'])
+  if (!auth.ok) {
+    auth = await requireRoleWithBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
+  }
 
   try {
     const body = await req.json().catch(() => ({}))
@@ -255,4 +258,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

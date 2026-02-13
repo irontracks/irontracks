@@ -365,16 +365,10 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                     if (!json?.ok) throw new Error(json?.error || 'Falha ao carregar histórico');
                     data = Array.isArray(json?.rows) ? json.rows : [];
                 } else {
-                    const { data: rows, error } = await supabase
-                        .from('workouts')
-                        .select('*')
-                        .eq('user_id', baseUserId)
-                        .eq('is_template', false)
-                        .order('date', { ascending: false })
-                        .limit(200);
-
-                    if (error) throw error;
-                    data = Array.isArray(rows) ? rows : [];
+                    const resp = await fetch('/api/workouts/history?limit=200')
+                    const json = await resp.json()
+                    if (!json?.ok) throw new Error(json?.error || 'Falha ao carregar histórico')
+                    data = Array.isArray(json?.rows) ? json.rows : []
                 }
 
                 const formatted = (data || []).map(w => {

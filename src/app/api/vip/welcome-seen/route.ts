@@ -1,35 +1,9 @@
 import { NextResponse } from 'next/server'
-import { requireUser, resolveRoleByUser } from '@/utils/auth/route'
+import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getVipPlanLimits } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
-
-const computeVipAccess = async (supabase: any, user: any) => {
-  const { role } = await resolveRoleByUser({ id: user?.id, email: user?.email })
-  if (role === 'admin' || role === 'teacher') return { ok: true as const, role, hasVip: true }
-  try {
-    const { data: appSub } = await supabase
-      .from('app_subscriptions')
-      .select('id, status')
-      .eq('user_id', user.id)
-      .in('status', ['active', 'past_due'])
-      .limit(1)
-    if (Array.isArray(appSub) && appSub.length > 0) {
-      return { ok: true as const, role, hasVip: true }
-    }
-
-    const { data } = await supabase
-      .from('marketplace_subscriptions')
-      .select('id, status')
-      .eq('student_user_id', user.id)
-      .in('status', ['active', 'past_due'])
-      .limit(1)
-    const hasVip = Array.isArray(data) && data.length > 0
-    return { ok: true as const, role, hasVip }
-  } catch {
-    return { ok: true as const, role, hasVip: false }
-  }
-}
 
 export async function POST() {
   try {
@@ -38,18 +12,18 @@ export async function POST() {
     const supabase = auth.supabase
     const user = auth.user
 
-    const access = await computeVipAccess(supabase, user)
-    if (!access.hasVip) {
+    const entitlement = await getVipPlanLimits(supabase, user.id)
+    if (entitlement.tier === 'free') {
       try {
         const admin = createAdminClient()
         await admin.from('audit_events').insert({
           actor_id: user.id,
           actor_email: user.email,
-          actor_role: access.role,
+          actor_role: 'user',
           action: 'vip_welcome_seen_by_non_vip',
           entity_type: 'vip_welcome',
           entity_id: user.id,
-          metadata: { userId: user.id, hasVip: false }
+          metadata: { userId: user.id, hasVip: false },
         })
       } catch {}
       return NextResponse.json({ ok: true, hasVip: false })

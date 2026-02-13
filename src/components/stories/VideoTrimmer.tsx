@@ -1,3 +1,3 @@
 'use client'
 
-export { default } from '@/components/stories/VideoTrimmer 3'
+export { default } from '@/components/stories/VideoTrimmerImpl'

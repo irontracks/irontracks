@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      if (!auth.ok) return auth.response
+    }
 
     const admin = createAdminClient()
     const uid = String(auth.user.id || '').trim()
@@ -40,4 +43,3 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

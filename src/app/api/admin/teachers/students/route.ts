@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin'])
+      if (!auth.ok) return auth.response
+    }
 
     const url = new URL(req.url)
     const teacher_user_id = String(url.searchParams.get('teacher_user_id') || '').trim()
@@ -27,4 +30,3 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

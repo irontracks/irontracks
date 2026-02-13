@@ -80,6 +80,30 @@ export async function requireRole(allowed: IrontracksRole[]) {
   return { ok: true as const, supabase: auth.supabase, user: auth.user, role }
 }
 
+export async function requireRoleWithBearer(req: Request, allowed: IrontracksRole[]) {
+  try {
+    const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    if (!token) return { ok: false as const, response: jsonError(401, 'unauthorized') }
+
+    const admin = createAdminClient()
+    const { data, error } = await admin.auth.getUser(token)
+    const user = data?.user ?? null
+    if (error || !user?.id) {
+      return { ok: false as const, response: jsonError(401, 'unauthorized') }
+    }
+
+    const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
+    const allowedSet = new Set((Array.isArray(allowed) ? allowed : []).filter(Boolean))
+    if (!allowedSet.has(role)) {
+      return { ok: false as const, response: jsonError(403, 'forbidden') }
+    }
+
+    return { ok: true as const, supabase: admin, user, role }
+  } catch {
+    return { ok: false as const, response: jsonError(401, 'unauthorized') }
+  }
+}
+
 export const isSafeStoragePath = (path: unknown) => {
   const p = typeof path === 'string' ? path.trim() : ''
   if (!p) return { ok: false as const, error: 'path required' }

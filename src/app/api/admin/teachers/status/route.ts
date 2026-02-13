@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin'])
+      if (!auth.ok) return auth.response
+    }
     const body = await req.json()
     const { id, status } = body || {}
     if (!id || !status) return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })

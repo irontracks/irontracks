@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { requireUser, resolveRoleByUser } from '@/utils/auth/route'
+import { requireUser } from '@/utils/auth/route'
+import { getVipPlanLimits } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,41 +96,14 @@ const avg = (rows: any[], key: string) => {
   return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
 }
 
-const computeVipAccess = async (supabase: any, user: any) => {
-  const { role } = await resolveRoleByUser({ id: user?.id, email: user?.email })
-  if (role === 'admin' || role === 'teacher') return { ok: true as const, role, hasVip: true }
-  try {
-    const { data: appSub } = await supabase
-      .from('app_subscriptions')
-      .select('id, status')
-      .eq('user_id', user.id)
-      .in('status', ['active', 'past_due'])
-      .limit(1)
-    if (Array.isArray(appSub) && appSub.length > 0) {
-      return { ok: true as const, role, hasVip: true }
-    }
-
-    const { data } = await supabase
-      .from('marketplace_subscriptions')
-      .select('id, status')
-      .eq('student_user_id', user.id)
-      .in('status', ['active', 'past_due'])
-      .limit(1)
-    const hasVip = Array.isArray(data) && data.length > 0
-    return { ok: true as const, role, hasVip }
-  } catch {
-    return { ok: true as const, role, hasVip: false }
-  }
-}
-
 export async function GET() {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
   const supabase = auth.supabase
   const user = auth.user
 
-  const access = await computeVipAccess(supabase, user)
-  if (!access.hasVip) return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
+  const entitlement = await getVipPlanLimits(supabase, user.id)
+  if (entitlement.tier === 'free') return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
   try {
     const now = Date.now()

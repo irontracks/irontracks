@@ -13,6 +13,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:smoke": "node scripts/delete-teacher-cascade.test.cjs && node scripts/vip-entitlement.test.cjs && node scripts/admin-routes-smoke.test.cjs && node scripts/auth-origin-smoke.test.cjs && node scripts/no-duplicate-style-files.test.cjs && node scripts/vip-endpoints-no-dup.test.cjs && node scripts/workouts-history-enforcement.test.cjs && node scripts/finish-payload-smoke.test.cjs",
+    "flags:report": "NODE_NO_WARNINGS=1 node scripts/feature-flags-report.mjs",
     "deploy": "echo '⛔️ PARE! O deploy agora é automático via GitHub. Faça commit e push na main.' && exit 1",
     "e2e:deload": "node scripts/e2e/deload.e2e.js",
     "postversion": "git push && git push --tags",

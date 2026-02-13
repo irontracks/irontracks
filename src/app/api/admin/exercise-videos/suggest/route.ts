@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
 
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { getVideoQueriesFromGemini, searchYouTubeCandidates } from '@/lib/videoSuggestions'
 
 export async function POST(req: Request) {
-  const auth = await requireRole(['admin'])
-  if (!auth.ok) return auth.response
-
   try {
+    let auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin'])
+      if (!auth.ok) return auth.response
+    }
     const body = await req.json().catch(() => ({}))
     const name = String((body as any)?.name || '').trim()
     if (!name) return NextResponse.json({ ok: false, error: 'name_required' }, { status: 400 })

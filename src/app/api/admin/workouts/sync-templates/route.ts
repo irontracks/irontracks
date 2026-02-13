@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
+import { hasValidInternalSecret, requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      if (!auth.ok) return auth.response
+    }
 
     const admin = createAdminClient()
     const body = await req.json().catch(() => ({}))

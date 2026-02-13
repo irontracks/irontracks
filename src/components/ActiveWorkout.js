@@ -10,6 +10,7 @@ import InviteManager from '@/components/InviteManager';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys, moveDraftItem } from '@/lib/workoutReorder';
+import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { createClient } from '@/utils/supabase/client';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
@@ -1609,35 +1610,7 @@ export default function ActiveWorkout(props) {
     setFinishing(true);
     try {
       persistDeloadHistoryFromSession();
-      const safeExercises = Array.isArray(workout?.exercises)
-        ? workout.exercises.map((ex) => {
-            if (!ex || typeof ex !== 'object') return null;
-            return {
-              name: String(ex?.name || '').trim(),
-              sets: Number(ex?.sets) || (Array.isArray(ex?.setDetails) ? ex.setDetails.length : 0),
-              reps: ex?.reps ?? '',
-              rpe: ex?.rpe ?? null,
-              cadence: ex?.cadence ?? null,
-              restTime: ex?.restTime ?? ex?.rest_time ?? null,
-              method: ex?.method ?? null,
-              videoUrl: ex?.videoUrl ?? ex?.video_url ?? null,
-              notes: ex?.notes ?? null,
-              setDetails: Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [],
-            };
-          })
-        : [];
-
-      const payload = {
-        workoutTitle: String(workout?.title || 'Treino'),
-        date: new Date().toISOString(),
-        totalTime: elapsedSeconds,
-        realTotalTime: elapsedSeconds,
-        logs: logs && typeof logs === 'object' ? logs : {},
-        exercises: safeExercises.filter((x) => x && typeof x === 'object' && String(x.name || '').length > 0),
-        originWorkoutId: workout?.id ?? null,
-        preCheckin: ui?.preCheckin ?? null,
-        postCheckin,
-      };
+      const payload = buildFinishWorkoutPayload({ workout, elapsedSeconds, logs, ui, postCheckin });
 
       let savedId = null;
       if (shouldSaveHistory) {
@@ -1945,7 +1918,7 @@ export default function ActiveWorkout(props) {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
-              <span className="text-xs text-neutral-400 whitespace-normal">Intra {pauseSec || 0}s • Minis: {miniSets} • Total: {total || 0} reps</span>
+              <span className="text-xs text-neutral-400 whitespace-normal">{modeLabel === 'SST' ? 'SST' : 'REST-P'} • Intra {pauseSec || 0}s • Total: {total || 0} reps</span>
             </div>
             <button
               type="button"

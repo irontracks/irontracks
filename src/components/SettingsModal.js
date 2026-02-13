@@ -35,7 +35,6 @@ export default function SettingsModal(props) {
   const featuresKillSwitch = Boolean(draft?.featuresKillSwitch ?? false)
   const featureTeamworkV2 = Boolean(draft?.featureTeamworkV2 ?? false)
   const featureStoriesV2 = Boolean(draft?.featureStoriesV2 ?? false)
-  const featureWeeklyReportCTA = Boolean(draft?.featureWeeklyReportCTA ?? false)
   const featureOfflineSyncV2 = Boolean(draft?.featureOfflineSyncV2 ?? false)
   const allowDirectMessages = Boolean(draft?.allowDirectMessages ?? true)
   const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
@@ -530,25 +529,6 @@ export default function SettingsModal(props) {
                       }
                     >
                       {featureStoriesV2 ? 'Ativo' : 'Desligado'}
-                    </button>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-bold text-white">CTA Relatório Semanal</div>
-                      <div className="text-xs text-neutral-400">Atalho para relatório semanal no Histórico.</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setValue('featureWeeklyReportCTA', !featureWeeklyReportCTA)}
-                      disabled={featuresKillSwitch}
-                      className={
-                        featureWeeklyReportCTA && !featuresKillSwitch
-                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
-                      }
-                    >
-                      {featureWeeklyReportCTA ? 'Ativo' : 'Desligado'}
                     </button>
                   </div>
 

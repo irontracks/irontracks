@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
-
     const admin = createAdminClient()
+    const auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+      if (!token) return auth.response
+      const { data, error } = await admin.auth.getUser(token)
+      const user = data?.user ?? null
+      if (error || !user?.id) return auth.response
+      const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
+      if (role !== 'admin') return jsonError(403, 'forbidden')
+    }
     const { data: rows, error } = await admin
       .from('teachers')
       .select('id, name, email, status, created_at, user_id, asaas_wallet_id, asaas_account_id, asaas_account_status')
@@ -17,13 +24,10 @@ export async function GET() {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     const teachers = rows || []
-    const emails = Array.from(new Set(teachers.map(t => (t.email || '').toLowerCase()).filter(Boolean)))
+    const emails = Array.from(new Set(teachers.map((t) => (t.email || '').toLowerCase()).filter(Boolean)))
     let idByEmail = new Map<string, string>()
     if (emails.length) {
-      const { data: profiles } = await admin
-        .from('profiles')
-        .select('id, email')
-        .in('email', emails)
+      const { data: profiles } = await admin.from('profiles').select('id, email').in('email', emails)
       for (const p of profiles || []) {
         if (p.email) idByEmail.set(p.email.toLowerCase(), p.id)
       }

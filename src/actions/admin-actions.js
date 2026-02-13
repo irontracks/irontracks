@@ -253,13 +253,18 @@ export async function updateTeacher(id, data) {
 
 export async function deleteTeacher(id) {
     try {
-        await checkAdmin()
+        const adminUser = await checkAdmin()
         const adminDb = createAdminClient()
         const safeId = String(id || '').trim()
         if (!safeId) throw new Error('Missing teacher id')
-        const { error } = await adminDb.from('teachers').delete().eq('id', safeId)
+        const { data, error } = await adminDb.rpc('delete_teacher_cascade', {
+            p_teacher_id: safeId,
+            p_actor_id: adminUser?.id || null,
+            p_actor_email: adminUser?.email || null,
+            p_actor_role: 'admin',
+        })
         if (error) throw error
-        return { success: true }
+        return { success: true, report: data ?? null }
     } catch (e) {
         return { error: getErrorMessage(e) }
     }
