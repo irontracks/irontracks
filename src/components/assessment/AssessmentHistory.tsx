@@ -195,7 +195,7 @@ const countSessionSets = (session: any): number => {
   const logs = session?.logs;
   if (logs && typeof logs === 'object') {
     try {
-      const values = Object.values(logs);
+      const values: any[] = Object.values(logs as any);
       if (Array.isArray(values)) {
         const doneCount = values.reduce((acc: number, v: any) => {
           if (v && typeof v === 'object' && v.done === true) return acc + 1;

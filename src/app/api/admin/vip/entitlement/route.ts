@@ -1,11 +1,21 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
-const looksLikeUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+const QuerySchema = z
+  .object({
+    id: z.preprocess((v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined), z.string().uuid().optional()),
+    email: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() ? v.trim().toLowerCase() : undefined),
+      z.string().email().optional(),
+    ),
+  })
+  .strict()
 
 export async function GET(req: Request) {
   try {
@@ -15,21 +25,19 @@ export async function GET(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const url = new URL(req.url)
-    const idRaw = String(url.searchParams.get('id') || '').trim()
-    const emailRaw = String(url.searchParams.get('email') || '').trim().toLowerCase()
+    const parsedQuery = parseSearchParams(req, QuerySchema)
+    if (parsedQuery.response) return parsedQuery.response
+    const { id, email } = parsedQuery.data!
 
-    if (!idRaw && !emailRaw) {
+    if (!id && !email) {
       return NextResponse.json({ ok: false, error: 'missing id/email' }, { status: 400 })
     }
 
     const admin = createAdminClient()
 
-    let userId = ''
-    if (idRaw && looksLikeUuid(idRaw)) userId = idRaw
-
-    if (!userId && emailRaw) {
-      const { data: profile } = await admin.from('profiles').select('id').ilike('email', emailRaw).maybeSingle()
+    let userId = id || ''
+    if (!userId && email) {
+      const { data: profile } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
       userId = String(profile?.id || '').trim()
     }
 

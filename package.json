@@ -6,17 +6,17 @@
     "node": ">=20 <23"
   },
   "scripts": {
-    "predev": "node scripts/ensure-next-compiled-commander.mjs",
-    "prebuild": "node scripts/ensure-next-compiled-commander.mjs",
-    "prestart": "node scripts/ensure-next-compiled-commander.mjs",
-    "dev": "next dev --webpack --hostname 0.0.0.0 --port 3000",
-    "build": "next build",
+    "predev": "tsx scripts/ensure-next-compiled-commander.ts",
+    "prebuild": "tsx scripts/ensure-next-compiled-commander.ts && tsx scripts/clean-next.ts",
+    "prestart": "tsx scripts/ensure-next-compiled-commander.ts",
+    "dev": "next dev --webpack --hostname localhost --port 3000",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint",
-    "test:smoke": "node scripts/delete-teacher-cascade.test.cjs && node scripts/vip-entitlement.test.cjs && node scripts/admin-routes-smoke.test.cjs && node scripts/auth-origin-smoke.test.cjs && node scripts/no-duplicate-style-files.test.cjs && node scripts/vip-endpoints-no-dup.test.cjs && node scripts/workouts-history-enforcement.test.cjs && node scripts/finish-payload-smoke.test.cjs",
-    "flags:report": "NODE_NO_WARNINGS=1 node scripts/feature-flags-report.mjs",
+    "lint": "node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.ts .",
+    "test:smoke": "tsx scripts/delete-teacher-cascade.test.ts && tsx scripts/vip-entitlement.test.ts && tsx scripts/admin-routes-smoke.test.ts && tsx scripts/auth-origin-smoke.test.ts && tsx scripts/no-duplicate-style-files.test.ts && tsx scripts/vip-endpoints-no-dup.test.ts && tsx scripts/workouts-history-enforcement.test.ts && tsx scripts/finish-payload-smoke.test.ts",
+    "flags:report": "NODE_NO_WARNINGS=1 tsx scripts/feature-flags-report.ts",
     "deploy": "echo '⛔️ PARE! O deploy agora é automático via GitHub. Faça commit e push na main.' && exit 1",
-    "e2e:deload": "node scripts/e2e/deload.e2e.js",
+    "e2e:deload": "tsx scripts/e2e/deload.e2e.ts",
     "postversion": "git push && git push --tags",
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open ios"
@@ -44,7 +44,8 @@
     "react": "19.2.1",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "19.2.1",
-    "scheduler": "^0.27.0"
+    "scheduler": "^0.27.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint-community/eslint-utils": "^4.9.1",
@@ -54,6 +55,7 @@
     "chalk": "^5.3.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "tsx": "^4.20.5"
   }
 }

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { z } from 'zod'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 
 export const dynamic = 'force-dynamic'
@@ -32,13 +33,29 @@ const resolvePublicOrigin = (request: Request) => {
   }
 }
 
+const QuerySchema = z
+  .object({
+    code: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string()).optional(),
+    next: z.preprocess((v) => (typeof v === 'string' ? v : ''), z.string()).optional(),
+    type: z.preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.string()).optional(),
+    error: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string()).optional(),
+    error_description: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string()).optional(),
+  })
+  .passthrough()
+
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? ''
-  const type = String(searchParams.get('type') || '').trim().toLowerCase()
-  const errorParam = searchParams.get('error')
-  const errorDescription = searchParams.get('error_description')
+  const url = new URL(request.url)
+  const spObj: Record<string, string> = {}
+  url.searchParams.forEach((value, key) => {
+    spObj[key] = value
+  })
+  const q = QuerySchema.parse(spObj)
+
+  const code = q.code || ''
+  const next = q.next ?? ''
+  const type = q.type || ''
+  const errorParam = q.error
+  const errorDescription = q.error_description
   const nextCookieName = 'it.auth.next'
   const safeOrigin = resolvePublicOrigin(request)
 
@@ -106,12 +123,15 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       const msg = String(error.message || '').toLowerCase()
-      if (msg.includes('code challenge') || msg.includes('code verifier') || msg.includes('pkce') || msg.includes('flow_state_not_found')) {
+      if (
+        msg.includes('code challenge') ||
+        msg.includes('code verifier') ||
+        msg.includes('pkce') ||
+        msg.includes('flow_state_not_found')
+      ) {
         return NextResponse.redirect(new URL('/auth/error?error=pkce_failed', safeOrigin))
       }
-      return NextResponse.redirect(
-        new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin),
-      )
+      return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin))
     }
     try {
       await supabase.auth.getUser()
@@ -122,3 +142,4 @@ export async function GET(request: Request) {
 
   return response
 }
+

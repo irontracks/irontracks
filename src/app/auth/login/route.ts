@@ -2,19 +2,25 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
+const parseOrigin = (raw: any) => {
+  try {
+    const s = String(raw || '').trim()
+    if (!s) return ''
+    return new URL(s).origin
+  } catch {
+    return ''
+  }
+}
+
 const resolvePublicOrigin = (request: Request) => {
   const isLocalEnv = process.env.NODE_ENV === 'development'
-  const envOriginRaw = String(
-    process.env.IRONTRACKS_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || '',
-  ).trim()
-  if (envOriginRaw) {
-    try {
-      return new URL(envOriginRaw).origin
-    } catch {}
-  }
+  const envOrigin = parseOrigin(process.env.IRONTRACKS_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL)
+  if (envOrigin) return envOrigin
+  if (!isLocalEnv) return ''
 
   const host = String(request.headers.get('x-forwarded-host') || request.headers.get('host') || '').trim()
   const proto = String(request.headers.get('x-forwarded-proto') || (isLocalEnv ? 'http' : 'https')).trim()
@@ -31,15 +37,40 @@ const resolvePublicOrigin = (request: Request) => {
   }
 }
 
+const QuerySchema = z
+  .object({
+    next: z
+      .preprocess((v) => (typeof v === 'string' ? v : ''), z.string())
+      .optional(),
+    provider: z
+      .preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.enum(['google', 'apple']).catch('google')),
+  })
+  .passthrough()
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const sp = url.searchParams
-  const next = sp.get('next') ?? '/dashboard'
-  const providerRaw = String(sp.get('provider') || '').trim().toLowerCase()
-  const provider = providerRaw === 'apple' ? 'apple' : 'google'
+  const spObj: Record<string, string> = {}
+  url.searchParams.forEach((value, key) => {
+    spObj[key] = value
+  })
+  const q = QuerySchema.parse(spObj)
+  const next = q.next ?? '/dashboard'
+  const provider = q.provider
   const nextCookieName = 'it.auth.next'
   const nextCookieMaxAgeSeconds = 60 * 5
   const safeOrigin = resolvePublicOrigin(request)
+  if (!safeOrigin) {
+    const fallbackOrigin = (() => {
+      const isLocalEnv = process.env.NODE_ENV === 'development'
+      try {
+        const base = new URL(request.url).origin
+        return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+      } catch {
+        return isLocalEnv ? 'http://localhost:3000' : 'https://localhost'
+      }
+    })()
+    return NextResponse.redirect(new URL('/auth/error?error=missing_public_origin', fallbackOrigin))
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY

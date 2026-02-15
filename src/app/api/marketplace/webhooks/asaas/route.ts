@@ -119,6 +119,38 @@ export async function POST(req: Request) {
         .eq('id', appPayRow.subscription_id)
     }
 
+    if (subTargetId) {
+      try {
+        const { data: subRow } = await admin
+          .from('app_subscriptions')
+          .select('user_id, plan_id, status, asaas_subscription_id, asaas_customer_id, current_period_start, current_period_end')
+          .eq('asaas_subscription_id', subTargetId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (subRow?.user_id) {
+          await admin
+            .from('user_entitlements')
+            .upsert(
+              {
+                user_id: subRow.user_id,
+                plan_id: subRow.plan_id,
+                status: subStatus,
+                provider: 'asaas',
+                provider_customer_id: subRow.asaas_customer_id || null,
+                provider_subscription_id: subRow.asaas_subscription_id || subTargetId,
+                current_period_start: subRow.current_period_start || null,
+                current_period_end: subRow.current_period_end || null,
+                valid_from: subRow.current_period_start || new Date().toISOString(),
+                valid_until: subRow.current_period_end || null,
+                metadata: { updated_by: 'asaas_webhook', asaas_event_id: eventId || null, asaas_payment_id: paymentId || null },
+              },
+              { onConflict: 'provider,provider_subscription_id' },
+            )
+        }
+      } catch {}
+    }
+
     await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)
     return NextResponse.json({ ok: true })
   } catch (e: any) {

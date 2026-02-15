@@ -4,6 +4,24 @@
 
 ---
 
+## Revalidação (Repo atual)
+
+Esta análise foi revalidada contra o codebase atual e alguns pontos do texto original estavam desatualizados.
+
+### O que continua verdadeiro (confirmado)
+- Há mistura de JS e TS em módulos importantes (ex.: actions e componentes legados), o que aumenta custo de refatoração.
+- O `schema_full_restore.sql` está incompleto (tem poucas tabelas) e não representa o banco real do produto.
+- A rota de login OAuth tem lógica de origem/redirect mais complexa do que o ideal.
+- Cobertura de testes automatizados é baixa em áreas críticas (VIP/billing/auth/offline).
+
+### O que estava desatualizado (corrigido aqui)
+- Não há “dezenas de arquivos ` 2`, ` 3`” espalhados no `src/` no estado atual; existe pelo menos um caso de wrapper canônico (`StudentDashboard` → `StudentDashboard3`), mas não a proliferação descrita.
+- Não existem múltiplos `sw 2.js…sw 6.js` em `/public/`; há somente `sw.js`.
+- APIs de IA têm rate limiting visível (por IP), via utilitário dedicado.
+- Existem migrations no repositório (`/supabase/migrations/`).
+- Billing/VIP hoje prioriza `user_entitlements` (tabela unificada), com fallback; não é mais “duas tabelas em cascata” como descrito.
+- `AdminPanelV2` e `ActiveWorkout` têm versões TSX no repo; arquivos `.js` podem existir como compatibilidade/import shim.
+
 ## Diagnóstico Geral
 
 O IronTracks é um produto com uma proposta de valor sólida e um escopo ambicioso — treino, social, IA, nutrição, avaliação física, monetização. Mas o código acumulou sinais claros de crescimento rápido sem fases de consolidação: duplicação de arquivos, inconsistência de linguagem (JS e TS misturados sem critério), schema desatualizado, feature flags que nunca foram limpas, e módulos que foram reescritos mas as versões antigas nunca foram removidas. O produto funciona, mas está carregando dívida técnica crescente que vai encarecer cada nova feature.
@@ -13,18 +31,12 @@ O IronTracks é um produto com uma proposta de valor sólida e um escopo ambicio
 ## 1. Dívida Técnica Estrutural
 
 ### Proliferação de arquivos duplicados
-Este é o problema mais visível e o mais fácil de resolver. O projeto tem dezenas de arquivos com sufixo ` 2`, ` 3` espalhados por toda a codebase:
+No codebase atual, não há evidência de “dezenas” de arquivos com sufixo ` 2`/` 3` dentro de `src/`. Existe pelo menos um padrão de wrapper canônico, onde um arquivo “estável” reexporta a versão final (ex.: `StudentDashboard.tsx` reexporta `StudentDashboard3.tsx`). Isso é aceitável como transição, mas precisa de governança para não virar padrão permanente.
 
-- `StudentDashboard.tsx`, `StudentDashboard 2.tsx`, `StudentDashboard 3.tsx`, `StudentDashboard3.tsx`
-- `route.ts`, `route 2.ts` dentro dos mesmos diretórios de auth
-- `GuidedTour.js`, `GuidedTour 2.js`, `GuidedTour 3.js`
-- `offlineSync.js`, `offlineSync 3.js`
-- `middleware.ts` (na raiz), `middleware 2.ts`, `middleware 3.ts` dentro de `/supabase/`
-
-O `StudentDashboard.tsx` atual é literalmente só `export { default } from './StudentDashboard3'` — a versão 3 virou canônica mas as versões 1 e 2 continuam existindo no repositório. Isso cria confusão para qualquer novo colaborador, polui buscas por arquivo, e aumenta risco de alguém editar a versão errada.
+**Risco real:** wrappers/shims sem política clara (e.g. reexports para manter imports antigos) podem gerar confusão e até loops de import se não apontarem explicitamente para o arquivo canônico.
 
 **Impacto:** Alto (confusão, risco de bug, custo de manutenção)  
-**Esforço para resolver:** Médio — uma sessão de limpeza + PR de remoção
+**Esforço para resolver:** Baixo/Médio — auditoria rápida + remoção/renomeação segura dos casos reais
 
 ### Mistura de JS e TypeScript sem critério
 O projeto usa `.tsx`/`.ts` nas partes novas e `.js` nas antigas, mas a fronteira não é limpa:
@@ -32,10 +44,10 @@ O projeto usa `.tsx`/`.ts` nas partes novas e `.js` nas antigas, mas a fronteira
 - `featureFlags.js` — arquivo central sem tipos
 - `workout-actions.js` — actions sem tipagem
 - `chat-actions.js` — idem
-- `AdminPanelV2.js` — componente complexo sem tipos
-- `ActiveWorkout.js` — componente crítico do fluxo principal, sem tipos
+- `HistoryList.js` — componente grande e central ainda em JS
+- `AdminPanelV2` e `ActiveWorkout` existem em TSX; arquivos `.js` podem existir como shim de compatibilidade/import.
 
-Componentes antigos e centrais como `ActiveWorkout`, `AdminPanelV2` e `HistoryList` ainda são `.js`, enquanto arquivos periféricos já são `.ts`. A inconsistência não é só estética — ela impede que o TypeScript proteja as partes mais críticas do app.
+O problema não é só estética: a mistura dificulta refatoração e amplia “zonas sem tipos” em lugares onde bugs são caros (treino ativo, histórico, billing e flows de admin).
 
 **Impacto:** Alto (bugs silenciosos, sem autocompletar, refatoração difícil)  
 **Esforço para resolver:** Alto — migração progressiva com plano de prioridade
@@ -49,17 +61,17 @@ O `schema_full_restore.sql` tem apenas 6 tabelas básicas (profiles, assessments
 - `workout_checkins` (feature nova documentada no checklist)
 - `stories`, `follows`, tabelas de notificação, etc.
 
-O schema no repositório não reflete o banco real. Isso é perigoso: qualquer desenvolvedor novo que clonar o projeto e tentar rodar localmente vai ter um banco diferente do produção. Migrations devem ser a fonte de verdade — e o `/supabase/migrations/` existe mas não foi compartilhado.
+O schema no repositório não reflete o banco real. Isso é perigoso: qualquer desenvolvedor novo que clonar o projeto e tentar rodar localmente pode ter um banco diferente do produção. Migrations devem ser a fonte de verdade — e elas existem no repo — mas o “restore” precisa ser alinhado para não enganar.
 
 **Impacto:** Crítico para onboarding e para debugging  
-**Esforço para resolver:** Médio — exportar schema completo e commitar migrations
+**Esforço para resolver:** Médio — exportar schema completo (ou gerar a partir das migrations) e garantir que `schema_full_restore.sql` reflita a realidade
 
 ---
 
 ## 2. Autenticação e Controle de Acesso
 
 ### Lógica de origem do OAuth excessivamente complexa
-O arquivo `auth/login/route.ts` tem ~70 linhas só para calcular o `safeOrigin` do redirect OAuth. Considera `x-forwarded-host`, `x-forwarded-proto`, variável de ambiente `IRONTRACKS_PUBLIC_ORIGIN`, `NODE_ENV`, e faz múltiplas tentativas com try/catch silencioso. Isso indica que o problema de redirect já causou bugs em produção (o `login_loop_debug_report.json` na raiz confirma isso).
+O fluxo de redirect OAuth considera headers (`x-forwarded-*`) e variáveis de ambiente (ex.: `IRONTRACKS_PUBLIC_ORIGIN`) para determinar o origin/redirect de forma defensiva. Isso costuma ser sinal de problemas históricos de ambiente (Vercel/CDN/Capacitor) e merece simplificação para reduzir “login loop” e inconsistência.
 
 O problema raiz é que o callback de OAuth depende de headers que podem variar entre Vercel, CDN e Capacitor. A solução robusta é fixar o `redirectTo` via variável de ambiente em vez de tentar inferir o origin dinamicamente.
 
@@ -67,26 +79,26 @@ O problema raiz é que o callback de OAuth depende de headers que podem variar e
 **Ação recomendada:** Simplificar para `process.env.NEXT_PUBLIC_APP_URL + '/auth/callback'` com fallback claro
 
 ### Aprovação de aluno como campo booleano simples
-O `layout.tsx` faz `profile.is_approved !== true` para bloquear alunos não aprovados. Isso funciona, mas é frágil: não há timestamp de quando foi aprovado, não há quem aprovou, não há histórico de rejeição, não há motivo. Se um aluno for desbloqueado por engano e precisar ser suspenso novamente, não há como auditoria.
+O gate de aprovação hoje não depende apenas de boolean: além de `is_approved`, também considera `approval_status`. Mesmo assim, ainda falta trilha de auditoria consistente (quem aprovou, quando, motivo de rejeição/suspensão).
 
 **Ação recomendada:** Migrar para `status: 'pending' | 'approved' | 'rejected' | 'suspended'` com `approved_at` e `approved_by`
 
 ### Ausência de rate limiting visível nas APIs de IA
-Os endpoints `/api/ai/coach-chat`, `/api/ai/workout-wizard`, `/api/ai/vip-coach` chamam modelos de linguagem. O sistema de `vip_usage_daily` controla quotas por usuário, mas não há evidência de rate limiting por IP ou por sessão não autenticada. Um usuário malicioso poderia esgotar créditos da API de IA sem autenticação completa.
+Os endpoints de IA têm rate limiting visível por IP (via utilitário dedicado). Isso reduz abuso, mas ainda vale revisar se a política cobre bem: usuários não autenticados, ataques distribuídos, e interação com as cotas VIP (ex.: `vip_usage_daily`).
 
 ---
 
 ## 3. Monetização e Sistema VIP
 
 ### Dois caminhos de cobrança sem unificação
-O sistema VIP verifica três fontes em cascata: role admin/teacher → `app_subscriptions` (RevenueCat/in-app) → `marketplace_subscriptions` (MercadoPago/Asaas). Isso significa que um aluno pode ter assinatura ativa em dois sistemas ao mesmo tempo, e a prioridade é definida pela ordem no código, não por lógica de negócio explícita.
+O sistema VIP hoje prioriza uma tabela de entitlements (`user_entitlements`) e usa fallback para assinaturas de app (`app_subscriptions`). A recomendação de unificação continua válida como princípio, mas a base de “entitlements” já existe — o foco agora é garantir que todas as fontes de cobrança atualizem essa tabela de forma auditável.
 
 Além disso, o fallback para `FREE_LIMITS` acontece silenciosamente se nenhuma assinatura for encontrada — sem log, sem alerta. Se houver bug no lookup do Supabase, o aluno paga e fica no free sem saber.
 
 **Ação recomendada:** Unificar status de assinatura em uma tabela de `user_entitlements` atualizada por webhook dos dois gateways, com log de mudanças
 
 ### Feature flags nunca evoluem para remoção
-O sistema de feature flags (`featureFlags.js`) tem 4 flags: `teamworkV2`, `storiesV2`, `weeklyReportCTA`, `offlineSyncV2`. O sufixo `V2` sugere que a V1 já existe — mas não há V1 nas flags. Provavelmente a V1 era o comportamento padrão sem flag.
+O sistema de feature flags no repo atual tem menos flags do que o texto original descrevia e já inclui metadados de owner/revisão. Mesmo assim, a recomendação continua: flags precisam de ciclo de vida (data de revisão, owner, e remoção quando estabiliza).
 
 O problema é que flags que não têm data de expiração e dono definido ficam para sempre. Com o tempo, o código fica cheio de `if (isFeatureEnabled(...))` sem que ninguém saiba se a feature já é estável ou ainda experimental. O `featuresKillSwitch` global existe mas é um sinal de alarmismo, não de controle.
 
@@ -117,7 +129,7 @@ Pastas de backup não devem existir no Git — para isso existe o histórico de 
 ## 5. Offline e PWA
 
 ### Múltiplas versões do Service Worker
-Há 6 versões do SW em `/public/`: `sw.js`, `sw 2.js`, `sw 3.js`, `sw 4.js`, `sw 5.js`, `sw 6.js`. Qual está ativo? Provavelmente `sw.js`, mas a presença das outras cria dúvida. Service Workers com cache stale são notoriamente difíceis de debugar em produção.
+No repo atual, há somente `sw.js` em `/public/`. Ainda assim, Service Worker é uma área sensível (cache stale), então vale manter um checklist explícito de deploy/atualização e evitar múltiplas variantes de SW no mesmo repositório.
 
 ### `offlineSyncV2` ainda é feature flag
 A feature de sync offline existe há tempo suficiente para ter gerado uma V2, mas ainda está atrás de flag. Isso sugere que ou a feature tem bugs conhecidos que impedem ativação por padrão, ou ninguém assumiu responsabilidade de estabilizá-la. O risco de sync offline com bugs silenciosos é alto — dados de treino podem ser perdidos sem o usuário perceber.
@@ -139,7 +151,7 @@ Para um app com billing, dados de saúde, lógica de permissão por role e sync 
 **Ação recomendada:** Priorizar testes nas camadas de maior risco: VIP access checks, billing webhooks, auth callbacks, workout save/sync.
 
 ### `login_loop_debug_report.json` na raiz
-A presença desse arquivo no repositório indica que um bug crítico de produção (loop de login) foi debugado e o artefato ficou commitado. Arquivos de debug não devem ir para o repositório principal — além de poluir, podem conter informações sensíveis sobre o ambiente.
+No estado atual do repo, não há evidência desse arquivo na raiz. A recomendação permanece: artefatos de debug não devem ser commitados no repositório principal.
 
 ---
 
@@ -161,11 +173,10 @@ Além dos problemas técnicos, há algumas oportunidades claras de produto que e
 
 | Prioridade | Item | Impacto | Esforço |
 |---|---|---|---|
-| 🔴 Crítico | Limpar arquivos duplicados (` 2`, ` 3`) | Alto | Baixo |
-| 🔴 Crítico | Exportar schema real + commitar migrations | Alto | Baixo |
-| 🔴 Crítico | Simplificar lógica de OAuth origin | Alto | Baixo |
-| 🟠 Alto | Migrar componentes críticos JS → TS | Alto | Alto |
-| 🟠 Alto | Unificar status de assinatura (entitlements) | Alto | Médio |
+| 🔴 Crítico | Alinhar `schema_full_restore.sql` com migrations/banco real | Alto | Médio |
+| 🔴 Crítico | Simplificar e estabilizar OAuth redirect/origin | Alto | Baixo/Médio |
+| 🟠 Alto | Migrar áreas críticas JS → TS (actions + HistoryList) | Alto | Alto |
+| 🟠 Alto | Entitlements: garantir atualização via webhooks + auditoria | Alto | Médio |
 | 🟠 Alto | Testes automatizados para VIP, billing e auth | Alto | Médio |
 | 🟡 Médio | Refatorar AdminPanelV2 e ActiveWorkout | Médio | Alto |
 | 🟡 Médio | Política de lifecycle para feature flags | Médio | Baixo |
@@ -173,3 +184,20 @@ Além dos problemas técnicos, há algumas oportunidades claras de produto que e
 | 🟢 Produto | Onboarding estruturado do aluno | Alto | Médio |
 | 🟢 Produto | IA integrada no treino ativo | Alto | Alto |
 | 🟢 Produto | Dashboard de evolução da turma (professor) | Alto | Médio |
+
+---
+
+## Checklist Atualizada (para “ficar 100%”)
+
+### Já corrigido recentemente (build/estabilidade)
+- [x] Build sem erro de import para `ActiveWorkout` (`.js` shim aponta para TSX)
+- [x] Build sem erro de import para `AdminPanelV2` (`.js` shim aponta para TSX)
+- [x] Remoção de loop de import (shim apontando explicitamente para `.tsx`)
+- [x] `AdminPanelV2.tsx` tipado e compilando sem erros de TypeScript
+
+### Próximas ações técnicas (prioridade)
+- [ ] Gerar/exportar um schema “fonte da verdade” (migrations → schema) e atualizar `schema_full_restore.sql`
+- [ ] Revisar e simplificar o cálculo de origin/redirect do OAuth com variável de ambiente canônica
+- [ ] Definir política de lifecycle para feature flags (owner + data + remoção ao estabilizar)
+- [ ] Migrar `HistoryList.js` e actions críticas (`workout-actions.js`, `chat-actions.js`) para TS de forma incremental
+- [ ] Criar testes mínimos para: VIP entitlement, auth callback e fluxo de assinatura

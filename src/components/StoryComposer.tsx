@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-// @ts-ignore
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
@@ -826,33 +825,29 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     return liveSizes?.card ?? { w: 0.26, h: 0.08 }
   }
 
-  const onPiecePointerDown = (key: string, e: React.PointerEvent) => {
+  const onPiecePointerDown = (key: string, e: React.PointerEvent<HTMLElement>) => {
     try {
       if (layout !== 'live') return
       if (!key) return
       if (!e?.currentTarget) return
-      // @ts-ignore
       if (typeof e?.pointerId !== 'number') return
       e.preventDefault?.()
       e.stopPropagation?.()
       const startPos = livePositions?.[key] ?? DEFAULT_LIVE_POSITIONS?.[key] ?? { x: 0.1, y: 0.1 }
-      // @ts-ignore
       dragRef.current = { key, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startPos }
       setDraggingKey(key)
-      // @ts-ignore
       e.currentTarget?.setPointerCapture?.(e.pointerId)
     } catch {
     }
   }
 
-  const onPiecePointerMove = (key: string, e: React.PointerEvent) => {
+  const onPiecePointerMove = (key: string, e: React.PointerEvent<HTMLElement>) => {
     try {
       if (layout !== 'live') return
       const activeKey = dragRef.current?.key
       const activePointerId = dragRef.current?.pointerId
       if (!activeKey || activeKey !== key) return
       if (typeof activePointerId !== 'number') return
-      // @ts-ignore
       if (e?.pointerId !== activePointerId) return
       const preview = previewRef.current
       const rect = preview?.getBoundingClientRect?.()
@@ -870,17 +865,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     }
   }
 
-  const onPiecePointerUp = (key: string, e: React.PointerEvent) => {
+  const onPiecePointerUp = (key: string, e: React.PointerEvent<HTMLElement>) => {
     try {
       const activeKey = dragRef.current?.key
       const activePointerId = dragRef.current?.pointerId
       if (!activeKey || activeKey !== key) return
       if (typeof activePointerId !== 'number') return
-      // @ts-ignore
       if (e?.pointerId !== activePointerId) return
       e.preventDefault?.()
       e.stopPropagation?.()
-      // @ts-ignore
       e.currentTarget?.releasePointerCapture?.(activePointerId)
       dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
       setDraggingKey(null)

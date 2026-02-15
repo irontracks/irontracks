@@ -3,6 +3,8 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 
 export type IrontracksRole = 'admin' | 'teacher' | 'user'
+export type RouteAuthFail = { ok: false; response: NextResponse<any>; supabase?: undefined; user?: undefined; role?: undefined }
+export type RouteAuthOk = { ok: true; supabase: any; user: any; role: IrontracksRole; response?: undefined }
 
 const getAdminEmail = () => {
   const envEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
@@ -67,9 +69,9 @@ export async function resolveRoleByUser(user: { id?: string | null; email?: stri
   return { role: 'user' as IrontracksRole }
 }
 
-export async function requireRole(allowed: IrontracksRole[]) {
+export async function requireRole(allowed: IrontracksRole[]): Promise<RouteAuthFail | RouteAuthOk> {
   const auth = await requireUser()
-  if (!auth.ok) return auth
+  if (!auth.ok) return auth as RouteAuthFail
 
   const { role } = await resolveRoleByUser({ id: auth.user.id, email: auth.user.email })
   const allowedSet = new Set((Array.isArray(allowed) ? allowed : []).filter(Boolean))
@@ -80,7 +82,7 @@ export async function requireRole(allowed: IrontracksRole[]) {
   return { ok: true as const, supabase: auth.supabase, user: auth.user, role }
 }
 
-export async function requireRoleWithBearer(req: Request, allowed: IrontracksRole[]) {
+export async function requireRoleWithBearer(req: Request, allowed: IrontracksRole[]): Promise<RouteAuthFail | RouteAuthOk> {
   try {
     const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
     if (!token) return { ok: false as const, response: jsonError(401, 'unauthorized') }

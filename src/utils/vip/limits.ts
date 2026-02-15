@@ -13,11 +13,12 @@ export type VipTierLimits = {
 
 export type VipEntitlementSource =
   | 'role'
+  | 'entitlement_table'
   | 'app_subscription'
-  | 'marketplace_subscription'
   | 'free_no_subscription'
+  | 'entitlement_missing_plan'
+  | 'entitlement_invalid'
   | 'app_subscription_missing_plan'
-  | 'marketplace_subscription_missing_plan'
 
 export type VipPlanResult = {
   tier: string
@@ -59,7 +60,67 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     return { tier: 'admin', limits: UNLIMITED_LIMITS, source: 'role' }
   }
 
-  // 2. Check App Subscriptions (In-App Purchases)
+  // 2. Check Entitlements Table (preferred)
+  const nowIso = new Date().toISOString()
+  const { data: ent } = await supabase
+    .from('user_entitlements')
+    .select(
+      'id, plan_id, status, provider, provider_subscription_id, valid_from, valid_until, current_period_end, limits_override, created_at',
+    )
+    .eq('user_id', userId)
+    .in('status', ['active', 'trialing', 'past_due'])
+    .lte('valid_from', nowIso)
+    .or(`valid_until.is.null,valid_until.gte.${nowIso}`)
+    .order('valid_until', { ascending: false, nullsFirst: true })
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (ent?.id) {
+    const override = ent?.limits_override && typeof ent.limits_override === 'object' ? ent.limits_override : null
+    if (override && Object.keys(override).length > 0) {
+      return {
+        tier: String(ent.plan_id || 'custom'),
+        limits: { ...FREE_LIMITS, ...(override as any) },
+        source: 'entitlement_table',
+        debug: {
+          entitlement_id: ent.id || null,
+          provider: ent.provider || null,
+          provider_subscription_id: ent.provider_subscription_id || null,
+          entitlement_status: ent.status || null,
+          valid_until: ent.valid_until || null,
+        },
+      }
+    }
+
+    if (ent?.plan_id) {
+      const limits = await fetchPlanLimits(supabase, ent.plan_id)
+      if (limits) {
+        return {
+          tier: ent.plan_id,
+          limits,
+          source: 'entitlement_table',
+          debug: { entitlement_id: ent.id || null, entitlement_status: ent.status || null },
+        }
+      }
+      console.warn('vip_entitlement_missing_plan', {
+        source: 'entitlement_table',
+        entitlement_id: ent.id || null,
+        plan_id: ent.plan_id,
+        status: ent.status || null,
+      })
+      return {
+        tier: 'free',
+        limits: FREE_LIMITS,
+        source: 'entitlement_missing_plan',
+        debug: { entitlement_id: ent.id || null, plan_id: ent.plan_id, entitlement_status: ent.status || null },
+      }
+    }
+
+    return { tier: 'free', limits: FREE_LIMITS, source: 'entitlement_invalid', debug: { entitlement_id: ent.id || null } }
+  }
+
+  // 3. Check App Subscriptions (legacy fallback)
   const { data: appSub } = await supabase
     .from('app_subscriptions')
     .select('id, plan_id, status')
@@ -90,44 +151,6 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
       limits: FREE_LIMITS,
       source: 'app_subscription_missing_plan',
       debug: { app_subscription_id: appSub.id || null, plan_id: appSub.plan_id, app_subscription_status: appSub.status || null },
-    }
-  }
-
-  // 3. Check Marketplace Subscriptions (Stripe/Asaas)
-  const { data: marketSub } = await supabase
-    .from('marketplace_subscriptions')
-    .select('id, plan_id, status')
-    .eq('student_user_id', userId)
-    .in('status', ['active', 'past_due', 'trialing'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  if (marketSub?.plan_id) {
-    const limits = await fetchPlanLimits(supabase, marketSub.plan_id)
-    if (limits) {
-      return {
-        tier: marketSub.plan_id,
-        limits,
-        source: 'marketplace_subscription',
-        debug: { marketplace_subscription_id: marketSub.id || null, marketplace_subscription_status: marketSub.status || null },
-      }
-    }
-    console.warn('vip_entitlement_missing_plan', {
-      source: 'marketplace_subscription',
-      marketplace_subscription_id: marketSub.id || null,
-      plan_id: marketSub.plan_id,
-      status: marketSub.status || null,
-    })
-    return {
-      tier: 'free',
-      limits: FREE_LIMITS,
-      source: 'marketplace_subscription_missing_plan',
-      debug: {
-        marketplace_subscription_id: marketSub.id || null,
-        plan_id: marketSub.plan_id,
-        marketplace_subscription_status: marketSub.status || null,
-      },
     }
   }
 

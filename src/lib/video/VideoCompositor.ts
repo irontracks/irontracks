@@ -24,6 +24,12 @@ interface ExportResult {
     duration: number;
 }
 
+type VideoElementWithCapture = HTMLVideoElement & {
+    captureStream?: () => MediaStream;
+    mozCaptureStream?: () => MediaStream;
+    requestVideoFrameCallback?: (cb: () => void) => number;
+};
+
 export class VideoCompositor {
     private ctx: CanvasRenderingContext2D | null = null;
     private canvas: HTMLCanvasElement | null = null;
@@ -196,8 +202,8 @@ export class VideoCompositor {
             }
         } else {
             // Tenta pegar direto do vídeo se Web Audio falhou
-            // @ts-ignore
-            const vidStream = videoElement.captureStream ? videoElement.captureStream() : videoElement.mozCaptureStream ? videoElement.mozCaptureStream() : null;
+            const v = videoElement as VideoElementWithCapture;
+            const vidStream = v.captureStream ? v.captureStream() : v.mozCaptureStream ? v.mozCaptureStream() : null;
             if (vidStream) {
                 const audioTracks = vidStream.getAudioTracks();
                 if (audioTracks.length > 0) canvasStream.addTrack(audioTracks[0]);
@@ -325,10 +331,9 @@ export class VideoCompositor {
             }
 
             // Próximo frame
-            // @ts-ignore
-            if (videoElement.requestVideoFrameCallback) {
-                // @ts-ignore
-                videoElement.requestVideoFrameCallback(processFrame);
+            const v = videoElement as VideoElementWithCapture;
+            if (typeof v.requestVideoFrameCallback === 'function') {
+                v.requestVideoFrameCallback(() => processFrame());
             } else {
                 requestAnimationFrame(processFrame);
             }
@@ -369,10 +374,9 @@ export class VideoCompositor {
             processFrameManual();
         }
         if (!useManualFps) {
-            // @ts-ignore
-            if (videoElement.requestVideoFrameCallback) {
-                // @ts-ignore
-                videoElement.requestVideoFrameCallback(processFrame);
+            const v = videoElement as VideoElementWithCapture;
+            if (typeof v.requestVideoFrameCallback === 'function') {
+                v.requestVideoFrameCallback(() => processFrame());
             } else {
                 requestAnimationFrame(processFrame);
             }
