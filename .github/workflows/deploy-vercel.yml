@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - deploy-20260114-160525
   workflow_dispatch: {}
 
 jobs:
