@@ -1,14 +1,14 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 
-const chunk = (arr, size) => {
-  const out: any[] = [];
+const chunk = (arr: unknown, size: unknown): unknown[][] => {
+  const out: unknown[][] = []
   const safe = Array.isArray(arr) ? arr : []
   const n = Math.max(1, Number(size) || 1)
   for (let i = 0; i < safe.length; i += n) out.push(safe.slice(i, i + n))
   return out
 }
 
-export async function listFollowerIdsOf(userId) {
+export async function listFollowerIdsOf(userId: unknown): Promise<string[]> {
   const uid = String(userId || '').trim()
   if (!uid) return []
   const admin = createAdminClient()
@@ -23,7 +23,7 @@ export async function listFollowerIdsOf(userId) {
     .filter(Boolean)
 }
 
-export async function filterRecipientsByPreference(recipientIds, preferenceKey) {
+export async function filterRecipientsByPreference(recipientIds: unknown, preferenceKey: unknown): Promise<string[]> {
   const key = String(preferenceKey || '').trim()
   const ids = (Array.isArray(recipientIds) ? recipientIds : []).map((v) => String(v || '').trim()).filter(Boolean)
   if (!key || ids.length === 0) return ids
@@ -39,14 +39,14 @@ export async function filterRecipientsByPreference(recipientIds, preferenceKey) 
   )
 
   return ids.filter((id) => {
-    const prefs = byId.get(id) || null
+    const prefs = byId.get(id) && typeof byId.get(id) === 'object' ? (byId.get(id) as Record<string, unknown>) : null
     if (!prefs) return true
     const raw = prefs[key]
     return raw !== false
   })
 }
 
-export async function shouldThrottleBySenderType(senderId, type, windowMinutes) {
+export async function shouldThrottleBySenderType(senderId: unknown, type: unknown, windowMinutes: unknown): Promise<boolean> {
   const sid = String(senderId || '').trim()
   const t = String(type || '').trim()
   const minutes = Math.max(1, Number(windowMinutes) || 15)
@@ -57,14 +57,16 @@ export async function shouldThrottleBySenderType(senderId, type, windowMinutes) 
   return Array.isArray(data) && data.length > 0
 }
 
-export async function insertNotifications(rows) {
+export async function insertNotifications(rows: unknown): Promise<{ ok: boolean; inserted: number; error?: string }> {
   const admin = createAdminClient()
-  const safeRows = (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r === 'object')
+  const safeRows = (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && typeof r === 'object')
+    .map((r) => r as Record<string, unknown>)
   if (!safeRows.length) return { ok: true, inserted: 0 }
 
   let inserted = 0
   for (const part of chunk(safeRows, 500)) {
-    const { error } = await admin.from('notifications').insert(part)
+    const { error } = await admin.from('notifications').insert(part as unknown as Array<Record<string, unknown>>)
     if (error) {
       const msg = String(error?.message ?? error)
       const lower = msg.toLowerCase()
@@ -76,18 +78,20 @@ export async function insertNotifications(rows) {
           lower.includes('is_read'))
       if (!schemaMismatch) return { ok: false, error: msg, inserted }
 
-      const fallback = part.map((r) => ({
-        user_id: r.user_id,
-        title: r.title,
-        message: r.message,
-        type: r.type,
-        read: r.read,
-      }))
+      const fallback = (part as unknown[]).map((r) => {
+        const row = r && typeof r === 'object' ? (r as Record<string, unknown>) : ({} as Record<string, unknown>)
+        return {
+          user_id: row.user_id,
+          title: row.title,
+          message: row.message,
+          type: row.type,
+          read: row.read,
+        }
+      })
       const { error: fallbackError } = await admin.from('notifications').insert(fallback)
       if (fallbackError) return { ok: false, error: String(fallbackError?.message ?? fallbackError), inserted }
     }
-    inserted += part.length
+    inserted += (part as unknown[]).length
   }
   return { ok: true, inserted }
 }
-

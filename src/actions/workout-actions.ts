@@ -1,16 +1,17 @@
 import { createClient } from '@/utils/supabase/client'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
+import type { ActionResult } from '@/types/actions'
 
-const safeString = (v) => {
+const safeString = (v: unknown): string => {
   const s = String(v ?? '').trim()
   return s
 }
 
-const safeIso = (v) => {
+const safeIso = (v: unknown): string | null => {
   try {
     if (!v) return null
-    const d = v instanceof Date ? v : new Date(v)
+    const d = v instanceof Date ? v : new Date(v as unknown as string | number | Date)
     const t = d.getTime()
     return Number.isFinite(t) ? d.toISOString() : null
   } catch {
@@ -18,7 +19,7 @@ const safeIso = (v) => {
   }
 }
 
-const safeJsonParse = (raw) => {
+const safeJsonParse = (raw: unknown): unknown => {
   try {
     if (!raw) return null
     if (typeof raw === 'object') return raw
@@ -30,43 +31,51 @@ const safeJsonParse = (raw) => {
   }
 }
 
-const buildExercisesPayload = (workout) => {
-  const w = workout && typeof workout === 'object' ? workout : {}
-  const exercises = Array.isArray(w.exercises) ? w.exercises : []
+const buildExercisesPayload = (workout: unknown): unknown[] => {
+  const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
+  const exercises = Array.isArray(w.exercises) ? (w.exercises as unknown[]) : []
   return exercises
     .filter((ex) => ex && typeof ex === 'object')
     .map((ex, idx) => {
+      const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
       const setDetails =
-        Array.isArray(ex.setDetails) ? ex.setDetails : Array.isArray(ex.set_details) ? ex.set_details : Array.isArray(ex.sets) ? ex.sets : null
-      const headerSets = Number.parseInt(String(ex.sets ?? ''), 10) || 0
+        Array.isArray(exObj.setDetails)
+          ? (exObj.setDetails as unknown[])
+          : Array.isArray(exObj.set_details)
+            ? (exObj.set_details as unknown[])
+            : Array.isArray(exObj.sets)
+              ? (exObj.sets as unknown[])
+              : null
+      const headerSets = Number.parseInt(String(exObj.sets ?? ''), 10) || 0
       const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0)
-      const sets: any[] = [];
+      const sets: Array<Record<string, unknown>> = []
       for (let i = 0; i < numSets; i += 1) {
         const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null
+        const sObj = s && typeof s === 'object' ? (s as Record<string, unknown>) : ({} as Record<string, unknown>)
         sets.push({
-          weight: s?.weight ?? null,
-          reps: s?.reps ?? ex?.reps ?? null,
-          rpe: s?.rpe ?? ex?.rpe ?? null,
-          set_number: s?.set_number ?? s?.setNumber ?? i + 1,
+          weight: sObj.weight ?? null,
+          reps: (sObj.reps ?? exObj.reps) ?? null,
+          rpe: (sObj.rpe ?? exObj.rpe) ?? null,
+          set_number: (sObj.set_number ?? sObj.setNumber) ?? (i + 1),
           completed: false,
-          is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-          advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+          is_warmup: !!(sObj.is_warmup ?? sObj.isWarmup),
+          advanced_config: (sObj.advanced_config ?? sObj.advancedConfig) ?? null,
         })
       }
       return {
-        name: safeString(ex?.name || ''),
-        notes: safeString(ex?.notes || ''),
-        video_url: ex?.videoUrl ?? ex?.video_url ?? null,
-        rest_time: ex?.restTime ?? ex?.rest_time ?? null,
-        cadence: ex?.cadence ?? null,
-        method: ex?.method ?? null,
+        name: safeString(exObj.name || ''),
+        notes: safeString(exObj.notes || ''),
+        video_url: (exObj.videoUrl ?? exObj.video_url) ?? null,
+        rest_time: (exObj.restTime ?? exObj.rest_time) ?? null,
+        cadence: exObj.cadence ?? null,
+        method: exObj.method ?? null,
         order: idx,
         sets,
       }
     })
 }
 
-export async function createWorkout(workout) {
+export async function createWorkout(workout: Record<string, unknown>): Promise<ActionResult<{ id: string }>> {
   try {
     const supabase = createClient()
     const {
@@ -95,7 +104,7 @@ export async function createWorkout(workout) {
     try {
       trackUserEvent('workout_create_ok', { type: 'workout', metadata: { id: workoutId, title } })
     } catch {}
-    return { ok: true, id: workoutId }
+    return { ok: true, data: { id: String(workoutId) } }
   } catch (e) {
     try {
       trackUserEvent('workout_create_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
@@ -104,7 +113,7 @@ export async function createWorkout(workout) {
   }
 }
 
-export async function updateWorkout(id, workout) {
+export async function updateWorkout(id: string, workout: Record<string, unknown>): Promise<ActionResult<{ id: string }>> {
   try {
     const supabase = createClient()
     const {
@@ -135,7 +144,7 @@ export async function updateWorkout(id, workout) {
     try {
       trackUserEvent('workout_update_ok', { type: 'workout', metadata: { id: savedId || workoutId, title } })
     } catch {}
-    return { ok: true, id: savedId || workoutId }
+    return { ok: true, data: { id: String(savedId || workoutId) } }
   } catch (e) {
     try {
       trackUserEvent('workout_update_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
@@ -144,7 +153,7 @@ export async function updateWorkout(id, workout) {
   }
 }
 
-export async function deleteWorkout(id) {
+export async function deleteWorkout(id: string): Promise<ActionResult> {
   try {
     const supabase = createClient()
     const workoutId = safeString(id)
@@ -157,7 +166,7 @@ export async function deleteWorkout(id) {
     try {
       trackUserEvent('workout_delete_ok', { type: 'workout', metadata: { id: workoutId } })
     } catch {}
-    return { ok: true }
+    return { ok: true, data: undefined }
   } catch (e) {
     try {
       trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
@@ -166,7 +175,7 @@ export async function deleteWorkout(id) {
   }
 }
 
-export async function setWorkoutArchived(id, archived = true) {
+export async function setWorkoutArchived(id: string, archived = true): Promise<ActionResult> {
   try {
     const supabase = createClient()
     const workoutId = safeString(id)
@@ -174,45 +183,49 @@ export async function setWorkoutArchived(id, archived = true) {
     const archivedAt = archived ? new Date().toISOString() : null
     const { error } = await supabase.from('workouts').update({ archived_at: archivedAt }).eq('id', workoutId)
     if (error) return { ok: false, error: error.message }
-    return { ok: true, archivedAt }
+    void archivedAt
+    return { ok: true, data: undefined }
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
 
-export async function setWorkoutSortOrder(id, sortOrder) {
+export async function setWorkoutSortOrder(ids: string[]): Promise<ActionResult> {
   try {
     const supabase = createClient()
-    const workoutId = safeString(id)
-    if (!workoutId) return { ok: false, error: 'missing id' }
-    const n = Number(sortOrder)
-    if (!Number.isFinite(n)) return { ok: false, error: 'invalid sort order' }
-    const { error } = await supabase.from('workouts').update({ sort_order: Math.floor(n) }).eq('id', workoutId)
-    if (error) return { ok: false, error: error.message }
-    return { ok: true }
+    const list = (Array.isArray(ids) ? ids : []).map((x) => safeString(x)).filter(Boolean)
+    for (let i = 0; i < list.length; i += 1) {
+      const workoutId = list[i]
+      const { error } = await supabase.from('workouts').update({ sort_order: i }).eq('id', workoutId)
+      if (error) return { ok: false, error: error.message }
+    }
+    return { ok: true, data: undefined }
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
 
-export async function importData(payload) {
-  const src = payload && typeof payload === 'object' ? payload : null
-  const workouts = Array.isArray(src?.workouts) ? src.workouts : []
-  if (!workouts.length) return { ok: true, created: 0 }
+export async function importData(payload: unknown): Promise<ActionResult<{ imported: number }>> {
+  const payloadObj = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : null
+  const workouts = Array.isArray(payloadObj?.workouts) ? (payloadObj?.workouts as unknown[]) : []
+  if (!workouts.length) return { ok: true, data: { imported: 0 } }
 
   let created = 0
   for (const w of workouts) {
+    const wObj = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
     const res = await createWorkout({
-      title: w?.title ?? w?.name ?? 'Treino',
-      notes: w?.notes ?? '',
-      exercises: Array.isArray(w?.exercises) ? w.exercises : [],
+      title: wObj?.title ?? wObj?.name ?? 'Treino',
+      notes: wObj?.notes ?? '',
+      exercises: Array.isArray(wObj?.exercises) ? (wObj.exercises as unknown[]) : [],
     })
     if (res?.ok) created += 1
   }
-  return { ok: true, created }
+  return { ok: true, data: { imported: created } }
 }
 
-export async function generatePostWorkoutInsights(input) {
+export async function generatePostWorkoutInsights(
+  input: unknown,
+): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const body = input && typeof input === 'object' ? input : {}
     const res = await fetch('/api/ai/post-workout-insights', {
@@ -221,14 +234,16 @@ export async function generatePostWorkoutInsights(input) {
       body: JSON.stringify(body),
     })
     const json = await res.json().catch(() => null)
-    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired }
-    return json
+    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as unknown as ActionResult<Record<string, unknown>>
+    return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
 
-export async function generateExerciseMuscleMap(input) {
+export async function generateExerciseMuscleMap(
+  input: unknown,
+): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const body = input && typeof input === 'object' ? input : {}
     const res = await fetch('/api/ai/exercise-muscle-map', {
@@ -238,13 +253,15 @@ export async function generateExerciseMuscleMap(input) {
     })
     const json = await res.json().catch(() => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao mapear exercícios' }
-    return json
+    return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
 
-export async function getMuscleMapWeek(input) {
+export async function getMuscleMapWeek(
+  input: unknown,
+): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const body = input && typeof input === 'object' ? input : {}
     const res = await fetch('/api/ai/muscle-map-week', {
@@ -254,13 +271,15 @@ export async function getMuscleMapWeek(input) {
     })
     const json = await res.json().catch(() => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular' }
-    return json
+    return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
 
-export async function getMuscleMapDay(input) {
+export async function getMuscleMapDay(
+  input: unknown,
+): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const body = input && typeof input === 'object' ? input : {}
     const res = await fetch('/api/ai/muscle-map-day', {
@@ -270,13 +289,15 @@ export async function getMuscleMapDay(input) {
     })
     const json = await res.json().catch(() => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular do dia' }
-    return json
+    return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
 
-export async function backfillExerciseMuscleMaps(input) {
+export async function backfillExerciseMuscleMaps(
+  input: unknown,
+): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const body = input && typeof input === 'object' ? input : {}
     const res = await fetch('/api/ai/exercise-muscle-map-backfill', {
@@ -286,13 +307,15 @@ export async function backfillExerciseMuscleMaps(input) {
     })
     const json = await res.json().catch(() => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao reprocessar histórico' }
-    return json
+    return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
 }
 
-export async function applyProgressionToNextTemplate(input) {
+export async function applyProgressionToNextTemplate(
+  input: unknown,
+): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const body = input && typeof input === 'object' ? input : {}
     const res = await fetch('/api/ai/apply-progression-next', {
@@ -302,7 +325,7 @@ export async function applyProgressionToNextTemplate(input) {
     })
     const json = await res.json().catch(() => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao aplicar progressão' }
-    return json
+    return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
     return { ok: false, error: e?.message ? String(e.message) : String(e) }
   }
@@ -320,7 +343,7 @@ export async function getIronRankLeaderboard(limit = 100) {
   }
 }
 
-const normalizeExerciseKey = (v) => {
+const normalizeExerciseKey = (v: unknown): string => {
   return safeString(v)
     .toLowerCase()
     .normalize('NFD')
@@ -328,15 +351,15 @@ const normalizeExerciseKey = (v) => {
     .replace(/\s+/g, ' ')
 }
 
-const extractLogsStatsByExercise = (session) => {
+const extractLogsStatsByExercise = (session: unknown) => {
   try {
-    const s = session && typeof session === 'object' ? session : {}
-    const logs: any = s?.logs && typeof s.logs === 'object' ? s.logs : {}
-    const exercises = Array.isArray(s?.exercises) ? s.exercises : []
-    const byKey = new Map()
+    const s = session && typeof session === 'object' ? (session as Record<string, unknown>) : ({} as Record<string, unknown>)
+    const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
+    const exercises = Array.isArray(s?.exercises) ? (s.exercises as unknown[]) : []
+    const byKey = new Map<string, { exercise: string; weight: number; reps: number; volume: number }>()
 
     Object.entries(logs).forEach(([k, v]) => {
-      const log: any = v && typeof v === 'object' ? v : null
+      const log = v && typeof v === 'object' ? (v as Record<string, unknown>) : null
       if (!log) return
       const doneRaw = log?.done ?? log?.isDone ?? log?.completed ?? null
       const done = doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
@@ -344,7 +367,9 @@ const extractLogsStatsByExercise = (session) => {
       const parts = String(k || '').split('-')
       const exIdx = Number(parts[0])
       if (!Number.isFinite(exIdx)) return
-      const exName = safeString(exercises?.[exIdx]?.name || '')
+      const ex = exercises?.[exIdx]
+      const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : null
+      const exName = safeString(exObj?.name || '')
       if (!exName) return
       const key = normalizeExerciseKey(exName)
       if (!key) return
@@ -368,13 +393,13 @@ const extractLogsStatsByExercise = (session) => {
   }
 }
 
-export async function getLatestWorkoutPrs() {
+export async function getLatestWorkoutPrs(): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const supabase = createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user?.id) return { ok: false, error: 'unauthorized', prs: [], workout: null }
+    if (!user?.id) return { ok: false, error: 'unauthorized', prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
 
     const { data: latest, error: lErr } = await supabase
       .from('workouts')
@@ -385,8 +410,8 @@ export async function getLatestWorkoutPrs() {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (lErr) return { ok: false, error: lErr.message, prs: [], workout: null }
-    if (!latest?.id) return { ok: true, prs: [], workout: { title: null, date: null } }
+    if (lErr) return { ok: false, error: lErr.message, prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
+    if (!latest?.id) return { ok: true, data: { prs: [], workout: { title: null, date: null } }, prs: [], workout: { title: null, date: null } } as unknown as ActionResult<Record<string, unknown>>
 
     const session = safeJsonParse(latest.notes)
     const currentMap = extractLogsStatsByExercise(session)
@@ -401,8 +426,8 @@ export async function getLatestWorkoutPrs() {
       .order('created_at', { ascending: false })
       .limit(30)
 
-    const prevBest = new Map()
-    for (const row of Array.isArray(prevRows) ? prevRows : []) {
+    const prevBest = new Map<string, { weight: number; reps: number; volume: number }>()
+    for (const row of Array.isArray(prevRows) ? (prevRows as Array<Record<string, unknown>>) : []) {
       const prevSession = safeJsonParse(row?.notes)
       const m = extractLogsStatsByExercise(prevSession)
       for (const [k, st] of m.entries()) {
@@ -415,7 +440,7 @@ export async function getLatestWorkoutPrs() {
       }
     }
 
-    const prs: any[] = [];
+    const prs: Array<Record<string, unknown>> = []
     for (const [k, st] of currentMap.entries()) {
       const base = prevBest.get(k) || { weight: 0, reps: 0, volume: 0 }
       const improved = {
@@ -427,23 +452,31 @@ export async function getLatestWorkoutPrs() {
       prs.push({ ...st, improved })
     }
 
-    prs.sort((a, b) => (b.volume || 0) - (a.volume || 0))
+    prs.sort((a, b) => (Number(b.volume) || 0) - (Number(a.volume) || 0))
 
     return {
       ok: true,
+      data: {
+        prs: prs.slice(0, 12),
+        workout: {
+          id: String(latest.id),
+          title: latest?.name ?? null,
+          date: safeIso(latest?.date) || safeIso(latest?.created_at),
+        },
+      },
       prs: prs.slice(0, 12),
       workout: {
         id: String(latest.id),
         title: latest?.name ?? null,
         date: safeIso(latest?.date) || safeIso(latest?.created_at),
       },
-    }
+    } as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e), prs: [], workout: null }
+    return { ok: false, error: e?.message ? String(e.message) : String(e), prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
   }
 }
 
-export async function computeWorkoutStreakAndStats() {
+export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Record<string, unknown>>> {
   try {
     const supabase = createClient()
     const {
@@ -536,7 +569,7 @@ export async function computeWorkoutStreakAndStats() {
       if (!vErr) totalVolumeKg = Math.round(Number(String(vol ?? 0).replace(',', '.')) || 0)
     } catch {}
 
-    const badges: any[] = [];
+    const badges: Array<Record<string, unknown>> = []
     if (totalWorkouts > 0) badges.push({ id: 'first_workout', label: 'Primeiro treino', kind: 'milestone' })
     if (currentStreak >= 3) badges.push({ id: 'streak_3', label: '3 dias seguidos', kind: 'streak' })
     if (currentStreak >= 7) badges.push({ id: 'streak_7', label: '7 dias seguidos', kind: 'streak' })
@@ -627,7 +660,7 @@ export async function generateAssessmentPlanAi(input) {
   const weight = assessment?.weight != null ? safeString(assessment.weight) : ''
   const bf = assessment?.body_fat_percentage != null ? safeString(assessment.body_fat_percentage) : assessment?.bf != null ? safeString(assessment.bf) : ''
 
-  const summary: any[] = [];
+  const summary: string[] = []
   summary.push(`Plano tático (base) para ${studentName}.`)
   if (goal) summary.push(`Objetivo: ${goal}`)
   if (weight) summary.push(`Peso atual: ${weight} kg`)

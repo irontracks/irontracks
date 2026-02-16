@@ -1,7 +1,16 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    updateId: z.string().optional(),
+    update_id: z.string().optional(),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
@@ -10,7 +19,9 @@ export async function POST(req: Request) {
     const supabase = auth.supabase
     const user = auth.user
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const updateId = String(body?.updateId || body?.update_id || '').trim()
     if (!updateId) return NextResponse.json({ ok: false, error: 'missing_update_id' }, { status: 400 })
 

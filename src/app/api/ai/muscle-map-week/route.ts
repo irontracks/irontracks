@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -9,9 +11,37 @@ import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 
 export const dynamic = 'force-dynamic'
 
+const ZodBodySchema = z
+  .object({
+    refreshCache: z.boolean().optional(),
+    refresh: z.boolean().optional(),
+    refreshAi: z.boolean().optional(),
+    weekStart: z.union([z.string(), z.number(), z.date()]).optional(),
+  })
+  .passthrough()
+
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeJsonParse = (raw: any) => {
+const AiExerciseMuscleMapSchema = z
+  .object({
+    exercises: z.array(
+      z.object({
+        name: z.string(),
+        muscles: z.array(
+          z.object({
+            id: z.string(),
+            sets_equivalent: z.number().optional(),
+            confidence: z.number().min(0).max(1).optional(),
+          })
+        ),
+      })
+    ),
+  })
+  .passthrough()
+
+type AiExerciseMuscleMap = z.infer<typeof AiExerciseMuscleMapSchema>
+
+const safeJsonParse = (raw: unknown) => {
   try {
     if (!raw) return null
     if (typeof raw === 'object') return raw
@@ -34,9 +64,9 @@ const extractJsonFromModelText = (text: string) => {
   return safeJsonParse(cleaned.slice(start, end + 1))
 }
 
-const toStr = (v: any) => String(v || '').trim()
+const toStr = (v: unknown): string => String(v || '').trim()
 
-const normalizeMuscleId = (raw: any, allowed: Set<string>) => {
+const normalizeMuscleId = (raw: unknown, allowed: Set<string>) => {
   const id = String(raw || '').trim().toLowerCase()
   if (!id) return ''
   if (allowed.has(id)) return id
@@ -46,20 +76,21 @@ const normalizeMuscleId = (raw: any, allowed: Set<string>) => {
 
 const DEFAULT_MUSCLE_ID_SET = new Set(MUSCLE_GROUPS.map((m) => m.id))
 
-const normalizeContributions = (mapping: any, allowed: Set<string>) => {
-  const raw = mapping && typeof mapping === 'object' ? mapping : null
-  const contributionsRaw = Array.isArray((raw as any)?.contributions) ? (raw as any).contributions : []
+const normalizeContributions = (mapping: unknown, allowed: Set<string>) => {
+  const raw = mapping && typeof mapping === 'object' ? (mapping as Record<string, unknown>) : null
+  const contributionsRaw = raw && Array.isArray(raw?.contributions) ? (raw.contributions as unknown[]) : []
   return contributionsRaw
-    .map((c: any) => {
-      const id = normalizeMuscleId(c?.muscleId, allowed)
-      const weight = Number(c?.weight)
+    .map((c) => {
+      const obj = c && typeof c === 'object' ? (c as Record<string, unknown>) : null
+      const id = normalizeMuscleId(obj?.muscleId, allowed)
+      const weight = Number(obj?.weight)
       if (!id || !Number.isFinite(weight) || weight <= 0) return null
       return { muscleId: id, weight }
     })
     .filter(Boolean)
 }
 
-const hasValidMapping = (mapping: any, allowed: Set<string>) => {
+const hasValidMapping = (mapping: unknown, allowed: Set<string>) => {
   return normalizeContributions(mapping, allowed).length > 0
 }
 
@@ -84,9 +115,10 @@ const addDaysUtc = (d: Date, days: number) => {
   return next
 }
 
-const parseEffortFactor = (log: any) => {
-  const rirRaw = log?.rir ?? log?.RIR
-  const rpeRaw = log?.rpe ?? log?.RPE
+const parseEffortFactor = (log: unknown) => {
+  const l = log && typeof log === 'object' ? (log as Record<string, unknown>) : {}
+  const rirRaw = l?.rir ?? l?.RIR
+  const rpeRaw = l?.rpe ?? l?.RPE
   const rir = Number(String(rirRaw ?? '').replace(',', '.'))
   if (Number.isFinite(rir)) {
     if (rir <= 1) return 1
@@ -105,21 +137,22 @@ const parseEffortFactor = (log: any) => {
   return 1
 }
 
-const parseNumber = (raw: any) => {
+const parseNumber = (raw: unknown) => {
   const n = Number(String(raw ?? '').replace(',', '.'))
   return Number.isFinite(n) ? n : null
 }
 
-const isSetDone = (log: any) => {
+const isSetDone = (log: unknown) => {
   if (!log || typeof log !== 'object') return false
-  if (Boolean((log as any)?.done)) return true
-  const reps = parseNumber((log as any)?.reps)
+  const logObj = log as Record<string, unknown>
+  if (Boolean(logObj?.done)) return true
+  const reps = parseNumber(logObj?.reps)
   return reps != null && reps > 0
 }
 
-const plannedSetsCount = (exercise: any) => {
-  const ex = exercise && typeof exercise === 'object' ? exercise : {}
-  const setsArr = Array.isArray(ex?.sets) ? ex.sets : null
+const plannedSetsCount = (exercise: unknown) => {
+  const ex = exercise && typeof exercise === 'object' ? (exercise as Record<string, unknown>) : ({} as Record<string, unknown>)
+  const setsArr = Array.isArray(ex?.sets) ? (ex.sets as unknown[]) : null
   if (setsArr) return setsArr.length
   const n = Number(ex?.sets ?? ex?.setsCount ?? ex?.setCount)
   if (Number.isFinite(n) && n > 0) return Math.floor(n)
@@ -136,38 +169,54 @@ const colorForRatio = (ratio: number) => {
   return '#ef4444'
 }
 
-const normalizeAiExerciseMap = (obj: any) => {
-  const base = obj && typeof obj === 'object' ? obj : {}
-  const itemsRaw = Array.isArray(base.items) ? base.items : []
-  const muscleIds = new Set(MUSCLE_GROUPS.map((m) => m.id))
+const normalizeAiExerciseMap = (obj: unknown) => {
+  const baseObj = obj && typeof obj === 'object' ? (obj as Record<string, unknown>) : ({} as Record<string, unknown>)
+  const itemsRaw = Array.isArray(baseObj.items)
+    ? (baseObj.items as unknown[])
+    : Array.isArray(baseObj.exercises)
+      ? (baseObj.exercises as unknown[])
+      : []
+  const muscleIds: Set<string> = new Set(MUSCLE_GROUPS.map((m) => m.id))
 
   const items = itemsRaw
-    .map((it: any) => {
-      const name = toStr(it?.name)
+    .map((it: unknown) => {
+      const item = it && typeof it === 'object' ? (it as Record<string, unknown>) : ({} as Record<string, unknown>)
+      const name = toStr(item?.name)
       const canonical =
-        toStr(it?.canonical_name || it?.canonicalName || it?.canonical) || (name ? resolveCanonicalExerciseName(name)?.canonical : '')
+        toStr(item?.canonical_name || item?.canonicalName || item?.canonical) || (name ? resolveCanonicalExerciseName(name)?.canonical : '')
       const key = normalizeExerciseName(canonical || name)
       if (!key) return null
 
-      const contribRaw = Array.isArray(it?.contributions) ? it.contributions : Array.isArray(it?.muscles) ? it.muscles : []
+      const contribRaw = Array.isArray(item?.contributions)
+        ? (item.contributions as unknown[])
+        : Array.isArray(item?.muscles)
+          ? (item.muscles as unknown[])
+          : []
       const contributions = contribRaw
-        .map((c: any) => {
-          const muscleId = toStr(c?.muscleId || c?.id)
-          if (!muscleId || !muscleIds.has(muscleId as any)) return null
-          const weight = Number(c?.weight)
+        .map((c: unknown) => {
+          const contrib = c && typeof c === 'object' ? (c as Record<string, unknown>) : ({} as Record<string, unknown>)
+          const muscleId = toStr(contrib?.muscleId || contrib?.id)
+          if (!muscleId || !muscleIds.has(muscleId)) return null
+          const weight = Number(contrib?.weight ?? contrib?.sets_equivalent)
           if (!Number.isFinite(weight) || weight <= 0) return null
-          const role = toStr(c?.role || c?.type || 'primary') || 'primary'
+          const role = toStr(contrib?.role || contrib?.type || 'primary') || 'primary'
           return { muscleId, weight, role }
         })
         .filter(Boolean)
 
-      const weightSum = contributions.reduce((acc: number, c: any) => acc + (Number(c?.weight) || 0), 0)
+      const weightSum = contributions.reduce((acc: number, c: unknown) => {
+        const contrib = c && typeof c === 'object' ? (c as Record<string, unknown>) : ({} as Record<string, unknown>)
+        return acc + (Number(contrib?.weight) || 0)
+      }, 0)
       const normalizedContrib =
         weightSum > 0
-          ? contributions.map((c: any) => ({ ...c, weight: (Number(c.weight) || 0) / weightSum }))
+          ? contributions.map((c: unknown) => {
+              const contrib = c && typeof c === 'object' ? (c as Record<string, unknown>) : ({} as Record<string, unknown>)
+              return { ...contrib, weight: (Number(contrib.weight) || 0) / weightSum }
+            })
           : []
 
-      const confidenceRaw = Number(it?.confidence)
+      const confidenceRaw = Number(item?.confidence)
       const confidence = Number.isFinite(confidenceRaw) ? Math.max(0, Math.min(1, confidenceRaw)) : 0.6
 
       return {
@@ -175,9 +224,9 @@ const normalizeAiExerciseMap = (obj: any) => {
         canonical_name: canonical || name,
         mapping: {
           contributions: normalizedContrib,
-          unilateral: Boolean(it?.unilateral),
+          unilateral: Boolean(item?.unilateral),
           confidence,
-          notes: toStr(it?.notes).slice(0, 240),
+          notes: toStr(item?.notes).slice(0, 240),
         },
         confidence,
       }
@@ -227,26 +276,59 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL })
-  const result = await model.generateContent([{ text: prompt }] as any)
+  const result = await model.generateContent(prompt)
   const text = (await result?.response?.text()) || ''
-  const parsed = extractJsonFromModelText(text)
-  if (!parsed) return []
-  return normalizeAiExerciseMap(parsed)
+  const rawParsed = extractJsonFromModelText(text)
+  const validationResult = AiExerciseMuscleMapSchema.safeParse(rawParsed)
+  let aiData: AiExerciseMuscleMap =
+    validationResult.success
+      ? validationResult.data
+      : { exercises: [] }
+  if (!validationResult.success) {
+    const baseObj = rawParsed && typeof rawParsed === 'object' ? (rawParsed as Record<string, unknown>) : ({} as Record<string, unknown>)
+    const items = Array.isArray(baseObj.items) ? (baseObj.items as unknown[]) : []
+    const adapted = {
+      exercises: items.map((it) => {
+        const obj = it && typeof it === 'object' ? (it as Record<string, unknown>) : ({} as Record<string, unknown>)
+        const musclesRaw = Array.isArray(obj?.contributions)
+          ? (obj.contributions as unknown[])
+          : Array.isArray(obj?.muscles)
+            ? (obj.muscles as unknown[])
+            : []
+        return {
+          name: String(obj?.name ?? ''),
+          muscles: musclesRaw.map((m: unknown) => {
+            const muscle = m && typeof m === 'object' ? (m as Record<string, unknown>) : ({} as Record<string, unknown>)
+            return {
+              id: String(muscle?.muscleId ?? muscle?.id ?? ''),
+              sets_equivalent: muscle?.weight ?? muscle?.sets_equivalent,
+              confidence: muscle?.confidence,
+            }
+          }),
+        }
+      }),
+    }
+    const second = AiExerciseMuscleMapSchema.safeParse(adapted)
+    aiData = second.success ? second.data : { exercises: [] }
+  }
+  const exercises = aiData.exercises
+  return normalizeAiExerciseMap({ exercises })
 }
 
-const normalizeAiInsights = (obj: any) => {
-  const base = obj && typeof obj === 'object' ? obj : {}
-  const toArr = (v: any) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean) : [])
-  const toStrArr = (v: any) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean) : [])
+const normalizeAiInsights = (obj: unknown) => {
+  const base = obj && typeof obj === 'object' ? (obj as Record<string, unknown>) : {}
+  const toArr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean) : [])
+  const toStrArr = (v: unknown) => (Array.isArray(v) ? v.map((x) => String(x || '').trim()).filter(Boolean) : [])
   const alertsRaw = Array.isArray(base?.imbalanceAlerts) ? base.imbalanceAlerts : []
   const recsRaw = Array.isArray(base?.recommendations) ? base.recommendations : []
   const imbalanceAlerts = alertsRaw
-    .map((a: any) => {
-      const type = toStr(a?.type).slice(0, 60)
-      const severity = toStr(a?.severity).slice(0, 20) || 'info'
-      const muscles = toStrArr(a?.muscles).slice(0, 6)
-      const evidence = toStr(a?.evidence).slice(0, 240)
-      const suggestion = toStr(a?.suggestion).slice(0, 240)
+    .map((a: unknown) => {
+      const aObj = a && typeof a === 'object' ? (a as Record<string, unknown>) : {}
+      const type = toStr(aObj?.type).slice(0, 60)
+      const severity = toStr(aObj?.severity).slice(0, 20) || 'info'
+      const muscles = toStrArr(aObj?.muscles).slice(0, 6)
+      const evidence = toStr(aObj?.evidence).slice(0, 240)
+      const suggestion = toStr(aObj?.suggestion).slice(0, 240)
       if (!type && !suggestion) return null
       return { type, severity, muscles, evidence, suggestion }
     })
@@ -254,9 +336,10 @@ const normalizeAiInsights = (obj: any) => {
     .slice(0, 6)
 
   const recommendations = recsRaw
-    .map((r: any) => {
-      const title = toStr(r?.title).slice(0, 80)
-      const actions = toArr(r?.actions).slice(0, 5)
+    .map((r: unknown) => {
+      const rObj = r && typeof r === 'object' ? (r as Record<string, unknown>) : {}
+      const title = toStr(rObj?.title).slice(0, 80)
+      const actions = toArr(rObj?.actions).slice(0, 5)
       if (!title && !actions.length) return null
       return { title: title || 'Recomendação', actions }
     })
@@ -270,7 +353,7 @@ const normalizeAiInsights = (obj: any) => {
   }
 }
 
-const generateWeeklyInsightsWithAi = async (apiKey: string, input: any) => {
+const generateWeeklyInsightsWithAi = async (apiKey: string, input: unknown) => {
   const schema = [
     '{',
     '  "summary": string[] (3-6),',
@@ -303,7 +386,7 @@ const generateWeeklyInsightsWithAi = async (apiKey: string, input: any) => {
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL })
-  const result = await model.generateContent([{ text: prompt }] as any)
+  const result = await model.generateContent(prompt)
   const text = (await result?.response?.text()) || ''
   const parsed = extractJsonFromModelText(text)
   if (!parsed) return null
@@ -318,7 +401,9 @@ export async function POST(req: Request) {
     const userId = String(auth.user.id || '').trim()
     const admin = createAdminClient()
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const refreshCache = Boolean(body?.refreshCache ?? body?.refresh)
     const refreshAi = Boolean(body?.refreshAi)
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -330,7 +415,7 @@ export async function POST(req: Request) {
     const weekStartDate = isoDate(weekStart)
     const cacheKeyDate = weekStartDate
 
-    let cachedPayload: any = null
+    let cachedPayload: Record<string, unknown> | null = null
     let cachedUpdatedAtMs = 0
     if (!refreshCache) {
       const { data: cached } = await admin
@@ -360,9 +445,8 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(120)
 
-    const sessions = (Array.isArray(workouts) ? workouts : [])
-      .map((w: any) => safeJsonParse(w?.notes))
-      .filter((s: any) => s && typeof s === 'object')
+    const workoutRows = (Array.isArray(workouts) ? workouts : []) as Array<Record<string, unknown>>
+    const sessions = workoutRows.map((w) => safeJsonParse(w?.notes)).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
 
     const exerciseKeyToCanonical = new Map<string, string>()
     for (const s of sessions) {
@@ -384,10 +468,11 @@ export async function POST(req: Request) {
           .select('exercise_key, canonical_name, mapping, confidence, source')
           .eq('user_id', userId)
           .in('exercise_key', exerciseKeys)
-      : { data: [] as any[] }
+      : { data: [] as Array<Record<string, unknown>> }
 
-    const mapByKey = new Map<string, any>()
-    for (const row of Array.isArray(maps) ? maps : []) {
+    const mapByKey = new Map<string, unknown>()
+    const mapRows = (Array.isArray(maps) ? maps : []) as Array<Record<string, unknown>>
+    for (const row of mapRows) {
       const k = toStr(row?.exercise_key)
       if (!k) continue
       const mapping = row?.mapping && typeof row.mapping === 'object' ? row.mapping : null
@@ -402,14 +487,17 @@ export async function POST(req: Request) {
     const heuristicRows = missingPairs
       .map((it) => buildHeuristicExerciseMap(it.canonical))
       .filter(Boolean)
-      .map((it: any) => ({
-        user_id: userId,
-        exercise_key: it.exercise_key,
-        canonical_name: it.canonical_name,
-        mapping: it.mapping,
-        confidence: it.confidence,
-        source: 'heuristic',
-      }))
+      .map((it: unknown) => {
+        const row = it && typeof it === 'object' ? (it as Record<string, unknown>) : ({} as Record<string, unknown>)
+        return {
+          user_id: userId,
+          exercise_key: row.exercise_key,
+          canonical_name: row.canonical_name,
+          mapping: row.mapping,
+          confidence: row.confidence,
+          source: 'heuristic',
+        }
+      })
 
     if (heuristicRows.length) {
       await admin.from('exercise_muscle_maps').upsert(heuristicRows, { onConflict: 'user_id,exercise_key' })
@@ -423,14 +511,14 @@ export async function POST(req: Request) {
     const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean)))
     const mappingBatchLimit = refreshAi ? 60 : 20
     const toMapWithAi = apiKey ? missingUnique.slice(0, mappingBatchLimit) : []
-    let newlyMapped: any[] = []
+    let newlyMapped: Array<Record<string, unknown>> = []
     if (toMapWithAi.length) {
       try {
-        newlyMapped = await classifyExercisesWithAi(apiKey as string, toMapWithAi)
+        newlyMapped = (await classifyExercisesWithAi(apiKey as string, toMapWithAi)) as Array<Record<string, unknown>>
       } catch {}
     }
     if (newlyMapped.length) {
-      const rows = newlyMapped.map((it: any) => ({
+      const rows = newlyMapped.map((it: Record<string, unknown>) => ({
         user_id: userId,
         exercise_key: it.exercise_key,
         canonical_name: it.canonical_name,
@@ -439,7 +527,11 @@ export async function POST(req: Request) {
         source: 'ai',
       }))
       await admin.from('exercise_muscle_maps').upsert(rows, { onConflict: 'user_id,exercise_key' })
-      for (const it of newlyMapped) mapByKey.set(it.exercise_key, it.mapping)
+      for (const it of newlyMapped) {
+        const k = toStr(it.exercise_key)
+        if (!k) continue
+        mapByKey.set(k, it.mapping ?? null)
+      }
     }
 
     const muscleIds = MUSCLE_GROUPS.map((m) => m.id)
@@ -472,7 +564,7 @@ export async function POST(req: Request) {
 
       const loggedSetsByExerciseIdx = new Map<number, Set<number>>()
       for (const [k, v] of Object.entries(logs)) {
-        const log = v && typeof v === 'object' ? (v as any) : null
+        const log = v && typeof v === 'object' ? (v as Record<string, unknown>) : null
         if (!log) continue
         const keyParts = String(k || '').split('-')
         const exIdx = Number(keyParts[0])
@@ -494,23 +586,25 @@ export async function POST(req: Request) {
         const canonical = resolveCanonicalExerciseName(exName)?.canonical || exName
         const exKey = normalizeExerciseName(canonical)
         const mapping = exKey ? mapByKey.get(exKey) : null
-        const contributionsRaw = Array.isArray(mapping?.contributions) ? mapping.contributions : []
+        const mappingObj = mapping && typeof mapping === 'object' ? (mapping as Record<string, unknown>) : ({} as Record<string, unknown>)
+        const contributionsRaw = Array.isArray(mappingObj?.contributions) ? (mappingObj.contributions as unknown[]) : []
         const contributions = contributionsRaw
-          .map((c: any) => {
-            const id = normalizeMuscleId(c?.muscleId, muscleIdSet)
-            const weight = Number(c?.weight)
+          .map((c) => {
+            const obj = c && typeof c === 'object' ? (c as Record<string, unknown>) : null
+            const id = normalizeMuscleId(obj?.muscleId, muscleIdSet)
+            const weight = Number(obj?.weight)
             if (!id || !Number.isFinite(weight) || weight <= 0) return null
             return { muscleId: id, weight }
           })
-          .filter(Boolean)
+          .filter((c): c is { muscleId: string; weight: number } => Boolean(c))
         if (!contributions.length) {
           unknownExercises.push(canonical || exName)
           diagnostics.exercisesWithoutMapping.add(canonical || exName)
           continue
         }
         for (const c of contributions) {
-          const id = toStr((c as any)?.muscleId)
-          const weight = Number((c as any)?.weight)
+          const id: string = toStr(c.muscleId)
+          const weight = Number(c.weight)
           if (!id || !Number.isFinite(weight) || weight <= 0) continue
           const value = effort * weight
           volumes[id] += value
@@ -530,15 +624,17 @@ export async function POST(req: Request) {
         const canonical = resolveCanonicalExerciseName(exName)?.canonical || exName
         const exKey = normalizeExerciseName(canonical)
         const mapping = exKey ? mapByKey.get(exKey) : null
-        const contributionsRaw = Array.isArray(mapping?.contributions) ? mapping.contributions : []
+        const mappingObj = mapping && typeof mapping === 'object' ? (mapping as Record<string, unknown>) : ({} as Record<string, unknown>)
+        const contributionsRaw = Array.isArray(mappingObj?.contributions) ? (mappingObj.contributions as unknown[]) : []
         const contributions = contributionsRaw
-          .map((c: any) => {
-            const id = normalizeMuscleId(c?.muscleId, muscleIdSet)
-            const weight = Number(c?.weight)
+          .map((c) => {
+            const obj = c && typeof c === 'object' ? (c as Record<string, unknown>) : null
+            const id = normalizeMuscleId(obj?.muscleId, muscleIdSet)
+            const weight = Number(obj?.weight)
             if (!id || !Number.isFinite(weight) || weight <= 0) return null
             return { muscleId: id, weight }
           })
-          .filter(Boolean)
+          .filter((c): c is { muscleId: string; weight: number } => Boolean(c))
         if (!contributions.length) {
           unknownExercises.push(canonical || exName)
           diagnostics.exercisesWithoutMapping.add(canonical || exName)
@@ -548,8 +644,8 @@ export async function POST(req: Request) {
         diagnostics.estimatedSetsUsed += remaining
         diagnostics.exercisesWithEstimatedSets.add(canonical || exName)
         for (const c of contributions) {
-          const id = toStr((c as any)?.muscleId)
-          const weight = Number((c as any)?.weight)
+          const id: string = toStr(c.muscleId)
+          const weight = Number(c.weight)
           if (!id || !Number.isFinite(weight) || weight <= 0) continue
           const value = remaining * effort * weight
           volumes[id] += value
@@ -596,8 +692,8 @@ export async function POST(req: Request) {
     if (refreshAi && apiKey) {
       try {
         insightsFromAi = await generateWeeklyInsightsWithAi(apiKey, insightInput)
-      } catch (e: any) {
-        aiError = e?.message ? String(e.message) : String(e)
+      } catch (e) {
+        aiError = String((e as Error)?.message ?? e)
       }
     }
     const cachedInsights = cachedPayload?.insights && typeof cachedPayload.insights === 'object' ? cachedPayload.insights : null
@@ -651,7 +747,7 @@ export async function POST(req: Request) {
       .upsert({ user_id: userId, week_start_date: cacheKeyDate, payload }, { onConflict: 'user_id,week_start_date' })
 
     return NextResponse.json(payload)
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 500 })
   }
 }

@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const PostBodySchema = z
+  .object({
+    thread_id: z.string().min(1),
+    role: z.enum(['user', 'assistant', 'system']),
+    content: z.string().min(1),
+  })
+  .passthrough()
 
 export async function GET(req: Request) {
   const auth = await requireUser()
@@ -44,12 +54,13 @@ export async function POST(req: Request) {
   if (entitlement.tier === 'free') return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
   try {
-    const body = await req.json().catch(() => ({}))
-    const threadId = String(body?.thread_id || '').trim()
-    const role = String(body?.role || '').trim()
-    const content = String(body?.content || '').trim()
+    const parsedBody = await parseJsonBody(req, PostBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
+    const threadId = String(body.thread_id || '').trim()
+    const role = String(body.role || '').trim()
+    const content = String(body.content || '').trim()
     if (!threadId || !role || !content) return NextResponse.json({ ok: false, error: 'missing_fields' }, { status: 400 })
-    if (!['user', 'assistant', 'system'].includes(role)) return NextResponse.json({ ok: false, error: 'invalid_role' }, { status: 400 })
 
     const { data, error } = await supabase
       .from('vip_chat_messages')

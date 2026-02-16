@@ -12,21 +12,33 @@ import { getKcalEstimate } from '@/utils/calories/kcalClient';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 
-const parseSessionNotes = (notes) => {
+type AnyObj = Record<string, unknown>
+
+interface WorkoutReportProps {
+    session: AnyObj | null
+    previousSession?: AnyObj | null
+    user: AnyObj | null
+    isVip?: boolean
+    onClose: () => void
+    settings?: AnyObj | null
+    onUpgrade?: () => void
+}
+
+const parseSessionNotes = (notes: unknown): AnyObj | null => {
     try {
         if (typeof notes === 'string') {
             const trimmed = notes.trim();
             if (!trimmed) return null;
             return JSON.parse(trimmed);
         }
-        if (notes && typeof notes === 'object') return notes;
+        if (notes && typeof notes === 'object') return notes as AnyObj;
         return null;
     } catch {
         return null;
     }
 };
 
-const normalizeExerciseKey = (v) => {
+const normalizeExerciseKey = (v: unknown): string => {
     try {
         return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
     } catch {
@@ -34,7 +46,7 @@ const normalizeExerciseKey = (v) => {
     }
 };
 
-const escapeHtml = (value) => {
+const escapeHtml = (value: unknown): string => {
     try {
         return String(value ?? '')
             .replace(/&/g, '&amp;')
@@ -47,11 +59,11 @@ const escapeHtml = (value) => {
     }
 };
 
-const remapPrevLogsByCanonical = (prevLogsByExercise, canonicalMap) => {
+const remapPrevLogsByCanonical = (prevLogsByExercise: unknown, canonicalMap: unknown): Record<string, unknown> => {
     try {
-        const src = prevLogsByExercise && typeof prevLogsByExercise === 'object' ? prevLogsByExercise : {};
-        const map = canonicalMap && typeof canonicalMap === 'object' ? canonicalMap : {};
-        const out: any = {};
+        const src = prevLogsByExercise && typeof prevLogsByExercise === 'object' ? (prevLogsByExercise as Record<string, unknown>) : {};
+        const map = canonicalMap && typeof canonicalMap === 'object' ? (canonicalMap as Record<string, unknown>) : {};
+        const out: Record<string, unknown> = {};
         Object.keys(src).forEach((k) => {
             const baseKey = String(k || '').trim();
             if (!baseKey) return;
@@ -59,12 +71,12 @@ const remapPrevLogsByCanonical = (prevLogsByExercise, canonicalMap) => {
             const canonicalName = String(map?.[aliasNorm] || baseKey).trim() || baseKey;
             const nextKey = normalizeExerciseKey(canonicalName);
             if (!nextKey) return;
-            const logsArr = Array.isArray(src[k]) ? src[k] : [];
+            const logsArr = Array.isArray(src[k]) ? (src[k] as unknown[]) : [];
             if (!out[nextKey]) {
                 out[nextKey] = logsArr;
                 return;
             }
-            const merged = Array.isArray(out[nextKey]) ? out[nextKey].slice() : [];
+            const merged = Array.isArray(out[nextKey]) ? (out[nextKey] as unknown[]).slice() : [];
             const maxLen = Math.max(merged.length, logsArr.length);
             for (let i = 0; i < maxLen; i += 1) {
                 if (merged[i] == null && logsArr[i] != null) merged[i] = logsArr[i];
@@ -73,15 +85,15 @@ const remapPrevLogsByCanonical = (prevLogsByExercise, canonicalMap) => {
         });
         return out;
     } catch {
-        return prevLogsByExercise || {};
+        return (prevLogsByExercise && typeof prevLogsByExercise === 'object') ? (prevLogsByExercise as Record<string, unknown>) : {};
     }
 };
 
-const remapPrevBaseMsByCanonical = (prevBaseMsByExercise, canonicalMap) => {
+const remapPrevBaseMsByCanonical = (prevBaseMsByExercise: unknown, canonicalMap: unknown): Record<string, unknown> => {
     try {
-        const src = prevBaseMsByExercise && typeof prevBaseMsByExercise === 'object' ? prevBaseMsByExercise : {};
-        const map = canonicalMap && typeof canonicalMap === 'object' ? canonicalMap : {};
-        const out: any = {};
+        const src = prevBaseMsByExercise && typeof prevBaseMsByExercise === 'object' ? (prevBaseMsByExercise as Record<string, unknown>) : {};
+        const map = canonicalMap && typeof canonicalMap === 'object' ? (canonicalMap as Record<string, unknown>) : {};
+        const out: Record<string, unknown> = {};
         Object.keys(src).forEach((k) => {
             const baseKey = String(k || '').trim();
             if (!baseKey) return;
@@ -93,25 +105,26 @@ const remapPrevBaseMsByCanonical = (prevBaseMsByExercise, canonicalMap) => {
         });
         return out;
     } catch {
-        return prevBaseMsByExercise || {};
+        return (prevBaseMsByExercise && typeof prevBaseMsByExercise === 'object') ? (prevBaseMsByExercise as Record<string, unknown>) : {};
     }
 };
 
-const applyCanonicalNamesToSession = (sessionObj, canonicalMap) => {
+const applyCanonicalNamesToSession = (sessionObj: unknown, canonicalMap: unknown): unknown => {
     try {
-        const base = sessionObj && typeof sessionObj === 'object' ? sessionObj : null;
+        const base = sessionObj && typeof sessionObj === 'object' ? (sessionObj as Record<string, unknown>) : null;
         if (!base) return sessionObj;
-        const map = canonicalMap && typeof canonicalMap === 'object' ? canonicalMap : {};
-        const exs = Array.isArray(base?.exercises) ? base.exercises : [];
+        const map = canonicalMap && typeof canonicalMap === 'object' ? (canonicalMap as Record<string, unknown>) : {};
+        const exs = Array.isArray(base?.exercises) ? (base.exercises as unknown[]) : [];
         if (!exs.length) return sessionObj;
-        const nextExercises = exs.map((ex) => {
+        const nextExercises = exs.map((ex: unknown) => {
             try {
-                const rawName = String(ex?.name || '').trim();
+                const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const rawName = String(exObj?.name || '').trim();
                 if (!rawName) return ex;
                 const aliasNorm = normalizeExerciseName(rawName);
                 const canonicalName = String(map?.[aliasNorm] || rawName).trim();
                 if (!canonicalName || canonicalName === rawName) return ex;
-                return { ...ex, name: canonicalName };
+                return { ...(exObj as Record<string, unknown>), name: canonicalName };
             } catch {
                 return ex;
             }
@@ -122,11 +135,11 @@ const applyCanonicalNamesToSession = (sessionObj, canonicalMap) => {
     }
 };
 
-const extractExerciseLogsByIndex = (sessionObj, exIdx) => {
+const extractExerciseLogsByIndex = (sessionObj: unknown, exIdx: number): unknown[] => {
     try {
-        const base = sessionObj && typeof sessionObj === 'object' ? sessionObj : null;
-        const logs = base?.logs && typeof base.logs === 'object' ? base.logs : {};
-        const out: any[] = [];
+        const base = sessionObj && typeof sessionObj === 'object' ? (sessionObj as Record<string, unknown>) : null;
+        const logs = base?.logs && typeof base.logs === 'object' ? (base.logs as Record<string, unknown>) : {};
+        const out: unknown[] = [];
         Object.keys(logs).forEach((key) => {
             const parts = String(key || '').split('-');
             const eIdx = Number(parts[0]);
@@ -141,13 +154,14 @@ const extractExerciseLogsByIndex = (sessionObj, exIdx) => {
     }
 };
 
-const hasAnyComparableLog = (logsArr) => {
+const hasAnyComparableLog = (logsArr: unknown): boolean => {
     try {
         const arr = Array.isArray(logsArr) ? logsArr : [];
         for (const l of arr) {
             if (!l || typeof l !== 'object') continue;
-            const w = Number(String(l?.weight ?? '').replace(',', '.'));
-            const r = Number(String(l?.reps ?? '').replace(',', '.'));
+            const obj = l as Record<string, unknown>
+            const w = Number(String(obj?.weight ?? '').replace(',', '.'));
+            const r = Number(String(obj?.reps ?? '').replace(',', '.'));
             if ((Number.isFinite(w) && w > 0) || (Number.isFinite(r) && r > 0)) return true;
         }
         return false;
@@ -156,34 +170,35 @@ const hasAnyComparableLog = (logsArr) => {
     }
 };
 
-const toDateMs = (v) => {
+const toDateMs = (v: unknown): number | null => {
     try {
         if (!v) return null;
-        if (v?.toDate) {
-            const d = v.toDate();
-            const ms = d instanceof Date ? d.getTime() : new Date(d).getTime();
+        const vObj = v && typeof v === 'object' ? (v as Record<string, unknown>) : null
+        if (vObj?.toDate && typeof vObj.toDate === 'function') {
+            const d = (vObj.toDate as () => unknown)();
+            const ms = d instanceof Date ? d.getTime() : new Date(d as unknown as string | number | Date).getTime();
             return Number.isFinite(ms) ? ms : null;
         }
         if (v instanceof Date) {
             const ms = v.getTime();
             return Number.isFinite(ms) ? ms : null;
         }
-        if (typeof v === 'object') {
-            const seconds = Number(v?.seconds ?? v?._seconds ?? v?.sec ?? null);
-            const nanos = Number(v?.nanoseconds ?? v?._nanoseconds ?? 0);
+        if (vObj) {
+            const seconds = Number(vObj?.seconds ?? vObj?._seconds ?? vObj?.sec ?? null);
+            const nanos = Number(vObj?.nanoseconds ?? vObj?._nanoseconds ?? 0);
             if (Number.isFinite(seconds) && seconds > 0) {
                 const ms = seconds * 1000 + Math.floor(nanos / 1e6);
                 return Number.isFinite(ms) ? ms : null;
             }
         }
-        const ms = new Date(v).getTime();
+        const ms = new Date(v as unknown as string | number | Date).getTime();
         return Number.isFinite(ms) ? ms : null;
     } catch {
         return null;
     }
 };
 
-const normalizeTitleKey = (v) => {
+const normalizeTitleKey = (v: unknown): string => {
     try {
         return String(v || '').trim().toLowerCase();
     } catch {
@@ -191,14 +206,15 @@ const normalizeTitleKey = (v) => {
     }
 };
 
-const computeMatchKey = (s) => {
+const computeMatchKey = (s: unknown): { originId: string | null; titleKey: string } => {
     if (!s || typeof s !== 'object') return { originId: null, titleKey: '' };
-    const originId = s?.originWorkoutId ?? s?.workoutId ?? null;
-    const titleKey = normalizeTitleKey(s?.workoutTitle ?? s?.name ?? '');
+    const obj = s as Record<string, unknown>
+    const originId = obj?.originWorkoutId ?? obj?.workoutId ?? null;
+    const titleKey = normalizeTitleKey(obj?.workoutTitle ?? obj?.name ?? '');
     return { originId: originId ? String(originId) : null, titleKey };
 };
 
-const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings, onUpgrade }) => {
+const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings, onUpgrade }: WorkoutReportProps) => {
     const reportRef = useRef<any>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -220,8 +236,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const previousFetchInFlightRef = useRef(false);
     const [resolvedPreviousSession, setResolvedPreviousSession] = useState<any>(null);
     const prevByExerciseFetchInFlightRef = useRef(false);
-    const [prevByExercise, setPrevByExercise] = useState({ logsByExercise: {}, baseMsByExercise: {} });
-    const [checkinsByKind, setCheckinsByKind] = useState({ pre: null, post: null });
+    const [prevByExercise, setPrevByExercise] = useState<{ logsByExercise: Record<string, unknown>; baseMsByExercise: Record<string, unknown> }>({ logsByExercise: {}, baseMsByExercise: {} });
+    const [checkinsByKind, setCheckinsByKind] = useState<{ pre: AnyObj | null; post: AnyObj | null }>({ pre: null, post: null });
     const [aiState, setAiState] = useState<any>(() => {
         const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
         return { status: existing ? 'ready' : 'idle', ai: existing, saved: false, error: '' };
@@ -257,7 +273,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     useEffect(() => {
         const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
-        setAiState((prev) => {
+        setAiState((prev: AnyObj) => {
             if (existing) return { ...prev, status: 'ready', ai: existing, error: '' };
             if (prev?.status === 'ready') return prev;
             return prev;
@@ -303,11 +319,13 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     .limit(10);
                 if (cancelled) return;
                 const rows = Array.isArray(data) ? data : [];
-                const next = { pre: null, post: null };
+                const next: { pre: AnyObj | null; post: AnyObj | null } = { pre: null, post: null };
                 rows.forEach((r) => {
-                    const kind = String(r?.kind || '').trim();
-                    if (kind === 'pre') next.pre = r;
-                    if (kind === 'post') next.post = r;
+                    const row = r && typeof r === 'object' ? (r as AnyObj) : null
+                    if (!row) return
+                    const kind = String(row?.kind || '').trim();
+                    if (kind === 'pre') next.pre = row;
+                    if (kind === 'post') next.post = row;
                 });
 
                 if (!next.pre && originWorkoutId && targetUserId && windowStartIso && windowEndIso) {
@@ -515,23 +533,26 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     if (!session) return null;
 
-    const formatDate = (ts) => {
+    const formatDate = (ts: unknown): string => {
         if (!ts) return '';
-        const d = ts.toDate ? ts.toDate() : new Date(ts);
+        const tsObj = ts && typeof ts === 'object' ? (ts as AnyObj) : null
+        const raw = tsObj?.toDate && typeof tsObj.toDate === 'function' ? (tsObj.toDate as () => unknown)() : ts
+        const d = raw instanceof Date ? raw : new Date(raw as unknown as string | number | Date)
         return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
     };
 
-    const formatDuration = (s) => {
-        const mins = Math.floor(s / 60);
-        const secs = Math.floor(s % 60);
+    const formatDuration = (s: unknown): string => {
+        const v = Number(s) || 0
+        const mins = Math.floor(v / 60);
+        const secs = Math.floor(v % 60);
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     };
 
     const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    const calculateTotalVolume = (logs) => {
+    const calculateTotalVolume = (logs: unknown): number => {
         try {
-            const safeLogs = logs && typeof logs === 'object' ? logs : {};
+            const safeLogs = logs && typeof logs === 'object' ? (logs as Record<string, unknown>) : {};
             let volume = 0;
             Object.values(safeLogs).forEach((log) => {
                 if (!log || typeof log !== 'object') return;
@@ -555,13 +576,13 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         return previousSession;
     })();
 
-    const sessionLogs = session?.logs && typeof session.logs === 'object' ? session.logs : {};
-    const prevSessionLogs = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? effectivePreviousSession.logs : {};
+    const sessionLogs: Record<string, unknown> = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {};
+    const prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {};
     const currentVolume = calculateTotalVolume(sessionLogs);
     const prevVolume = effectivePreviousSession ? calculateTotalVolume(prevSessionLogs) : 0;
     const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0;
     const durationInMinutes = (Number(session?.totalTime) || 0) / 60;
-    const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? session.outdoorBike : null;
+    const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? (session.outdoorBike as AnyObj) : null;
     const calories = (() => {
         const ov = Number(kcalEstimate);
         if (Number.isFinite(ov) && ov > 0) return Math.round(ov);
@@ -570,13 +591,13 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         return Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
     })();
 
-    const formatKm = (meters) => {
+    const formatKm = (meters: unknown): string => {
         const m = Number(meters);
         if (!Number.isFinite(m) || m <= 0) return '-';
         return `${(m / 1000).toFixed(2)} km`;
     };
 
-    const formatKmh = (kmh) => {
+    const formatKmh = (kmh: unknown): string => {
         const v = Number(kmh);
         if (!Number.isFinite(v) || v <= 0) return '-';
         return `${v.toFixed(1)} km/h`;
@@ -592,10 +613,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
         const out: any = {};
         if (effectivePreviousSession && Array.isArray(effectivePreviousSession?.exercises)) {
-            const safePrevLogs = prevSessionLogs;
-            effectivePreviousSession.exercises.forEach((ex, exIdx) => {
-                if (!ex || typeof ex !== 'object') return;
-                const exName = String(ex?.name || '').trim();
+            const safePrevLogs = prevSessionLogs as Record<string, unknown>;
+            (effectivePreviousSession.exercises as unknown[]).forEach((ex: unknown, exIdx: number) => {
+                const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
+                if (!exObj) return;
+                const exName = String(exObj?.name || '').trim();
                 const keyName = normalizeExerciseKey(exName);
                 if (!keyName) return;
                 const exLogs: any[] = [];
@@ -655,10 +677,20 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             setIsGenerating(true);
             try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch {}
             const prev = effectivePreviousSession ?? (await resolvePreviousFromHistory());
-            let canonicalMap = {};
+            let canonicalMap: Record<string, unknown> = {};
             try {
-                const currentNames = (Array.isArray(session?.exercises) ? session.exercises : []).map((e) => e?.name).filter(Boolean);
-                const prevNames = (Array.isArray(prev?.exercises) ? prev.exercises : []).map((e) => e?.name).filter(Boolean);
+                const currentNames = (Array.isArray(session?.exercises) ? (session.exercises as unknown[]) : [])
+                    .map((e: unknown) => {
+                        const exObj = e && typeof e === 'object' ? (e as AnyObj) : ({} as AnyObj)
+                        return exObj?.name
+                    })
+                    .filter(Boolean);
+                const prevNames = (Array.isArray((prev as AnyObj | null)?.exercises) ? (((prev as AnyObj).exercises) as unknown[]) : [])
+                    .map((e: unknown) => {
+                        const exObj = e && typeof e === 'object' ? (e as AnyObj) : ({} as AnyObj)
+                        return exObj?.name
+                    })
+                    .filter(Boolean);
                 const allNames = Array.from(new Set([...currentNames, ...prevNames].map((v) => String(v || '').trim()).filter(Boolean))).slice(0, 120);
                 if (allNames.length) {
                     const resp = await fetch('/api/exercises/canonicalize', {
@@ -667,9 +699,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         headers: { 'content-type': 'application/json' },
                         body: JSON.stringify({ names: allNames, mode: 'prefetch' }),
                     });
-                    const json = await resp.json().catch(() => null);
+                    const json = await resp.json().catch((): unknown => null);
                     if (resp.ok && json?.ok && json?.map && typeof json.map === 'object') {
-                        canonicalMap = json.map;
+                        canonicalMap = json.map as Record<string, unknown>;
                     }
                 }
             } catch {}
@@ -691,7 +723,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     }
                 } catch {}
             }
-            const html = buildReportHTML(sessionForReport, prevForReport, user?.displayName || user?.email || '', calories, {
+            const html = buildReportHTML(sessionForReport, prevForReport, String(user?.displayName || user?.email || ''), calories, {
                 prevLogsByExercise: prevLogsForReport,
                 prevBaseMsByExercise: prevBaseForReport,
                 ai: aiToUse || null,
@@ -736,7 +768,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const handleGenerateAi = async () => {
         if (!session) return;
         if (aiState?.status === 'loading') return;
-        setAiState((prev) => ({ ...(prev || {}), status: 'loading', error: '', saved: false }));
+        setAiState((prev: AnyObj) => ({ ...(prev || {}), status: 'loading', error: '', saved: false }));
         try {
             const res = await generatePostWorkoutInsights({
                 workoutId: typeof session?.id === 'string' ? session.id : null,
@@ -747,12 +779,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     if (onUpgrade) onUpgrade();
                     else alert('Upgrade necessário para usar esta função.');
                 }
-                setAiState((prev) => ({ ...(prev || {}), status: 'error', error: String(res?.error || 'Falha ao gerar insights') }));
+                setAiState((prev: AnyObj) => ({ ...(prev || {}), status: 'error', error: String(res?.error || 'Falha ao gerar insights') }));
                 return;
             }
             setAiState({ status: 'ready', ai: res.ai || null, saved: !!res.saved, error: '' });
         } catch (e) {
-            setAiState((prev) => ({ ...(prev || {}), status: 'error', error: String(e?.message || e || 'Falha ao gerar insights') }));
+            setAiState((prev: AnyObj) => ({ ...(prev || {}), status: 'error', error: String(e?.message || e || 'Falha ao gerar insights') }));
         }
     };
 
@@ -780,26 +812,30 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         );
     };
 
-    const handlePartnerPlan = (participant) => {
+    const handlePartnerPlan = (participant: unknown) => {
         try {
-            if (!participant) return;
-            const exercises = Array.isArray(session?.exercises) ? session.exercises : [];
+            const part = participant && typeof participant === 'object' ? (participant as AnyObj) : null
+            if (!part) return;
+            const exercises = Array.isArray(session?.exercises) ? (session.exercises as unknown[]) : [];
             const workout = {
                 title: escapeHtml(session?.workoutTitle || 'Treino'),
-                exercises: exercises.map((ex) => ({
-                    name: escapeHtml(ex?.name),
-                    sets: Number(ex.sets) || 0,
-                    reps: escapeHtml(ex?.reps),
-                    rpe: escapeHtml(ex?.rpe),
-                    cadence: escapeHtml(ex?.cadence),
-                    restTime: escapeHtml(ex?.restTime),
-                    method: escapeHtml(ex?.method),
-                    notes: escapeHtml(ex?.notes)
-                }))
+                exercises: exercises.map((ex: unknown) => {
+                    const e = ex && typeof ex === 'object' ? (ex as AnyObj) : ({} as AnyObj)
+                    return ({
+                        name: escapeHtml(e?.name),
+                        sets: Number(e?.sets) || 0,
+                        reps: escapeHtml(e?.reps),
+                        rpe: escapeHtml(e?.rpe),
+                        cadence: escapeHtml(e?.cadence),
+                        restTime: escapeHtml(e?.restTime),
+                        method: escapeHtml(e?.method),
+                        notes: escapeHtml(e?.notes)
+                    })
+                })
             };
             const partnerUser = {
-                displayName: escapeHtml(participant?.name || participant?.uid || ''),
-                email: escapeHtml(participant?.email || '')
+                displayName: escapeHtml(part?.name || part?.uid || ''),
+                email: escapeHtml(part?.email || '')
             };
             const html = workoutPlanHtml(workout, partnerUser);
             const win = window.open('', '_blank');
@@ -892,23 +928,24 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         }
     };
 
-    const teamMeta = session.teamMeta && typeof session.teamMeta === 'object' ? session.teamMeta : null;
-    const rawParticipants = teamMeta && Array.isArray(teamMeta.participants) ? teamMeta.participants : [];
+    const teamMeta = session.teamMeta && typeof session.teamMeta === 'object' ? (session.teamMeta as AnyObj) : null;
+    const rawParticipants = teamMeta && Array.isArray(teamMeta.participants) ? (teamMeta.participants as unknown[]) : [];
     const currentUserId = user?.id || user?.uid || null;
-    const partners = rawParticipants.filter((p) => {
-        const uid = p && (p.uid || p.id || null);
+    const partners = rawParticipants.filter((p: unknown) => {
+        const part = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
+        const uid = part && (part.uid || part.id || null);
         if (!uid || !currentUserId) return true;
         return uid !== currentUserId;
     });
 
     const isTeamSession = partners.length > 0;
     const preCheckin = (() => {
-        const local = session?.preCheckin && typeof session.preCheckin === 'object' ? session.preCheckin : null;
-        const db = checkinsByKind?.pre && typeof checkinsByKind.pre === 'object' ? checkinsByKind.pre : null;
+        const local = session?.preCheckin && typeof session.preCheckin === 'object' ? (session.preCheckin as AnyObj) : null;
+        const db = checkinsByKind?.pre || null;
         if (db) {
-            const answers = db?.answers && typeof db.answers === 'object' ? db.answers : {};
+            const answers = db?.answers && typeof db.answers === 'object' ? (db.answers as AnyObj) : {};
             const timeMinutes = answers?.time_minutes ?? answers?.timeMinutes ?? null;
-            const base = local && typeof local === 'object' ? { ...local } : {};
+            const base: AnyObj = local ? ({ ...local } as AnyObj) : {};
             if (db?.energy != null) base.energy = db.energy;
             if (db?.soreness != null) base.soreness = db.soreness;
             if (timeMinutes != null && String(timeMinutes) !== '') base.timeMinutes = timeMinutes;
@@ -918,12 +955,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         return local;
     })();
     const postCheckin = (() => {
-        const local = session?.postCheckin && typeof session.postCheckin === 'object' ? session.postCheckin : null;
-        const db = checkinsByKind?.post && typeof checkinsByKind.post === 'object' ? checkinsByKind.post : null;
+        const local = session?.postCheckin && typeof session.postCheckin === 'object' ? (session.postCheckin as AnyObj) : null;
+        const db = checkinsByKind?.post || null;
         if (db) {
-            const answers = db?.answers && typeof db.answers === 'object' ? db.answers : {};
+            const answers = db?.answers && typeof db.answers === 'object' ? (db.answers as AnyObj) : {};
             const rpe = answers?.rpe ?? null;
-            const base = local && typeof local === 'object' ? { ...local } : {};
+            const base: AnyObj = local ? ({ ...local } as AnyObj) : {};
             if (rpe != null && String(rpe) !== '') base.rpe = rpe;
             if (db?.mood != null) base.satisfaction = db.mood;
             if (db?.soreness != null) base.soreness = db.soreness;
@@ -933,7 +970,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         return local;
     })();
     const checkinRecommendations = (() => {
-        const toNumberOrNull = (v) => {
+        const toNumberOrNull = (v: unknown) => {
             try {
                 const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'));
                 return Number.isFinite(n) ? n : null;
@@ -1263,7 +1300,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                 <div className="md:col-span-2 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Resumo</div>
                                     <ul className="space-y-2">
-                                        {(Array.isArray(aiState.ai.summary) ? aiState.ai.summary : []).map((item, idx) => (
+                                        {(Array.isArray(aiState.ai.summary) ? aiState.ai.summary : []).map((item: unknown, idx: number) => (
                                             <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                     ))}
                                 </ul>
@@ -1272,7 +1309,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                     <div className="mt-4">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Destaques</div>
                                         <ul className="space-y-2">
-                                            {aiState.ai.highlights.map((item, idx) => (
+                                            {aiState.ai.highlights.map((item: unknown, idx: number) => (
                                                 <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                             ))}
                                         </ul>
@@ -1283,7 +1320,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                     <div className="mt-4">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Atenção</div>
                                         <ul className="space-y-2">
-                                            {aiState.ai.warnings.map((item, idx) => (
+                                            {aiState.ai.warnings.map((item: unknown, idx: number) => (
                                                 <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                             ))}
                                         </ul>
@@ -1299,13 +1336,16 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                         <div className="mt-4">
                                             <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRs</div>
                                             <div className="space-y-2">
-                                                {aiState.ai.prs.map((p, idx) => (
+                                                {aiState.ai.prs.map((p: unknown, idx: number) => {
+                                                    const pr = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
+                                                    return (
                                                     <div key={idx} className="text-xs text-neutral-200">
-                                                        <span className="font-black">{String(p.exercise || '').trim() || '—'}</span>{' '}
-                                                        <span className="text-neutral-400">{String(p.label || '').trim() ? `(${String(p.label).trim()})` : ''}</span>{' '}
-                                                        <span className="font-semibold">{String(p.value || '').trim()}</span>
+                                                        <span className="font-black">{String(pr.exercise || '').trim() || '—'}</span>{' '}
+                                                        <span className="text-neutral-400">{String(pr.label || '').trim() ? `(${String(pr.label).trim()})` : ''}</span>{' '}
+                                                        <span className="font-semibold">{String(pr.value || '').trim()}</span>
                                                     </div>
-                                                ))}
+                                                    )
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -1349,15 +1389,18 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                             </div>
                                         )}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {aiState.ai.progression.map((rec, idx) => (
+                                            {aiState.ai.progression.map((rec: unknown, idx: number) => {
+                                                const r = rec && typeof rec === 'object' ? (rec as AnyObj) : ({} as AnyObj)
+                                                return (
                                                 <div key={idx} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
-                                                    <div className="text-sm font-black text-neutral-100">{String(rec.exercise || '').trim() || '—'}</div>
-                                                    <div className="text-sm text-neutral-100 mt-1">{String(rec.recommendation || '').trim()}</div>
-                                                    {String(rec.reason || '').trim() && (
-                                                        <div className="text-xs text-neutral-400 mt-2">{String(rec.reason || '').trim()}</div>
+                                                    <div className="text-sm font-black text-neutral-100">{String(r.exercise || '').trim() || '—'}</div>
+                                                    <div className="text-sm text-neutral-100 mt-1">{String(r.recommendation || '').trim()}</div>
+                                                    {String(r.reason || '').trim() && (
+                                                        <div className="text-xs text-neutral-400 mt-2">{String(r.reason || '').trim()}</div>
                                                     )}
                                                 </div>
-                                            ))}
+                                                )
+                                            })}
                                         </div>
                                     </div>
                                 )}
@@ -1380,15 +1423,18 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                             </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {partners.map((p, idx) => (
+                            {partners.map((p: unknown, idx: number) => {
+                                const part = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
+                                return (
                                 <button
-                                    key={p.uid || p.id || idx}
-                                    onClick={() => handlePartnerPlan(p)}
+                                    key={String(part.uid || part.id || idx)}
+                                    onClick={() => handlePartnerPlan(part)}
                                     className="px-3 py-2 rounded-full bg-black text-white text-xs font-bold uppercase tracking-wide hover:bg-neutral-900"
                                 >
-                                    Ver PDF de {p.name || 'Parceiro'}
+                                    Ver PDF de {String(part.name || 'Parceiro')}
                                 </button>
-                            ))}
+                                )
+                            })}
                         </div>
                     </div>
                 )}
@@ -1508,16 +1554,18 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                         const prevLog = prevLogs[sIdx];
 
                                         if (!log || typeof log !== 'object') return null;
-                                        if (!log.weight && !log.reps) return null;
+                                        const logObj = log as AnyObj;
+                                        if (!logObj.weight && !logObj.reps) return null;
 
                                             let progressionText = "-";
                                             let rowClass = "";
 
                                             if (prevLog && typeof prevLog === 'object') {
-                                                const cw = Number(String(log?.weight ?? '').replace(',', '.'));
-                                                const pw = Number(String(prevLog?.weight ?? '').replace(',', '.'));
-                                                const cr = Number(String(log?.reps ?? '').replace(',', '.'));
-                                                const pr = Number(String(prevLog?.reps ?? '').replace(',', '.'));
+                                                const prevObj = prevLog as AnyObj;
+                                                const cw = Number(String(logObj?.weight ?? '').replace(',', '.'));
+                                                const pw = Number(String(prevObj?.weight ?? '').replace(',', '.'));
+                                                const cr = Number(String(logObj?.reps ?? '').replace(',', '.'));
+                                                const pr = Number(String(prevObj?.reps ?? '').replace(',', '.'));
                                                 const canWeight = Number.isFinite(cw) && cw > 0 && Number.isFinite(pw) && pw > 0;
                                                 const canReps = Number.isFinite(cr) && cr > 0 && Number.isFinite(pr) && pr > 0;
                                                 if (canWeight) {
@@ -1548,8 +1596,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                             return (
                                                 <tr key={sIdx} className="border-b border-neutral-800">
                                                     <td className="py-2 font-mono text-neutral-400 text-xs">#{sIdx + 1}</td>
-                                                    <td className="py-2 text-center font-semibold text-sm">{log.weight || '-'}</td>
-                                                    <td className="py-2 text-center font-mono text-sm">{log.reps || '-'}</td>
+                                                    <td className="py-2 text-center font-semibold text-sm">{logObj.weight != null && String(logObj.weight) !== '' ? String(logObj.weight) : '-'}</td>
+                                                    <td className="py-2 text-center font-mono text-sm">{logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '-'}</td>
                                                     <td className={`py-2 text-center text-[11px] uppercase ${rowClass}`}>{progressionText}</td>
                                                 </tr>
                                             );
@@ -1590,11 +1638,13 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     previousSession={effectivePreviousSession}
                     isVip={isVip}
                     onUpgrade={onUpgrade}
-                    onSaveToReport={(summary) => {
-                        setAiState((prev) => ({
-                            ...prev,
-                            ai: { ...(prev.ai || {}), summary: [...(prev.ai?.summary || []), summary] }
-                        }));
+                    onSaveToReport={(summary: unknown) => {
+                        setAiState((prev: AnyObj) => {
+                            const base = prev && typeof prev === 'object' ? prev : {}
+                            const ai = base.ai && typeof base.ai === 'object' ? (base.ai as AnyObj) : {}
+                            const current = Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []
+                            return { ...base, ai: { ...ai, summary: [...current, summary] } }
+                        });
                     }}
                 />
             )}

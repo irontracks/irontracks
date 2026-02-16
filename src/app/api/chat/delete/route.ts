@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    messageId: z.string().optional(),
+    message_id: z.string().optional(),
+    scope: z.string().optional(),
+  })
+  .passthrough()
 
 const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
   const url = String(publicUrl || '').trim()
@@ -30,7 +40,9 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const messageId = String(body?.messageId || body?.message_id || '').trim()
     const scope = String(body?.scope || '').trim().toLowerCase() === 'direct' ? 'direct' : 'channel'
     if (!messageId) return NextResponse.json({ ok: false, error: 'message_id required' }, { status: 400 })

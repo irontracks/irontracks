@@ -1,9 +1,49 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    action: z.string().optional(),
+    create_subaccount: z.boolean().optional(),
+    teacher_id: z.string().optional(),
+    id: z.string().optional(),
+    user_id: z.string().optional(),
+    email: z.string().optional(),
+    asaas_wallet_id: z.string().optional(),
+    walletId: z.string().optional(),
+    asaas_account_id: z.string().optional(),
+    asaasAccountId: z.string().optional(),
+    asaas_account_status: z.string().optional(),
+    asaasAccountStatus: z.string().optional(),
+    name: z.string().optional(),
+    fullName: z.string().optional(),
+    display_name: z.string().optional(),
+    cpfCnpj: z.string().optional(),
+    cpf_cnpj: z.string().optional(),
+    birthDate: z.string().optional(),
+    birth_date: z.string().optional(),
+    companyType: z.string().optional(),
+    company_type: z.string().optional(),
+    phone: z.string().optional(),
+    mobilePhone: z.string().optional(),
+    mobile_phone: z.string().optional(),
+    address: z.string().optional(),
+    addressNumber: z.string().optional(),
+    address_number: z.string().optional(),
+    complement: z.string().optional(),
+    province: z.string().optional(),
+    postalCode: z.string().optional(),
+    postal_code: z.string().optional(),
+    incomeValue: z.union([z.string(), z.number()]).optional(),
+    income_value: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough()
 
 const parseNumber = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) return value
@@ -20,7 +60,9 @@ export async function POST(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const action = String(body?.action || '').trim().toLowerCase()
     const createSubaccount = action === 'create_subaccount' || body?.create_subaccount === true
 

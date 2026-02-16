@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import {
     RotateCcw,
     History,
@@ -75,7 +76,7 @@ const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
 
 const appId = 'irontracks-production';
 
-function InAppNotifyBinder({ bind }) {
+function InAppNotifyBinder({ bind }: { bind?: ((notify: ((payload: unknown) => void) | null) => void) | null }): React.ReactElement | null {
     const { notify } = useInAppNotifications();
     const safeBind = typeof bind === 'function' ? bind : null;
     useEffect(() => {
@@ -88,25 +89,26 @@ function InAppNotifyBinder({ bind }) {
     return null;
 }
 
-const mapWorkoutRow = (w) => {
-	const rawExercises = Array.isArray(w?.exercises) ? w.exercises : [];
+const mapWorkoutRow = (w: unknown) => {
+    const workout = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+	const rawExercises = Array.isArray(workout?.exercises) ? (workout.exercises as unknown[]) : [];
 	const exs = rawExercises
-		.filter((e) => e && typeof e === 'object')
-		.sort((a, b) => (a.order || 0) - (b.order || 0))
-		.map((e) => {
+		.filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
+		.sort((a: Record<string, unknown>, b: Record<string, unknown>) => (Number(a.order) || 0) - (Number(b.order) || 0))
+		.map((e: Record<string, unknown>) => {
 			try {
 				const isCardio = String(e.method || '').toLowerCase() === 'cardio';
 				const dbSets = Array.isArray(e.sets)
-					? e.sets.filter((s) => s && typeof s === 'object')
+					? (e.sets as unknown[]).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
 					: [];
 
 				const sortedSets = dbSets
 					.slice()
-					.sort((aSet, bSet) => (aSet?.set_number || 0) - (bSet?.set_number || 0));
+					.sort((aSet: Record<string, unknown>, bSet: Record<string, unknown>) => (Number(aSet?.set_number) || 0) - (Number(bSet?.set_number) || 0));
 
 				const setsCount = sortedSets.length || (isCardio ? 1 : 4);
 
-				const setDetails = sortedSets.map((s, idx) => ({
+				const setDetails = sortedSets.map((s: Record<string, unknown>, idx: number) => ({
 					set_number: s?.set_number ?? idx + 1,
 					reps: s?.reps ?? null,
 					rpe: s?.rpe ?? null,
@@ -116,20 +118,20 @@ const mapWorkoutRow = (w) => {
 				}));
 
 				const nonEmptyReps = setDetails
-					.map((s) => s.reps)
-					.filter((r) => r !== null && r !== undefined && r !== '');
+					.map((s: { reps: unknown }) => s.reps)
+					.filter((r: unknown) => r !== null && r !== undefined && r !== '');
 				const defaultReps = isCardio ? '20' : '10';
 				let repsHeader = defaultReps;
 				if (nonEmptyReps.length > 0) {
 					const uniqueReps = Array.from(new Set(nonEmptyReps));
-					repsHeader = uniqueReps.length === 1 ? uniqueReps[0] : nonEmptyReps[0] ?? defaultReps;
+					repsHeader = uniqueReps.length === 1 ? String(uniqueReps[0] ?? defaultReps) : String(nonEmptyReps[0] ?? defaultReps);
 				}
 
 				const rpeValues = setDetails
-					.map((s) => s.rpe)
-					.filter((v) => v !== null && v !== undefined && !Number.isNaN(v));
+					.map((s: { rpe: unknown }) => s.rpe)
+					.filter((v: unknown) => v !== null && v !== undefined && !Number.isNaN(Number(v)));
 				const defaultRpe = isCardio ? 5 : 8;
-				const rpeHeader = rpeValues.length > 0 ? rpeValues[0] : defaultRpe;
+				const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe;
 
 				return {
 					id: e.id,
@@ -146,7 +148,7 @@ const mapWorkoutRow = (w) => {
 				};
 			} catch (mapErr) {
 				console.error('Erro ao mapear exercício', {
-					workoutId: w?.id,
+					workoutId: workout?.id,
 					exerciseId: e?.id,
 					error: mapErr,
 				});
@@ -156,32 +158,36 @@ const mapWorkoutRow = (w) => {
 		.filter(Boolean);
 
 	return {
-		id: w.id,
-		title: w.name,
-		notes: w.notes,
+		id: workout.id,
+		title: workout.name,
+		notes: workout.notes,
 		exercises: exs,
-		is_template: !!w.is_template,
-		user_id: w.user_id,
-		created_by: w.created_by,
-        archived_at: w.archived_at ?? null,
-        sort_order: typeof w.sort_order === 'number' ? w.sort_order : (w.sort_order == null ? 0 : Number(w.sort_order) || 0),
-        created_at: w.created_at ?? null,
+		is_template: !!workout.is_template,
+		user_id: workout.user_id,
+		created_by: workout.created_by,
+        archived_at: workout.archived_at ?? null,
+        sort_order: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
+        created_at: workout.created_at ?? null,
 	};
 };
 
-function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
-    const { confirm, alert } = useDialog() as any;
-    const [user, setUser] = useState(initialUser ?? null);
+function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
+    const { confirm, alert } = useDialog();
+    type UserRecord = { id?: string } & Record<string, unknown>
+    const initialUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
+    const initialProfileObj = initialProfile && typeof initialProfile === 'object' ? (initialProfile as Record<string, unknown>) : null
+    const initialUserTyped: UserRecord | null = initialUserObj ? ({ ...initialUserObj, id: initialUserObj.id ? String(initialUserObj.id) : undefined } as UserRecord) : null
+    const [user, setUser] = useState<UserRecord | null>(initialUserTyped);
     const [authLoading, setAuthLoading] = useState(false);
     const [view, setView] = useState('dashboard');
     const [directChat, setDirectChat] = useState<any>(null);
-    const [workouts, setWorkouts] = useState(() => {
+    const [workouts, setWorkouts] = useState<Array<Record<string, unknown>>>(() => {
         try {
-            const list = Array.isArray(initialWorkouts) ? initialWorkouts : [];
-            const mapped = list
+            const list = Array.isArray(initialWorkouts) ? (initialWorkouts as unknown[]) : [];
+            const mapped = (list
                 .map((row) => mapWorkoutRow(row))
                 .filter(Boolean)
-                .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (String(a.title || '')).localeCompare(String(b.title || '')))) as Array<Record<string, unknown>>;
             return mapped;
         } catch {
             return [];
@@ -202,10 +208,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [duplicateGroups, setDuplicateGroups] = useState<any[]>([]);
     const [duplicatesBusy, setDuplicatesBusy] = useState(false);
     const inAppNotifyRef = useRef<any>(null);
-    const bindInAppNotify = useCallback((fn) => {
+    const bindInAppNotify = useCallback((fn: unknown) => {
         inAppNotifyRef.current = typeof fn === 'function' ? fn : null;
     }, []);
-    const inAppNotify = useCallback((payload) => {
+    const inAppNotify = useCallback((payload: unknown) => {
         const fn = inAppNotifyRef.current;
         if (typeof fn === 'function') fn(payload);
     }, []);
@@ -215,11 +221,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [preCheckinDraft, setPreCheckinDraft] = useState({ energy: '', soreness: '', timeMinutes: '60', notes: '' })
     const preCheckinResolveRef = useRef<any>(null)
 
-    const requestPreWorkoutCheckin = useCallback(async (workout) => {
+    const requestPreWorkoutCheckin = useCallback(async (workout: unknown) => {
         if (!user?.id) return null
         if (preCheckinOpen) return null
         return await new Promise((resolve) => {
-            preCheckinResolveRef.current = (value) => {
+            preCheckinResolveRef.current = (value: unknown) => {
                 resolve(value ?? null)
             }
             setPreCheckinWorkout(workout && typeof workout === 'object' ? workout : null)
@@ -231,7 +237,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const [whatsNewOpen, setWhatsNewOpen] = useState(false)
     const [pendingUpdate, setPendingUpdate] = useState<any>(null)
     const [isCoach, setIsCoach] = useState(false);
-    const initialRole = String(initialProfile?.role || '').toLowerCase()
+    const initialRole = String(initialProfileObj?.role || '').toLowerCase()
     const [vipAccess, setVipAccess] = useState(() => ({
         loaded: initialRole === 'admin' || initialRole === 'teacher',
         hasVip: initialRole === 'admin' || initialRole === 'teacher',
@@ -269,7 +275,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const editActiveBaseRef = useRef<any>(null);
     const editActiveAddExerciseRef = useRef(false);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
-    const userSettingsApi: any = useUserSettings(user?.id) as any
+    const userSettingsApi = useUserSettings(user?.id)
     const whatsNewShownRef = useRef(false)
     const TOUR_VERSION = 1
     const [tourOpen, setTourOpen] = useState(false)
@@ -279,19 +285,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 
     // Local fallback to guarantee the tour doesn't re-open when DB upsert fails/offline.
     // Stored per-user AND per-tour-version.
-    const getTourLocalKey = useCallback((uid) => {
+    const getTourLocalKey = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         return safeUid ? `irontracks.onboarding.tour.v${TOUR_VERSION}.dismissed.${safeUid}` : ''
     }, [TOUR_VERSION])
-    const getTourAutoOpenedKey = useCallback((uid) => {
+    const getTourAutoOpenedKey = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         return safeUid ? `irontracks.onboarding.tour.v${TOUR_VERSION}.autoOpened.${safeUid}` : ''
     }, [TOUR_VERSION])
-    const getTourSeenKey = useCallback((uid) => {
+    const getTourSeenKey = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         return safeUid ? `irontracks.onboarding.tour.v${TOUR_VERSION}.seen.${safeUid}` : ''
     }, [TOUR_VERSION])
-    const readLocalTourDismissal = useCallback((uid) => {
+    const readLocalTourDismissal = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         if (!safeUid) return null
         try {
@@ -311,7 +317,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             return null
         }
     }, [TOUR_VERSION, getTourLocalKey])
-    const writeLocalTourDismissal = useCallback((uid, status) => {
+    const writeLocalTourDismissal = useCallback((uid: unknown, status: unknown) => {
         const safeUid = uid ? String(uid) : ''
         if (!safeUid) return
         const safeStatus = status === 'completed' ? 'completed' : 'skipped'
@@ -322,7 +328,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             window.localStorage.setItem(key, JSON.stringify({ version: TOUR_VERSION, status: safeStatus, at: Date.now() }))
         } catch {}
     }, [TOUR_VERSION, getTourLocalKey])
-    const wasTourSeenEver = useCallback((uid) => {
+    const wasTourSeenEver = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         if (!safeUid) return false
         try {
@@ -334,7 +340,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             return false
         }
     }, [getTourSeenKey])
-    const markTourSeenEver = useCallback((uid) => {
+    const markTourSeenEver = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         if (!safeUid) return
         try {
@@ -344,7 +350,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             window.localStorage.setItem(key, '1')
         } catch {}
     }, [getTourSeenKey])
-    const wasTourAutoOpenedThisSession = useCallback((uid) => {
+    const wasTourAutoOpenedThisSession = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         if (!safeUid) return false
         try {
@@ -356,7 +362,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             return false
         }
     }, [getTourAutoOpenedKey])
-    const markTourAutoOpenedThisSession = useCallback((uid) => {
+    const markTourAutoOpenedThisSession = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
         if (!safeUid) return
         try {
@@ -376,13 +382,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     const refreshSyncState = useCallback(async () => {
         try {
             const online = isOnline()
-            const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+            const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
             const offlineSyncV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true
             if (offlineSyncV2Enabled) {
                 const sum = await getOfflineQueueSummary({ userId: user?.id })
                 if (sum?.ok) {
-                    setSyncState((prev) => ({
-                        ...(prev || {}),
+                    setSyncState((prev: unknown) => ({
+                        ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}),
                         online: sum.online !== false,
                         pending: Number(sum.pending || 0),
                         failed: Number(sum.failed || 0),
@@ -392,22 +398,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 }
             }
             const pending = await getPendingCount()
-            setSyncState((prev) => ({ ...(prev || {}), online, pending, failed: 0, due: 0 }))
+            setSyncState((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), online, pending, failed: 0, due: 0 }))
         } catch {
-            setSyncState((prev) => ({ ...(prev || {}), online: isOnline() }))
+            setSyncState((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), online: isOnline() }))
         }
     }, [user?.id, userSettingsApi?.settings])
 
     const runFlushQueue = useCallback(async () => {
         try {
             if (!isOnline()) {
-                setSyncState((prev) => ({ ...(prev || {}), online: false }))
+                setSyncState((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), online: false }))
                 return
             }
-            setSyncState((prev) => ({ ...(prev || {}), syncing: true, online: true }))
+            setSyncState((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), syncing: true, online: true }))
             await flushOfflineQueue({ max: 8 })
         } finally {
-            setSyncState((prev) => ({ ...(prev || {}), syncing: false }))
+            setSyncState((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), syncing: false }))
             await refreshSyncState()
         }
     }, [refreshSyncState])
@@ -441,12 +447,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         return () => clearInterval(t)
     }, [runFlushQueue, syncState?.pending, user?.id])
 
-    const logTourEvent = useCallback(async (event, payload) => {
+    const logTourEvent = useCallback(async (event: unknown, payload: unknown) => {
         try {
             if (!user?.id) return
             const ev = String(event || '').trim()
             if (!ev) return
-            const basePayload = payload && typeof payload === 'object' ? payload : {}
+            const basePayload = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : ({} as Record<string, unknown>)
             const enriched = {
                 ...basePayload,
                 role: String(user?.role || ''),
@@ -462,13 +468,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         } catch {}
     }, [supabase, user?.id, user?.role])
 
-    const upsertTourFlags = useCallback(async (patch) => {
+    const upsertTourFlags = useCallback(async (patch: unknown) => {
         try {
             if (!user?.id) return { ok: false, error: 'missing_user' }
-            const base = patch && typeof patch === 'object' ? patch : {}
+            const base = patch && typeof patch === 'object' ? (patch as Record<string, unknown>) : ({} as Record<string, unknown>)
             const payload = {
                 user_id: user.id,
-                preferences: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {},
+                preferences: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : {},
                 tour_version: TOUR_VERSION,
                 updated_at: new Date().toISOString(),
                 ...base,
@@ -519,7 +525,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     setTourOpen(true)
                 }
             } catch {
-                if (!cancelled) setTourBoot((prev) => ({ ...(prev || {}), loaded: true }))
+                if (!cancelled) setTourBoot((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), loaded: true }))
             }
         })()
         return () => {
@@ -565,7 +571,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         const uid = user?.id ? String(user.id) : ''
         if (!uid) return
         if (!userSettingsApi?.loaded) return
-        const prefs: any = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
+        const prefs = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
         if (prefs?.whatsNewAutoOpen === false) return
         ;(async () => {
             try {
@@ -605,7 +611,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             }
             const entry = getLatestWhatsNew()
             if (!entry?.id) return
-            const prev: any = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
+            const prev = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
             const nextSeenAt = Date.now()
             const next = { ...(prev || {}), whatsNewLastSeenId: String(entry.id), whatsNewLastSeenAt: nextSeenAt }
             try { userSettingsApi?.setSettings?.(next) } catch {}
@@ -614,7 +620,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     }, [userSettingsApi, pendingUpdate])
     const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
 
-    const setUrlTabParam = useCallback((nextTab) => {
+    const setUrlTabParam = useCallback((nextTab: unknown) => {
         try {
             if (typeof window === 'undefined') return;
             const tabValue = String(nextTab || '').trim();
@@ -634,7 +640,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         } catch {}
     }, []);
 
-    const openAdminPanel = useCallback((tab) => {
+    const openAdminPanel = useCallback((tab: unknown) => {
         setShowAdminPanel(true);
         try {
             if (typeof window !== 'undefined') {
@@ -685,21 +691,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         } catch {}
     }, [setUrlTabParam, user?.role]);
 
-    const resolveExerciseVideos = useCallback(async (exercises) => {
+    const resolveExerciseVideos = useCallback(async (exercises: unknown): Promise<{ exercises: Array<Record<string, unknown>>; updates: Array<Record<string, unknown>> }> => {
         try {
-            const list = Array.isArray(exercises) ? exercises : [];
-            const missingNames = list
-                .map((ex) => {
-                    const name = String(ex?.name || '').trim();
+            const list = Array.isArray(exercises) ? (exercises as unknown[]) : [];
+            const exercisesList = list.map((ex) => (ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)))
+            const missingNames = exercisesList
+                .map((exercise: Record<string, unknown>) => {
+                    const name = String(exercise?.name || '').trim();
                     if (!name) return null;
-                    const current = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
+                    const current = String(exercise?.videoUrl ?? exercise?.video_url ?? '').trim();
                     if (current) return null;
                     return name;
                 })
                 .filter(Boolean);
 
             const uniqueNames = Array.from(new Set(missingNames)).slice(0, 80);
-            if (!uniqueNames.length) return { exercises: list, updates: [] };
+            if (!uniqueNames.length) return { exercises: exercisesList, updates: [] };
 
             const res = await fetch('/api/exercise-library/resolve', {
                 method: 'POST',
@@ -707,35 +714,40 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 body: JSON.stringify({ names: uniqueNames }),
             });
             const json = await res.json().catch(() => ({}));
-            if (!json?.ok) return { exercises: list, updates: [] };
+            if (!json?.ok) return { exercises: exercisesList, updates: [] };
 
-            const videos = json?.videos && typeof json.videos === 'object' ? json.videos : {};
-            const updates: any[] = [];
-            const next = list.map((ex) => {
-                const current = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
-                if (current) return ex;
-                const normalized = normalizeExerciseName(String(ex?.name || ''));
+            const videos = json?.videos && typeof json.videos === 'object' ? (json.videos as Record<string, unknown>) : {};
+            const updates: Array<Record<string, unknown>> = [];
+            const next = exercisesList.map((exercise: Record<string, unknown>) => {
+                const current = String(exercise?.videoUrl ?? exercise?.video_url ?? '').trim();
+                if (current) return exercise;
+                const normalized = normalizeExerciseName(String(exercise?.name || ''));
                 const url = normalized ? String(videos[normalized] || '').trim() : '';
-                if (!url) return ex;
-                if (ex?.id) updates.push({ id: ex.id, url });
-                return { ...ex, videoUrl: url, video_url: url };
+                if (!url) return exercise;
+                if (exercise?.id) updates.push({ id: exercise.id, url });
+                return { ...exercise, videoUrl: url, video_url: url };
             });
 
             return { exercises: next, updates };
         } catch {
-            return { exercises: Array.isArray(exercises) ? exercises : [], updates: [] };
+            const safe = Array.isArray(exercises) ? (exercises as unknown[]) : []
+            const list = safe.map((ex) => (ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)))
+            return { exercises: list, updates: [] };
         }
     }, []);
 
-    const persistExerciseVideoUrls = useCallback(async (updates) => {
+    const persistExerciseVideoUrls = useCallback(async (updates: unknown) => {
         try {
-            const rows = Array.isArray(updates) ? updates : [];
+            const rows = Array.isArray(updates) ? (updates as unknown[]) : [];
             const filtered = rows
-                .map((r) => ({ id: String(r?.id || '').trim(), url: String(r?.url || '').trim() }))
+                .map((r: unknown) => {
+                    const row = r && typeof r === 'object' ? (r as Record<string, unknown>) : ({} as Record<string, unknown>)
+                    return { id: String(row?.id || '').trim(), url: String(row?.url || '').trim() }
+                })
                 .filter((r) => !!r.id && !!r.url)
                 .slice(0, 100);
             if (!filtered.length) return;
-            await Promise.allSettled(filtered.map((r) => supabase.from('exercises').update({ video_url: r.url }).eq('id', r.id)));
+            await Promise.allSettled(filtered.map((r: { id: string; url: string }) => supabase.from('exercises').update({ video_url: r.url }).eq('id', r.id)));
         } catch {}
     }, [supabase]);
 
@@ -750,20 +762,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         return `ex_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     }, []);
 
-    const normalizeWorkoutForEditor = useCallback((raw) => {
+    const normalizeWorkoutForEditor = useCallback((raw: unknown) => {
         try {
-            const base = raw && typeof raw === 'object' ? raw : {};
+            const base = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : ({} as Record<string, unknown>);
             const title = String(base.title || base.name || 'Treino').trim() || 'Treino';
-            const exercisesRaw = Array.isArray(base.exercises) ? base.exercises : [];
-            const exercisesInitial = exercisesRaw.filter((ex) => ex && typeof ex === 'object').map((ex) => {
+            const exercisesRaw = Array.isArray(base.exercises) ? (base.exercises as unknown[]) : [];
+            const exercisesInitial = exercisesRaw
+                .filter((ex: unknown): ex is Record<string, unknown> => Boolean(ex && typeof ex === 'object'))
+                .map((ex: Record<string, unknown>) => {
                 const existing = ex?._itx_exKey ? String(ex._itx_exKey) : '';
                 const fromId = ex?.id != null ? `id_${String(ex.id)}` : '';
                 const nextKey = existing || fromId || generateExerciseKey();
                 return { ...ex, _itx_exKey: nextKey };
             });
 
-            const seen = new Set();
-            const exercises = exercisesInitial.map((ex) => {
+            const seen = new Set<string>();
+            const exercises = exercisesInitial.map((ex: Record<string, unknown>) => {
                 const k = String(ex?._itx_exKey || '');
                 if (!k || seen.has(k)) {
                     const nextKey = generateExerciseKey();
@@ -780,13 +794,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     }, [generateExerciseKey]);
 
-    const stripWorkoutInternalKeys = useCallback((workout) => {
+    const stripWorkoutInternalKeys = useCallback((workout: unknown) => {
         try {
-            const w = workout && typeof workout === 'object' ? workout : {};
+            const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>);
             const exercises = Array.isArray(w.exercises)
-                ? w.exercises.map((ex) => {
+                ? (w.exercises as unknown[]).map((ex: unknown) => {
                       if (!ex || typeof ex !== 'object') return ex;
-                      const { _itx_exKey, ...rest } = ex;
+                      const obj = ex as Record<string, unknown>
+                      const { _itx_exKey, ...rest } = obj;
+                      void _itx_exKey
                       return rest;
                   })
                 : w.exercises;
@@ -796,21 +812,27 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     }, []);
 
-    const reindexSessionLogsAfterWorkoutEdit = useCallback((oldWorkout, newWorkout, logs) => {
+    const reindexSessionLogsAfterWorkoutEdit = useCallback((oldWorkout: unknown, newWorkout: unknown, logs: unknown) => {
         try {
-            const safeLogs = logs && typeof logs === 'object' ? logs : {};
-            const oldExercises = Array.isArray(oldWorkout?.exercises) ? oldWorkout.exercises : [];
-            const newExercises = Array.isArray(newWorkout?.exercises) ? newWorkout.exercises : [];
-            const oldKeyByIndex = oldExercises.map((ex) => String(ex?._itx_exKey || ''));
-            const newIndexByKey = new Map();
-            newExercises.forEach((ex, idx) => {
-                const k = String(ex?._itx_exKey || '');
+            const safeLogs = logs && typeof logs === 'object' ? (logs as Record<string, unknown>) : {};
+            const oldObj = oldWorkout && typeof oldWorkout === 'object' ? (oldWorkout as Record<string, unknown>) : ({} as Record<string, unknown>)
+            const newObj = newWorkout && typeof newWorkout === 'object' ? (newWorkout as Record<string, unknown>) : ({} as Record<string, unknown>)
+            const oldExercises = Array.isArray(oldObj?.exercises) ? (oldObj.exercises as unknown[]) : [];
+            const newExercises = Array.isArray(newObj?.exercises) ? (newObj.exercises as unknown[]) : [];
+            const oldKeyByIndex = oldExercises.map((ex: unknown) => {
+                const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                return String(exObj?._itx_exKey || '')
+            });
+            const newIndexByKey = new Map<string, number>();
+            newExercises.forEach((ex: unknown, idx: number) => {
+                const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const k = String(exObj?._itx_exKey || '');
                 if (!k) return;
                 if (newIndexByKey.has(k)) return;
                 newIndexByKey.set(k, idx);
             });
 
-            const result: any = {};
+            const result: Record<string, unknown> = {};
             Object.entries(safeLogs).forEach(([k, v]) => {
                 const parts = String(k || '').split('-');
                 if (parts.length !== 2) {
@@ -827,8 +849,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 const newIdx = exKey ? newIndexByKey.get(exKey) : undefined;
                 if (typeof newIdx !== 'number' || newIdx < 0) return;
                 const ex = newExercises[newIdx] || null;
-                const headerSets = Number.parseInt(ex?.sets, 10) || 0;
-                const details = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : [];
+                const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const headerSets = Number.parseInt(String(exObj?.sets ?? ''), 10) || 0;
+                const details = Array.isArray(exObj?.setDetails)
+                  ? (exObj.setDetails as unknown[])
+                  : Array.isArray(exObj?.set_details)
+                    ? (exObj.set_details as unknown[])
+                    : [];
                 const maxSets = headerSets || (Array.isArray(details) ? details.length : 0);
                 if (maxSets && setIdx >= maxSets) return;
                 result[`${newIdx}-${setIdx}`] = v;
@@ -995,7 +1022,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         if (!userId) return;
 
         let mounted = true;
-        let channel;
+        let channel: RealtimeChannel | null = null;
 
         try {
             channel = supabase
@@ -1350,24 +1377,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     }, [supabase, user?.id, userSettingsApi?.settings, view]);
 
     useEffect(() => {
-        const baseUser = initialUser && typeof initialUser === 'object' ? initialUser : null
-        if (!baseUser?.id) {
+        const baseUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
+        if (!baseUserObj?.id) {
             try {
                 if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
             } catch {}
             return
         }
-        const meta = baseUser?.user_metadata || {}
-        const emailRaw = String(baseUser?.email || '').trim()
+        const meta = baseUserObj?.user_metadata && typeof baseUserObj.user_metadata === 'object' ? (baseUserObj.user_metadata as Record<string, unknown>) : {}
+        const emailRaw = String(baseUserObj?.email || '').trim()
         const emailUser = emailRaw.includes('@') ? emailRaw.split('@')[0] : (emailRaw || 'Usuário')
-        const profileDisplayName = String(initialProfile?.display_name || initialProfile?.displayName || '').trim()
-        const profilePhotoURL = String(initialProfile?.photo_url || initialProfile?.photoURL || initialProfile?.photoUrl || '').trim()
+        const profileObj = initialProfile && typeof initialProfile === 'object' ? (initialProfile as Record<string, unknown>) : {}
+        const profileDisplayName = String(profileObj?.display_name || profileObj?.displayName || '').trim()
+        const profilePhotoURL = String(profileObj?.photo_url || profileObj?.photoURL || profileObj?.photoUrl || '').trim()
         const metaDisplayName = String(meta?.full_name || meta?.name || '').trim()
         const displayName = profileDisplayName || metaDisplayName || emailUser
         const photoURL = profilePhotoURL || meta?.avatar_url || meta?.picture || null
-        const nextUser = { ...baseUser, displayName, photoURL, role: initialProfile?.role || 'user' }
-        setUser(nextUser)
-        const role = String(initialProfile?.role || '').toLowerCase()
+        const nextUser = { ...baseUserObj, id: String(baseUserObj.id), displayName, photoURL, role: profileObj?.role || 'user' }
+        setUser(nextUser as UserRecord)
+        const role = String(profileObj?.role || '').toLowerCase()
         setIsCoach(role === 'teacher' || role === 'admin')
     }, [initialUser, initialProfile])
 
@@ -1378,15 +1406,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         ;(async () => {
             try {
                 const res = await fetch('/api/vip/access', { method: 'GET', credentials: 'include', cache: 'no-store' })
-                const json = await res.json().catch(() => null)
+                const json = await res.json().catch((): unknown => null)
                 if (cancelled) return
                 if (json && json.ok) {
                     setVipAccess({ loaded: true, hasVip: !!json.hasVip })
                     return
                 }
-                setVipAccess((prev) => ({ loaded: true, hasVip: !!prev?.hasVip }))
+                setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
             } catch {
-                if (!cancelled) setVipAccess((prev) => ({ loaded: true, hasVip: !!prev?.hasVip }))
+                if (!cancelled) setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
             }
         })()
         return () => { cancelled = true }
@@ -1468,7 +1496,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             }
 
             try {
-                const seedName = String(initialProfile?.display_name || '').trim() || String(user?.displayName || '').trim();
+                const profileObj = initialProfile && typeof initialProfile === 'object' ? (initialProfile as Record<string, unknown>) : {}
+                const seedName = String(profileObj?.display_name || '').trim() || String(user?.displayName || '').trim();
                 if (!cancelled) {
                     setProfileIncomplete(!seedName);
                     setProfileDraftName(seedName);
@@ -1485,7 +1514,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         return () => {
             cancelled = true;
         };
-    }, [initialProfile?.display_name, user?.id, user?.displayName]);
+    }, [initialProfile, user?.id, user?.displayName]);
 
     useEffect(() => {
         if (!user?.id) return;
@@ -1493,32 +1522,35 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         const run = async () => {
             try {
                 const res = await fetch('/api/dashboard/bootstrap', { cache: 'no-store', credentials: 'include' });
-                const json = await res.json().catch(() => null);
+                const json = await res.json().catch((): unknown => null);
                 if (cancelled) return;
-                if (!json?.ok) return;
+                const jsonObj = json && typeof json === 'object' ? (json as Record<string, unknown>) : null
+                if (!jsonObj?.ok) return;
 
-                const prof = json?.profile && typeof json.profile === 'object' ? json.profile : null;
+                const prof = jsonObj?.profile && typeof jsonObj.profile === 'object' ? (jsonObj.profile as Record<string, unknown>) : null;
                 const displayName = String(prof?.display_name || '').trim();
                 const photoURL = String(prof?.photo_url || '').trim();
                 const role = String(prof?.role || '').toLowerCase();
 
-                setUser((prev) => {
-                    const current = prev && typeof prev === 'object' ? prev : null;
+                setUser((prev: UserRecord | null) => {
+                    const current = prev && typeof prev === 'object' ? (prev as UserRecord) : null;
                     if (!current) return prev;
-                    const patch: any = {};
-                    if (displayName && displayName !== current.displayName) patch.displayName = displayName;
-                    if (photoURL && photoURL !== current.photoURL) patch.photoURL = photoURL;
+                    const patch: Record<string, unknown> = {};
+                    if (displayName && displayName !== String(current.displayName || '')) patch.displayName = displayName;
+                    if (photoURL && photoURL !== String(current.photoURL || '')) patch.photoURL = photoURL;
                     if (role && role !== String(current.role || '').toLowerCase()) patch.role = role;
-                    return Object.keys(patch).length ? { ...current, ...patch } : prev;
+                    return Object.keys(patch).length ? ({ ...current, ...patch } as UserRecord) : prev;
                 });
                 if (role) setIsCoach(role === 'teacher' || role === 'admin');
 
-                if (Array.isArray(json.workouts) && json.workouts.length) {
-                    const mapped = json.workouts
-                        .map((row) => mapWorkoutRow(row))
-                        .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+                const workoutsRaw = Array.isArray(jsonObj.workouts) ? (jsonObj.workouts as unknown[]) : []
+                if (workoutsRaw.length) {
+                    const mapped = workoutsRaw
+                        .map((row: unknown) => mapWorkoutRow(row))
+                        .filter(Boolean)
+                        .sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(a.title || '').localeCompare(String(b.title || '')));
                     setWorkouts(mapped);
-                    const totalEx = mapped.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0);
+                    const totalEx = mapped.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0);
                     setStats({ workouts: mapped.length, exercises: totalEx, activeStreak: 0 });
                 }
             } catch {}
@@ -1545,10 +1577,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             if (typeof navigator !== 'undefined' && navigator.onLine === false) {
                 try {
                     const cached = await cacheGetWorkouts({ userId: currentUser.id })
-                    if (cached?.workouts && Array.isArray(cached.workouts) && cached.workouts.length) {
-                        setWorkouts(cached.workouts)
-                        const totalEx = cached.workouts.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0)
-                        setStats({ workouts: cached.workouts.length, exercises: totalEx, activeStreak: 0 })
+                    const cachedObj = cached && typeof cached === 'object' ? (cached as Record<string, unknown>) : null
+                    const cachedWorkouts = Array.isArray(cachedObj?.workouts) ? (cachedObj?.workouts as Array<Record<string, unknown>>) : []
+                    if (cachedWorkouts.length) {
+                        setWorkouts(cachedWorkouts)
+                        const totalEx = cachedWorkouts.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0)
+                        setStats({ workouts: cachedWorkouts.length, exercises: totalEx, activeStreak: 0 })
                     }
                 } catch {}
                 return
@@ -1560,7 +1594,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             let studentData: any[] = []
             let studentsList: any[] = []
 
-            const hydrateWorkouts = async (rows) => {
+            const hydrateWorkouts = async (rows: unknown) => {
                 const base = Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : [];
                 const workoutIds = base.map((w) => w.id).filter(Boolean);
                 if (workoutIds.length === 0) return base.map((w) => ({ ...w, exercises: [] }));
@@ -1734,17 +1768,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 if (!data.length) {
                     try {
                         const resLegacy = await fetch('/api/workouts/list', { cache: 'no-store' });
-                        const jsonLegacy = await resLegacy.json().catch(() => null);
-                        if (jsonLegacy?.ok && Array.isArray(jsonLegacy.rows) && jsonLegacy.rows.length) {
-                            data = (jsonLegacy.rows || []).map((w) => ({
-                                id: w?.id,
-                                name: w?.name,
-                                notes: null,
-                                is_template: true,
-                                user_id: currentUser.id,
-                                created_by: null,
-                                exercises: [],
-                            }));
+                        const jsonLegacy = await resLegacy.json().catch((): unknown => null);
+                        const jsonLegacyObj = jsonLegacy && typeof jsonLegacy === 'object' ? (jsonLegacy as Record<string, unknown>) : null
+                        const rows = Array.isArray(jsonLegacyObj?.rows) ? (jsonLegacyObj?.rows as unknown[]) : []
+                        if (jsonLegacyObj?.ok && rows.length) {
+                            data = rows.map((w: unknown) => {
+                                const row = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                return ({
+                                    id: row?.id,
+                                    name: row?.name,
+                                    notes: null,
+                                    is_template: true,
+                                    user_id: currentUser.id,
+                                    created_by: null,
+                                    exercises: [] as unknown[],
+                                } as Record<string, unknown>)
+                            });
                         }
                     } catch {}
                 }
@@ -1754,11 +1793,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 				const mappedRaw = data
 					.map((row) => mapWorkoutRow(row))
 					.filter(Boolean);
-                const mapped = mappedRaw.sort((a, b) => {
+                const mapped = mappedRaw.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
                     const ao = Number.isFinite(Number(a?.sort_order)) ? Number(a.sort_order) : 0
                     const bo = Number.isFinite(Number(b?.sort_order)) ? Number(b.sort_order) : 0
                     if (ao !== bo) return ao - bo
-                    return (a.title || '').localeCompare(b.title || '')
+                    return String(a.title || '').localeCompare(String(b.title || ''))
                 });
 
                 try {
@@ -1795,21 +1834,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 } else {
                     setWorkouts(mapped)
                     try {
-                        const shared = mapped.filter(w => (w.created_by && w.created_by !== currentUser.id))
-                        const byCoach = new Map()
+                        const shared = mapped.filter((w: Record<string, unknown>) => (w.created_by && String(w.created_by) !== String(currentUser.id)))
+                        const byCoach = new Map<string, Array<Record<string, unknown>>>()
                         for (const w of shared) {
-                            const cid = w.created_by
+                            const cid = String(w.created_by || '').trim()
+                            if (!cid) continue
                             const list = byCoach.get(cid) || []
                             list.push(w)
                             byCoach.set(cid, list)
                         }
                         const coachIds = Array.from(byCoach.keys())
-                        let profiles = []
+                        let profiles: Array<{ id: string; display_name?: string | null }> = []
                         if (coachIds.length) {
                             const { data: profs } = await supabase.from('profiles').select('id, display_name').in('id', coachIds)
                             profiles = profs || []
                         }
-                        const nameByCoach = new Map(profiles.map(p => [p.id, p.display_name || String(p.id).slice(0,8)]))
+                        const nameByCoach = new Map(profiles.map((p) => [p.id, p.display_name || String(p.id).slice(0, 8)]))
                         const folders = Array.from(byCoach.entries()).map(([cid, list]) => ({
                             id: cid,
                             name: `Treinos compartilhados de ${nameByCoach.get(cid) || String(cid).slice(0,8)}`,
@@ -1823,7 +1863,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 }
                 
 				// Atualiza estatísticas
-				const totalEx = mapped.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0);
+				const totalEx = mapped.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0);
 				setStats({ 
 					workouts: mapped.length, 
 					exercises: totalEx, 
@@ -1838,10 +1878,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 				// Dev HMR aborts or transient network; ignore quietly
                 try {
                     const cached = await cacheGetWorkouts({ userId: specificUser?.id })
-                    if (cached?.workouts && Array.isArray(cached.workouts) && cached.workouts.length) {
-                        setWorkouts(cached.workouts)
-                        const totalEx = cached.workouts.reduce((acc, w) => acc + (Array.isArray(w?.exercises) ? w.exercises.length : 0), 0)
-                        setStats({ workouts: cached.workouts.length, exercises: totalEx, activeStreak: 0 })
+                    const cachedObj = cached && typeof cached === 'object' ? (cached as Record<string, unknown>) : null
+                    const cachedWorkouts = Array.isArray(cachedObj?.workouts) ? (cachedObj?.workouts as Array<Record<string, unknown>>) : []
+                    if (cachedWorkouts.length) {
+                        setWorkouts(cachedWorkouts)
+                        const totalEx = cachedWorkouts.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0)
+                        setStats({ workouts: cachedWorkouts.length, exercises: totalEx, activeStreak: 0 })
                     }
                 } catch {}
 				return;
@@ -1922,9 +1964,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     };
 
-    const handleStartSession = async (workout) => {
-        const exercisesList = Array.isArray(workout?.exercises)
-            ? workout.exercises.filter(ex => ex && typeof ex === 'object')
+    const handleStartSession = async (workout: unknown) => {
+        const workoutObj = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
+        const exercisesList = Array.isArray(workoutObj?.exercises)
+            ? (workoutObj.exercises as unknown[]).filter((ex: unknown): ex is Record<string, unknown> => Boolean(ex && typeof ex === 'object'))
             : [];
 
         if (exercisesList.length === 0) {
@@ -1934,28 +1977,29 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 
         const first = exercisesList[0] || {};
         const exMin = toMinutesRounded(estimateExerciseSeconds(first));
-        const totalMin = toMinutesRounded(exercisesList.reduce((acc, ex) => acc + calculateExerciseDuration(ex), 0));
-        const workoutTitle = String(workout?.title || workout?.name || 'Treino');
+        const totalMin = toMinutesRounded(exercisesList.reduce((acc: number, ex: Record<string, unknown>) => acc + calculateExerciseDuration(ex), 0));
+        const workoutTitle = String(workoutObj?.title || workoutObj?.name || 'Treino');
         const ok = await confirm(`Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`, 'Iniciar Treino');
         if (!ok) return;
         let preCheckin = null
         try {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
             const prompt = s ? s.promptPreWorkoutCheckin !== false : true
             if (prompt) {
                 preCheckin = await requestPreWorkoutCheckin(workout)
                 if (preCheckin && user?.id) {
-                    const energyN = Number(preCheckin.energy)
-                    const sorenessN = Number(preCheckin.soreness)
-                    const timeN = Number(preCheckin.timeMinutes)
+                    const pre = preCheckin && typeof preCheckin === 'object' ? (preCheckin as Record<string, unknown>) : ({} as Record<string, unknown>)
+                    const energyN = Number(pre.energy)
+                    const sorenessN = Number(pre.soreness)
+                    const timeN = Number(pre.timeMinutes)
                     const { error: checkinError } = await supabase.from('workout_checkins').insert({
                         user_id: user.id,
                         kind: 'pre',
-                        planned_workout_id: String(workout?.id || '').trim() ? workout.id : null,
+                        planned_workout_id: String(workoutObj?.id || '').trim() ? workoutObj.id : null,
                         active_session_user_id: null,
                         energy: Number.isFinite(energyN) && energyN >= 1 && energyN <= 5 ? Math.round(energyN) : null,
                         soreness: Number.isFinite(sorenessN) && sorenessN >= 0 && sorenessN <= 10 ? Math.round(sorenessN) : null,
-                        notes: String(preCheckin.notes || '').trim() ? String(preCheckin.notes || '').trim() : null,
+                        notes: String(pre.notes || '').trim() ? String(pre.notes || '').trim() : null,
                         answers: {
                             time_minutes: Number.isFinite(timeN) && timeN > 0 ? Math.round(timeN) : null,
                         },
@@ -1973,14 +2017,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             persistExerciseVideoUrls(resolved?.updates || []);
         } catch {}
         {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
             const enabled = s ? s.enableSounds !== false : true
             const volumeRaw = Number(s?.soundVolume ?? 100)
             const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1
             playStartSound({ enabled, volume })
         }
         setActiveSession({
-            workout: { ...workout, exercises: resolvedExercises },
+            workout: { ...workoutObj, exercises: resolvedExercises },
             logs: {},
             ui: {
                 baseExerciseCount: resolvedExercises.length,
@@ -1993,8 +2037,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         });
         setView('active');
         try {
-            const wid = String(workout?.id || '').trim() || null;
-            const title = String(workout?.title || workout?.name || 'Treino').trim();
+            const wid = String(workoutObj?.id || '').trim() || null;
+            const title = String(workoutObj?.title || workoutObj?.name || 'Treino').trim();
             fetch('/api/social/workout-start', {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
@@ -2002,30 +2046,30 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             }).catch(() => {});
         } catch {}
         {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
             const allowPrompt = s ? s.notificationPermissionPrompt !== false : true
             if (allowPrompt && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-            Notification.requestPermission().catch(e => console.warn('Erro permissão notificação:', e));
+            Notification.requestPermission().catch((e: unknown) => console.warn('Erro permissão notificação:', String((e as Error)?.message ?? e)));
             }
         }
     };
 
-    const handleUpdateSessionLog = (key, data) => {
+    const handleUpdateSessionLog = (key: string, data: unknown) => {
         if (!activeSession) return;
-        setActiveSession(prev => {
-            if (!prev) return null;
-            return {
-                ...prev,
-                logs: { ...(prev.logs || {}), [key]: data }
-            };
+        setActiveSession((prev: unknown) => {
+            const p = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : null
+            if (!p) return null;
+            const logs = p.logs && typeof p.logs === 'object' ? (p.logs as Record<string, unknown>) : {}
+            return { ...p, logs: { ...logs, [key]: data } };
         });
     };
 
-    const handleStartTimer = (duration, context) => {
-        setActiveSession((prev) => {
-            if (!prev) return prev;
+    const handleStartTimer = (duration: number, context: unknown) => {
+        setActiveSession((prev: unknown) => {
+            const p = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : null
+            if (!p) return prev;
             return {
-                ...prev,
+                ...p,
                 timerTargetTime: Date.now() + (duration * 1000),
                 timerContext: context && typeof context === 'object' ? context : null
             };
@@ -2033,13 +2077,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     };
 
     const handleCloseTimer = () => {
-        setActiveSession((prev) => {
-            if (!prev) return prev;
-            return { ...prev, timerTargetTime: null, timerContext: null };
+        setActiveSession((prev: unknown) => {
+            const p = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : null
+            if (!p) return prev;
+            return { ...p, timerTargetTime: null, timerContext: null };
         });
     };
 
-	const handleFinishSession = async (sessionData, showReport) => {
+	const handleFinishSession = async (sessionData: unknown, showReport?: boolean) => {
 		suppressForeignFinishToastUntilRef.current = Date.now() + 8000;
         try {
             if (user?.id) {
@@ -2064,27 +2109,29 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     }
 	const handleCreateWorkout = () => { setCreateWizardOpen(true) };
 
-	const handleEditWorkout = async (workout) => {
-		if (!workout || !workout.id) return;
+	const handleEditWorkout = async (workout: unknown) => {
+        const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : null
+		if (!w || !w.id) return;
 		try {
 			const supabase = createClient();
 			const { data, error } = await supabase
 				.from('workouts')
 				.select('*, exercises(*, sets(*))')
-				.eq('id', workout.id)
+				.eq('id', w.id)
 				.maybeSingle();
 			if (error) throw error;
 			if (!data) {
-				setCurrentWorkout(workout);
+				setCurrentWorkout(w);
 				setView('edit');
 				return;
 			}
 			const mapped = mapWorkoutRow(data);
             try {
-                const resolved = await resolveExerciseVideos(mapped?.exercises || []);
-                const exercises = Array.isArray(resolved?.exercises) ? resolved.exercises : (mapped?.exercises || []);
+                const mappedObj = mapped && typeof mapped === 'object' ? (mapped as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const resolved = await resolveExerciseVideos(mappedObj?.exercises || []);
+                const exercises = Array.isArray(resolved?.exercises) ? resolved.exercises : (Array.isArray(mappedObj?.exercises) ? (mappedObj.exercises as Array<Record<string, unknown>>) : []);
                 persistExerciseVideoUrls(resolved?.updates || []);
-                setCurrentWorkout({ ...mapped, exercises });
+                setCurrentWorkout({ ...mappedObj, exercises });
             } catch {
                 setCurrentWorkout(mapped);
             }
@@ -2095,18 +2142,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 		}
 	};
 
-    const handleSaveWorkout = useCallback(async (workoutToSave) => {
-        const w = workoutToSave || currentWorkout;
+    const handleSaveWorkout = useCallback(async (workoutToSave?: unknown) => {
+        const wRaw = workoutToSave || currentWorkout;
+        const w = wRaw && typeof wRaw === 'object' ? (wRaw as Record<string, unknown>) : null
         if (!user || !w || !w.title) return { ok: false, error: 'Treino inválido ou usuário ausente' };
         try {
             if (w.id) {
-                const res = await updateWorkout(w.id, w);
-                setCurrentWorkout(w);
+                const res = await updateWorkout(String(w.id), w);
+                setCurrentWorkout(wRaw);
                 return res;
             } else {
                 const created = await createWorkout(w);
-                const id = created?.id ?? null;
-                setCurrentWorkout({ ...w, id });
+                const id = created?.ok ? created.data.id : null;
+                setCurrentWorkout({ ...wRaw, id });
                 return created;
             }
         } catch (e) {
@@ -2115,25 +2163,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     }, [currentWorkout, user]);
 
-    const handlePersistWorkoutTemplateFromSession = useCallback(async (workoutFromSession) => {
+    const handlePersistWorkoutTemplateFromSession = useCallback(async (workoutFromSession: unknown) => {
         try {
             const normalized = normalizeWorkoutForEditor(workoutFromSession);
             const cleaned = stripWorkoutInternalKeys(normalized);
-            if (!cleaned || !cleaned.title) return { ok: false, error: 'Treino inválido para salvar' };
+            const cleanedObj = cleaned && typeof cleaned === 'object' ? (cleaned as Record<string, unknown>) : null
+            if (!cleanedObj || !cleanedObj.title) return { ok: false, error: 'Treino inválido para salvar' };
 
-            if (cleaned.id) {
-                await updateWorkout(cleaned.id, cleaned);
+            if (cleanedObj.id) {
+                await updateWorkout(String(cleanedObj.id), cleanedObj);
                 try {
                     await fetchWorkouts();
                 } catch {}
                 return { ok: true, mode: 'update' };
             }
 
-            const created = await createWorkout(cleaned);
+            const created = await createWorkout(cleanedObj);
             try {
                 await fetchWorkouts();
             } catch {}
-            return { ok: true, mode: 'create', id: created?.id ?? null };
+            return { ok: true, mode: 'create', id: created?.ok ? created.data.id : null };
         } catch (e) {
             const msg = e?.message ? String(e.message) : String(e);
             return { ok: false, error: msg || 'Falha ao salvar treino' };
@@ -2180,25 +2229,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         } catch {}
     }, []);
 
-    const handleSaveActiveWorkoutEditor = useCallback(async (workoutFromEditor) => {
+    const handleSaveActiveWorkoutEditor = useCallback(async (workoutFromEditor: unknown) => {
         const normalized = normalizeWorkoutForEditor(workoutFromEditor);
         const cleaned = stripWorkoutInternalKeys(normalized);
         const shouldDeferPersist = !!editActiveAddExerciseRef.current;
         const res = shouldDeferPersist ? { deferred: true } : await handleSaveWorkout(cleaned);
-        setActiveSession((prev) => {
-            if (!prev) return prev;
-            const oldWorkout = editActiveBaseRef.current || normalizeWorkoutForEditor(prev.workout);
-            const nextLogs = reindexSessionLogsAfterWorkoutEdit(oldWorkout, normalized, prev.logs || {});
-            const baseUi = prev?.ui && typeof prev.ui === 'object' ? prev.ui : {};
+        setActiveSession((prev: unknown) => {
+            const p = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : null
+            if (!p) return prev;
+            const oldWorkout = editActiveBaseRef.current || normalizeWorkoutForEditor(p.workout);
+            const nextLogs = reindexSessionLogsAfterWorkoutEdit(oldWorkout, normalized, p.logs || {});
+            const baseUi = p?.ui && typeof p.ui === 'object' ? (p.ui as Record<string, unknown>) : {};
             const nextUi = shouldDeferPersist ? { ...baseUi, pendingTemplateUpdate: true } : baseUi;
-            return { ...prev, workout: normalized, logs: nextLogs, ui: nextUi };
+            return { ...p, workout: normalized, logs: nextLogs, ui: nextUi };
         });
         editActiveBaseRef.current = normalized;
         setEditActiveDraft(normalized);
         return res;
     }, [handleSaveWorkout, normalizeWorkoutForEditor, reindexSessionLogsAfterWorkoutEdit, stripWorkoutInternalKeys]);
 
-	const handleDeleteWorkout = async (id, title) => {
+	const handleDeleteWorkout = async (id: string, title: unknown) => {
 		const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
 		if (!(await confirm(`Apagar o treino "${name}"?`, "Excluir Treino"))) return;
 		try {
@@ -2211,10 +2261,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 		} catch (e) { await alert("Erro: " + (e?.message ?? String(e))); }
 	};
 
-    const handleRestoreWorkout = async (workout) => {
-        const id = String(workout?.id || '').trim()
+    const handleRestoreWorkout = async (workout: unknown) => {
+        const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
+        const id = String(w?.id || '').trim()
         if (!id) return
-        const name = workout?.title || 'este treino'
+        const name = w?.title || 'este treino'
         if (!(await confirm(`Restaurar o treino "${name}"?`, 'Restaurar Treino'))) return
         try {
             const res = await setWorkoutArchived(id, false)
@@ -2228,17 +2279,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     }
 
-	const handleDuplicateWorkout = async (workout) => {
-		if (!(await confirm(`Duplicar "${workout.title}"?`, "Duplicar Treino"))) return;
-		const newWorkout = { ...workout, title: `${workout.title} (Cópia)` };
-		delete newWorkout.id;
+	const handleDuplicateWorkout = async (workout: unknown) => {
+        const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
+		if (!(await confirm(`Duplicar "${String(w.title || '')}"?`, "Duplicar Treino"))) return;
+		const newWorkout = { ...w, title: `${String(w.title || '')} (Cópia)` };
+		delete (newWorkout as Record<string, unknown>).id;
 		try {
-			await createWorkout(newWorkout);
+			await createWorkout(newWorkout as Record<string, unknown>);
 			await fetchWorkouts();
 		} catch (e) { await alert("Erro ao duplicar: " + (e?.message ?? String(e))); }
 	};
 
-    const handleBulkEditWorkouts = async (items) => {
+    const handleBulkEditWorkouts = async (items: unknown) => {
         try {
             const arr = Array.isArray(items) ? items : []
             if (!arr.length) return
@@ -2260,16 +2312,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 
             let sortSaved = true
             let sortError = ''
-            for (let i = 0; i < arr.length; i += 1) {
-                const it = arr[i]
-                const id = String(it?.id || '').trim()
-                if (!id) continue
-                const r2 = await setWorkoutSortOrder(id, i)
-                if (!r2?.ok) {
-                    sortSaved = false
-                    sortError = String(r2?.error || 'Falha ao ordenar treinos')
-                    break
-                }
+            const sortIds = arr.map((it) => String(it?.id || '').trim()).filter(Boolean)
+            const r2 = await setWorkoutSortOrder(sortIds)
+            if (!r2?.ok) {
+                sortSaved = false
+                sortError = String(r2?.error || 'Falha ao ordenar treinos')
             }
 
             await fetchWorkouts()
@@ -2434,8 +2481,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             return set
         })
 
-        const parent = Array.from({ length: list.length }).map((_, i) => i)
-        const find = (x) => {
+        const parent: number[] = Array.from({ length: list.length }).map((_, i) => i)
+        const find = (x: number) => {
             let r = x
             while (parent[r] !== r) r = parent[r]
             let cur = x
@@ -2446,13 +2493,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             }
             return r
         }
-        const unite = (a, b) => {
+        const unite = (a: number, b: number) => {
             const ra = find(a)
             const rb = find(b)
             if (ra !== rb) parent[rb] = ra
         }
 
-        const similarity = (a, b) => {
+        const similarity = (a: number, b: number): number => {
             const A = keys[a]
             const B = keys[b]
             if (!A?.size || !B?.size) return 0
@@ -2474,7 +2521,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             }
         }
 
-        const groupsMap = new Map()
+        const groupsMap = new Map<number, number[]>()
         for (let i = 0; i < list.length; i += 1) {
             const r = find(i)
             const arr = groupsMap.get(r) || []
@@ -2489,7 +2536,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             for (const e of edges) {
                 if (idxs.includes(e.i) && idxs.includes(e.j)) best = Math.max(best, e.score)
             }
-            groups.push({ items: idxs.map((i) => list[i]), score: best || 0.9 })
+            groups.push({ items: idxs.map((i: number) => list[i]), score: best || 0.9 })
         }
 
         if (!groups.length) {
@@ -2501,16 +2548,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         setDuplicatesOpen(true)
     }
 
-    const handleArchiveDuplicateGroup = async (group) => {
+    const handleArchiveDuplicateGroup = async (group: unknown) => {
         if (duplicatesBusy) return
         try {
-            if (!group?.items || group.items.length < 2) return
-            const base = group.items[0]
-            const others = group.items.slice(1)
+            const g = group && typeof group === 'object' ? (group as Record<string, unknown>) : ({} as Record<string, unknown>)
+            const items = Array.isArray(g?.items) ? (g.items as unknown[]) : []
+            if (items.length < 2) return
+            const base = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : null
+            const others = items.slice(1)
             if (!(await confirm(`Arquivar ${others.length} duplicados e manter "${base?.title || 'Treino'}"?`, 'Arquivar duplicados'))) return
             setDuplicatesBusy(true)
             for (const w of others) {
-                const id = String(w?.id || '').trim()
+                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const id = String(wo?.id || '').trim()
                 if (!id) continue
                 const res = await setWorkoutArchived(id, true)
                 if (!res?.ok) throw new Error(String(res?.error || 'Falha ao arquivar'))
@@ -2525,12 +2575,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     }
 
-    const handleMergeDuplicateGroup = async (group) => {
+    const handleMergeDuplicateGroup = async (group: unknown) => {
         if (duplicatesBusy) return
         try {
-            if (!group?.items || group.items.length < 2) return
-            const base = group.items[0]
-            const others = group.items.slice(1)
+            const g = group && typeof group === 'object' ? (group as Record<string, unknown>) : ({} as Record<string, unknown>)
+            const items = Array.isArray(g?.items) ? (g.items as unknown[]) : []
+            if (items.length < 2) return
+            const base = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : null
+            const others = items.slice(1)
             if (!(await confirm(`Mesclar ${others.length} duplicados em "${base?.title || 'Treino'}" e arquivar os demais?`, 'Mesclar duplicados'))) return
             setDuplicatesBusy(true)
 
@@ -2548,11 +2600,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                 }
             }
             for (const w of others) {
-                const exs = Array.isArray(w?.exercises) ? w.exercises : []
+                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const exs = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]) : []
                 for (const ex of exs) {
-                    const name = String(ex?.name || '').trim()
-                    const method = String(ex?.method || '').trim()
-                    const reps = String(ex?.reps || '').trim()
+                    const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                    const name = String(exObj?.name || '').trim()
+                    const method = String(exObj?.method || '').trim()
+                    const reps = String(exObj?.reps || '').trim()
                     const k = `${normalizeExerciseName(resolveCanonicalExerciseName(name).canonical || name)}|${method}|${reps}`
                     if (!k || seen.has(k)) continue
                     seen.add(k)
@@ -2566,7 +2620,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino mesclado'))
 
             for (const w of others) {
-                const id = String(w?.id || '').trim()
+                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const id = String(wo?.id || '').trim()
                 if (!id) continue
                 const a = await setWorkoutArchived(id, true)
                 if (!a?.ok) throw new Error(String(a?.error || 'Falha ao arquivar'))
@@ -2581,7 +2636,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
         }
     }
 
-    const handleShareWorkout = async (workout) => {
+    const handleShareWorkout = async (workout: unknown) => {
         setExportWorkout(workout);
         setShowExportModal(true);
     };
@@ -2603,7 +2658,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 
     const handleExportJson = () => {
         if (!exportWorkout) return;
-        const json = JSON.stringify({ workout: { title: exportWorkout.title, exercises: (exportWorkout.exercises || []).map(ex => ({ name: ex.name, sets: ex.sets, reps: ex.reps, rpe: ex.rpe, cadence: ex.cadence, restTime: ex.restTime, method: ex.method, videoUrl: ex.videoUrl, notes: ex.notes })) } }, null, 2);
+        const json = JSON.stringify({ workout: { title: exportWorkout.title, exercises: (exportWorkout.exercises || []).map((ex: unknown) => { const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>); return ({ name: e.name, sets: e.sets, reps: e.reps, rpe: e.rpe, cadence: e.cadence, restTime: e.restTime, method: e.method, videoUrl: e.videoUrl, notes: e.notes }) }) } }, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2618,22 +2673,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             setExportingAll(true);
             const payload = {
                 user: { id: user?.id || '', email: user?.email || '' },
-                workouts: (workouts || []).map(w => ({
+                workouts: (workouts || []).map((w: Record<string, unknown>) => ({
                     id: w.id,
                     title: w.title,
                     notes: w.notes,
                     is_template: true,
-                    exercises: (w.exercises || []).map(ex => ({
-                        name: ex.name,
-                        sets: ex.sets,
-                        reps: ex.reps,
-                        rpe: ex.rpe,
-                        cadence: ex.cadence,
-                        restTime: ex.restTime,
-                        method: ex.method,
-                        videoUrl: ex.videoUrl,
-                        notes: ex.notes
-                    }))
+                    exercises: (Array.isArray(w.exercises) ? (w.exercises as unknown[]) : []).map((ex: unknown) => {
+                        const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                        return ({
+                            name: e.name,
+                            sets: e.sets,
+                            reps: e.reps,
+                            rpe: e.rpe,
+                            cadence: e.cadence,
+                            restTime: e.restTime,
+                            method: e.method,
+                            videoUrl: e.videoUrl,
+                            notes: e.notes
+                        })
+                    })
                 }))
             };
             const json = JSON.stringify(payload, null, 2);
@@ -2654,8 +2712,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     };
 
     // JSON IMPORT HANDLER
-    const handleJsonUpload = (e) => {
-        const input = e?.target;
+    const handleJsonUpload = (e: unknown) => {
+        const input = (e as { target?: HTMLInputElement | null })?.target ?? null;
         const file = input?.files?.[0];
         if (!file) return;
         try {
@@ -2707,7 +2765,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
             }}
         >
         <InAppNotifyBinder bind={bindInAppNotify} />
-        <TeamWorkoutProvider user={user} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
+        <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
             <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                 <IncomingInviteModal onStartSession={handleStartSession} />
                 <InviteAcceptedModal />
@@ -2718,19 +2776,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                         hasCommunity: (userSettingsApi?.settings?.moduleCommunity !== false),
                     })}
                     actions={{
-                        openAdminPanel: (tab) => {
+                        openAdminPanel: (tab: unknown) => {
                             try {
                                 const safe = String(tab || 'dashboard').trim() || 'dashboard'
                                 openAdminPanel(safe)
                             } catch {}
                         },
                     }}
-                    onEvent={(name, payload) => {
+                    onEvent={(name: unknown, payload: unknown) => {
                         logTourEvent(name, payload)
                     }}
                     onComplete={async () => {
                         setTourOpen(false)
-                        setTourBoot((prev) => ({ ...(prev || {}), completed: true, skipped: false, version: TOUR_VERSION }))
+                        setTourBoot((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), completed: true, skipped: false, version: TOUR_VERSION }))
                         try { writeLocalTourDismissal(user?.id, 'completed') } catch {}
                         const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
                         if (!res?.ok) {
@@ -2740,7 +2798,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     }}
                     onSkip={async () => {
                         setTourOpen(false)
-                        setTourBoot((prev) => ({ ...(prev || {}), completed: false, skipped: true, version: TOUR_VERSION }))
+                        setTourBoot((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), completed: false, skipped: true, version: TOUR_VERSION }))
                         try { writeLocalTourDismissal(user?.id, 'skipped') } catch {}
                         const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
                         if (!res?.ok) {
@@ -2750,7 +2808,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                     }}
                     onCancel={async () => {
                         setTourOpen(false)
-                        setTourBoot((prev) => ({ ...(prev || {}), completed: false, skipped: true, version: TOUR_VERSION }))
+                        setTourBoot((prev: unknown) => ({ ...((prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}) || {}), completed: false, skipped: true, version: TOUR_VERSION }))
                         try { writeLocalTourDismissal(user?.id, 'skipped') } catch {}
                         const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
                         if (!res?.ok) {
@@ -2889,10 +2947,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                             profileIncomplete={Boolean(profileIncomplete)}
                             onOpenCompleteProfile={() => setShowCompleteProfile(true)}
                             view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
-                            onChangeView={(next) => setView(next)}
-                            assessmentsContent={(user?.id || initialUser?.id) ? <AssessmentHistory studentId={user?.id || initialUser?.id} /> : null}
-                            communityContent={(user?.id || initialUser?.id) ? <CommunityClient embedded /> : null}
-                            vipContent={<VipHub user={user} locked={!vipAccess?.hasVip} onOpenWorkoutEditor={(w) => handleEditWorkout(w)} onOpenVipTab={() => setView('vip')} />}
+                            onChangeView={(next: string) => setView(next)}
+                            assessmentsContent={
+                                (user?.id || initialUserObj?.id) ? (
+                                    <ErrorBoundary>
+                                        <Suspense fallback={<div className="p-4 text-neutral-400">Carregando…</div>}>
+                                            <AssessmentHistory studentId={String(user?.id || initialUserObj?.id || '')} />
+                                        </Suspense>
+                                    </ErrorBoundary>
+                                ) : null
+                            }
+                            communityContent={(user?.id || initialUserObj?.id) ? <CommunityClient embedded /> : null}
+                            vipContent={<VipHub user={user} locked={!vipAccess?.hasVip} onOpenWorkoutEditor={(w: unknown) => handleEditWorkout(w)} onOpenVipTab={() => setView('vip')} />}
                             vipLabel="VIP"
                             vipLocked={!vipAccess?.hasVip}
                             vipEnabled={true}
@@ -2906,7 +2972,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                             onEditWorkout={(w) => handleEditWorkout(w)}
                             onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
                             onBulkEditWorkouts={handleBulkEditWorkouts}
-                            currentUserId={user?.id || initialUser?.id}
+                            currentUserId={String(user?.id || initialUserObj?.id || '')}
                             exportingAll={Boolean(exportingAll)}
                             onExportAll={handleExportAllWorkouts}
                             streakStats={streakStats}
@@ -2936,7 +3002,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ answers, mode }),
                                 })
-                                const data = await res.json().catch(() => null)
+                                const data = await res.json().catch((): unknown => null)
                                 if (!res.ok) {
                                     const msg = data?.error ? String(data.error) : 'Falha ao gerar treino com IA.'
                                     throw new Error(msg)
@@ -3025,7 +3091,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                             onBack={() => setView('dashboard')}
                             onStartTimer={handleStartTimer}
                             isCoach={isCoach}
-                            onUpdateSession={(updates) => setActiveSession(prev => ({ ...prev, ...updates }))}
+                            onUpdateSession={(updates: unknown) => setActiveSession((prev: unknown) => {
+                                const p = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : null
+                                if (!p) return prev
+                                const u = updates && typeof updates === 'object' ? (updates as Record<string, unknown>) : {}
+                                return { ...p, ...u }
+                            })}
                             nextWorkout={nextWorkout}
                             onEditWorkout={() => handleOpenActiveWorkoutEditor()}
                             onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
@@ -3044,7 +3115,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 <ExerciseEditor
                                     workout={editActiveDraft}
                                     onCancel={() => handleCloseActiveWorkoutEditor()}
-                                    onChange={(w) => setEditActiveDraft(normalizeWorkoutForEditor(w))}
+                                    onChange={(w: unknown) => setEditActiveDraft(normalizeWorkoutForEditor(w))}
                                     onSave={handleSaveActiveWorkoutEditor}
                                     onSaved={() => {
                                         fetchWorkouts().catch(() => {});
@@ -3059,10 +3130,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                         <HistoryList
                             user={user}
                             settings={userSettingsApi?.settings ?? null}
-                            onViewReport={(s) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
+                            onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
                             onBack={() => setView('dashboard')}
                             targetId={user?.id || ''}
-                            targetEmail={user?.email || ''}
+                            targetEmail={user?.email ? String(user.email) : ''}
                             readOnly={false}
                             title="Histórico"
                             vipLimits={vipStatus?.limits}
@@ -3138,15 +3209,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                                     </div>
                                                 </div>
                                                 <div className="mt-3 space-y-2">
-                                                    {items.map((w, wi) => (
-                                                        <div key={`dup-item-${idx}-${wi}`} className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900/40 border border-neutral-800 px-3 py-2">
-                                                            <div className="min-w-0">
-                                                                <div className="text-sm font-bold text-white truncate">{String(w?.title || 'Treino')}</div>
-                                                                <div className="text-[11px] text-neutral-500 font-mono">{Array.isArray(w?.exercises) ? w.exercises.length : 0} EXERCÍCIOS</div>
+                                                    {items.map((w: unknown, wi: number) => {
+                                                        const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                                        const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
+                                                        return (
+                                                            <div key={`dup-item-${idx}-${wi}`} className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900/40 border border-neutral-800 px-3 py-2">
+                                                                <div className="min-w-0">
+                                                                    <div className="text-sm font-bold text-white truncate">{String(wo?.title || 'Treino')}</div>
+                                                                    <div className="text-[11px] text-neutral-500 font-mono">{exCount} EXERCÍCIOS</div>
+                                                                </div>
+                                                                <div className="text-[11px] font-bold text-neutral-500">{wi === 0 ? 'BASE' : 'DUP'}</div>
                                                             </div>
-                                                            <div className="text-[11px] font-bold text-neutral-500">{wi === 0 ? 'BASE' : 'DUP'}</div>
-                                                        </div>
-                                                    ))}
+                                                        )
+                                                    })}
                                                 </div>
                                             </div>
                                         )
@@ -3182,14 +3257,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                     {(openStudent.workouts || []).length === 0 && (
                                         <p className="text-neutral-500 text-sm">Nenhum treino encontrado.</p>
                                     )}
-                                    {(openStudent.workouts || []).map(w => (
-                                        <div key={w.id} className="p-3 rounded-xl border border-neutral-700 bg-neutral-800">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-white font-bold text-sm">{w.title}</span>
-                                                <span className="text-xs text-neutral-400">{w.exercises?.length || 0} exercícios</span>
+                                    {(openStudent.workouts || []).map((w: unknown, idx: number) => {
+                                        const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                        const id = String(wo?.id || '').trim() || `w-${idx}`
+                                        const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
+                                        return (
+                                            <div key={id} className="p-3 rounded-xl border border-neutral-700 bg-neutral-800">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-white font-bold text-sm">{String(wo?.title || '')}</span>
+                                                    <span className="text-xs text-neutral-400">{exCount} exercícios</span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </div>
                         </div>
@@ -3209,7 +3289,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
 
                     {view === 'chatList' && (
                         <div className="absolute inset-0 z-50 bg-neutral-900">
-                            <ChatListScreen user={user} onClose={() => setView('dashboard')} onSelectUser={() => {}} onSelectChannel={(c) => { setDirectChat(c); setView('directChat'); }} />
+                            <ChatListScreen user={user} onClose={() => setView('dashboard')} onSelectUser={() => {}} onSelectChannel={(c: unknown) => { setDirectChat(c); setView('directChat'); }} />
                         </div>
                     )}
 
@@ -3338,18 +3418,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                 </button>
                             </div>
                             <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
-                                {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex, idx) => (
-                                    <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
-                                        <div className="flex justify-between items-center">
-                                            <h4 className="font-bold text-white text-sm">{String(ex?.name || '—')}</h4>
-                                            <span className="text-xs text-neutral-400">{(parseInt(ex?.sets) || 0)} x {String(ex?.reps || '-')}</span>
+                                {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex: unknown, idx: number) => {
+                                    const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                    return (
+                                        <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="font-bold text-white text-sm">{String(e?.name || '—')}</h4>
+                                                <span className="text-xs text-neutral-400">{(parseInt(String(e?.sets ?? '')) || 0)} x {String(e?.reps || '-')}</span>
+                                            </div>
+                                            <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
+                                                <Clock size={14} className="text-yellow-500" /><span>Descanso: {e?.restTime ? `${parseInt(String(e.restTime))}s` : '-'}</span>
+                                            </div>
+                                            {e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
                                         </div>
-                                        <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
-                                            <Clock size={14} className="text-yellow-500" /><span>Descanso: {ex?.restTime ? `${parseInt(ex.restTime)}s` : '-'}</span>
-                                        </div>
-                                        {ex?.notes && <p className="text-sm text-neutral-300 mt-2">{String(ex.notes || '')}</p>}
-                                    </div>
-                                ))}
+                                    )
+                                })}
                                 {(!Array.isArray(quickViewWorkout?.exercises) || quickViewWorkout.exercises.length === 0) && (
                                     <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
                                 )}
@@ -3403,7 +3486,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                                         <span className="font-mono text-yellow-500">{(() => { const end = sessionTicker || activeSession.startedAt; const s = Math.max(0, Math.floor((end - activeSession.startedAt) / 1000)); const m = Math.floor(s/60), sec = s%60; return `${m}:${String(sec).padStart(2,'0')}`; })()}</span>
                                         <span className="text-neutral-500">tempo atual</span>
                                         <span className="opacity-30">•</span>
-                                        <span className="font-mono text-neutral-200">{(() => { const total = (activeSession.workout?.exercises || []).reduce((acc, ex) => acc + calculateExerciseDuration(ex), 0); return `${toMinutesRounded(total)} min`; })()}</span>
+                                        <span className="font-mono text-neutral-200">{(() => { const list = Array.isArray(activeSession.workout?.exercises) ? activeSession.workout.exercises : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>
                                         <span className="text-neutral-500">estimado total</span>
                                     </div>
                                     <div className="h-1 bg-neutral-700 rounded-full overflow-hidden mt-2">
@@ -3608,7 +3691,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
                             }
                             setWhatsNewOpen(true)
                         }}
-                        onSave={async (next) => {
+                        onSave={async (next: unknown) => {
                             try {
                                 const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})
                                 const res = await userSettingsApi?.save?.(safeNext)
@@ -3638,7 +3721,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }) {
     );
 }
 
-export default function IronTracksAppClient({ initialUser, initialProfile, initialWorkouts }) {
+export default function IronTracksAppClient({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
     const [isMounted, setIsMounted] = useState(false);
     useEffect(() => {
         const t = setTimeout(() => {

@@ -1,8 +1,28 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
+
+const IncomingEventSchema = z
+  .object({
+    name: z.unknown().optional(),
+    type: z.unknown().optional(),
+    screen: z.unknown().optional(),
+    path: z.unknown().optional(),
+    metadata: z.unknown().optional(),
+    clientTs: z.unknown().optional(),
+    appVersion: z.unknown().optional(),
+  })
+  .passthrough()
+
+const ZodBodySchema = z.union([
+  z.object({ events: z.array(IncomingEventSchema).max(50) }).passthrough(),
+  z.array(IncomingEventSchema).max(50),
+  IncomingEventSchema,
+])
 
 type IncomingEvent = {
   name?: unknown
@@ -44,7 +64,9 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const rawEvents = Array.isArray((body as any)?.events) ? (body as any).events : (body ? [body] : [])
     const events: IncomingEvent[] = rawEvents.filter(Boolean).slice(0, 50)
 
@@ -93,4 +115,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

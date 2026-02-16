@@ -34,17 +34,27 @@ export const getPendingCount = async () => {
 export const getOfflineQueueSummary = async ({ userId }: any = {}) => {
   try {
     const all = await queueGetAll();
-    const jobs = Array.isArray(all) ? all : [];
+    const jobs = Array.isArray(all) ? (all as Array<Record<string, unknown>>) : [];
     
     // Calculate stats
     const now = Date.now();
-    const pending = jobs.filter(j => (j.status || 'pending') === 'pending').length;
-    const failed = jobs.filter(j => j.status === 'failed').length;
-    const due = jobs.filter(j => !j.nextAttemptAt || j.nextAttemptAt <= now).length;
+    const pending = jobs.filter((j) => String((j as Record<string, unknown>)?.status || 'pending') === 'pending').length;
+    const failed = jobs.filter((j) => String((j as Record<string, unknown>)?.status || '') === 'failed').length;
+    const due = jobs.filter((j) => {
+      const job = j as Record<string, unknown>
+      const next = job?.nextAttemptAt
+      return !next || Number(next) <= now
+    }).length;
     
     // Find next due
-    const future = jobs.filter(j => j.nextAttemptAt && j.nextAttemptAt > now).sort((a, b) => a.nextAttemptAt - b.nextAttemptAt);
-    const nextDueAt = future.length > 0 ? future[0].nextAttemptAt : null;
+    const future = jobs
+      .filter((j) => {
+        const job = j as Record<string, unknown>
+        const next = Number(job?.nextAttemptAt)
+        return Number.isFinite(next) && next > now
+      })
+      .sort((a, b) => Number((a as Record<string, unknown>)?.nextAttemptAt) - Number((b as Record<string, unknown>)?.nextAttemptAt));
+    const nextDueAt = future.length > 0 ? Number((future[0] as Record<string, unknown>)?.nextAttemptAt) : null;
 
     return {
       ok: true,
@@ -65,7 +75,8 @@ export const clearOfflineJobs = async ({ userId }: any = {}) => {
         const all = await queueGetAll();
         if (Array.isArray(all)) {
             for (const job of all) {
-                await queueDelete(job.id);
+                const j = job && typeof job === 'object' ? (job as Record<string, unknown>) : ({} as Record<string, unknown>)
+                await queueDelete(String(j.id));
             }
         }
         return { ok: true };
@@ -74,16 +85,14 @@ export const clearOfflineJobs = async ({ userId }: any = {}) => {
     }
 };
 
-export const bumpOfflineJob = async ({ id }) => {
+export const bumpOfflineJob = async ({ id }: { id: string }) => {
     try {
         const all = await queueGetAll();
-        const list = Array.isArray(all) ? all : [];
-        const job = list.find(j => j.id === id);
+        const list = Array.isArray(all) ? (all as Array<Record<string, unknown>>) : [];
+        const job = list.find((j) => String((j as Record<string, unknown>)?.id || '') === id);
         if (job) {
-            job.nextAttemptAt = 0;
-            job.attempts = 0;
-            job.status = 'pending';
-            await queuePut(job);
+            const next = { ...job, nextAttemptAt: 0, attempts: 0, status: 'pending' }
+            await queuePut(next);
         }
     } catch (e) {
         console.error('Bump failed', e);
@@ -107,34 +116,35 @@ export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
   const now = Date.now();
 
   for (const job of all) {
+    const j = job && typeof job === 'object' ? (job as Record<string, unknown>) : ({} as Record<string, unknown>)
     // Check eligibility
     if (!force) {
-        if (job.nextAttemptAt && job.nextAttemptAt > now) continue;
-        if (job.status === 'failed' && !force) continue; 
+        if (j.nextAttemptAt && Number(j.nextAttemptAt) > now) continue;
+        if (String(j.status || '') === 'failed' && !force) continue; 
     }
 
     try {
-      if (job.type === 'finish_workout') {
-        await processFinishWorkout(job);
+      if (String(j.type || '') === 'finish_workout') {
+        await processFinishWorkout(j);
       }
       // Success
-      await queueDelete(job.id);
+      await queueDelete(String(j.id));
       processed++;
     } catch (err) {
-      console.error('Failed to process offline job:', job, err);
+      console.error('Failed to process offline job:', j, err);
       errors++;
       
       // Update job with failure info
-      job.attempts = (job.attempts || 0) + 1;
-      job.lastError = String(err?.message || err);
-      job.nextAttemptAt = now + (1000 * 60 * Math.pow(2, job.attempts)); // Exponential backoff
+      const attempts = (Number(j.attempts) || 0) + 1
+      const nextAttemptAt = now + (1000 * 60 * Math.pow(2, attempts))
+      const nextJob: Record<string, unknown> = { ...j, attempts, lastError: String((err as any)?.message || err), nextAttemptAt }
       
-      if (job.attempts >= (job.maxAttempts || 7)) {
-          job.status = 'failed';
+      if (attempts >= (Number(j.maxAttempts) || 7)) {
+          nextJob.status = 'failed';
       } else {
-          job.status = 'pending'; 
+          nextJob.status = 'pending'; 
       }
-      await queuePut(job);
+      await queuePut(nextJob);
     }
   }
 

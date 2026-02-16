@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    session: z.unknown(),
+    progression: z.array(z.unknown()).min(1),
+    historyId: z.string().optional(),
+    history_id: z.string().optional(),
+  })
+  .passthrough()
 
 const normalizeKey = (v: any) =>
   String(v || '')
@@ -19,8 +30,10 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
-    const session = body?.session && typeof body.session === 'object' ? body.session : null
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
+    const session: any = body?.session && typeof body.session === 'object' ? body.session : null
     const progression = safeArray<any>(body?.progression).filter((x) => x && typeof x === 'object')
     const historyId = String(body?.historyId || body?.history_id || '').trim() || null
 
@@ -125,4 +138,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

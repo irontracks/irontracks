@@ -6,8 +6,11 @@ import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock,
 import { APP_VERSION } from '@/lib/version';
 import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
+import { useRouter } from 'next/navigation';
+import { isPwaStandalone } from '@/utils/platform';
 
 const LoginScreen = () => {
+    const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0);
@@ -134,6 +137,11 @@ const LoginScreen = () => {
             const password = emailData.password.trim();
 
             if (authMode === 'login') {
+                try {
+                    if (process.env.NODE_ENV !== 'production') {
+                        console.log('[Auth] Modo standalone:', isPwaStandalone());
+                    }
+                } catch {}
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 
@@ -145,7 +153,8 @@ const LoginScreen = () => {
                 }
 
                 holdLoading = true;
-                window.location.href = '/dashboard';
+                router.replace('/dashboard');
+                try { router.refresh(); } catch {}
             } 
             else if (authMode === 'signup') {
                 if (password !== emailData.confirmPassword) {
@@ -207,7 +216,8 @@ const LoginScreen = () => {
 
                 // Auto login usually happens, or check email confirmation
                 holdLoading = true;
-                window.location.href = '/wait-approval';
+                router.replace('/wait-approval');
+                try { router.refresh(); } catch {}
             }
             else if (authMode === 'recover') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -238,7 +248,8 @@ const LoginScreen = () => {
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 holdLoading = true;
-                window.location.href = '/dashboard';
+                router.replace('/dashboard');
+                try { router.refresh(); } catch {}
             }
         } catch (err) {
             console.error("Auth Error:", err);

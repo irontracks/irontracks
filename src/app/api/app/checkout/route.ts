@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,18 +15,25 @@ const addDays = (d: Date, days: number) => {
 
 const toDateOnly = (d: Date) => d.toISOString().slice(0, 10)
 
+const BodySchema = z
+  .object({
+    planId: z.string().min(1),
+    billingType: z.preprocess((v) => (typeof v === 'string' ? v.trim().toUpperCase() : 'PIX'), z.string().default('PIX')),
+    cpfCnpj: z.preprocess((v) => String(v ?? '').replace(/\D/g, ''), z.string().min(1)),
+    mobilePhone: z.preprocess((v) => String(v ?? '').replace(/\D/g, ''), z.string().min(1)),
+    name: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().optional().default('')),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await req.json().catch(() => ({}))
-    const planId = (body?.planId || '').trim() as string
-    const billingType = ((body?.billingType || 'PIX') as string).trim().toUpperCase()
-    const cpfCnpj = (body?.cpfCnpj || '').replace(/\D/g, '') as string
-    const mobilePhone = (body?.mobilePhone || '').replace(/\D/g, '') as string
-    const payerName = ((body?.name || '') as string).trim()
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { planId, billingType, cpfCnpj, mobilePhone, name: payerName } = parsedBody.data!
 
     if (!planId) return NextResponse.json({ ok: false, error: 'missing_plan' }, { status: 400 })
     if (!['PIX'].includes(billingType)) return NextResponse.json({ ok: false, error: 'unsupported_billing_type' }, { status: 400 })

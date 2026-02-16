@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const PutBodySchema = z
+  .object({
+    goal: z.string().optional(),
+    equipment: z.string().optional(),
+    constraints: z.string().optional(),
+    preferences: z.record(z.unknown()).optional(),
+  })
+  .passthrough()
 
 export async function GET() {
   const auth = await requireUser()
@@ -36,7 +47,9 @@ export async function PUT(req: Request) {
   if (entitlement.tier === 'free') return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
   try {
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, PutBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const goal = typeof body?.goal === 'string' ? body.goal.trim() : null
     const equipment = typeof body?.equipment === 'string' ? body.equipment.trim() : null
     const constraints = typeof body?.constraints === 'string' ? body.constraints.trim() : null

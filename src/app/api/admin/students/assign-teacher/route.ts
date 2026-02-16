@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    student_id: z.string().optional(),
+    teacher_user_id: z.string().nullable().optional(),
+    teacher_email: z.string().optional(),
+    email: z.string().optional(),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +23,9 @@ export async function POST(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const body = await req.json()
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const student_id = body?.student_id as string | undefined
     let teacher_user_id = body?.teacher_user_id as string | null
     const teacher_email = (body?.teacher_email || '') as string

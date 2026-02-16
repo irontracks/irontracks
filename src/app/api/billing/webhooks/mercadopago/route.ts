@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +35,19 @@ const mapSubscriptionStatus = (status: string) => {
   return 'pending'
 }
 
+const BodySchema = z
+  .object({
+    type: z.string().optional(),
+    topic: z.string().optional(),
+    action: z.string().optional(),
+    data: z
+      .object({
+        id: z.union([z.string(), z.number()]).optional(),
+      })
+      .optional(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   const secret = (process.env.MERCADOPAGO_WEBHOOK_SECRET || '').trim()
   if (!secret) {
@@ -43,7 +58,9 @@ export async function POST(req: Request) {
   const xSignature = (req.headers.get('x-signature') || '').trim()
   const xRequestId = (req.headers.get('x-request-id') || '').trim()
 
-  const body = await req.json().catch(() => ({} as any))
+  const parsedBody = await parseJsonBody(req, BodySchema)
+  if (parsedBody.response) return parsedBody.response
+  const body = parsedBody.data!
   const dataId = String(body?.data?.id || url.searchParams.get('data.id') || url.searchParams.get('id') || '').trim()
   if (!xSignature || !xRequestId || !dataId) {
     return NextResponse.json({ ok: false, error: 'invalid_webhook' }, { status: 400 })
@@ -141,4 +158,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

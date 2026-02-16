@@ -3,7 +3,7 @@ const DB_VERSION = 1
 const STORE_KV = 'kv'
 const STORE_QUEUE = 'queue'
 
-const hasIndexedDb = () => {
+const hasIndexedDb = (): boolean => {
   try {
     return typeof indexedDB !== 'undefined'
   } catch {
@@ -27,14 +27,14 @@ const openDb = (): Promise<IDBDatabase> =>
     }
   })
 
-const txDone = (tx: IDBTransaction) =>
-  new Promise((resolve, reject) => {
+const txDone = (tx: IDBTransaction): Promise<null> =>
+  new Promise<null>((resolve, reject) => {
     tx.oncomplete = () => resolve(null)
     tx.onabort = () => reject(tx.error)
     tx.onerror = () => reject(tx.error)
   })
 
-export const kvGet = async (key) => {
+export const kvGet = async (key: unknown): Promise<unknown | null> => {
   const k = String(key || '')
   if (!k) return null
   if (!hasIndexedDb()) {
@@ -49,7 +49,7 @@ export const kvGet = async (key) => {
   const tx = db.transaction(STORE_KV, 'readonly')
   const store = tx.objectStore(STORE_KV)
   const req = store.get(k)
-  const val = await new Promise((resolve) => {
+  const val = await new Promise<unknown | null>((resolve) => {
     req.onsuccess = () => resolve(req.result ?? null)
     req.onerror = () => resolve(null)
   })
@@ -57,7 +57,7 @@ export const kvGet = async (key) => {
   return val
 }
 
-export const kvSet = async (key, value) => {
+export const kvSet = async (key: unknown, value: unknown): Promise<boolean> => {
   const k = String(key || '')
   if (!k) return false
   if (!hasIndexedDb()) {
@@ -75,8 +75,8 @@ export const kvSet = async (key, value) => {
   return true
 }
 
-export const queuePut = async (job) => {
-  const j = job && typeof job === 'object' ? job : null
+export const queuePut = async (job: unknown): Promise<boolean> => {
+  const j = job && typeof job === 'object' ? (job as Record<string, unknown>) : null
   const id = String(j?.id || '').trim()
   if (!id) return false
   if (!hasIndexedDb()) {
@@ -98,7 +98,7 @@ export const queuePut = async (job) => {
   return true
 }
 
-export const queueDelete = async (id) => {
+export const queueDelete = async (id: unknown): Promise<boolean> => {
   const key = String(id || '').trim()
   if (!key) return false
   if (!hasIndexedDb()) {
@@ -119,7 +119,7 @@ export const queueDelete = async (id) => {
   return true
 }
 
-export const queueGetAll = async (): Promise<any[]> => {
+export const queueGetAll = async (): Promise<unknown[]> => {
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
@@ -133,8 +133,8 @@ export const queueGetAll = async (): Promise<any[]> => {
   const tx = db.transaction(STORE_QUEUE, 'readonly')
   const store = tx.objectStore(STORE_QUEUE)
   const req = store.getAll()
-  const list = await new Promise<any[]>((resolve) => {
-    req.onsuccess = () => resolve(Array.isArray(req.result) ? (req.result as any[]) : [])
+  const list = await new Promise<unknown[]>((resolve) => {
+    req.onsuccess = () => resolve(Array.isArray(req.result) ? (req.result as unknown[]) : [])
     req.onerror = () => resolve([])
   })
   await txDone(tx).catch(() => null)

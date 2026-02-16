@@ -180,7 +180,7 @@ export default function MuscleMapCard(props: Props) {
           return
         }
         autoErrorCountRef.current = 0
-        const payload = res as ApiPayload
+        const payload = res as unknown as ApiPayload
         setState({ status: 'ready', data: payload, error: '' })
         setAutoSync({ status: 'idle', error: '', lastAt: now })
         setDataUpdatedAt(now)
@@ -324,7 +324,7 @@ export default function MuscleMapCard(props: Props) {
           `Exercícios únicos: ${Number(res?.uniqueExercises || 0).toLocaleString('pt-BR')}\n` +
           `Mapeados (heurística): ${Number(res?.heuristicMapped || 0).toLocaleString('pt-BR')}\n` +
           `Mapeados (IA): ${Number(res?.aiMapped || 0).toLocaleString('pt-BR')}\n` +
-          `Ainda sem mapa: ${Number((res?.remainingUnmapped || []).length || 0).toLocaleString('pt-BR')}`
+          `Ainda sem mapa: ${Number((Array.isArray(res?.remainingUnmapped) ? res.remainingUnmapped.length : 0) || 0).toLocaleString('pt-BR')}`
       )
     } catch {}
     await load({ refreshCache: true, refreshAi: false, source: 'manual' })

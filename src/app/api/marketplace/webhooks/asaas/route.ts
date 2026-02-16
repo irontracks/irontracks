@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +13,22 @@ const mapSubscriptionStatusFromPayment = (status: string) => {
   return 'pending'
 }
 
+const BodySchema = z
+  .object({
+    event: z.string().optional(),
+    type: z.string().optional(),
+    eventType: z.string().optional(),
+    id: z.string().optional(),
+    eventId: z.string().optional(),
+    payment: z.any().optional(),
+    data: z
+      .object({
+        payment: z.any().optional(),
+      })
+      .optional(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   const secret = (process.env.ASAAS_WEBHOOK_SECRET || '').trim()
   const provided = (req.headers.get('x-webhook-secret') || '').trim()
@@ -21,7 +39,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json().catch(() => ({}))
+  const parsedBody = await parseJsonBody(req, BodySchema)
+  if (parsedBody.response) return parsedBody.response
+  const body = parsedBody.data!
 
   const eventType = (body?.event || body?.type || body?.eventType || '') as string
   const eventId = (body?.id || body?.eventId || null) as string | null

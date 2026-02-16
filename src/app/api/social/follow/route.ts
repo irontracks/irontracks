@@ -1,16 +1,26 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications } from '@/lib/social/notifyFollowers'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z
+  .object({
+    following_id: z.string().min(1),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const followingId = String(body?.following_id || '').trim()
     const followerId = String(auth.user.id || '').trim()
     if (!followingId) return NextResponse.json({ ok: false, error: 'missing following_id' }, { status: 400 })

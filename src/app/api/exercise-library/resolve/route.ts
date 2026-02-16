@@ -1,14 +1,25 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
 import { requireUser } from '@/utils/auth/route'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
+import { parseJsonBody } from '@/utils/zod'
+
+const ZodBodySchema = z
+  .object({
+    names: z.unknown().optional(),
+    name: z.unknown().optional(),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
 
   try {
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const rawNames = (body as any)?.names ?? (body as any)?.name ?? []
     const names = Array.isArray(rawNames) ? rawNames : [rawNames]
 
@@ -45,4 +56,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

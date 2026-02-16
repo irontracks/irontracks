@@ -1,6 +1,15 @@
+import { z } from 'zod'
+import { createClient } from '@/utils/supabase/server'
+import { parseJsonBody } from '@/utils/zod'
+
 export const runtime = 'nodejs'
 
-import { createClient } from '@/utils/supabase/server'
+const ZodBodySchema = z
+  .object({
+    html: z.string().min(1),
+    fileName: z.string().optional(),
+  })
+  .passthrough()
 
 const sanitizeHtml = (value) => {
   try {
@@ -14,9 +23,11 @@ const sanitizeHtml = (value) => {
   }
 }
 
-export async function POST(req) {
+export async function POST(req: Request) {
   try {
-    const { html, fileName } = await req.json()
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { html, fileName } = parsedBody.data!
     const internalSecret = String(process.env.IRONTRACKS_INTERNAL_SECRET || '').trim()
     const provided = String(req.headers.get('x-internal-secret') || '').trim()
     const hasInternal = Boolean(internalSecret && provided && provided === internalSecret)

@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
+import { parseJsonBody } from '@/utils/zod'
 
 const parseTrainingNumberOrZero = (v: any) => {
   const n = typeof v === 'number' ? v : Number(String(v || '').replace(',', '.'))
@@ -86,6 +88,13 @@ const computeWorkoutStreak = (dateRows: any[]) => {
   return streak
 }
 
+const BodySchema = z
+  .object({
+    session: z.unknown(),
+    idempotencyKey: z.string().optional(),
+  })
+  .passthrough()
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -95,8 +104,10 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await request.json()
-    const session = body?.session
+    const parsedBody = await parseJsonBody(request, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
+    const session = (body as any)?.session
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
     const idempotencyKey = String(body?.idempotencyKey || session?.idempotencyKey || session?.finishIdempotencyKey || '').trim()
     const reqId =

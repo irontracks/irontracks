@@ -1,7 +1,22 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    message: z.string().min(1),
+    stack: z.string().optional(),
+    pathname: z.string().optional(),
+    url: z.string().optional(),
+    userAgent: z.string().optional(),
+    appVersion: z.string().optional(),
+    source: z.string().optional(),
+    meta: z.record(z.unknown()).optional(),
+  })
+  .passthrough()
 
 const trimLen = (v: any, max: number) => {
   const s = String(v ?? '')
@@ -18,7 +33,9 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await request.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(request, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const message = trimLen(body?.message, 1200)
     if (!message) return NextResponse.json({ ok: false, error: 'missing message' }, { status: 400 })
 
@@ -54,4 +71,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

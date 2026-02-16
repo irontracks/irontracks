@@ -1,12 +1,26 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
+const BodySchema = z
+  .object({
+    email: z.string().min(1),
+    phone: z.string().optional().nullable(),
+    full_name: z.string().min(1),
+    birth_date: z.string().optional().nullable(),
+    role_requested: z.string().optional().nullable(),
+    cref: z.string().optional().nullable(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { email, phone, full_name, birth_date, role_requested, cref } = body
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { email, phone, full_name, birth_date, role_requested, cref } = parsedBody.data!
 
     // 1. Validation
     if (!email || !full_name) {

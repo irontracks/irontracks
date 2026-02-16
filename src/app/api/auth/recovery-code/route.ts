@@ -1,23 +1,24 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function isValidEmail(email: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-}
+const BodySchema = z
+  .object({
+    email: z.preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.string().email()),
+    code: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().min(1)),
+    password: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().min(6)),
+  })
+  .passthrough()
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => ({}))
-    const email = String(body?.email || '').trim().toLowerCase()
-    const code = String(body?.code || '').trim()
-    const password = String(body?.password || '').trim()
-
-    if (!email || !isValidEmail(email) || !code || password.length < 6) {
-      return NextResponse.json({ ok: false, error: 'Dados inválidos.' }, { status: 400 })
-    }
+    const parsedBody = await parseJsonBody(request, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { email, code, password } = parsedBody.data!
 
     const admin = createAdminClient()
 
@@ -50,4 +51,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e?.message || 'Erro interno.' }, { status: 500 })
   }
 }
-

@@ -1,32 +1,35 @@
-const safeArray = (v) => (Array.isArray(v) ? v : [])
+const safeArray = (v: unknown): unknown[] => (Array.isArray(v) ? (v as unknown[]) : [])
+const safeArrayTyped = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
-export const buildExerciseSortKey = (exercise, index) => {
-  const rawId = exercise?.id ?? exercise?.exercise_id ?? exercise?.exerciseId
+export const buildExerciseSortKey = (exercise: unknown, index: number): string => {
+  const ex = exercise && typeof exercise === 'object' ? (exercise as Record<string, unknown>) : ({} as Record<string, unknown>)
+  const rawId = ex?.id ?? ex?.exercise_id ?? ex?.exerciseId
   const id = String(rawId ?? '').trim()
   if (id) return `id:${id}`
-  const name = String(exercise?.name ?? '').trim()
+  const name = String(ex?.name ?? '').trim()
   return `idx:${index}:${name}`
 }
 
-export const buildExerciseDraft = (exercises) =>
-  safeArray(exercises).map((exercise, index) => ({
-    key: buildExerciseSortKey(exercise, index),
-    exercise,
-  }))
+export const buildExerciseDraft = (exercises: unknown): Array<{ key: string; exercise: unknown }> =>
+  safeArray(exercises).map((exercise, index) => ({ key: buildExerciseSortKey(exercise, index), exercise }))
 
-export const draftOrderKeys = (draft) =>
+export const draftOrderKeys = (draft: unknown): string[] =>
   safeArray(draft)
-    .map((item) => String(item?.key ?? '').trim())
+    .map((item) => {
+      const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : ({} as Record<string, unknown>)
+      return String(obj?.key ?? '').trim()
+    })
     .filter(Boolean)
 
-export const applyExerciseOrder = (exercises, draft) => {
+export const applyExerciseOrder = (exercises: unknown, draft: unknown): unknown[] => {
   const list = safeArray(exercises)
-  const ordered: any[] = [];
-  const used = new Set()
-  const byKey = new Map(list.map((exercise, index) => [buildExerciseSortKey(exercise, index), exercise]))
+  const ordered: unknown[] = []
+  const used = new Set<string>()
+  const byKey = new Map<string, unknown>(list.map((exercise, index) => [buildExerciseSortKey(exercise, index), exercise]))
 
   for (const item of safeArray(draft)) {
-    const key = String(item?.key ?? '').trim()
+    const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : ({} as Record<string, unknown>)
+    const key = String(obj?.key ?? '').trim()
     if (!key || used.has(key)) continue
     const exercise = byKey.get(key)
     if (!exercise) continue
@@ -44,8 +47,8 @@ export const applyExerciseOrder = (exercises, draft) => {
   return ordered
 }
 
-export const moveDraftItem = (draft, fromIndex, toIndex) => {
-  const list = safeArray(draft)
+export const moveDraftItem = <T,>(draft: T[], fromIndex: unknown, toIndex: unknown): T[] => {
+  const list = safeArrayTyped<T>(draft)
   const from = Number(fromIndex)
   const to = Number(toIndex)
   if (!Number.isFinite(from) || !Number.isFinite(to)) return list

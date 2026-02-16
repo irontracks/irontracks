@@ -1,5 +1,6 @@
 "use client";
 
+import type { SocialNotificationType } from '@/types/social'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -7,16 +8,50 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge';
 import NotificationToast from '@/components/NotificationToast';
 
-const InAppNotificationsContext = createContext({
-  notify: (_payload) => {},
-  clear: () => {},
-});
+interface ToastPayload {
+  id?: string
+  text?: string
+  message?: string
+  senderName?: string
+  title?: string
+  displayName?: string
+  type?: SocialNotificationType | string
+  link?: string
+  photoURL?: string
+}
+
+interface NormalizedToast {
+  id?: string
+  text: string
+  senderName: string
+  displayName: string
+  type: SocialNotificationType | string
+  link?: string
+  photoURL: string | null
+}
+
+interface InAppNotificationsContextValue {
+  notify: (payload: ToastPayload) => void
+  clear: () => void
+}
+
+interface InAppNotificationsProviderProps {
+  children: React.ReactNode
+  userId?: string
+  settings?: Record<string, unknown>
+  durationMs?: number
+  disableRealtime?: boolean
+  onOpenMessages?: () => void
+  onOpenNotifications?: () => void
+}
+
+const InAppNotificationsContext = createContext<InAppNotificationsContextValue>({ notify: () => {}, clear: () => {} });
 
 export function useInAppNotifications() {
   return useContext(InAppNotificationsContext);
 }
 
-const normalizeToast = (raw) => {
+const normalizeToast = (raw: ToastPayload): NormalizedToast | null => {
   const n = raw && typeof raw === 'object' ? raw : null;
   if (!n) return null;
   const text = String(n.text ?? n.message ?? '').trim();
@@ -38,7 +73,7 @@ const normalizeToast = (raw) => {
   };
 };
 
-export function InAppNotificationsProvider(props) {
+export function InAppNotificationsProvider(props: InAppNotificationsProviderProps) {
   const router = useRouter();
   const supabase = useMemo(() => {
     try {
@@ -72,12 +107,12 @@ export function InAppNotificationsProvider(props) {
   const settingsApi = useUserSettings(resolvedUserId);
   const settings = (props?.settings && typeof props.settings === 'object' ? props.settings : null) || settingsApi?.settings || null;
 
-  const [toast, setToast] = useState<any>(null);
+  const [toast, setToast] = useState<NormalizedToast | null>(null);
   const lastKeyRef = useRef({ key: '', at: 0 });
 
   const clear = useCallback(() => setToast(null), []);
 
-  const notify = useCallback((payload) => {
+  const notify = useCallback((payload: ToastPayload) => {
     const normalized = normalizeToast(payload);
     if (!normalized) return;
     const key = normalized.id ? `id:${normalized.id}` : `t:${normalized.type}|m:${normalized.text}`;

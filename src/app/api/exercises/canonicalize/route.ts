@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 import { requireUser } from '@/utils/auth/route'
@@ -7,6 +9,14 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    mode: z.string().optional(),
+    names: z.unknown().optional(),
+    name: z.unknown().optional(),
+  })
+  .passthrough()
 
 const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -112,7 +122,9 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response
 
   try {
-    const body: any = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const mode = String(body?.mode || '').trim().toLowerCase()
     const asyncPrefetch = mode === 'prefetch' || mode === 'async'
     const raw = body?.names ?? body?.name ?? []

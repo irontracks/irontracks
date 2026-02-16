@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    walletId: z.string().optional(),
+    asaas_wallet_id: z.string().optional(),
+  })
+  .passthrough()
 
 const isMissingColumn = (err: any, column: string) => {
   const msg = String(err?.message || '').toLowerCase()
@@ -88,7 +97,9 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
-    const body = await req.json().catch(() => ({} as any))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const walletId = String(body?.asaas_wallet_id || body?.walletId || '').trim()
     if (!walletId) return NextResponse.json({ ok: false, error: 'missing_wallet_id' }, { status: 400 })
 

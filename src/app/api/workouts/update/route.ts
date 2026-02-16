@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 
 const safeString = (v: any) => String(v ?? '').trim()
+
+const ZodBodySchema = z
+  .object({
+    workout: z.unknown().optional(),
+    id: z.union([z.string(), z.number()]).optional(),
+    workoutId: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough()
 
 const buildExercisesPayload = (workout: any) => {
   const w = workout && typeof workout === 'object' ? workout : {}
@@ -42,7 +52,9 @@ const buildExercisesPayload = (workout: any) => {
 
 export async function PATCH(request: Request) {
   try {
-    const payload = await request.json().catch(() => null)
+    const parsedBody = await parseJsonBody(request, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const payload: any = parsedBody.data!
     const workout = payload?.workout && typeof payload.workout === 'object' ? payload.workout : payload
     const workoutId = safeString(payload?.id ?? payload?.workoutId ?? workout?.id ?? workout?.workout_id)
     if (!workoutId) return NextResponse.json({ ok: false, error: 'missing id' }, { status: 400 })

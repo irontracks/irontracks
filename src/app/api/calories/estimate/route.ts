@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+
+const ZodBodySchema = z
+  .object({
+    session: z.unknown(),
+    workoutId: z.string().optional(),
+  })
+  .passthrough()
 
 const safeString = (v: any) => {
   try {
@@ -110,8 +119,10 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
     if (!user?.id) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await request.json().catch(() => null)
-    const session = body?.session
+    const parsedBody = await parseJsonBody(request, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
+    const session: any = body?.session
     const workoutId = typeof body?.workoutId === 'string' ? body.workoutId : null
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
 
@@ -217,4 +228,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    submission_id: z.string().optional(),
+    id: z.string().optional(),
+  })
+  .passthrough()
 
 const isEnabled = () => String(process.env.ENABLE_EXECUTION_VIDEO || '').trim().toLowerCase() === 'true'
 
@@ -14,7 +23,9 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response
 
   try {
-    const body: any = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const submissionId = String(body?.submission_id || body?.id || '').trim()
     if (!submissionId) return jsonError(400, 'submission_id_required')
 
@@ -57,4 +68,3 @@ export async function POST(req: Request) {
     return jsonError(500, e?.message ?? String(e))
   }
 }
-

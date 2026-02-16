@@ -1,11 +1,22 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    workoutId: z.string().optional(),
+    workout_id: z.string().optional(),
+    id: z.string().optional(),
+    session: z.unknown().optional(),
+  })
+  .passthrough()
 
 const POST_WORKOUT_MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -174,9 +185,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
     const workoutId = String(body?.workoutId || body?.workout_id || body?.id || '').trim()
-    const sessionFromBody = body?.session && typeof body.session === 'object' ? body.session : null
+    const sessionFromBody: any = body?.session && typeof body.session === 'object' ? body.session : null
     const resolvedId = workoutId || (sessionFromBody?.id ? String(sessionFromBody.id) : '')
     if (!resolvedId) return NextResponse.json({ ok: false, error: 'workoutId required' }, { status: 400 })
 

@@ -1,7 +1,8 @@
 import { createClient } from '@/utils/supabase/client';
+import type { ActionResult } from '@/types/actions'
 
 // Função para obter ou criar canal direto entre dois usuários
-export async function getOrCreateDirectChannel(userId1, userId2) {
+export async function getOrCreateDirectChannel(userId1: string, userId2: string): Promise<string> {
     const supabase = createClient();
     
     try {
@@ -21,7 +22,7 @@ export async function getOrCreateDirectChannel(userId1, userId2) {
 }
 
 // Função para buscar conversas do usuário
-export async function getUserConversations(userId) {
+export async function getUserConversations(userId: string): Promise<ActionResult<unknown[]>> {
     const supabase = createClient();
     
     try {
@@ -29,15 +30,19 @@ export async function getUserConversations(userId) {
             .rpc('get_user_conversations', { user_id: userId });
 
         if (error) throw error;
-        return data || [];
+        return { ok: true, data: (data || []) as unknown[] };
     } catch (error) {
         console.error('Erro ao buscar conversas:', error);
-        throw error;
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
 
 // Função para enviar mensagem
-export async function sendDirectMessage(channelId, senderId, content) {
+export async function sendDirectMessage(
+    channelId: string,
+    senderId: string,
+    content: string,
+): Promise<ActionResult<{ id: string }>> {
     const supabase = createClient();
     
     try {
@@ -62,15 +67,16 @@ export async function sendDirectMessage(channelId, senderId, content) {
 
         if (channelError) throw channelError;
 
-        return message;
+        return { ok: true, data: { id: String(message?.id) } };
     } catch (error) {
         console.error('Erro ao enviar mensagem:', error);
-        throw error;
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
 
 // Função para buscar mensagens de um canal
-export async function getDirectMessages(channelId, limit = 50, beforeId = null) {
+export async function getDirectMessages(channelId: string, limit?: number): Promise<ActionResult<unknown[]>>
+export async function getDirectMessages(channelId: string, limit = 50, beforeId: string | null = null): Promise<ActionResult<unknown[]>> {
     const supabase = createClient();
     
     try {
@@ -91,15 +97,15 @@ export async function getDirectMessages(channelId, limit = 50, beforeId = null) 
         const { data, error } = await query;
 
         if (error) throw error;
-        return data || [];
+        return { ok: true, data: (data || []) as unknown[] };
     } catch (error) {
         console.error('Erro ao buscar mensagens:', error);
-        throw error;
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
 }
 
 // Função para marcar mensagens como lidas
-export async function markMessagesAsRead(channelId, userId) {
+export async function markMessagesAsRead(channelId: string, userId: string): Promise<ActionResult> {
     const supabase = createClient();
     
     try {
@@ -111,9 +117,9 @@ export async function markMessagesAsRead(channelId, userId) {
             .eq('is_read', false);
 
         if (error) throw error;
-        return true;
+        return { ok: true, data: undefined };
     } catch (error) {
         console.error('Erro ao marcar mensagens como lidas:', error);
-        return false;
+        return { ok: false, error: error instanceof Error ? error.message : String(error) };
     }
 }

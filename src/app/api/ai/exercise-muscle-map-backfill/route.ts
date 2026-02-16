@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -8,6 +10,13 @@ import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    days: z.coerce.number().optional(),
+    maxAi: z.coerce.number().optional(),
+  })
+  .passthrough()
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -139,7 +148,9 @@ export async function POST(req: Request) {
     const userId = String(auth.user.id || '').trim()
     const admin = createAdminClient()
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const daysRaw = Number(body?.days ?? 365)
     const days = Number.isFinite(daysRaw) ? Math.min(3650, Math.max(7, Math.floor(daysRaw))) : 365
     const maxAiRaw = Number(body?.maxAi ?? 240)
@@ -268,4 +279,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

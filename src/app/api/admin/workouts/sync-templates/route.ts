@@ -1,9 +1,21 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    id: z.string().optional(),
+    email: z.string().optional(),
+    names: z.array(z.string()).optional(),
+    mode: z.string().optional(),
+    template_ids: z.array(z.string()).optional(),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
@@ -14,7 +26,9 @@ export async function POST(req: Request) {
     }
 
     const admin = createAdminClient()
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const id = body?.id as string | undefined
     const email = body?.email as string | undefined
 

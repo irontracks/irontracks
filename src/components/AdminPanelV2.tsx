@@ -2778,7 +2778,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                             await alert('Esse treino pertence a um aluno. Para não apagar o treino dele, a exclusão aqui é bloqueada.');
                                                             return;
                                                         }
-                                                        const res = await deleteWorkout(t.id);
+                                                        const res = await deleteWorkout(String(t.id || ''));
                                                         if (!res?.ok) {
                                                             await alert('Erro ao excluir: ' + (String(res?.error || '') || 'Falha ao excluir treino'));
                                                             return;
@@ -5441,7 +5441,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                     initialData={editingTemplate}
                                     onSave={async (data: UnknownRecord) => {
                                         try {
-                                            const res = await updateWorkout(editingTemplate.id, data);
+                                            const res = await updateWorkout(String(editingTemplate.id || ''), data);
                                             const sync = (res as UnknownRecord)?.sync || null;
                                             const { data: refreshed } = await supabase
                                                 .from('workouts')
@@ -5506,7 +5506,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                             const targetUserId = selectedStudent?.user_id ? String(selectedStudent.user_id) : '';
                                             if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
                                             if (editingStudentWorkout.id) {
-                                                await updateWorkout(editingStudentWorkout.id, data);
+                                                await updateWorkout(String(editingStudentWorkout.id || ''), data);
                                             } else {
                                             const { data: nw } = await supabase
                                                 .from('workouts')

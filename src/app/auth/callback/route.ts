@@ -80,7 +80,15 @@ export async function GET(request: Request) {
   const safeNext = rawNext.startsWith('/') ? rawNext : fallbackNext.startsWith('/') ? fallbackNext : '/dashboard'
   const redirectUrl = new URL(safeNext, safeOrigin)
 
-  let response = NextResponse.redirect(redirectUrl)
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta http-equiv="cache-control" content="no-store"/><title>Entrando…</title></head><body style="margin:0;background:#0a0a0a;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px"><div style="max-width:420px;width:100%"><div style="font-weight:900;font-size:18px;margin-bottom:8px">Entrando…</div><div style="opacity:.8;font-size:13px;line-height:1.4;margin-bottom:16px">Finalizando autenticação e abrindo o app.</div><a href="${safeNext}" style="display:block;text-decoration:none;background:#facc15;color:#000;font-weight:900;padding:12px 14px;border-radius:12px;text-align:center">Continuar</a></div><script>try{window.location.replace(${JSON.stringify(safeNext)})}catch(e){try{window.location.href=${JSON.stringify(safeNext)}}catch(_){}}</script></body></html>`
+
+  let response = new NextResponse(html, {
+    status: 200,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store, max-age=0',
+    },
+  })
   try {
     response.cookies.set(nextCookieName, '', { path: '/', maxAge: 0 })
   } catch {}
@@ -142,4 +150,3 @@ export async function GET(request: Request) {
 
   return response
 }
-

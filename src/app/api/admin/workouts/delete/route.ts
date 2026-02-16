@@ -1,7 +1,15 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { deleteTemplateFromSubscribers } from '@/lib/workoutSync'
+
+const ZodBodySchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
@@ -14,8 +22,10 @@ export async function POST(req: Request) {
     const role = auth.role
     const requesterId = auth.user.id
 
-    const body = await req.json()
-    const { id } = body || {}
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
+    const id = String(body?.id || '').trim()
     if (!id) return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
 
     const { data: w, error: wErr } = await admin

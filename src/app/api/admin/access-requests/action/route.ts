@@ -1,8 +1,17 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    requestId: z.string().min(1),
+    action: z.enum(['accept', 'reject']),
+  })
+  .passthrough()
 
 const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlreadyCreated: boolean) => {
   const apiKey = String(process.env.RESEND_API_KEY || '').trim()
@@ -45,10 +54,13 @@ export async function POST(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const body = await req.json()
-    const { requestId, action } = body
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
+    const requestId = String(body?.requestId || '').trim()
+    const action = String(body?.action || '').trim()
 
-    if (!requestId || !['accept', 'reject'].includes(action)) {
+    if (!requestId || (action !== 'accept' && action !== 'reject')) {
       return NextResponse.json({ ok: false, error: 'Dados inválidos.' }, { status: 400 })
     }
 

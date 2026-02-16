@@ -6,23 +6,112 @@ import { playStartSound } from '@/lib/sounds';
 import { useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 
-const TeamWorkoutContext = createContext<any>(null);
+interface TeamParticipant {
+    id?: string
+    user_id?: string
+    display_name?: string
+    photo_url?: string | null
+    status?: string
+}
+
+interface TeamSession {
+    id: string
+    isHost: boolean
+    participants: TeamParticipant[]
+    code?: string
+    hostName?: string
+}
+
+interface IncomingInvite {
+    id: string
+    from_uid: string
+    workout_data?: Record<string, unknown> | null
+    team_session_id?: string | null
+    status: 'pending' | 'accepted' | 'rejected'
+    created_at: string
+    createdAt?: string | number
+    invite_id?: string
+    from_display_name?: string
+    fromName?: string
+    profiles?: {
+        display_name: string | null
+        photo_url: string | null
+    } | null
+    from?: {
+        displayName?: string
+        photoURL?: string | null
+        uid?: string
+        display_name?: string | null
+        photo_url?: string | null
+    }
+    workout?: Record<string, unknown> | null
+}
+
+interface AcceptedInviteNotice {
+    inviteId: string
+    fromName: string
+    fromPhoto: string | null
+    teamSessionId?: string | null
+    user?: { displayName: string; photoURL: string | null; uid: string | null }
+}
+
+type PresenceStatus = 'online' | 'away' | 'offline'
+
+interface JoinResult {
+    ok: boolean
+    teamSessionId?: string
+    participants?: TeamParticipant[]
+    workout?: Record<string, unknown> | null
+    error?: string
+}
+
+interface ActionOkResult {
+    ok: boolean
+    error?: string
+}
+
+interface TeamWorkoutContextValue {
+    incomingInvites: IncomingInvite[]
+    acceptedInviteNotice: AcceptedInviteNotice | null
+    teamSession: TeamSession | null
+    loading: boolean
+    presence: Record<string, { status: PresenceStatus; last_seen?: string }>
+    presenceStatus: PresenceStatus
+    setPresenceStatus: (status: PresenceStatus) => void
+    joinByCode: (code: string) => Promise<JoinResult>
+    leaveSession: () => Promise<void>
+    sendInvite: (targetUser: unknown, workoutData: Record<string, unknown>, teamSessionId?: string | null) => Promise<unknown>
+    acceptInvite: (invite: IncomingInvite, onStartSession?: (workout: Record<string, unknown>) => void) => Promise<unknown>
+    rejectInvite: (inviteId: string) => Promise<void>
+    createJoinCode: (workout: Record<string, unknown>, ttlMinutes?: number) => Promise<unknown>
+    dismissAcceptedInvite: () => void
+    refetchInvites: () => Promise<void>
+}
+
+interface TeamWorkoutProviderProps {
+    children: React.ReactNode
+    user: { id: string; email?: string | null } | null
+    settings?: Record<string, unknown> | null
+    onStartSession?: (workout: Record<string, unknown>) => void
+}
+
+const TeamWorkoutContext = createContext<TeamWorkoutContextValue | null>(null);
 
 export const useTeamWorkout = () => {
-    const context = useContext(TeamWorkoutContext) as any;
-    if (context === undefined) {
+    const context = useContext(TeamWorkoutContext);
+    if (!context) {
         throw new Error('useTeamWorkout must be used within a TeamWorkoutProvider');
     }
     return context;
 };
 
-export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }: any) => {
-    const [incomingInvites, setIncomingInvites] = useState<any[]>([]);
-    const [acceptedInviteNotice, setAcceptedInviteNotice] = useState<any>(null);
-    const [teamSession, setTeamSession] = useState<any>(null);
+export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }: TeamWorkoutProviderProps) => {
+    const [incomingInvites, setIncomingInvites] = useState<IncomingInvite[]>([]);
+    const [acceptedInviteNotice, setAcceptedInviteNotice] = useState<AcceptedInviteNotice | null>(null);
+    const [teamSession, setTeamSession] = useState<TeamSession | null>(null);
     const [loading, setLoading] = useState(false);
-    const [presence, setPresence] = useState<any>({});
-    const [presenceStatus, setPresenceStatus] = useState('online');
+    const [presence, setPresence] = useState<Record<string, { status: PresenceStatus }>>({});
+    const [presenceStatus, setPresenceStatus] = useState<PresenceStatus>('online');
     const supabase = useMemo(() => createClient(), []);
     const seenAcceptedInviteIdsRef = useRef(new Set());
     const { notify } = useInAppNotifications();
@@ -46,7 +135,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         return { enabled, volume };
     }, [settings]);
 
-    const joinByCode = useCallback(async (code) => {
+    const joinByCode = useCallback(async (code: string): Promise<JoinResult> => {
         try {
             if (!teamworkV2Enabled) return { ok: false, error: 'disabled' };
             const safe = String(code || '').trim();
@@ -57,8 +146,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             const sessionId = payload?.team_session_id ? String(payload.team_session_id) : '';
             if (!sessionId) throw new Error('Sessão inválida');
             const parts = Array.isArray(payload?.participants) ? payload.participants : [];
-            setTeamSession({ id: sessionId, isHost: false, participants: parts });
-            return { ok: true, teamSessionId: sessionId, participants: parts, workout: payload?.workout ?? null };
+            setTeamSession({ id: sessionId, isHost: false, participants: parts as unknown as TeamParticipant[] });
+            return { ok: true, teamSessionId: sessionId, participants: parts as unknown as TeamParticipant[], workout: (payload?.workout ?? null) as unknown as Record<string, unknown> | null };
         } catch (e) {
             return { ok: false, error: e?.message || String(e || '') };
         }
@@ -85,6 +174,11 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     .map(inv => ({
                         id: inv.id,
                         created_at: inv.created_at,
+                        from_uid: inv.from_uid,
+                        team_session_id: inv.team_session_id ?? null,
+                        status: inv.status,
+                        workout_data: inv.workout_data ?? null,
+                        profiles: inv.profiles ?? null,
                         from: {
                             displayName: inv.profiles?.display_name || 'Unknown',
                             photoURL: inv.profiles?.photo_url,
@@ -92,7 +186,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                         },
                         workout: inv.workout_data
                     }));
-                setIncomingInvites(mapped);
+                setIncomingInvites(mapped as unknown as IncomingInvite[]);
             } catch {
                 return;
             }
@@ -140,6 +234,11 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                             return [{
                                 id: newInvite.id,
                                 created_at: newInvite.created_at,
+                                from_uid: String(newInvite.from_uid),
+                                team_session_id: newInvite.team_session_id ? String(newInvite.team_session_id) : null,
+                                status: 'pending',
+                                workout_data: (newInvite.workout_data ?? null) as unknown as Record<string, unknown> | null,
+                                profiles: profile && typeof profile === 'object' ? { display_name: profile.display_name ?? null, photo_url: profile.photo_url ?? null } : null,
                                 from: {
                                     displayName: profile?.display_name || 'Unknown',
                                     photoURL: profile?.photo_url,
@@ -221,6 +320,11 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     .map(inv => ({
                         id: inv.id,
                         created_at: inv.created_at,
+                        from_uid: inv.from_uid,
+                        team_session_id: inv.team_session_id ?? null,
+                        status: inv.status,
+                        workout_data: inv.workout_data ?? null,
+                        profiles: inv.profiles ?? null,
                         from: {
                             displayName: inv.profiles?.display_name || 'Unknown',
                             photoURL: inv.profiles?.photo_url,
@@ -228,7 +332,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                         },
                         workout: inv.workout_data
                     }));
-                setIncomingInvites(mapped);
+                setIncomingInvites(mapped as unknown as IncomingInvite[]);
             } catch {
                 return;
             }
@@ -326,12 +430,12 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
 
                         const nextParticipants = Array.isArray(updated.participants) ? updated.participants : [];
                         setTeamSession(prev => {
-                            const base = prev && typeof prev === 'object' ? prev : {};
-                            const nextId = base.id ?? teamSession?.id ?? updated.id ?? null;
+                            const base = prev && typeof prev === 'object' ? prev : null;
+                            const nextId = base?.id ?? teamSession?.id ?? updated.id ?? null;
                             return {
-                                ...base,
+                                ...(base as unknown as TeamSession),
                                 id: nextId,
-                                participants: nextParticipants
+                                participants: nextParticipants as unknown as TeamParticipant[]
                             };
                         });
                     } catch {
@@ -361,13 +465,13 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     .eq('session_id', teamSession.id);
                 if (cancelled) return;
                 const rows = Array.isArray(data) ? data : [];
-                const next: any = {};
+                const next: Record<string, { status: PresenceStatus; last_seen?: string }> = {};
                 for (const r of rows) {
                     const uid = String(r?.user_id || '').trim();
                     if (!uid) continue;
-                    next[uid] = { status: String(r?.status || 'online'), updatedAt: r?.updated_at ? String(r.updated_at) : '' };
+                    next[uid] = { status: String(r?.status || 'online') as PresenceStatus, last_seen: r?.updated_at ? String(r.updated_at) : undefined };
                 }
-                setPresence(next);
+                setPresence(next as unknown as Record<string, { status: PresenceStatus }>);
             } catch {
             }
         };
@@ -381,10 +485,11 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     .on(
                         'postgres_changes',
                         { event: '*', schema: 'public', table: 'team_session_presence', filter: `session_id=eq.${teamSession.id}` },
-                        (payload: any) => {
+                        (payload: unknown) => {
                             try {
-                                const ev = String(payload?.eventType || '').toUpperCase();
-                                const row = ev === 'DELETE' ? payload?.old : payload?.new;
+                                const p = payload as any
+                                const ev = String(p?.eventType || '').toUpperCase();
+                                const row = ev === 'DELETE' ? p?.old : p?.new;
                                 const uid = String(row?.user_id || '').trim();
                                 if (!uid) return;
                                 setPresence((prev) => {
@@ -393,7 +498,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                                         delete base[uid];
                                         return base;
                                     }
-                                    base[uid] = { status: String(row?.status || 'online'), updatedAt: row?.updated_at ? String(row.updated_at) : '' };
+                                    base[uid] = { status: String(row?.status || 'online') as PresenceStatus };
                                     return base;
                                 });
                             } catch {
@@ -476,7 +581,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         let mounted = true;
         let channel = null;
 
-        const showAccepted = async (inviteRow) => {
+        const showAccepted = async (inviteRow: any) => {
             try {
                 if (!mounted) return;
                 const id = inviteRow?.id ? String(inviteRow.id) : '';
@@ -498,14 +603,17 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 }
 
                 if (!mounted) return;
+                const fromName = String(profile?.display_name || 'Seu parceiro').trim() || 'Seu parceiro';
                 setAcceptedInviteNotice({
                     inviteId: id,
+                    fromName,
+                    fromPhoto: profile?.photo_url || null,
                     teamSessionId: teamSessionId || null,
                     user: {
-                        displayName: profile?.display_name || 'Seu parceiro',
+                        displayName: fromName,
                         photoURL: profile?.photo_url || null,
                         uid: toUid || null,
-                    }
+                    },
                 });
                 try { playStartSound(soundOpts); } catch {}
             } catch {
@@ -586,13 +694,14 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         };
     }, [supabase, user?.id, teamSession?.id, soundOpts]);
 
-    const sendInvite = async (targetUser, workout, currentTeamSessionId = null) => {
+    const sendInvite = async (targetUser: any, workout: any, currentTeamSessionId: string | null = null) => {
         try {
             if (!user?.id) throw new Error('Usuário inválido');
             const targetUserId = targetUser?.id ? String(targetUser.id) : '';
             if (!targetUserId) throw new Error('Aluno inválido');
 
             let sessionId = currentTeamSessionId;
+            const u = user as unknown as { displayName?: string; photoURL?: string | null };
 
             if (!sessionId) {
                 const { data: session, error } = await supabase
@@ -600,7 +709,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     .insert({
                         host_uid: user.id,
                         status: 'active',
-                        participants: [{ uid: user.id, name: user.displayName, photo: user.photoURL }]
+                        participants: [{ uid: user.id, name: u.displayName, photo: u.photoURL }]
                     })
                     .select()
                     .single();
@@ -612,8 +721,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 setTeamSession({
                     id: sessionId,
                     isHost: true,
-                    hostName: user.displayName,
-                    participants: Array.isArray(session?.participants) ? session.participants : []
+                    hostName: u.displayName,
+                    participants: (Array.isArray(session?.participants) ? session.participants : []) as unknown as TeamParticipant[]
                 });
 
                 if (teamworkV2Enabled) {
@@ -660,13 +769,14 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
 
             let sessionId = teamSession?.id ? String(teamSession.id) : '';
             let participants = teamSession?.participants || [];
+            const u = user as unknown as { displayName?: string; photoURL?: string | null };
             if (!sessionId) {
                 const { data: session, error } = await supabase
                     .from('team_sessions')
                     .insert({
                         host_uid: user.id,
                         status: 'active',
-                        participants: [{ uid: user.id, name: user.displayName, photo: user.photoURL }],
+                        participants: [{ uid: user.id, name: u.displayName, photo: u.photoURL }],
                         workout_state: { workout_data: workout, join_code: code, join_expires_at: expiresAt }
                     })
                     .select()
@@ -675,7 +785,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 sessionId = session?.id ? String(session.id) : '';
                 participants = Array.isArray(session?.participants) ? session.participants : [];
                 if (!sessionId) throw new Error('Falha ao criar sessão');
-                setTeamSession({ id: sessionId, isHost: true, hostName: user.displayName, participants });
+                setTeamSession({ id: sessionId, isHost: true, hostName: u.displayName, participants: participants as unknown as TeamParticipant[] });
             } else {
                 const { data: existing } = await supabase
                     .from('team_sessions')
@@ -721,7 +831,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             setTeamSession({
                 id: teamSessionId,
                 isHost: false,
-                participants: newParticipants
+                participants: newParticipants as unknown as TeamParticipant[]
             });
 
             setIncomingInvites(prev => {
@@ -802,7 +912,9 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             setPresenceStatus,
             presence,
             dismissAcceptedInvite,
-            loading
+            loading,
+            presenceStatus,
+            refetchInvites,
         }}>
             {children}
         </TeamWorkoutContext.Provider>

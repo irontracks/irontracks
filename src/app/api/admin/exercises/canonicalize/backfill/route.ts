@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
@@ -7,6 +9,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    limit: z.coerce.number().optional(),
+  })
+  .passthrough()
 
 const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -67,7 +75,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const limitRaw = Number((body as any)?.limit)
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(60, Math.floor(limitRaw))) : 30
 

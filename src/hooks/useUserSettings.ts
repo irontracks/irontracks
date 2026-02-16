@@ -2,57 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { UserSettingsSchema, type UserSettings, DEFAULT_USER_SETTINGS } from '@/schemas/settings'
 
-export const DEFAULT_SETTINGS = {
-  units: 'kg',
-  dashboardDensity: 'comfortable',
-  uiMode: 'beginner',
-  moduleSocial: true,
-  moduleCommunity: true,
-  moduleMarketplace: true,
-  promptPreWorkoutCheckin: true,
-  promptPostWorkoutCheckin: true,
-  showStoriesBar: true,
-  showNewRecordsCard: true,
-  showIronRank: true,
-  showBadges: true,
-  whatsNewLastSeenId: '',
-  whatsNewLastSeenAt: 0,
-  whatsNewAutoOpen: true,
-  whatsNewRemind24h: true,
-  enableSounds: true,
-  allowTeamInvites: true,
-  allowSocialFollows: true,
-  allowDirectMessages: true,
-  notifyDirectMessages: true,
-  notifyAppointments: true,
-  notifySocialFollows: true,
-  notifyFriendOnline: true,
-  notifyFriendWorkoutEvents: true,
-  notifyFriendPRs: true,
-  notifyFriendStreaks: true,
-  notifyFriendGoals: true,
-  soundVolume: 100,
-  inAppToasts: true,
-  notificationPermissionPrompt: true,
-  restTimerNotify: true,
-  restTimerVibrate: true,
-  restTimerRepeatAlarm: true,
-  restTimerRepeatIntervalMs: 1500,
-  restTimerTickCountdown: true,
-  restTimerDefaultSeconds: 90,
-  autoRestTimerWhenMissing: false,
-  programTitleStartDay: 'monday',
-  featuresKillSwitch: false,
-  featureTeamworkV2: false,
-  featureStoriesV2: false,
-  featureOfflineSyncV2: false,
-}
+export const DEFAULT_SETTINGS = DEFAULT_USER_SETTINGS
 
 const STORAGE_KEY = 'irontracks.userSettings.v1'
 const TABLE_MISSING_KEY = 'irontracks.userSettings.user_settings_table_missing.v1'
+void UserSettingsSchema
 
-const safeJsonParse = (raw) => {
+const safeJsonParse = (raw: string): unknown => {
   try {
     return JSON.parse(raw)
   } catch {
@@ -60,7 +18,7 @@ const safeJsonParse = (raw) => {
   }
 }
 
-export function useUserSettings(userId) {
+export function useUserSettings(userId: string | null | undefined) {
   const supabase = useMemo(() => {
     try {
       return createClient()
@@ -69,11 +27,11 @@ export function useUserSettings(userId) {
     }
   }, [])
   const safeUserId = userId ? String(userId) : ''
-  const [loaded, setLoaded] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS)
-  const lastSavedRef = useRef<any>(null)
-  const tableMissingRef = useRef(false)
+  const [loaded, setLoaded] = useState<boolean>(false)
+  const [saving, setSaving] = useState<boolean>(false)
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_USER_SETTINGS)
+  const lastSavedRef = useRef<string | null>(null)
+  const tableMissingRef = useRef<boolean>(false)
 
   useEffect(() => {
     if (!safeUserId) return
@@ -90,7 +48,7 @@ export function useUserSettings(userId) {
         const cachedRaw = window.localStorage.getItem(`${STORAGE_KEY}.${safeUserId}`) || ''
         const cached = cachedRaw ? safeJsonParse(cachedRaw) : null
         if (cached && typeof cached === 'object') {
-          setSettings((prev) => ({ ...prev, ...cached }))
+          setSettings((prev) => ({ ...prev, ...(cached as unknown as Partial<UserSettings>) }))
         }
       }
     } catch {}
@@ -106,9 +64,10 @@ export function useUserSettings(userId) {
 
         if (cancelled) return
         if (error) {
-          const status = Number((error as any)?.status)
-          const code = error?.code ? String(error.code) : ''
-          const msg = error?.message ? String(error.message) : ''
+          const e = error as unknown as { status?: unknown; code?: unknown; message?: unknown }
+          const status = Number(e?.status)
+          const code = e?.code ? String(e.code) : ''
+          const msg = e?.message ? String(e.message) : ''
           const isMissing = status === 404 || code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg)
           if (isMissing) {
             tableMissingRef.current = true
@@ -122,7 +81,7 @@ export function useUserSettings(userId) {
 
         const prefs = data?.preferences && typeof data.preferences === 'object' ? data.preferences : null
         if (prefs) {
-          setSettings((prev) => ({ ...prev, ...prefs }))
+          setSettings((prev) => ({ ...prev, ...(prefs as unknown as Partial<UserSettings>) }))
         }
         lastSavedRef.current = data?.updated_at || null
       } catch {
@@ -136,12 +95,15 @@ export function useUserSettings(userId) {
     }
   }, [supabase, safeUserId])
 
-  const updateSetting = useCallback((key, value) => {
+  const updateSetting = useCallback(<K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
     if (!key) return
     setSettings((prev) => ({ ...prev, [key]: value }))
   }, [])
 
-  const save = useCallback(async (overrideSettings?: any) => {
+  const save = useCallback(
+    async (
+      overrideSettings?: Partial<UserSettings> | null | undefined,
+    ): Promise<{ ok: boolean; error?: string; localOnly?: boolean }> => {
     if (!safeUserId) return { ok: false, error: 'missing_user' }
     if (saving) return { ok: false, error: 'saving' }
     if (!supabase) return { ok: false, error: 'missing_supabase' }
@@ -172,9 +134,10 @@ export function useUserSettings(userId) {
         .upsert(payload, { onConflict: 'user_id' })
 
       if (error) {
-        const status = Number((error as any)?.status)
-        const code = error?.code ? String(error.code) : ''
-        const msg = error?.message ? String(error.message) : ''
+        const e = error as unknown as { status?: unknown; code?: unknown; message?: unknown }
+        const status = Number(e?.status)
+        const code = e?.code ? String(e.code) : ''
+        const msg = e?.message ? String(e.message) : ''
         const isMissing = status === 404 || code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg)
         if (isMissing) {
           tableMissingRef.current = true
@@ -203,11 +166,14 @@ export function useUserSettings(userId) {
 
       return { ok: true }
     } catch (e) {
-      return { ok: false, error: e?.message ?? String(e) }
+      const message = e instanceof Error ? e.message : String(e)
+      return { ok: false, error: message }
     } finally {
       setSaving(false)
     }
-  }, [safeUserId, saving, settings, supabase])
+  },
+    [safeUserId, saving, settings, supabase],
+  )
 
   return {
     loaded,

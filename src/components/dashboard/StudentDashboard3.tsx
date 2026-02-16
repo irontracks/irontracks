@@ -246,7 +246,7 @@ export default function StudentDashboard(props: Props) {
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Perfil incompleto</div>
             <div className="text-sm text-neutral-300 mt-1">Complete seu nome de exibição para personalizar sua conta.</div>
           </div>
-          <button onClick={props.onOpenCompleteProfile} className="shrink-0 bg-yellow-500 text-black font-black px-4 py-2 rounded-xl active:scale-95 transition-transform">
+          <button type="button" onClick={props.onOpenCompleteProfile} className="shrink-0 bg-yellow-500 text-black font-black px-4 py-2 rounded-xl active:scale-95 transition-transform">
             Terminar cadastro
           </button>
         </div>
@@ -259,6 +259,7 @@ export default function StudentDashboard(props: Props) {
           <div className="bg-neutral-900/70 backdrop-blur-md border border-neutral-800/70 rounded-2xl p-1 shadow-lg shadow-black/30">
             <div data-tour="tabs" className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 flex gap-1">
               <button
+                type="button"
                 onClick={() => props.onChangeView('dashboard')}
                 data-tour="tab-workouts"
                 className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${
@@ -268,6 +269,7 @@ export default function StudentDashboard(props: Props) {
                 Treinos
               </button>
               <button
+                type="button"
                 onClick={() => props.onChangeView('assessments')}
                 data-tour="tab-assessments"
                 className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${
@@ -278,6 +280,7 @@ export default function StudentDashboard(props: Props) {
               </button>
               {showCommunityTab ? (
                 <button
+                  type="button"
                   onClick={() => props.onChangeView('community')}
                   data-tour="tab-community"
                   className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${
@@ -289,6 +292,7 @@ export default function StudentDashboard(props: Props) {
               ) : null}
               {showVipTab ? (
                 <button
+                  type="button"
                   onClick={() => props.onChangeView('vip')}
                   data-tour="tab-vip"
                   className={`flex-1 min-h-[44px] px-2 sm:px-3 rounded-lg font-black text-[11px] sm:text-xs uppercase tracking-wide sm:tracking-wider whitespace-nowrap leading-none transition-colors ${

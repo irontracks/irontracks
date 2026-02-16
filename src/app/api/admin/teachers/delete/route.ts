@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { jsonError, requireRole, requireRoleWithBearer, resolveRoleByUser } from '@/utils/auth/route'
+import { parseJsonBody } from '@/utils/zod'
+
+const ZodBodySchema = z
+  .object({
+    id: z.string().min(1),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const id = String(body?.id || '').trim()
     if (!id) return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
 

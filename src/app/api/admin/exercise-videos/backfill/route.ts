@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server'
 
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { getVideoQueriesFromGemini, searchYouTubeCandidates } from '@/lib/videoSuggestions'
+
+const ZodBodySchema = z
+  .object({
+    limit: z.coerce.number().optional(),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +20,9 @@ export async function POST(req: Request) {
       auth = await requireRoleWithBearer(req, ['admin'])
       if (!auth.ok) return auth.response
     }
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const limitRaw = Number((body as any)?.limit)
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, Math.floor(limitRaw))) : 20
 
