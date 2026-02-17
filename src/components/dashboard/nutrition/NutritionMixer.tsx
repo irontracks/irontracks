@@ -18,6 +18,8 @@ type MealEntry = {
   fat: number
 }
 
+const PERCENT_SCALE = 100
+
 function safeNumber(value: any): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
@@ -53,25 +55,32 @@ function Meter({
   const safeGoal = Math.max(0, safeNumber(goal))
   const ratio = safeGoal > 0 ? safeValue / safeGoal : 0
   const pct = clamp01(ratio)
+  const pctValue = Math.round(pct * PERCENT_SCALE)
   const clipping = safeGoal > 0 && ratio > 1
-  const barClass = clipping ? 'bg-red-500/80' : 'bg-yellow-500/80'
+  const barClass = clipping ? 'bg-gradient-to-r from-red-500/70 to-red-400/90' : 'bg-gradient-to-r from-yellow-400/80 to-yellow-500/90'
 
   return (
-    <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 p-3">
+    <div className="rounded-2xl bg-neutral-950/40 border border-neutral-800/70 p-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] uppercase tracking-wide text-neutral-400">{label}</div>
-          <div className="mt-1 text-base font-semibold text-neutral-100">
+          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">{label}</div>
+          <div className="mt-1 text-lg font-semibold text-white">
             {Math.round(safeValue)}
             <span className="text-neutral-500">/{Math.round(safeGoal || 0)}{unit}</span>
           </div>
         </div>
-        <div className={clipping ? 'text-xs font-semibold text-red-300' : 'text-xs font-semibold text-neutral-300'}>
-          {Math.round(pct * 100)}%
+        <div
+          className={
+            clipping
+              ? 'text-[11px] font-semibold text-red-200 rounded-full px-2 py-1 bg-red-500/10 border border-red-500/20'
+              : 'text-[11px] font-semibold text-yellow-300 rounded-full px-2 py-1 bg-yellow-500/10 border border-yellow-500/20'
+          }
+        >
+          {pctValue}%
         </div>
       </div>
-      <div className="mt-3 h-1.5 rounded-full bg-neutral-800 overflow-hidden">
-        <div className={`h-full ${barClass}`} style={{ width: `${Math.round(pct * 100)}%` }} />
+      <div className="mt-3 h-2 rounded-full bg-neutral-900/70 border border-neutral-800/60 overflow-hidden">
+        <div className={`h-full ${barClass}`} style={{ width: `${pctValue}%` }} />
       </div>
     </div>
   )
@@ -133,6 +142,16 @@ export default function NutritionMixer({
   const [aiBusy, setAiBusy] = useState(false)
   const [aiUpgrade, setAiUpgrade] = useState(false)
   const [entriesLoading, setEntriesLoading] = useState(false)
+  const calorieRatio = safeGoals.calories > 0 ? safeNumber(totals?.calories) / safeGoals.calories : 0
+  const caloriePct = Math.round(clamp01(calorieRatio) * PERCENT_SCALE)
+  const calorieClipping = safeGoals.calories > 0 && calorieRatio > 1
+  const calorieBarClass = calorieClipping
+    ? 'bg-gradient-to-r from-red-500/70 to-red-400/90'
+    : 'bg-gradient-to-r from-yellow-400/80 to-yellow-500/90'
+  const calorieStatusLabel = calorieClipping ? 'Acima da meta' : 'Dentro da meta'
+  const calorieStatusClass = calorieClipping
+    ? 'text-red-200 bg-red-500/10 border-red-500/20'
+    : 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20'
 
   useEffect(() => {
     setTotals({
@@ -397,27 +416,35 @@ export default function NutritionMixer({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800/60 shadow-[0_12px_40px_rgba(0,0,0,0.35)] p-4">
+    <div className="space-y-5">
+      <div className="rounded-3xl bg-gradient-to-br from-neutral-900/90 via-neutral-900/70 to-neutral-950 border border-neutral-800/70 shadow-[0_20px_60px_rgba(0,0,0,0.45)] p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-wide text-neutral-400">Hoje</div>
-            <div className="mt-1 text-3xl font-semibold tracking-tight">
-              <span className={safeNumber(totals?.calories) > safeNumber(safeGoals?.calories) ? 'text-red-300' : 'text-white'}>
-                {Math.round(totals.calories)}
-              </span>
+            <div className="text-[10px] uppercase tracking-[0.24em] text-neutral-500">Resumo de hoje</div>
+            <div className="mt-2 text-4xl font-semibold tracking-tight">
+              <span className={calorieClipping ? 'text-red-200' : 'text-white'}>{Math.round(totals.calories)}</span>
               <span className="text-neutral-500"> kcal</span>
             </div>
             <div className="mt-1 text-sm text-neutral-400">
-              Meta: <span className="text-neutral-200 font-semibold">{Math.round(safeGoals.calories)} kcal</span>
+              Meta diária: <span className="text-neutral-200 font-semibold">{Math.round(safeGoals.calories)} kcal</span>
             </div>
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
-            {safeNumber(totals?.calories) > safeNumber(safeGoals?.calories) ? 'Acima da meta' : 'Dentro da meta'}
+          <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] border ${calorieStatusClass}`}>
+            {calorieStatusLabel}
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-[11px] text-neutral-400">
+            <span>Progresso da meta</span>
+            <span className="text-neutral-200 font-semibold">{caloriePct}%</span>
+          </div>
+          <div className="mt-2 h-2 rounded-full bg-neutral-950/60 border border-neutral-800/60 overflow-hidden">
+            <div className={`h-full ${calorieBarClass}`} style={{ width: `${caloriePct}%` }} />
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-3 gap-3">
           {canViewMacros ? (
             <>
               <Meter label="Proteína" unit="g" value={totals.protein} goal={safeGoals.protein} />
@@ -425,7 +452,7 @@ export default function NutritionMixer({
               <Meter label="Gordura" unit="g" value={totals.fat} goal={safeGoals.fat} />
             </>
           ) : (
-            <div className="col-span-3 rounded-2xl bg-neutral-900/50 border border-neutral-800/60 p-4">
+            <div className="col-span-3 rounded-2xl bg-neutral-950/40 border border-neutral-800/70 p-4">
               <div className="text-sm font-semibold text-white">Macros no plano Pro</div>
               <div className="mt-1 text-xs text-neutral-400">Ative para ver proteína, carbo e gordura detalhados.</div>
               {!hideVipCtas ? (
@@ -442,8 +469,9 @@ export default function NutritionMixer({
         </div>
       </div>
 
-      <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800/60 p-4">
-        <div className="text-sm font-semibold text-neutral-200">Adicionar refeição</div>
+      <div className="rounded-3xl bg-neutral-900/80 border border-neutral-800/70 shadow-[0_16px_45px_rgba(0,0,0,0.4)] p-5">
+        <div className="text-[10px] uppercase tracking-[0.22em] text-neutral-500">Adicionar refeição</div>
+        <div className="mt-2 text-sm font-semibold text-white">Descreva sua refeição</div>
         <div className="mt-1 text-xs text-neutral-400">Ex.: 150g frango + 100g arroz</div>
         <div className="mt-3">
           <textarea
@@ -459,7 +487,7 @@ export default function NutritionMixer({
             }}
             disabled={isPending || !!schemaMissing}
             rows={3}
-            className="w-full rounded-2xl bg-neutral-950 border border-neutral-800/60 px-4 py-3 text-sm font-semibold text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-yellow-500/30 resize-none"
+            className="w-full rounded-2xl bg-neutral-950/70 border border-neutral-800/70 px-4 py-3 text-sm font-semibold text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-yellow-500/40 resize-none"
             placeholder={schemaMissing ? 'Nutrição não configurada no banco.' : 'Digite sua refeição...'}
           />
         </div>
@@ -502,9 +530,9 @@ export default function NutritionMixer({
         ) : null}
       </div>
 
-      <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800/60 p-4">
+      <div className="rounded-3xl bg-neutral-900/80 border border-neutral-800/70 shadow-[0_16px_45px_rgba(0,0,0,0.4)] p-5">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-semibold text-neutral-200">Lançamentos</div>
+          <div className="text-[10px] uppercase tracking-[0.22em] text-neutral-500">Lançamentos</div>
           <div className="flex items-center gap-4">
             <button type="button" onClick={() => setEntriesTick((v) => v + 1)} className="text-xs text-yellow-400 hover:text-yellow-300 transition">
               Atualizar
@@ -516,13 +544,13 @@ export default function NutritionMixer({
         </div>
 
         {goalsOpen ? (
-          <div className="mt-3 rounded-2xl bg-neutral-950 border border-neutral-800/60 p-4">
+          <div className="mt-4 rounded-2xl bg-neutral-950/60 border border-neutral-800/70 p-4">
             <div className="grid grid-cols-2 gap-2">
               <input
                 value={String(goalsDraft.calories)}
                 onChange={(e) => setGoalsDraft((p) => ({ ...p, calories: safeNumber(e.target.value) }))}
                 inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                className="rounded-2xl bg-neutral-900/70 border border-neutral-800/70 px-3 py-3 text-neutral-100 font-semibold"
                 placeholder="Kcal"
                 aria-label="Meta de calorias"
               />
@@ -530,7 +558,7 @@ export default function NutritionMixer({
                 value={String(goalsDraft.protein)}
                 onChange={(e) => setGoalsDraft((p) => ({ ...p, protein: safeNumber(e.target.value) }))}
                 inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                className="rounded-2xl bg-neutral-900/70 border border-neutral-800/70 px-3 py-3 text-neutral-100 font-semibold"
                 placeholder="Proteína"
                 aria-label="Meta de proteína"
                 disabled={!canViewMacros}
@@ -539,7 +567,7 @@ export default function NutritionMixer({
                 value={String(goalsDraft.carbs)}
                 onChange={(e) => setGoalsDraft((p) => ({ ...p, carbs: safeNumber(e.target.value) }))}
                 inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                className="rounded-2xl bg-neutral-900/70 border border-neutral-800/70 px-3 py-3 text-neutral-100 font-semibold"
                 placeholder="Carbo"
                 aria-label="Meta de carboidratos"
                 disabled={!canViewMacros}
@@ -548,7 +576,7 @@ export default function NutritionMixer({
                 value={String(goalsDraft.fat)}
                 onChange={(e) => setGoalsDraft((p) => ({ ...p, fat: safeNumber(e.target.value) }))}
                 inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                className="rounded-2xl bg-neutral-900/70 border border-neutral-800/70 px-3 py-3 text-neutral-100 font-semibold"
                 placeholder="Gordura"
                 aria-label="Meta de gordura"
                 disabled={!canViewMacros}
@@ -557,7 +585,7 @@ export default function NutritionMixer({
             {goalsError ? <div className="mt-3 text-sm text-red-200">{goalsError}</div> : null}
             {!canViewMacros && !hideVipCtas ? <div className="mt-3 text-xs text-neutral-400">Macros liberado no VIP Pro.</div> : null}
             <div className="mt-3 flex items-center justify-end gap-2">
-              <button type="button" onClick={() => setGoalsOpen(false)} className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-4 py-2 text-xs font-semibold text-neutral-200 hover:bg-neutral-900 transition">
+              <button type="button" onClick={() => setGoalsOpen(false)} className="rounded-2xl bg-neutral-900/70 border border-neutral-800/70 px-4 py-2 text-xs font-semibold text-neutral-200 hover:bg-neutral-900 transition">
                 Cancelar
               </button>
               <button
@@ -585,28 +613,28 @@ export default function NutritionMixer({
           </div>
         ) : null}
 
-        <div className="mt-3 space-y-3">
+        <div className="mt-4 space-y-3">
           {entriesLoading ? (
-            <div className="rounded-2xl bg-neutral-950/40 border border-neutral-800/60 p-5">
+            <div className="rounded-2xl bg-neutral-950/50 border border-neutral-800/70 p-5">
               <div className="h-4 w-32 rounded bg-neutral-800/70 animate-pulse" />
               <div className="mt-3 h-3 w-56 rounded bg-neutral-800/60 animate-pulse" />
               <div className="mt-5 h-12 rounded-2xl bg-neutral-800/40 border border-neutral-800/60 animate-pulse" />
             </div>
           ) : (Array.isArray(entries) ? entries : []).length === 0 ? (
-            <div className="rounded-2xl bg-neutral-950/40 border border-neutral-800/60 p-5 text-center">
+            <div className="rounded-2xl bg-neutral-950/50 border border-neutral-800/70 p-5 text-center">
               <div className="text-sm font-semibold text-white">Sem refeições hoje</div>
               <div className="mt-1 text-xs text-neutral-400">Adicione um lançamento para começar.</div>
               <button
                 type="button"
                 onClick={submitOrFocus}
-                className="mt-4 inline-flex items-center justify-center rounded-2xl bg-yellow-500 text-black font-semibold px-4 py-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition duration-300"
+                className="mt-4 inline-flex items-center justify-center rounded-2xl bg-neutral-900/70 border border-neutral-800/70 text-white font-semibold px-4 py-2 hover:bg-neutral-900 active:scale-95 transition duration-300"
               >
                 Adicionar refeição
               </button>
             </div>
           ) : (
             (Array.isArray(entries) ? entries : []).map((item) => (
-              <div key={item.id} className="rounded-2xl bg-neutral-950/40 border border-neutral-800/60 p-4">
+              <div key={item.id} className="rounded-2xl bg-neutral-950/50 border border-neutral-800/70 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-white truncate">{item.food_name}</div>
@@ -620,7 +648,7 @@ export default function NutritionMixer({
                       type="button"
                       disabled={entryBusyId === item.id}
                       onClick={() => deleteEntry(item.id)}
-                      className="h-9 px-3 rounded-xl bg-neutral-900/60 border border-neutral-800/60 text-xs font-semibold text-neutral-200 hover:bg-neutral-900 disabled:opacity-60"
+                      className="h-9 px-3 rounded-xl bg-neutral-900/70 border border-neutral-800/70 text-xs font-semibold text-neutral-200 hover:bg-neutral-900 disabled:opacity-60"
                     >
                       {entryBusyId === item.id ? '...' : 'Remover'}
                     </button>
@@ -638,7 +666,7 @@ export default function NutritionMixer({
             type="button"
             onClick={submitOrFocus}
             disabled={!!schemaMissing}
-            className="w-full h-12 rounded-2xl bg-yellow-500 text-black font-semibold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 active:scale-95 transition duration-300 disabled:opacity-60"
+            className="w-full h-12 rounded-2xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-semibold shadow-lg shadow-yellow-500/25 hover:from-yellow-300 hover:to-yellow-400 active:scale-95 transition duration-300 disabled:opacity-60"
           >
             {isPending ? 'Processando...' : input.trim() ? 'Lançar refeição' : 'Adicionar refeição'}
           </button>
