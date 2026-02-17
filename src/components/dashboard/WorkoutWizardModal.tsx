@@ -145,7 +145,7 @@ export default function WorkoutWizardModal(props: Props) {
     setDraftIdx(0)
     try {
       const res = await Promise.resolve(props.onGenerate(answers, { mode }))
-      const many = res && typeof res === 'object' && Array.isArray((res as any)?.drafts) ? ((res as any).drafts as WorkoutDraft[]) : null
+      const many = res && typeof res === 'object' && Array.isArray((res as Record<string, unknown>)?.drafts) ? ((res as Record<string, unknown>).drafts as WorkoutDraft[]) : null
       if (many && many.length) {
         const safe = many
           .map((d) => ({
@@ -170,7 +170,7 @@ export default function WorkoutWizardModal(props: Props) {
         }
         setDraft({ title, exercises })
       }
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message ? String(e.message) : 'Falha ao gerar treino.')
       setDraft(null)
       setDrafts(null)
@@ -188,7 +188,7 @@ export default function WorkoutWizardModal(props: Props) {
     setError('')
     try {
       await Promise.resolve(props.onSaveDrafts(list))
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message ? String(e.message) : 'Falha ao salvar treinos.')
     } finally {
       setSavingAll(false)

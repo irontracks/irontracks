@@ -1,4 +1,4 @@
-export function parseTrainingNumber(value) {
+export function parseTrainingNumber(value: unknown): number | null {
   try {
     if (typeof value === 'number') {
       return Number.isFinite(value) ? value : null;
@@ -21,8 +21,7 @@ export function parseTrainingNumber(value) {
   }
 }
 
-export function parseTrainingNumberOrZero(value) {
+export function parseTrainingNumberOrZero(value: unknown): number {
   const n = parseTrainingNumber(value);
   return typeof n === 'number' && Number.isFinite(n) ? n : 0;
 }
-

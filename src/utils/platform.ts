@@ -13,7 +13,7 @@ export const isPwaStandalone = (): boolean => {
 export const isIosNative = (): boolean => {
   try {
     if (typeof window === 'undefined') return false
-    const cap: any = (window as any)?.Capacitor
+    const cap: any = (window as unknown as { Capacitor?: unknown })?.Capacitor
     if (!cap) return false
     const getPlatform = typeof cap.getPlatform === 'function' ? cap.getPlatform.bind(cap) : null
     if (!getPlatform) return false

@@ -12,17 +12,19 @@ export const FEATURE_META = {
   weeklyReportCTA: { key: FEATURE_KEYS.weeklyReportCTA, owner: 'core', review_at: '2026-03-31' },
 }
 
-const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v)
+type UnknownRecord = Record<string, unknown>
 
-export const isKillSwitchOn = (settings) => {
-  const s = isObject(settings) ? settings : {}
+const isObject = (v: unknown): v is UnknownRecord => Boolean(v && typeof v === 'object' && !Array.isArray(v))
+
+export const isKillSwitchOn = (settings: unknown): boolean => {
+  const s = isObject(settings) ? settings : ({} as UnknownRecord)
   return s.featuresKillSwitch === true
 }
 
-export const isFeatureEnabled = (settings, key) => {
+export const isFeatureEnabled = (settings: unknown, key: string): boolean => {
   if (isKillSwitchOn(settings)) return false
-  const s = isObject(settings) ? settings : {}
-  return s?.[key] === true
+  const s = isObject(settings) ? settings : ({} as UnknownRecord)
+  return s[key] === true
 }
 
 export const listFeatureFlags = () => {

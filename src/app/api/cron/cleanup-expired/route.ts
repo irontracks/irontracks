@@ -99,9 +99,9 @@ export async function GET(req: Request) {
     const paths: string[] = []
 
     for (const r of rows || []) {
-      const id = String((r as any).id || '')
+      const id = String((r as Record<string, unknown>).id || '')
       if (!id) continue
-      const content = String((r as any).content || '').trim()
+      const content = String((r as Record<string, unknown>).content || '').trim()
       try {
         const payload = JSON.parse(content)
         const type = String(payload?.type || '').toLowerCase()

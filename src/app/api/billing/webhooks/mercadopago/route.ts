@@ -35,6 +35,16 @@ const mapSubscriptionStatus = (status: string) => {
   return 'pending'
 }
 
+const addInterval = (start: Date, interval: string) => {
+  const d = new Date(start)
+  if (String(interval || '').toLowerCase() === 'year') {
+    d.setMonth(d.getMonth() + 12)
+    return d
+  }
+  d.setMonth(d.getMonth() + 1)
+  return d
+}
+
 const BodySchema = z
   .object({
     type: z.string().optional(),
@@ -105,6 +115,45 @@ export async function POST(req: Request) {
         .eq('provider', 'mercadopago')
         .eq('provider_subscription_id', providerSubscriptionId)
 
+      if (status === 'active') {
+        const { data: sub } = await admin
+          .from('app_subscriptions')
+          .select('id, user_id, plan_id')
+          .eq('provider', 'mercadopago')
+          .eq('provider_subscription_id', providerSubscriptionId)
+          .maybeSingle()
+        if (sub?.user_id) {
+          const { data: plan } = await admin.from('app_plans').select('id, interval').eq('id', sub.plan_id).maybeSingle()
+          const now = new Date()
+          const end = plan?.interval ? addInterval(now, String(plan.interval)) : null
+          await admin
+            .from('user_entitlements')
+            .upsert(
+              {
+                user_id: sub.user_id,
+                plan_id: sub.plan_id,
+                status: 'active',
+                provider: 'mercadopago',
+                provider_subscription_id: providerSubscriptionId,
+                current_period_start: now.toISOString(),
+                current_period_end: end ? end.toISOString() : null,
+                valid_from: now.toISOString(),
+                valid_until: end ? end.toISOString() : null,
+                metadata: { mercadopago: { kind: 'preapproval', subscription_id: providerSubscriptionId, raw: preapproval } },
+              },
+              { onConflict: 'provider,provider_subscription_id' },
+            )
+          await admin
+            .from('app_subscriptions')
+            .update({
+              current_period_start: now.toISOString(),
+              current_period_end: end ? end.toISOString() : null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sub.id)
+        }
+      }
+
       return NextResponse.json({ ok: true })
     }
 
@@ -124,10 +173,25 @@ export async function POST(req: Request) {
       const meta = payment && typeof payment === 'object' ? { mercadopago: { raw: payment } } : { mercadopago: {} }
 
       if (scope === 'vip' && userId) {
+        const now = new Date()
+        const { data: plan } = planId ? await admin.from('app_plans').select('id, interval').eq('id', planId).maybeSingle() : { data: null }
+        const end = plan?.interval ? addInterval(now, String(plan.interval)) : null
+
+        const { data: activeSub } = await admin
+          .from('app_subscriptions')
+          .select('id, status')
+          .eq('provider', 'mercadopago')
+          .eq('user_id', userId)
+          .in('status', ['pending', 'active', 'past_due'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
         await admin
           .from('app_payments')
           .upsert(
             {
+              subscription_id: activeSub?.id ?? null,
               user_id: userId,
               plan_id: planId || null,
               amount_cents: amountCents,
@@ -141,12 +205,36 @@ export async function POST(req: Request) {
           )
 
         if (status.toLowerCase() === 'approved') {
+          const entSubId = activeSub?.id ? String(activeSub.id) : ''
           await admin
             .from('app_subscriptions')
-            .update({ status: 'active', updated_at: new Date().toISOString() })
+            .update({
+              status: 'active',
+              current_period_start: now.toISOString(),
+              current_period_end: end ? end.toISOString() : null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('provider', 'mercadopago')
             .eq('user_id', userId)
             .in('status', ['pending', 'past_due'])
+
+          await admin
+            .from('user_entitlements')
+            .upsert(
+              {
+                user_id: userId,
+                plan_id: planId || null,
+                status: 'active',
+                provider: 'mercadopago',
+                provider_subscription_id: `payment:${dataId}`,
+                current_period_start: now.toISOString(),
+                current_period_end: end ? end.toISOString() : null,
+                valid_from: now.toISOString(),
+                valid_until: end ? end.toISOString() : null,
+                metadata: { mercadopago: { kind: 'payment', payment_id: dataId, subscription_id: entSubId || null, raw: payment } },
+              },
+              { onConflict: 'provider,provider_subscription_id' },
+            )
         }
       }
 
@@ -154,7 +242,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, ignored: true })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

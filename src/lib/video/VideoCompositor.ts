@@ -152,7 +152,10 @@ export class VideoCompositor {
         this.canvas.width = outputWidth;
         this.canvas.height = outputHeight;
 
-        this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
+        const AudioCtxCtor = w.AudioContext || w.webkitAudioContext
+        if (!AudioCtxCtor) throw new Error('AudioContext not available')
+        this.audioCtx = new AudioCtxCtor();
         this.destNode = this.audioCtx.createMediaStreamDestination();
         
         try {

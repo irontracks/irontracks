@@ -2,25 +2,38 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { asaasRequest } from '@/lib/asaas'
+import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
-const addDays = (d: Date, days: number) => {
-  const next = new Date(d)
-  next.setDate(next.getDate() + days)
-  return next
+const resolveBaseUrl = (req: Request) => {
+  const env = (process.env.APP_BASE_URL || '').trim().replace(/\/$/, '')
+  if (env) return env
+  const origin = (req.headers.get('origin') || '').trim().replace(/\/$/, '')
+  if (origin) return origin
+  return 'http://localhost:3000'
 }
 
-const toDateOnly = (d: Date) => d.toISOString().slice(0, 10)
+const toDateOnly = (iso: string | null) => {
+  try {
+    if (!iso) return null
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toISOString().slice(0, 10)
+  } catch {
+    return null
+  }
+}
+
+const onlyDigits = (v: unknown) => String(v ?? '').replace(/\D/g, '')
 
 const BodySchema = z
   .object({
     planId: z.string().min(1),
     billingType: z.preprocess((v) => (typeof v === 'string' ? v.trim().toUpperCase() : 'PIX'), z.string().default('PIX')),
-    cpfCnpj: z.preprocess((v) => String(v ?? '').replace(/\D/g, ''), z.string().min(1)),
-    mobilePhone: z.preprocess((v) => String(v ?? '').replace(/\D/g, ''), z.string().min(1)),
+    cpfCnpj: z.preprocess((v) => onlyDigits(v), z.string().min(1)),
+    mobilePhone: z.preprocess((v) => onlyDigits(v), z.string().min(1)),
     name: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().optional().default('')),
   })
   .passthrough()
@@ -52,42 +65,33 @@ export async function POST(req: Request) {
 
     const { data: existing } = await admin
       .from('app_subscriptions')
-      .select('id, status, asaas_subscription_id, provider, provider_subscription_id, provider_customer_id, created_at')
+      .select('id, status, provider, plan_id, metadata, created_at')
       .eq('plan_id', planId)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
     if (existing && String(existing.status || '') === 'pending') {
-      const subId = String(existing?.asaas_subscription_id || existing?.provider_subscription_id || '').trim()
-      if (subId) {
-        const payments = await asaasRequest<{ data?: any[] }>({
-          method: 'GET',
-          path: `/subscriptions/${encodeURIComponent(subId)}/payments`,
-        })
-        const first = Array.isArray(payments?.data) && payments.data.length ? payments.data[0] : null
-        const amountCents = Number.isFinite(plan.price_cents) ? Number(plan.price_cents) : 0
-        const payRow = first?.id
-          ? {
-              id: '',
-              status: first?.status || 'pending',
-              due_date: first?.dueDate || null,
-              asaas_payment_id: first.id,
-              invoice_url: first?.invoiceUrl || null,
-              pix_qr_code: first?.pixQrCode?.encodedImage || null,
-              pix_payload: first?.pixQrCode?.payload || null,
-            }
-          : null
-        return NextResponse.json({
-          ok: true,
-          subscription: { id: existing.id, status: existing.status, asaas_subscription_id: subId },
-          payment: payRow,
-          resumed: true,
-          amount_cents: amountCents,
-        })
+      const ageMs = Date.now() - new Date(String(existing.created_at || '')).getTime()
+      const meta = existing?.metadata && typeof existing.metadata === 'object' ? (existing.metadata as any) : {}
+      const mp = meta?.mercadopago && typeof meta.mercadopago === 'object' ? meta.mercadopago : {}
+      const payId = String(mp?.payment_id || '').trim()
+      if (String(existing.provider || '') === 'mercadopago' && payId) {
+        const { data: pay } = await admin
+          .from('app_payments')
+          .select('id, status, due_date, provider_payment_id, invoice_url, pix_qr_code, pix_payload')
+          .eq('subscription_id', existing.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        return NextResponse.json({ ok: true, subscription: { id: existing.id, status: existing.status }, payment: pay || null, resumed: true })
       }
-      await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', existing.id)
-    } else if (existing && ['active', 'past_due'].includes(existing.status || '')) {
+      if (Number.isFinite(ageMs) && ageMs > 10 * 60 * 1000) {
+        await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', existing.id)
+      } else {
+        return NextResponse.json({ ok: false, error: 'pending_subscription_exists' }, { status: 409 })
+      }
+    } else if (existing && ['active', 'past_due'].includes(String(existing.status || ''))) {
       return NextResponse.json({ ok: false, error: 'already_subscribed' }, { status: 409 })
     }
 
@@ -111,46 +115,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'already_has_active_subscription' }, { status: 409 })
     }
 
-    const { data: mappedCustomer } = await admin
-      .from('asaas_customers')
-      .select('asaas_customer_id')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    let asaasCustomerId = (mappedCustomer?.asaas_customer_id || '') as string
-    if (!asaasCustomerId) {
-      const customer = await asaasRequest<{ id: string }>({
-        method: 'POST',
-        path: '/customers',
-        body: {
-          name: payerName || (user.email || 'Cliente'),
-          cpfCnpj,
-          email: user.email || undefined,
-          mobilePhone,
-        },
-      })
-      asaasCustomerId = customer.id
-      await admin.from('asaas_customers').upsert({ user_id: user.id, asaas_customer_id: asaasCustomerId })
-    }
-
-    const cycle = plan.interval === 'year' ? 'YEARLY' : 'MONTHLY'
-    const value = Number((plan.price_cents || 0) / 100)
-    const nextDueDate = toDateOnly(addDays(new Date(), 1))
-
-    const subscription = await asaasRequest<{ id: string }>({
-      method: 'POST',
-      path: '/subscriptions',
-      body: {
-        customer: asaasCustomerId,
-        billingType,
-        nextDueDate,
-        value,
-        cycle,
-        description: plan.name,
-      },
-    })
-
-    const subscriptionId = subscription.id
+    const amount = Number((plan.price_cents || 0) / 100)
+    const currencyId = String(plan.currency || 'BRL').trim().toUpperCase()
 
     const { data: subRow, error: subErr } = await admin
       .from('app_subscriptions')
@@ -158,16 +124,11 @@ export async function POST(req: Request) {
         plan_id: plan.id,
         user_id: user.id,
         status: 'pending',
-        provider: 'asaas',
-        provider_subscription_id: subscriptionId,
-        provider_customer_id: asaasCustomerId,
-        asaas_subscription_id: subscriptionId,
-        asaas_customer_id: asaasCustomerId,
-        metadata: { checkout: { billingType } },
+        provider: 'mercadopago',
+        metadata: { checkout: { billingType: 'PIX' } },
       })
-      .select('id, status, asaas_subscription_id')
+      .select('id, status')
       .single()
-
     if (subErr || !subRow) {
       const msg = String(subErr?.message || '')
       if (msg.toLowerCase().includes('column') && msg.toLowerCase().includes('provider')) {
@@ -176,15 +137,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: subErr?.message || 'failed_to_store_subscription' }, { status: 400 })
     }
 
-    const payments = await asaasRequest<{ data?: any[] }>({
-      method: 'GET',
-      path: `/subscriptions/${encodeURIComponent(subscriptionId)}/payments`,
+    const baseUrl = resolveBaseUrl(req)
+    const idDigits = onlyDigits(cpfCnpj)
+    const idType = idDigits.length === 14 ? 'CNPJ' : 'CPF'
+    const payment = await mercadopagoRequest<any>({
+      method: 'POST',
+      path: '/v1/payments',
+      body: {
+        transaction_amount: amount,
+        description: plan.name,
+        payment_method_id: 'pix',
+        external_reference: `vip:${user.id}:${plan.id}`,
+        notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
+        payer: {
+          email: user.email || undefined,
+          first_name: payerName || undefined,
+          identification: idDigits ? { type: idType, number: idDigits } : undefined,
+        },
+      },
     })
-    const first = Array.isArray(payments?.data) && payments.data.length ? payments.data[0] : null
-    if (!first?.id) return NextResponse.json({ ok: true, subscription: subRow, payment: null })
+
+    const providerPaymentId = String(payment?.id || '').trim()
+    const tx = payment?.point_of_interaction?.transaction_data || {}
+    const pixQrCode = tx?.qr_code_base64 ? String(tx.qr_code_base64) : null
+    const pixPayload = tx?.qr_code ? String(tx.qr_code) : null
+    const invoiceUrl = tx?.ticket_url ? String(tx.ticket_url) : null
+    const dueIso = payment?.date_of_expiration ? String(payment.date_of_expiration) : null
+    const dueDate = toDateOnly(dueIso)
 
     const amountCents = Number.isFinite(plan.price_cents) ? Number(plan.price_cents) : 0
-
     const { data: payRow, error: payErr } = await admin
       .from('app_payments')
       .insert({
@@ -192,20 +173,19 @@ export async function POST(req: Request) {
         plan_id: plan.id,
         user_id: user.id,
         amount_cents: amountCents,
-        currency: plan.currency || 'BRL',
-        billing_type: billingType,
-        status: first?.status || 'pending',
-        due_date: first?.dueDate || null,
-        paid_at: first?.paymentDate || null,
-        provider: 'asaas',
-        provider_payment_id: first.id,
-        asaas_payment_id: first.id,
-        invoice_url: first?.invoiceUrl || null,
-        pix_qr_code: first?.pixQrCode?.encodedImage || null,
-        pix_payload: first?.pixQrCode?.payload || null,
-        raw: first || {},
+        currency: currencyId,
+        billing_type: 'PIX',
+        status: String(payment?.status || 'pending'),
+        due_date: dueDate,
+        paid_at: payment?.date_approved || null,
+        provider: 'mercadopago',
+        provider_payment_id: providerPaymentId,
+        invoice_url: invoiceUrl,
+        pix_qr_code: pixQrCode,
+        pix_payload: pixPayload,
+        raw: payment || {},
       })
-      .select('id, status, due_date, asaas_payment_id, invoice_url, pix_qr_code, pix_payload')
+      .select('id, status, due_date, provider_payment_id, invoice_url, pix_qr_code, pix_payload')
       .single()
 
     if (payErr) {
@@ -216,8 +196,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: payErr.message }, { status: 400 })
     }
 
+    await admin
+      .from('app_subscriptions')
+      .update({
+        metadata: { checkout: { billingType: 'PIX' }, mercadopago: { payment_id: providerPaymentId, invoice_url: invoiceUrl } },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', subRow.id)
+
     return NextResponse.json({ ok: true, subscription: subRow, payment: payRow || null })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

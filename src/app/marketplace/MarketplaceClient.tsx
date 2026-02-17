@@ -23,12 +23,12 @@ type CheckoutResponse = {
   ok: boolean
   error?: string
   resumed?: boolean
-  subscription?: { id: string; status: string; asaas_subscription_id: string }
+  subscription?: { id: string; status: string }
   payment?: {
     id: string
     status: string
     due_date: string | null
-    asaas_payment_id: string
+    provider_payment_id: string
     invoice_url: string | null
     pix_qr_code: string | null
     pix_payload: string | null
@@ -86,8 +86,7 @@ const toCheckoutUserMessage = (raw: string) => {
   if (s === 'already_has_active_subscription') return 'Você já tem uma assinatura ativa ou pendente nesta conta.'
   if (s === 'already_subscribed') return 'Você já iniciou uma assinatura deste plano nesta conta.'
   if (s === 'pending_subscription_exists') return 'Você tem uma tentativa de assinatura pendente. Finalize ou cancele para tentar novamente.'
-  if (s === 'asaas_api_key_missing') return 'Pagamento PIX indisponível (Asaas não configurado no servidor).'
-  if (s === 'mercadopago_access_token_missing') return 'Pagamento no cartão indisponível (Mercado Pago não configurado no servidor).'
+  if (s === 'mercadopago_access_token_missing') return 'Pagamento indisponível (Mercado Pago não configurado no servidor).'
   if (s === 'unauthorized') return 'Você precisa estar logado para assinar.'
   return s
 }
@@ -144,7 +143,8 @@ const TIERS = {
 export default function MarketplaceClient() {
   const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
-  const isIosNative = useMemo(() => getIsIosNative(), [])
+  const iapEnabled = useMemo(() => String(process.env.NEXT_PUBLIC_ENABLE_IAP || '').trim().toLowerCase() === 'true', [])
+  const isIosNative = useMemo(() => (iapEnabled ? getIsIosNative() : false), [iapEnabled])
 
   const [userId, setUserId] = useState<string>('')
   const [plans, setPlans] = useState<AppPlan[]>([])
@@ -208,7 +208,7 @@ export default function MarketplaceClient() {
           try {
             await Purchases.configure({ apiKey, appUserID: user.id })
             setIapConfigured(true)
-          } catch (e: any) {
+          } catch (e) {
             setIapConfigured(false)
             setIapError(e?.message ? String(e.message) : 'Falha ao iniciar compra pela App Store.')
           }
@@ -273,7 +273,7 @@ export default function MarketplaceClient() {
       setIapOfferings(offerings)
       const { customerInfo } = await Purchases.getCustomerInfo()
       setIapCustomerInfo(customerInfo || null)
-    } catch (e: any) {
+    } catch (e) {
       setIapError(e?.message ? String(e.message) : 'Falha ao carregar opções da App Store.')
     } finally {
       setIapLoading(false)
@@ -288,12 +288,12 @@ export default function MarketplaceClient() {
 
   const getIapPackageForPlan = useCallback((offerings: PurchasesOfferings | null, plan: AppPlan | null) => {
     if (!offerings || !plan) return null
-    const current = (offerings as any)?.current
+    const current = offerings.current
     const pkgs: PurchasesPackage[] = Array.isArray(current?.availablePackages) ? current.availablePackages : []
     if (!pkgs.length) return null
-    const exact = pkgs.find((p) => String((p as any)?.product?.identifier || '').trim() === plan.id)
+    const exact = pkgs.find((p) => String(p?.product?.identifier || '').trim() === plan.id)
     if (exact) return exact
-    const loose = pkgs.find((p) => String((p as any)?.product?.identifier || '').includes(plan.id))
+    const loose = pkgs.find((p) => String(p?.product?.identifier || '').includes(plan.id))
     return loose || pkgs[0]
   }, [])
 
@@ -305,7 +305,7 @@ export default function MarketplaceClient() {
         throw new Error(String(json?.error || 'Falha ao validar assinatura.'))
       }
       return true
-    } catch (e: any) {
+    } catch (e) {
       setIapError(e?.message ? String(e.message) : 'Falha ao validar assinatura.')
       return false
     }
@@ -322,14 +322,14 @@ export default function MarketplaceClient() {
       const pkg = getIapPackageForPlan(iapOfferings, selectedPlan)
       if (!pkg) throw new Error('Produto indisponível na App Store para este plano.')
       const result = await Purchases.purchasePackage({ aPackage: pkg })
-      const info = (result as any)?.customerInfo as CustomerInfo | undefined
-      if (info) setIapCustomerInfo(info)
+      const info = result?.customerInfo
+      if (info) setIapCustomerInfo(info || null)
       const ok = await syncIapToBackend()
       if (ok) {
         window.alert('Assinatura ativada com sucesso.')
         closeCheckout()
       }
-    } catch (e: any) {
+    } catch (e) {
       const msg = e?.message ? String(e.message) : String(e || '')
       if (String(e?.userCancelled || '').toLowerCase() === 'true' || msg.toLowerCase().includes('cancel')) {
         setIapError('Compra cancelada.')
@@ -352,7 +352,7 @@ export default function MarketplaceClient() {
       setIapCustomerInfo(customerInfo || null)
       const ok = await syncIapToBackend()
       if (ok) window.alert('Compras restauradas.')
-    } catch (e: any) {
+    } catch (e) {
       setIapError(e?.message ? String(e.message) : 'Falha ao restaurar compras.')
     } finally {
       setIapLoading(false)
@@ -378,7 +378,7 @@ export default function MarketplaceClient() {
       })
       const json = (await res.json().catch(() => ({}))) as CheckoutResponse
       setCheckoutResult(json)
-    } catch (e: any) {
+    } catch (e) {
       setCheckoutResult({ ok: false, error: e?.message || String(e) })
     } finally {
       setCheckingOut(false)
@@ -407,7 +407,7 @@ export default function MarketplaceClient() {
         return
       }
       window.location.href = redirectUrl
-    } catch (e: any) {
+    } catch (e) {
       setCheckoutResult({ ok: false, error: e?.message || String(e) })
     } finally {
       setCardRedirecting(false)
@@ -429,7 +429,7 @@ export default function MarketplaceClient() {
       }
       setCheckoutResult(null)
       window.alert('Tentativa cancelada. Você pode tentar novamente.')
-    } catch (e: any) {
+    } catch (e) {
       setCheckoutResult({ ok: false, error: e?.message || String(e) })
     }
   }, [selectedPlan])
@@ -652,7 +652,7 @@ export default function MarketplaceClient() {
                     {iapLoading ? 'Carregando...' : 'Restaurar Compras'}
                   </button>
 
-                  {iapCustomerInfo && (iapCustomerInfo as any)?.entitlements?.active && Object.keys((iapCustomerInfo as any).entitlements.active).length ? (
+                  {iapCustomerInfo?.entitlements?.active && Object.keys(iapCustomerInfo.entitlements.active).length ? (
                     <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200 flex items-start gap-2">
                       <Check size={16} className="mt-0.5 shrink-0" />
                       <span>Assinatura ativa detectada.</span>

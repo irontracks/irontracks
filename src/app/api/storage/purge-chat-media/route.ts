@@ -28,7 +28,7 @@ export async function POST(req: Request) {
           allPaths.push(...paths)
         } else {
           // It was a file at root (or empty folder), add it directly if has id
-          if ((item as any).id) {
+          if ((item as unknown as { id?: string | null })?.id) {
              allPaths.push(item.name)
           }
         }
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const { data: directDeleted } = await admin.from('direct_messages').delete().like('content', '%"type"%').select('id')
     
     return NextResponse.json({ ok: true, deleted: allPaths.length, messagesRemoved: (globalDeleted?.length || 0) + (directDeleted?.length || 0) })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

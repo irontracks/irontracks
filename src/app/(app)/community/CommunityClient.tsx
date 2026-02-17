@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext'
 import { ArrowLeft, Search, Settings, UserPlus, UserMinus } from 'lucide-react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 type ProfileRow = {
   id: string
@@ -28,9 +29,9 @@ type FollowRequestItem = {
   follower_profile: ProfileRow | null
 }
 
-const safeString = (v: any) => (v === null || v === undefined ? '' : String(v))
+const safeString = (v: unknown): string => (v === null || v === undefined ? '' : String(v))
 
-const formatRoleLabel = (raw: any) => {
+const formatRoleLabel = (raw: unknown): string => {
   const r = String(raw || '').trim().toLowerCase()
   if (r === 'teacher') return 'PROFESSOR'
   if (r === 'admin') return 'ADMIN'
@@ -125,7 +126,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         const { data } = await supabase.from('profiles').select('id, display_name, photo_url, role').in('id', missing).limit(5000)
         const rows = Array.isArray(data) ? data : []
         const got = new Set<string>()
-        rows.forEach((row: any) => {
+        rows.forEach((row: Record<string, unknown>) => {
           const id = String(row?.id || '').trim()
           if (!id) return
           got.add(id)
@@ -191,7 +192,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
 
       const list = (Array.isArray(profilesRes?.data) ? profilesRes.data : [])
         .filter((row) => row && typeof row === 'object')
-        .map((row: any) => ({
+        .map((row: Record<string, unknown>) => ({
           id: String(row.id),
           display_name: row.display_name ? String(row.display_name) : null,
           photo_url: row.photo_url ? String(row.photo_url) : null,
@@ -202,7 +203,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
       setProfiles(list)
 
       const map = new Map<string, FollowRow>()
-      ;(Array.isArray(followsRes?.data) ? followsRes.data : []).forEach((row: any) => {
+      ;(Array.isArray(followsRes?.data) ? followsRes.data : []).forEach((row: Record<string, unknown>) => {
         const fid = String(row?.following_id || '').trim()
         if (!fid) return
         map.set(fid, {
@@ -215,7 +216,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
 
       let incomingRows = (Array.isArray(incomingRes?.data) ? incomingRes.data : [])
         .filter((r) => r && typeof r === 'object')
-        .map((r: any) => ({
+        .map((r: Record<string, unknown>) => ({
           follower_id: String(r?.follower_id || '').trim(),
           following_id: String(r?.following_id || '').trim(),
           status: 'pending' as const,
@@ -234,8 +235,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             .limit(100)
 
           const followerIds = (Array.isArray(notifRows) ? notifRows : [])
-            .map((n: any) => {
-              const meta = n?.metadata && typeof n.metadata === 'object' ? n.metadata : null
+            .map((n: Record<string, unknown>) => {
+              const meta = n?.metadata && typeof n.metadata === 'object' ? (n.metadata as Record<string, unknown>) : null
               return String(n?.sender_id ?? meta?.follower_id ?? '').trim()
             })
             .filter(Boolean)
@@ -271,8 +272,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
     }
 
     let mounted = true
-    let incomingChannel: any
-    let outgoingChannel: any
+    let incomingChannel: RealtimeChannel | null = null
+    let outgoingChannel: RealtimeChannel | null = null
 
     const run = async () => {
       setLoading(true)
@@ -300,7 +301,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             try {
               if (!mounted) return
               const ev = String(payload?.eventType || '').toUpperCase()
-              const row = (ev === 'DELETE' ? payload?.old : payload?.new) as any
+              const row = (ev === 'DELETE' ? payload?.old : payload?.new) as Record<string, unknown>
               const followerId = String(row?.follower_id || '').trim()
               const status = String(row?.status || '').trim().toLowerCase()
               if (!followerId) return
@@ -337,7 +338,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             try {
               if (!mounted) return
               const ev = String(payload?.eventType || '').toUpperCase()
-              const row = (ev === 'DELETE' ? payload?.old : payload?.new) as any
+              const row = (ev === 'DELETE' ? payload?.old : payload?.new) as Record<string, unknown>
               const followingId = String(row?.following_id || '').trim()
               const status = String(row?.status || '').trim().toLowerCase()
               if (!followingId) return
@@ -431,7 +432,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
       }
 
       setFollowRequests((prev) => prev.filter((r) => r.follower_id !== fid))
-    } catch (e: any) {
+    } catch (e) {
       if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
     } finally {
       setBusyRequestId('')
@@ -477,7 +478,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
       try {
         await loadAll(userId)
       } catch {}
-    } catch (e: any) {
+    } catch (e) {
       if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
     } finally {
       setBusyId('')
@@ -521,7 +522,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         next.set(pid, { follower_id: userId, following_id: pid, status: 'pending' })
         return next
       })
-    } catch (e: any) {
+    } catch (e) {
       showMessage(String(e?.message ?? e))
     } finally {
       setBusyId('')
@@ -550,7 +551,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         next.delete(pid)
         return next
       })
-    } catch (e: any) {
+    } catch (e) {
       if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
     } finally {
       setBusyId('')
@@ -812,7 +813,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                         return
                       }
                       setCommunitySettingsOpen(false)
-                    } catch (e: any) {
+                    } catch (e) {
                       if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
                     }
                   }}

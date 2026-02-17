@@ -49,7 +49,7 @@ export async function getVideoQueriesFromGemini(exerciseName: string) {
   const result = await model.generateContent(prompt)
   const text = (await result?.response?.text()) || ''
   const parsed = extractJson(text)
-  const queriesRaw = parsed && typeof parsed === 'object' ? (parsed as any).queries : null
+  const queriesRaw = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>).queries : null
   const queriesArr = Array.isArray(queriesRaw) ? queriesRaw : []
 
   const cleaned = queriesArr

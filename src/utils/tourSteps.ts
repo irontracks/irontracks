@@ -1,10 +1,13 @@
 'use client'
 
-export function getTourSteps({ role, hasCommunity }) {
+type TourAction = { name: string; args?: unknown[] }
+export type TourStep = { id: string; selector: string; title: string; body: string; action?: TourAction }
+
+export function getTourSteps({ role, hasCommunity }: { role: unknown; hasCommunity: unknown }): TourStep[] {
   const r = String(role || '').toLowerCase()
   const isCoach = r === 'teacher' || r === 'admin'
 
-  const base = [
+  const base: TourStep[] = [
     {
       id: 'menu',
       selector: '[data-tour="header-menu"]',
@@ -31,7 +34,7 @@ export function getTourSteps({ role, hasCommunity }) {
     },
   ]
 
-  const community = hasCommunity
+  const community = Boolean(hasCommunity)
     ? [
         {
           id: 'community',
@@ -79,5 +82,5 @@ export function getTourSteps({ role, hasCommunity }) {
       ]
     : []
 
-  return [...base, ...community, ...coach]
+  return [...base, ...community, ...coach] as TourStep[]
 }

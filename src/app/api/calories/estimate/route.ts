@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const ZodBodySchema = z
   .object({
@@ -11,7 +12,7 @@ const ZodBodySchema = z
   })
   .passthrough()
 
-const safeString = (v: any) => {
+const safeString = (v: unknown): string => {
   try {
     return String(v ?? '').trim()
   } catch {
@@ -35,14 +36,14 @@ const extractJsonFromText = (text: string) => {
   }
 }
 
-const calculateTotalVolume = (logs: any) => {
+const calculateTotalVolume = (logs: Record<string, unknown>) => {
   try {
-    const safeLogs = logs && typeof logs === 'object' ? logs : {}
     let volume = 0
-    Object.values(safeLogs).forEach((log: any) => {
+    Object.values(logs).forEach((log: unknown) => {
       if (!log || typeof log !== 'object') return
-      const w = Number(safeString(log.weight).replace(',', '.'))
-      const r = Number(safeString(log.reps).replace(',', '.'))
+      const row = log as Record<string, unknown>
+      const w = Number(safeString(row.weight).replace(',', '.'))
+      const r = Number(safeString(row.reps).replace(',', '.'))
       if (!Number.isFinite(w) || !Number.isFinite(r)) return
       if (w <= 0 || r <= 0) return
       volume += w * r
@@ -53,9 +54,10 @@ const calculateTotalVolume = (logs: any) => {
   }
 }
 
-const computeFallbackKcal = ({ session, volume }: { session: any; volume: number }) => {
+const computeFallbackKcal = ({ session, volume }: { session: Record<string, unknown>; volume: number }) => {
   try {
-    const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? session.outdoorBike : null
+    const outdoorBike =
+      session?.outdoorBike && typeof session.outdoorBike === 'object' ? (session.outdoorBike as Record<string, unknown>) : null
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
     const durationMinutes = (Number(session?.totalTime) || 0) / 60
@@ -65,7 +67,7 @@ const computeFallbackKcal = ({ session, volume }: { session: any; volume: number
   }
 }
 
-const getLatestWeightKg = async ({ supabase, targetUserId }: { supabase: any; targetUserId: string }) => {
+const getLatestWeightKg = async ({ supabase, targetUserId }: { supabase: SupabaseClient; targetUserId: string }) => {
   try {
     const { data, error } = await supabase
       .from('assessments')
@@ -75,7 +77,7 @@ const getLatestWeightKg = async ({ supabase, targetUserId }: { supabase: any; ta
       .limit(1)
       .maybeSingle()
     if (error) return null
-    const w = Number((data as any)?.weight)
+    const w = Number((data as Record<string, unknown>)?.weight)
     if (!Number.isFinite(w) || w <= 0) return null
     return w
   } catch {
@@ -88,7 +90,7 @@ const getLatestWeightKg = async ({ supabase, targetUserId }: { supabase: any; ta
         .limit(1)
         .maybeSingle()
       if (error) return null
-      const w = Number((data as any)?.weight)
+      const w = Number((data as Record<string, unknown>)?.weight)
       if (!Number.isFinite(w) || w <= 0) return null
       return w
     } catch {
@@ -101,7 +103,7 @@ const getLatestWeightKg = async ({ supabase, targetUserId }: { supabase: any; ta
           .limit(1)
           .maybeSingle()
         if (error) return null
-        const w = Number((data as any)?.weight)
+        const w = Number((data as Record<string, unknown>)?.weight)
         if (!Number.isFinite(w) || w <= 0) return null
         return w
       } catch {
@@ -121,12 +123,13 @@ export async function POST(request: Request) {
 
     const parsedBody = await parseJsonBody(request, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
-    const session: any = body?.session
+    const body = parsedBody.data as Record<string, unknown>
+    const session = body?.session && typeof body.session === 'object' ? (body.session as Record<string, unknown>) : null
     const workoutId = typeof body?.workoutId === 'string' ? body.workoutId : null
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
 
-    const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object' ? session.outdoorBike : null
+    const outdoorBike =
+      session?.outdoorBike && typeof session.outdoorBike === 'object' ? (session.outdoorBike as Record<string, unknown>) : null
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) {
       return NextResponse.json({ ok: true, kcal: Math.round(bikeKcal), source: 'bike' })
@@ -136,13 +139,13 @@ export async function POST(request: Request) {
     if (workoutId) {
       try {
         const { data: row } = await supabase.from('workouts').select('id, user_id').eq('id', workoutId).maybeSingle()
-        const uid = safeString((row as any)?.user_id)
+        const uid = safeString((row as Record<string, unknown>)?.user_id)
         if (uid) targetUserId = uid
       } catch {
       }
     }
 
-    const logs = session?.logs && typeof session.logs === 'object' ? session.logs : {}
+    const logs = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {}
     const volume = calculateTotalVolume(logs)
     const totalTimeSeconds = Number(session?.totalTime) || 0
     const minutes = totalTimeSeconds > 0 ? totalTimeSeconds / 60 : 0
@@ -171,12 +174,15 @@ export async function POST(request: Request) {
         weightKg,
         volumeKg: Math.round(volume),
         exercises: Array.isArray(session?.exercises)
-          ? session.exercises.slice(0, 30).map((ex: any) => ({
-              name: safeString(ex?.name),
-              sets: Number(ex?.sets) || null,
-              method: safeString(ex?.method),
-              rest: Number(ex?.restTime ?? ex?.rest_time) || null,
-            }))
+          ? (session.exercises as unknown[]).slice(0, 30).map((ex: unknown) => {
+              const row = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : {}
+              return {
+                name: safeString(row?.name),
+                sets: Number(row?.sets) || null,
+                method: safeString(row?.method),
+                rest: Number(row?.restTime ?? row?.rest_time) || null,
+              }
+            })
           : [],
       })
 
@@ -184,20 +190,21 @@ export async function POST(request: Request) {
     try {
       const genAI = new GoogleGenerativeAI(apiKey)
       const model = genAI.getGenerativeModel({ model: modelId })
-      const result = await model.generateContent([{ text: prompt }])
+      const result = await model.generateContent(prompt)
       const text = (await result?.response?.text()) || ''
       const parsed = extractJsonFromText(text)
-      const metMin = Number(parsed?.metMin)
-      const metMax = Number(parsed?.metMax)
+      const parsedObj = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {}
+      const metMin = Number(parsedObj?.metMin)
+      const metMax = Number(parsedObj?.metMax)
       if (!Number.isFinite(metMin) || !Number.isFinite(metMax)) throw new Error('invalid_met')
       const mn = clampNumber(metMin, 1, 20)
       const mx = clampNumber(metMax, 1, 20)
       const lo = Math.min(mn, mx)
       const hi = Math.max(mn, mx)
-      const conf = safeString(parsed?.confidence)
+      const conf = safeString(parsedObj?.confidence)
       const confidence = conf === 'high' || conf === 'medium' || conf === 'low' ? conf : 'low'
-      const assumptions = Array.isArray(parsed?.assumptions)
-        ? parsed.assumptions.map((x: any) => safeString(x)).filter((x: string) => x).slice(0, 5)
+      const assumptions = Array.isArray(parsedObj?.assumptions)
+        ? (parsedObj.assumptions as unknown[]).map((x: unknown) => safeString(x)).filter((x: string) => x).slice(0, 5)
         : []
       met = { metMin: lo, metMax: hi, confidence, assumptions }
     } catch {
@@ -224,7 +231,8 @@ export async function POST(request: Request) {
       assumptions: met.assumptions,
       source: 'gemini-met',
     })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
 }

@@ -19,7 +19,7 @@ export async function GET() {
 
     const report = await runChatDiagnostics(supabase, user.id)
     return NextResponse.json(report)
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       .single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, inserted })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

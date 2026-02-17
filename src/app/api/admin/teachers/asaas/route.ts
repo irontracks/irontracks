@@ -266,7 +266,7 @@ export async function POST(req: Request) {
     if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 400 })
 
     return NextResponse.json({ ok: true, teacher: updated })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

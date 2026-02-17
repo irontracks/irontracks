@@ -134,7 +134,7 @@ export async function GET() {
       },
       { headers: { 'cache-control': 'no-store, max-age=0' } },
     )
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

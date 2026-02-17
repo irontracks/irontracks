@@ -43,12 +43,13 @@ export async function GET(req: Request) {
     if (!looksLikeUuid(targetUserId)) return NextResponse.json({ ok: false, error: 'invalid target' }, { status: 400 })
 
     if (auth.role === 'teacher') {
-      const { data: link } = await supabase
+      const { data: links } = await supabase
         .from('students')
         .select('id')
         .eq('user_id', targetUserId)
         .eq('teacher_id', auth.user.id)
-        .maybeSingle()
+        .limit(1)
+      const link = Array.isArray(links) ? links[0] : null
       if (!link?.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
@@ -62,7 +63,7 @@ export async function GET(req: Request) {
       .limit(200)
 
     return NextResponse.json({ ok: true, rows: rows || [] })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -194,7 +194,7 @@ export async function POST(req: Request) {
       .single()
 
     return NextResponse.json({ ok: true, subscription: subRow, payment: payRow || null })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

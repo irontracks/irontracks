@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ ok: false, error: error?.message || 'failed to sign' }, { status: 400 })
 
     return NextResponse.json({ ok: true, bucket, path: safe.path, token: data.token, bucketLimitBytes: b2?.file_size_limit ?? null })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

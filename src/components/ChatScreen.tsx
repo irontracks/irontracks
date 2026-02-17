@@ -23,11 +23,34 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 
+interface ChannelRow { id: string; name?: string; [key: string]: unknown }
+interface InviteRow { to_uid: string; from_uid: string; [key: string]: unknown }
+
+interface FormattedMessage {
+    id: string
+    text: string
+    kind: string
+    mediaUrl?: string
+    thumbUrl?: string
+    uid: string
+    createdAt: Date
+    displayName: string
+    photoURL?: string | null
+    [key: string]: unknown
+}
+
+interface ChatScreenProps {
+    user: Record<string, unknown> | null
+    onClose: () => void
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
 const CHAT_MEDIA_PREVIEW_SIZE = 800;
 
-const ChatScreen = ({ user, onClose }) => {
+const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const [view, setView] = useState('list');
-    const [activeChannel, setActiveChannel] = useState<any>(null);
+    const [activeChannel, setActiveChannel] = useState<ChannelRow | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const { confirm, alert, prompt } = useDialog();
@@ -35,15 +58,16 @@ const ChatScreen = ({ user, onClose }) => {
     const confirmRef = useRef(confirm);
     const promptRef = useRef(prompt);
 
-    const [globalChannel, setGlobalChannel] = useState<any>(null);
-    const [messages, setMessages] = useState<any[]>([]);
+    const [globalChannel, setGlobalChannel] = useState<ChannelRow | null>(null);
+    const [messages, setMessages] = useState<FormattedMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [showEmoji, setShowEmoji] = useState(false);
-    const fileInputRef = useRef<any>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [uploading, setUploading] = useState(false);
     
     const [searchQuery] = useState('');
-    const safeUserId = user?.id ? String(user.id) : '';
+    const userObj: Record<string, unknown> = isRecord(user) ? user : {}
+    const safeUserId = userObj?.id ? String(userObj.id) : '';
 
     const dummy = useRef<HTMLDivElement | null>(null);
     const supabase = useMemo(() => createClient(), []);
@@ -54,8 +78,8 @@ const ChatScreen = ({ user, onClose }) => {
         promptRef.current = prompt;
     }, [alert, confirm, prompt]);
 
-    const [privateChannels, setPrivateChannels] = useState<any[]>([]);
-    const [sendingInviteTo, setSendingInviteTo] = useState<any>(null);
+    const [privateChannels, setPrivateChannels] = useState<Array<Record<string, unknown>>>([]);
+    const [sendingInviteTo, setSendingInviteTo] = useState<{ uid: string; displayName: string } | null>(null);
 
     const fetchGlobalId = useCallback(async () => {
         const res = await fetch('/api/chat/global-id')
@@ -83,19 +107,27 @@ const ChatScreen = ({ user, onClose }) => {
         } catch {}
     }, [])
 
-    const formatMessage = useCallback((m) => {
-        let payload = null
-        try { if (typeof m.content === 'string' && m.content.startsWith('{')) payload = JSON.parse(m.content) } catch {}
+    const formatMessage = useCallback((m: Record<string, unknown>): FormattedMessage => {
+        const contentRaw = m.content
+        const contentStr = typeof contentRaw === 'string' ? contentRaw : (contentRaw == null ? '' : String(contentRaw))
+        let payload: Record<string, unknown> | null = null
+        try {
+            if (contentStr && contentStr.startsWith('{')) {
+                const parsed: unknown = JSON.parse(contentStr)
+                payload = isRecord(parsed) ? parsed : null
+            }
+        } catch {}
+        const profilesObj = isRecord(m.profiles) ? (m.profiles as Record<string, unknown>) : {}
         return {
-            id: m.id,
-            text: payload?.text ?? m.content,
-            kind: payload?.type ?? 'text',
-            mediaUrl: payload?.media_url,
-            thumbUrl: payload?.thumb_url,
-            uid: m.user_id,
-            createdAt: new Date(m.created_at),
-            displayName: m.profiles?.display_name || 'Unknown',
-            photoURL: m.profiles?.photo_url
+            id: String(m.id ?? ''),
+            text: String(payload?.text ?? contentStr),
+            kind: String(payload?.type ?? 'text'),
+            mediaUrl: payload?.media_url != null ? String(payload.media_url) : undefined,
+            thumbUrl: payload?.thumb_url != null ? String(payload.thumb_url) : undefined,
+            uid: String(m.user_id ?? ''),
+            createdAt: new Date(String(m.created_at ?? '')),
+            displayName: String(profilesObj?.display_name ?? 'Unknown'),
+            photoURL: profilesObj?.photo_url != null ? String(profilesObj.photo_url) : null
         }
     }, [])
 
@@ -177,7 +209,8 @@ const ChatScreen = ({ user, onClose }) => {
                 }
                 
                 if (json.ok && json.data) {
-                    setMessages(json.data.reverse().map(formatMessage));
+                    const rows = Array.isArray(json.data) ? json.data : []
+                    setMessages(rows.reverse().map((row) => formatMessage(isRecord(row) ? row : {})));
                 } else {
                     console.error("API returned error or no data:", json);
                 }
@@ -190,9 +223,9 @@ const ChatScreen = ({ user, onClose }) => {
         const channel = supabase
             .channel(`chat:${activeChannel.id}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${activeChannel.id}` },
-                async (payload) => {
+                async (payload: Record<string, unknown>) => {
                     try {
-                        const newMsg = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+                        const newMsg = isRecord(payload?.new) ? (payload.new as Record<string, unknown>) : null;
                         if (!newMsg) return;
                         const senderId = newMsg?.user_id ? String(newMsg.user_id) : '';
                         let profile = null;
@@ -202,9 +235,9 @@ const ChatScreen = ({ user, onClose }) => {
                                 .select('display_name, photo_url')
                                 .eq('id', senderId)
                                 .maybeSingle();
-                            profile = data || null;
+                            profile = isRecord(data) ? data : null;
                         }
-                        setMessages((prev) => [...prev, formatMessage({ ...newMsg, profiles: profile })]);
+                        setMessages((prev) => [...prev, formatMessage({ ...newMsg, profiles: profile } as Record<string, unknown>)]);
                     } catch (e) {
                         console.error('Erro ao processar mensagem realtime:', e);
                         return;
@@ -221,7 +254,7 @@ const ChatScreen = ({ user, onClose }) => {
         dummy.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const handleSendMessage = async (e) => {
+    const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!newMessage.trim() || !activeChannel) return;
         const text = newMessage;
@@ -234,7 +267,7 @@ const ChatScreen = ({ user, onClose }) => {
         })
     };
 
-    const handleDeleteMessage = async (msg) => {
+    const handleDeleteMessage = async (msg: FormattedMessage) => {
         const id = msg?.id ? String(msg.id) : '';
         if (!id) return;
         const ok = await confirmRef.current('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar' });
@@ -249,14 +282,15 @@ const ChatScreen = ({ user, onClose }) => {
             if (!res.ok || !json?.ok) throw new Error(json?.error || 'Erro ao deletar mensagem.');
             setMessages((prev) => prev.filter((m) => String(m?.id || '') !== id));
         } catch (e) {
-            await alertRef.current(e?.message || 'Erro ao deletar mensagem.');
+            const msg = (e as Record<string, unknown>)?.message
+            await alertRef.current(typeof msg === 'string' ? msg : 'Erro ao deletar mensagem.');
         }
     };
 
     const handleAttachClick = () => { fileInputRef.current?.click() }
 
-    const handleFileSelected = async (e: any) => {
-        const files = Array.from(e?.target?.files || []) as File[]
+    const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []) as File[]
         if (!files.length || !activeChannel) return
         setUploading(true)
         try {
@@ -267,14 +301,14 @@ const ChatScreen = ({ user, onClose }) => {
 
                 const pathBase = `${activeChannel.id}/${Date.now()}_${file.name.replace(/\s+/g,'_')}`
                 if (isImage) {
-                    const compressed: any = await compressImage(file, { maxWidth: 1280, quality: 0.8 })
-                    const thumb: any = await generateImageThumbnail(file, { thumbWidth: 360 })
+                    const compressed = (await compressImage(file, { maxWidth: 1280, quality: 0.8 })) as Blob
+                    const thumb = (await generateImageThumbnail(file, { thumbWidth: 360 })) as Blob
                     const signMain = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}.jpg` }) }).then(r => r.json())
                     if (!signMain.ok) throw new Error(signMain.error || 'Falha ao assinar upload')
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signMain.path, signMain.token, compressed as any)
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signMain.path, signMain.token, compressed)
                     const signThumb = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}_thumb.jpg` }) }).then(r => r.json())
                     if (!signThumb.ok) throw new Error(signThumb.error || 'Falha ao assinar thumbnail')
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signThumb.path, signThumb.token, thumb as any)
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signThumb.path, signThumb.token, thumb)
                     const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signMain.path)
                     const { data: pubThumb } = await supabase.storage.from('chat-media').getPublicUrl(signThumb.path)
                     const payload = { type: 'image', media_url: pub.publicUrl, thumb_url: pubThumb.publicUrl }
@@ -283,17 +317,21 @@ const ChatScreen = ({ user, onClose }) => {
                     if (file.size > 200 * 1024 * 1024) { await alertRef.current('Vídeo acima de 200MB. Comprima antes.'); continue }
                     const signVid = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}` }) }).then(r => r.json())
                     if (!signVid.ok) throw new Error(signVid.error || 'Falha ao assinar upload')
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file as any)
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file)
                     const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signVid.path)
                     const payload = { type: 'video', media_url: pub.publicUrl }
                     await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
                 }
             }
-        } catch (err) { console.error(err); await alertRef.current('Falha ao enviar mídia: '+(err?.message || String(err))) }
+        } catch (err) {
+            console.error(err);
+            const msg = (err as Record<string, unknown>)?.message
+            await alertRef.current('Falha ao enviar mídia: ' + (typeof msg === 'string' ? msg : String(err)))
+        }
         finally { setUploading(false); e.target.value = '' }
     }
 
-    const insertEmoji = (emoji) => { setNewMessage(prev => prev + emoji); setShowEmoji(false) }
+    const insertEmoji = (emoji: string) => { setNewMessage(prev => prev + emoji); setShowEmoji(false) }
 
     const handleAddGif = async () => {
         const url = await promptRef.current('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
@@ -302,26 +340,29 @@ const ChatScreen = ({ user, onClose }) => {
         await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
     }
 
-    const handleUserClick = async (targetUser) => {
+    const handleUserClick = async (targetUser: Record<string, unknown>) => {
         if (!safeUserId) {
             await alertRef.current('Sessão inválida. Faça login novamente.');
             return;
         }
-        const existingChat = privateChannels.find(c => c.otherUserId === targetUser.id);
+        const tu = isRecord(targetUser) ? targetUser : {}
+        const targetId = String(tu.id ?? '').trim()
+        const targetName = String(tu.display_name ?? '').trim()
+        const existingChat = privateChannels.find((c) => String((c as Record<string, unknown>)?.otherUserId ?? '') === targetId);
         
         if (existingChat) {
             openPrivateChat(existingChat);
             return;
         }
 
-        if (await confirmRef.current(`Quer conversar com ${targetUser.display_name}?`, "Iniciar Conversa")) {
-            setSendingInviteTo(targetUser.id);
+        if (await confirmRef.current(`Quer conversar com ${targetName}?`, "Iniciar Conversa")) {
+            setSendingInviteTo({ uid: targetId, displayName: targetName || 'Usuário' });
             try {
                 const { data: pending } = await supabase
                     .from('chat_invites')
                     .select('*')
                     .eq('sender_id', safeUserId)
-                    .eq('receiver_id', targetUser.id)
+                    .eq('receiver_id', targetId)
                     .eq('status', 'pending')
                     .single();
                 
@@ -332,10 +373,10 @@ const ChatScreen = ({ user, onClose }) => {
                         if (delErr) throw delErr;
                         const { error: reErr } = await supabase.from('chat_invites').insert({
                             sender_id: safeUserId,
-                            receiver_id: targetUser.id
+                            receiver_id: targetId
                         });
                         if (reErr) throw reErr;
-                        await alertRef.current(`Convite reenviado para ${targetUser.display_name}!`, "Convite Reenviado");
+                        await alertRef.current(`Convite reenviado para ${targetName}!`, "Convite Reenviado");
                         setView('list');
                     } else {
                         await alertRef.current("Você já enviou um convite para este usuário.");
@@ -343,10 +384,10 @@ const ChatScreen = ({ user, onClose }) => {
                 } else {
                     const { error } = await supabase.from('chat_invites').insert({
                         sender_id: safeUserId,
-                        receiver_id: targetUser.id
+                        receiver_id: targetId
                     });
                     if (error) throw error;
-                    await alertRef.current(`Convite enviado para ${targetUser.display_name}! Aguarde a aceitação.`, "Convite Enviado");
+                    await alertRef.current(`Convite enviado para ${targetName}! Aguarde a aceitação.`, "Convite Enviado");
                     setView('list');
                 }
             } catch (e) {
@@ -357,7 +398,7 @@ const ChatScreen = ({ user, onClose }) => {
         }
     };
 
-    const handleAcceptInvite = async (invite) => {
+    const handleAcceptInvite = async (invite: Record<string, unknown>) => {
         if (!safeUserId) {
             await alertRef.current('Sessão inválida. Faça login novamente.');
             return;
@@ -368,10 +409,10 @@ const ChatScreen = ({ user, onClose }) => {
 
             await supabase.from('chat_members').insert([
                 { channel_id: channel.id, user_id: safeUserId },
-                { channel_id: channel.id, user_id: invite.sender_id }
+                { channel_id: channel.id, user_id: String(invite.sender_id ?? '') }
             ]);
 
-            await supabase.from('chat_invites').update({ status: 'accepted' }).eq('id', invite.id);
+            await supabase.from('chat_invites').update({ status: 'accepted' }).eq('id', String(invite.id ?? ''));
 
             await loadData();
         } catch (e) {
@@ -379,13 +420,13 @@ const ChatScreen = ({ user, onClose }) => {
         }
     };
 
-    const handleRejectInvite = async (id) => {
+    const handleRejectInvite = async (id: string) => {
         await supabase.from('chat_invites').update({ status: 'rejected' }).eq('id', id);
         loadData();
     };
 
-    const openPrivateChat = (channel) => {
-        setActiveChannel({ ...channel, type: 'private' });
+    const openPrivateChat = (channel: Record<string, unknown>) => {
+        setActiveChannel({ ...(channel as ChannelRow), type: 'private' });
         setView('chat');
     };
 

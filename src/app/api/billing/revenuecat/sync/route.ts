@@ -102,7 +102,7 @@ export async function POST() {
     }
 
     return NextResponse.json({ ok: true, planId: productId, expiresDate })
-  } catch (e: any) {
+  } catch (e) {
     const msg = e?.message ? String(e.message) : String(e || 'error')
     return NextResponse.json({ ok: false, error: msg }, { status: 400 })
   }

@@ -25,7 +25,10 @@ const parseJson = (raw: any) => {
 const extractLogs = (notes: any) => {
   const base = notes && typeof notes === 'object' ? notes : null
   if (!base) return null
-  return (base as any)?.logs ?? (base as any)?.session?.logs ?? (base as any)?.rawSession?.logs ?? null
+  const obj = base as Record<string, unknown>
+  const session = obj?.session && typeof obj.session === 'object' ? (obj.session as Record<string, unknown>) : null
+  const rawSession = obj?.rawSession && typeof obj.rawSession === 'object' ? (obj.rawSession as Record<string, unknown>) : null
+  return obj?.logs ?? session?.logs ?? rawSession?.logs ?? null
 }
 
 export async function GET() {
@@ -68,7 +71,7 @@ export async function GET() {
         const entries = logsObj ? Object.entries(logsObj) : []
         const doneEntries = entries.filter(([, v]) => {
           const vv = v && typeof v === 'object' ? v : null
-          const done = (vv as any)?.done ?? (vv as any)?.isDone ?? (vv as any)?.completed ?? null
+          const done = (vv as Record<string, unknown>)?.done ?? (vv as Record<string, unknown>)?.isDone ?? (vv as Record<string, unknown>)?.completed ?? null
           return done === true || String(done || '').toLowerCase() === 'true'
         })
         return {
@@ -108,11 +111,10 @@ export async function GET() {
         rpc_error_raw: rpcRes.error ? safeJson(rpcRes.error) : null,
       },
     })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json(
       { ok: false, error: e?.message ? String(e.message) : String(e), where: 'api/diagnostics/iron-rank' },
       { status: 500 }
     )
   }
 }
-

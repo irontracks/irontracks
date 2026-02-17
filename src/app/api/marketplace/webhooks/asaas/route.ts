@@ -65,7 +65,7 @@ export async function POST(req: Request) {
       .single()
 
     if (insertErr) {
-      const code = (insertErr as any)?.code as string | undefined
+      const code = (insertErr as unknown as { code?: string })?.code
       const msg = insertErr.message || ''
       if (code === '23505' || msg.toLowerCase().includes('duplicate')) {
         return NextResponse.json({ ok: true, deduped: true })
@@ -173,7 +173,7 @@ export async function POST(req: Request) {
 
     await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e) {
     try {
       await admin
         .from('asaas_webhook_events')

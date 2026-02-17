@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
-    const name = String((body as any)?.name || '').trim()
+    const name = String((body as Record<string, unknown>)?.name || '').trim()
     if (!name) return NextResponse.json({ ok: false, error: 'name_required' }, { status: 400 })
 
     const normalized = normalizeExerciseName(name)
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
       const found = await searchYouTubeCandidates(q, 6)
       for (const it of found as any[]) {
         if (!it) continue
-        const videoId = String((it as any).videoId || '').trim()
+        const videoId = String((it as Record<string, unknown>).videoId || '').trim()
         if (!videoId || seen.has(videoId)) continue
         seen.add(videoId)
         candidates.push(it as any)
@@ -92,7 +92,7 @@ export async function POST(req: Request) {
 
     const count = Array.isArray(inserted) ? inserted.length : 0
     return NextResponse.json({ ok: true, exercise_library_id: libRow.id, created: count })
-  } catch (e: any) {
+  } catch (e) {
     const msg = e?.message ? String(e.message) : String(e)
     const status =
       msg === 'missing_youtube_key' || msg === 'missing_gemini_key'

@@ -99,8 +99,10 @@ export default function StoryViewer({
   const storyId = story?.id
   const storyViewed = Boolean(story?.viewed)
   const storyMediaUrl = story?.mediaUrl || ''
-  const storyMediaKind = (story as any)?.mediaKind
-  const storyTrimRaw = (story as any)?.meta?.trim ?? (story as any)?.trim
+  const storyObj = story && typeof story === 'object' ? (story as Record<string, unknown>) : ({} as Record<string, unknown>)
+  const storyMediaKind = storyObj?.mediaKind
+  const storyMeta = storyObj?.meta && typeof storyObj.meta === 'object' ? (storyObj.meta as Record<string, unknown>) : null
+  const storyTrimRaw = storyMeta?.trim ?? storyObj?.trim
   const mediaKind = useMemo(() => {
     const k = storyMediaKind
     if (k === 'video' || k === 'image') return k
@@ -130,8 +132,10 @@ export default function StoryViewer({
   const needsVideoFallback = isVideo && ((isIOS && isWebm) || !!videoError)
   const trimRange = useMemo(() => {
     const raw = storyTrimRaw
-    const start = Number(raw?.start ?? raw?.[0] ?? 0)
-    const end = Number(raw?.end ?? raw?.[1] ?? 0)
+    const rawObj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null
+    const rawArr = Array.isArray(raw) ? raw : null
+    const start = Number(rawObj?.start ?? rawArr?.[0] ?? 0)
+    const end = Number(rawObj?.end ?? rawArr?.[1] ?? 0)
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null
     return { start, end }
   }, [storyTrimRaw])
@@ -185,7 +189,7 @@ export default function StoryViewer({
         el.muted = next
         if (!next) {
           const p = el.play()
-          if (p && typeof (p as any).catch === 'function') (p as any).catch(() => {})
+          if (p) p.catch(() => {})
         }
       }
       return next
@@ -333,7 +337,7 @@ export default function StoryViewer({
           } catch {}
           try {
             const p = v.play()
-            if (p && typeof (p as any).catch === 'function') (p as any).catch(() => {})
+            if (p) p.catch(() => {})
           } catch {}
         }
       } else {
@@ -356,7 +360,7 @@ export default function StoryViewer({
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setComments(json.data || [])
-    } catch (e: any) {
+    } catch (e) {
       setCommentsError(e.message)
     } finally {
       setCommentsLoading(false)
@@ -372,7 +376,7 @@ export default function StoryViewer({
       if (!res.ok) throw new Error(json.error)
       setViewers(json.data || [])
       viewersStoryIdRef.current = storyId
-    } catch (e: any) {
+    } catch (e) {
       setViewersError(e.message)
     } finally {
       setViewersLoading(false)

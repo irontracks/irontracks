@@ -369,7 +369,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
       onClose();
     } catch (err) {
       console.error(err);
-      if (String((err as any)?.message || '').includes('video_metadata_timeout')) {
+      if (String((err as Record<string, unknown>)?.message || '').includes('video_metadata_timeout')) {
         setCompressionError('Não foi possível carregar o vídeo para compressão. Tente novamente.');
       } else if (mediaType === 'video' && media?.size > MAX_VIDEO_BYTES) {
         setCompressionError('Falha ao comprimir o vídeo. Reduza duração ou resolução e tente novamente.');

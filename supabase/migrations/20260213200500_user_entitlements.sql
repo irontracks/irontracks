@@ -83,7 +83,7 @@ select
 from public.app_subscriptions s
 where s.status in ('active','trialing','past_due')
   and s.asaas_subscription_id is not null
-on conflict (provider, provider_subscription_id)
+on conflict (provider, provider_subscription_id) where provider_subscription_id is not null
 do update set
   status = excluded.status,
   plan_id = excluded.plan_id,

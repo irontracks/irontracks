@@ -1,0 +1,67 @@
+import { NextResponse } from 'next/server'
+import { requireUser } from '@/utils/auth/route'
+import { getVipPlanLimits } from '@/utils/vip/limits'
+import { createAdminClient } from '@/utils/supabase/admin'
+
+export const dynamic = 'force-dynamic'
+
+export async function POST() {
+  try {
+    const auth = await requireUser()
+    if (!auth.ok) return auth.response
+
+    const userId = String(auth.user.id || '').trim()
+    const limits = await getVipPlanLimits(auth.supabase, userId)
+    if (limits.tier === 'free') {
+      return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
+    }
+
+    const admin = createAdminClient()
+
+    const { data: program } = await admin
+      .from('vip_periodization_programs')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const keepIds = new Set<string>()
+    if (program?.id) {
+      const { data: links } = await admin
+        .from('vip_periodization_workouts')
+        .select('workout_id')
+        .eq('user_id', userId)
+        .eq('program_id', String(program.id))
+        .limit(500)
+      ;(Array.isArray(links) ? links : []).forEach((r: any) => {
+        const id = String(r?.workout_id || '').trim()
+        if (id) keepIds.add(id)
+      })
+    }
+
+    const { data: vipTemplates } = await admin
+      .from('workouts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('is_template', true)
+      .ilike('name', 'VIP •%')
+      .is('archived_at', null)
+      .limit(2000)
+
+    const idsToArchive = (Array.isArray(vipTemplates) ? vipTemplates : [])
+      .map((r: any) => String(r?.id || '').trim())
+      .filter((id) => id && !keepIds.has(id))
+
+    if (!idsToArchive.length) return NextResponse.json({ ok: true, archived: 0 })
+
+    const { error } = await admin.from('workouts').update({ archived_at: new Date().toISOString() }).in('id', idsToArchive)
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+
+    return NextResponse.json({ ok: true, archived: idsToArchive.length })
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  }
+}
+

@@ -137,7 +137,7 @@ export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
       // Update job with failure info
       const attempts = (Number(j.attempts) || 0) + 1
       const nextAttemptAt = now + (1000 * 60 * Math.pow(2, attempts))
-      const nextJob: Record<string, unknown> = { ...j, attempts, lastError: String((err as any)?.message || err), nextAttemptAt }
+      const nextJob: Record<string, unknown> = { ...j, attempts, lastError: String((err as Record<string, unknown>)?.message || err), nextAttemptAt }
       
       if (attempts >= (Number(j.maxAttempts) || 7)) {
           nextJob.status = 'failed';

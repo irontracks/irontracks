@@ -1,27 +1,39 @@
-const formatDate = (ts) => {
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const formatDate = (ts: unknown): string => {
   if (!ts) return ''
-  const d = ts.toDate ? ts.toDate() : new Date(ts)
+  const obj = isRecord(ts) ? ts : null
+  const toDate = obj && typeof obj.toDate === 'function' ? (obj.toDate as () => unknown) : null
+  const d = toDate
+    ? toDate()
+    : new Date(typeof ts === 'number' || typeof ts === 'string' || ts instanceof Date ? ts : String(ts))
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-const formatShortDate = (ts) => {
+const formatShortDate = (ts: unknown): string => {
   try {
     if (!ts) return ''
-    const d = ts.toDate ? ts.toDate() : new Date(ts)
+    const obj = isRecord(ts) ? ts : null
+    const toDate = obj && typeof obj.toDate === 'function' ? (obj.toDate as () => unknown) : null
+    const d = toDate
+      ? toDate()
+      : new Date(typeof ts === 'number' || typeof ts === 'string' || ts instanceof Date ? ts : String(ts))
+    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
   } catch {
     return ''
   }
 }
 
-const formatDuration = (s) => {
+const formatDuration = (s: unknown): string => {
   const safe = Number(s) || 0
   const mins = Math.floor(safe / 60)
   const secs = Math.floor(safe % 60)
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`
 }
 
-const escapeHtml = (v) => {
+const escapeHtml = (v: unknown): string => {
   try {
     return String(v ?? '')
       .replaceAll('&', '&amp;')
@@ -34,7 +46,7 @@ const escapeHtml = (v) => {
   }
 }
 
-const normalizeExerciseKey = (v) => {
+const normalizeExerciseKey = (v: unknown): string => {
   try {
     return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ')
   } catch {
@@ -42,15 +54,14 @@ const normalizeExerciseKey = (v) => {
   }
 }
 
-const calculateTotalVolume = (logs) => {
+const calculateTotalVolume = (logs: unknown): number => {
   try {
     let volume = 0
-    const safeLogs = logs && typeof logs === 'object' ? logs : {}
-    Object.values(safeLogs).forEach((log) => {
-      if (!log || typeof log !== 'object') return
-      const row: any = log as any
-      const w = Number(String(row.weight ?? '').replace(',', '.'))
-      const r = Number(String(row.reps ?? '').replace(',', '.'))
+    const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {}
+    Object.values(safeLogs).forEach((log: unknown) => {
+      if (!isRecord(log)) return
+      const w = Number(String(log.weight ?? '').replace(',', '.'))
+      const r = Number(String(log.reps ?? '').replace(',', '.'))
       if (!Number.isFinite(w) || !Number.isFinite(r)) return
       if (w <= 0 || r <= 0) return
       volume += w * r
@@ -61,13 +72,13 @@ const calculateTotalVolume = (logs) => {
   }
 }
 
-const getSetTag = (log) => {
-  if (!log || typeof log !== 'object') return null
-  const row: any = log as any
-  const isWarmup = !!(row.is_warmup ?? row.isWarmup)
+const getSetTag = (log: unknown): string | null => {
+  if (!isRecord(log)) return null
+  const isWarmup = !!(log.is_warmup ?? log.isWarmup)
   if (isWarmup) return 'Aquecimento'
-  const cfg = row.advanced_config ?? row.advancedConfig
-  const rawType = cfg && (cfg.type || cfg.kind || cfg.mode)
+  const cfg = log.advanced_config ?? log.advancedConfig
+  const cfgObj = isRecord(cfg) ? cfg : null
+  const rawType = cfgObj ? (cfgObj.type ?? cfgObj.kind ?? cfgObj.mode) : null
   const t = String(rawType || '').toLowerCase()
   if (!t) return null
   if (t.includes('drop')) return 'Drop-set'
@@ -77,18 +88,26 @@ const getSetTag = (log) => {
   return 'Método'
 }
 
-export function buildReportData(session, previousSession, studentName = '', kcalOverride = null, options = null) {
-  const opts = options && typeof options === 'object' ? options : {}
-  const prevLogsByExercise = opts?.prevLogsByExercise && typeof opts.prevLogsByExercise === 'object' ? opts.prevLogsByExercise : null
-  const prevBaseMsByExercise = opts?.prevBaseMsByExercise && typeof opts.prevBaseMsByExercise === 'object' ? opts.prevBaseMsByExercise : null
-  const aiRaw = opts?.ai && typeof opts.ai === 'object' ? opts.ai : session?.ai && typeof session.ai === 'object' ? session.ai : null
+export function buildReportData(
+  session: unknown,
+  previousSession: unknown,
+  studentName = '',
+  kcalOverride: number | null = null,
+  options: unknown = null,
+) {
+  const opts: Record<string, unknown> = isRecord(options) ? options : {}
+  const prevLogsByExercise = isRecord(opts?.prevLogsByExercise) ? (opts.prevLogsByExercise as Record<string, unknown>) : null
+  const prevBaseMsByExercise = isRecord(opts?.prevBaseMsByExercise) ? (opts.prevBaseMsByExercise as Record<string, unknown>) : null
+  const aiFromOptions = isRecord(opts?.ai) ? opts.ai : null
+  const aiFromSession = isRecord(session) && isRecord((session as Record<string, unknown>).ai) ? (session as Record<string, unknown>).ai : null
+  const aiRaw = aiFromOptions || aiFromSession
 
-  const sessionObj = session && typeof session === 'object' ? session : {}
-  const prevObj = previousSession && typeof previousSession === 'object' ? previousSession : null
+  const sessionObj = isRecord(session) ? session : {}
+  const prevObj = isRecord(previousSession) ? previousSession : null
 
-  const sessionLogs = sessionObj?.logs && typeof sessionObj.logs === 'object' ? sessionObj.logs : {}
+  const sessionLogs: Record<string, unknown> = isRecord(sessionObj?.logs) ? (sessionObj.logs as Record<string, unknown>) : {}
   const currentVolume = calculateTotalVolume(sessionLogs)
-  const prevVolume = prevObj ? calculateTotalVolume(prevObj?.logs && typeof prevObj.logs === 'object' ? prevObj.logs : {}) : 0
+  const prevVolume = prevObj ? calculateTotalVolume(isRecord(prevObj?.logs) ? prevObj.logs : {}) : 0
   const volumeDeltaPct = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : null
 
   const totalTimeSeconds = Number(sessionObj?.totalTime) || 0
@@ -96,7 +115,7 @@ export function buildReportData(session, previousSession, studentName = '', kcal
     (Number(sessionObj?.realTotalTime) || 0)
     || (Array.isArray(sessionObj?.exerciseDurations) ? sessionObj.exerciseDurations.reduce((a, b) => a + (Number(b) || 0), 0) : 0)
 
-  const outdoorBikeRaw = sessionObj?.outdoorBike && typeof sessionObj.outdoorBike === 'object' ? sessionObj.outdoorBike : null
+  const outdoorBikeRaw = isRecord(sessionObj?.outdoorBike) ? (sessionObj.outdoorBike as Record<string, unknown>) : null
   const outdoorBike = outdoorBikeRaw ? {
     distanceKm: (() => {
       const dist = Number(outdoorBikeRaw?.distanceMeters)
@@ -134,71 +153,76 @@ export function buildReportData(session, previousSession, studentName = '', kcal
     return Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
   })()
 
-  const prevLogsMap: any = {};
-  const prevBaseMap: any = {};
+  const prevLogsMap: Record<string, Array<Record<string, unknown> | null>> = {}
+  const prevBaseMap: Record<string, unknown> = {}
   if (prevLogsByExercise) {
     Object.keys(prevLogsByExercise).forEach((k) => {
       const key = normalizeExerciseKey(k)
       if (!key) return
       const logs = prevLogsByExercise[k]
       if (!Array.isArray(logs)) return
-      prevLogsMap[key] = logs
+      prevLogsMap[key] = logs.map((x) => (isRecord(x) ? x : null))
       if (prevBaseMsByExercise && prevBaseMsByExercise[k] != null) {
         prevBaseMap[key] = prevBaseMsByExercise[k]
       }
     })
   } else {
-    const safePrevLogs = prevObj?.logs && typeof prevObj.logs === 'object' ? prevObj.logs : {}
-    if (prevObj && Array.isArray(prevObj?.exercises)) {
-      prevObj.exercises.forEach((ex, exIdx) => {
-        if (!ex || typeof ex !== 'object') return
-        const exName = String(ex?.name || '').trim()
+    const safePrevLogs: Record<string, unknown> = isRecord(prevObj?.logs) ? (prevObj.logs as Record<string, unknown>) : {}
+    const prevExercises: unknown[] = prevObj && Array.isArray(prevObj?.exercises) ? (prevObj.exercises as unknown[]) : []
+    if (prevExercises.length) {
+      prevExercises.forEach((ex, exIdx) => {
+        const exObj = isRecord(ex) ? ex : {}
+        const exName = String(exObj?.name || '').trim()
         const key = normalizeExerciseKey(exName)
         if (!key) return
-        const exLogs: any[] = [];
+        const exLogs: Array<Record<string, unknown> | null> = []
         Object.keys(safePrevLogs).forEach((k) => {
           const parts = String(k || '').split('-')
           const eIdx = parseInt(parts[0] || '0', 10)
           const sIdx = parseInt(parts[1] || '0', 10)
           if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx)) return
           if (eIdx !== exIdx) return
-          exLogs[sIdx] = safePrevLogs[k]
+          const v = safePrevLogs[k]
+          exLogs[sIdx] = isRecord(v) ? v : null
         })
         prevLogsMap[key] = exLogs
       })
     }
   }
 
-  const exercisesArray = Array.isArray(sessionObj?.exercises) ? sessionObj.exercises : []
+  const exercisesArray: unknown[] = Array.isArray(sessionObj?.exercises) ? (sessionObj.exercises as unknown[]) : []
   const exercises = exercisesArray.map((ex, exIdx) => {
-    const setsPlanned = parseInt(ex?.sets || 0, 10)
-    const exKey = normalizeExerciseKey(ex?.name)
+    const exObj = isRecord(ex) ? ex : {}
+    const setsPlanned = parseInt(String(exObj?.sets || 0), 10)
+    const exKey = normalizeExerciseKey(exObj?.name)
     const prevLogs = prevLogsMap[exKey] || []
     const baseMs = prevBaseMap[exKey]
     const baseLabel = baseMs ? `Base: ${formatShortDate(baseMs)}` : null
 
-    const sets: any[] = [];
+    type Progression = { type: 'weight' | 'reps' | 'volume'; deltaText: string; direction: 'up' | 'down' | 'flat' }
+    type SetRow = { index: number; weight: unknown; reps: unknown; cadence: unknown; tag: string | null; note: string | null; progression: Progression | null }
+    const sets: SetRow[] = []
     for (let sIdx = 0; sIdx < setsPlanned; sIdx++) {
       const key = `${exIdx}-${sIdx}`
       const log = sessionLogs[key]
-      if (!log || typeof log !== 'object') continue
+      if (!isRecord(log)) continue
       if (!log.weight && !log.reps) continue
 
       const prevLog = prevLogs[sIdx]
 
       const cw = Number(String(log.weight ?? '').replace(',', '.'))
       const cr = Number(String(log.reps ?? '').replace(',', '.'))
-      const pw = prevLog && typeof prevLog === 'object' ? Number(String(prevLog.weight ?? '').replace(',', '.')) : NaN
-      const pr = prevLog && typeof prevLog === 'object' ? Number(String(prevLog.reps ?? '').replace(',', '.')) : NaN
+      const pw = isRecord(prevLog) ? Number(String(prevLog.weight ?? '').replace(',', '.')) : NaN
+      const pr = isRecord(prevLog) ? Number(String(prevLog.reps ?? '').replace(',', '.')) : NaN
 
       const canWeight = Number.isFinite(cw) && cw > 0 && Number.isFinite(pw) && pw > 0
       const canReps = Number.isFinite(cr) && cr > 0 && Number.isFinite(pr) && pr > 0
 
-      let progression = null
-      if (prevLog && typeof prevLog === 'object') {
+      let progression: Progression | null = null
+      if (isRecord(prevLog)) {
         if (canWeight) {
           const delta = cw - pw
-          const fmt = (n) => (Number.isFinite(n) ? String(n).replace(/\.0+$/, '') : String(n))
+          const fmt = (n: unknown) => (Number.isFinite(Number(n)) ? String(n).replace(/\.0+$/, '') : String(n))
           const deltaText = delta > 0 ? `+${fmt(delta)}kg` : delta < 0 ? `${fmt(delta)}kg` : '='
           const direction = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
           progression = { type: 'weight', deltaText, direction }
@@ -222,26 +246,27 @@ export function buildReportData(session, previousSession, studentName = '', kcal
         }
       }
 
-      const note = (log && (log.note || log.observation)) || null
+      const noteRaw = log.notes ?? log.note ?? log.observation ?? null
+      const note = noteRaw != null ? String(noteRaw).trim() || null : null
       const tag = getSetTag(log)
       sets.push({
         index: sIdx + 1,
         weight: log.weight ?? null,
         reps: log.reps ?? null,
-        cadence: ex?.cadence ?? null,
+        cadence: exObj?.cadence ?? null,
         tag,
         note,
         progression,
       })
     }
 
-    const showProgression = sets.some((s) => s?.progression && s.progression.type && s.progression.type !== 'none')
+    const showProgression = sets.some((s) => !!s?.progression)
 
     return {
-      name: String(ex?.name || '').trim(),
-      method: ex?.method && ex.method !== 'Normal' ? String(ex.method) : null,
-      rpe: ex?.rpe ?? null,
-      cadence: ex?.cadence ?? null,
+      name: String(exObj?.name || '').trim(),
+      method: exObj?.method && exObj.method !== 'Normal' ? String(exObj.method) : null,
+      rpe: exObj?.rpe ?? null,
+      cadence: exObj?.cadence ?? null,
       baseLabel,
       showProgression,
       sets,
@@ -257,7 +282,7 @@ export function buildReportData(session, previousSession, studentName = '', kcal
 
       Object.keys(sessionLogs).forEach((k) => {
         const log = sessionLogs[k]
-        if (!log || typeof log !== 'object') return
+        if (!isRecord(log)) return
         const w = Number(String(log.weight ?? '').replace(',', '.'))
         const r = Number(String(log.reps ?? '').replace(',', '.'))
         if ((!Number.isFinite(w) || w <= 0) && (!Number.isFinite(r) || r <= 0)) return
@@ -318,7 +343,17 @@ export function buildReportData(session, previousSession, studentName = '', kcal
     session: {
       workoutId: sessionObj?.id ?? null,
       workoutTitle: String(sessionObj?.workoutTitle || 'Treino'),
-      startAt: sessionObj?.date ? new Date(sessionObj.date?.toDate ? sessionObj.date.toDate() : sessionObj.date).toISOString() : null,
+      startAt: (() => {
+        const raw = sessionObj?.date
+        if (!raw) return null
+        const obj = isRecord(raw) ? raw : null
+        const toDate = obj && typeof obj.toDate === 'function' ? (obj.toDate as () => unknown) : null
+        const d = toDate
+          ? toDate()
+          : new Date(typeof raw === 'number' || typeof raw === 'string' || raw instanceof Date ? raw : String(raw))
+        if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null
+        return d.toISOString()
+      })(),
       endAt: null,
       totalTimeSeconds,
       realTimeSeconds: realTotalTimeSeconds,
@@ -333,9 +368,15 @@ export function buildReportData(session, previousSession, studentName = '', kcal
   }
 }
 
-export function buildReportHTML(session, previousSession, studentName = '', kcalOverride = null, options = null) {
+export function buildReportHTML(
+  session: unknown,
+  previousSession: unknown,
+  studentName = '',
+  kcalOverride: number | null = null,
+  options: unknown = null,
+) {
   const reportData = buildReportData(session, previousSession, studentName, kcalOverride, options)
-  const aiRaw = reportData?.ai && typeof reportData.ai === 'object' ? reportData.ai : null
+  const aiRaw = isRecord((reportData as Record<string, unknown>)?.ai) ? ((reportData as Record<string, unknown>).ai as Record<string, unknown>) : null
 
   const volumeDeltaStr = reportData?.summaryMetrics?.volumeDeltaPctVsPrev != null
     ? Number(reportData.summaryMetrics.volumeDeltaPctVsPrev).toFixed(1)
@@ -369,7 +410,7 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
       return `<li><span style="font-weight:900; color:#f5f5f5">${ex || 'Ajuste'}</span><span style="color:#a3a3a3"> — ${rec}</span></li>`
     }).filter(Boolean)
 
-    const bullets = (items) => {
+    const bullets = (items: string[]) => {
       if (!items?.length) return ''
       return `<ul style="margin:10px 0 0; padding-left: 18px; display:grid; gap: 6px">${items.map((v) => `<li style="color:#e5e7eb">${escapeHtml(v)}</li>`).join('')}</ul>`
     }
@@ -380,7 +421,7 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
       return ''
     })()
 
-    const sections: any[] = [];
+    const sections: string[] = [];
     if (rating != null) {
       const filled = '★'.repeat(rating)
       const empty = '☆'.repeat(Math.max(0, 5 - rating))
@@ -650,7 +691,7 @@ export function buildReportHTML(session, previousSession, studentName = '', kcal
           </div>
           <div style="text-align:right">
             <div style="font-size:20px; font-weight:900; color:#fafafa">${workoutTitleSafe}</div>
-            <div style="color:#a3a3a3">${escapeHtml(formatDate(session?.date))}</div>
+            <div style="color:#a3a3a3">${escapeHtml(formatDate(isRecord(session) ? (session as Record<string, unknown>).date : null))}</div>
             ${studentNameSafe ? `<div style="color:#a3a3a3; font-size:12px; text-transform:uppercase; letter-spacing:.08em">Aluno: <span style="color:#fafafa; font-weight:900">${studentNameSafe}</span></div>` : ''}
           </div>
         </div>

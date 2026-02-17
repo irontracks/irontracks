@@ -75,7 +75,7 @@ export async function GET(req: Request) {
 
     const nextBefore = events.length ? events[events.length - 1]?.createdAt : null
     return NextResponse.json({ ok: true, events, nextBefore })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

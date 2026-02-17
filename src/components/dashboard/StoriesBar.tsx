@@ -34,7 +34,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       if (!res.ok || !json?.ok) throw new Error(String(json?.error || 'Falha ao carregar stories'))
       const arr = Array.isArray(json?.data) ? (json.data as StoryGroup[]) : []
       setGroups(arr)
-    } catch (e: any) {
+    } catch (e) {
       setError(String(e?.message || e))
       setGroups([])
     } finally {
@@ -101,7 +101,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
 
       await reload()
-    } catch (e: any) {
+    } catch (e) {
       const msg = String(e?.message || e)
       console.error('Story upload error:', e)
       const low = msg.toLowerCase()

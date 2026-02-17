@@ -42,7 +42,7 @@ export const getLatestWhatsNew = () => {
   if (!arr.length) return null
   const sorted = arr
     .slice()
-    .sort((a, b) => toMs(String((b as any)?.dateIso || '')) - toMs(String((a as any)?.dateIso || '')) || String((b as any)?.id || '').localeCompare(String((a as any)?.id || '')))
+    .sort((a, b) => toMs(String((b as Record<string, unknown>)?.dateIso || '')) - toMs(String((a as Record<string, unknown>)?.dateIso || '')) || String((b as Record<string, unknown>)?.id || '').localeCompare(String((a as Record<string, unknown>)?.id || '')))
   const latest = sorted[0]
   if (!latest) return null
   return latest

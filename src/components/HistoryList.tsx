@@ -9,6 +9,7 @@ import { generatePeriodReportInsights } from '@/actions/workout-actions';
 import { useDialog } from '@/contexts/DialogContext';
 import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
+import { adminFetchJson } from '@/utils/admin/adminFetch';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -16,12 +17,59 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const PERIOD_SESSIONS_LIMIT = 30;
 const TOP_EXERCISES_LIMIT = 5;
 
+interface WorkoutLog {
+    weight?: unknown;
+    reps?: unknown;
+    done?: boolean;
+    [key: string]: unknown;
+}
+
+interface WorkoutSummary {
+    id: string;
+    workoutTitle?: string | null;
+    date?: unknown;
+    dateMs?: unknown;
+    totalTime?: unknown;
+    rawSession?: Record<string, unknown> | null;
+    raw?: Record<string, unknown> | null;
+    isTemplate?: boolean;
+    exercises?: Array<Record<string, unknown>>;
+    name?: string | null;
+    [key: string]: unknown;
+}
+
+interface WorkoutTemplate {
+    id: string;
+    name?: string | null;
+    exercises?: Array<Record<string, unknown>>;
+    [key: string]: unknown;
+}
+
+interface ManualExercise {
+    name: string;
+    sets: number;
+    reps: string;
+    restTime: number;
+    cadence: string;
+    notes: string;
+    weights?: unknown[];
+    repsPerSet?: unknown[];
+    [key: string]: unknown;
+}
+
+type PeriodReport = { type: 'week' | 'month'; stats: Record<string, unknown> };
+type PeriodAiState = { status: 'idle' | 'loading' | 'ready' | 'error'; ai: Record<string, unknown> | null; error: string };
+type PeriodPdfState = { status: 'idle' | 'loading' | 'ready' | 'error'; url: string | null; blob: Blob | null; error: string };
+
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
 const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false, vipLimits, onUpgrade }) => {
     const { confirm, alert } = useDialog();
-    const [history, setHistory] = useState<any[]>([]);
+    const [history, setHistory] = useState<WorkoutSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const supabase = useMemo(() => createClient(), []);
     const safeUserId = user?.id ? String(user.id) : '';
+    const safeUserEmail = String((user as any)?.email || '').trim().toLowerCase();
     const isReadOnly = !!readOnly;
     const [range, setRange] = useState(() => (readOnly ? 'all' : '30'));
     const [showManual, setShowManual] = useState(false);
@@ -30,23 +78,23 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const [manualNotes, setManualNotes] = useState('');
     const [manualTab, setManualTab] = useState('existing');
     const weeklyReportCtaEnabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.weeklyReportCTA), [settings]);
-    const [availableWorkouts, setAvailableWorkouts] = useState<any[]>([]);
-    const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+    const [availableWorkouts, setAvailableWorkouts] = useState<WorkoutTemplate[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
     const [newWorkout, setNewWorkout] = useState({ title: '', exercises: [] });
-    const [manualExercises, setManualExercises] = useState<any[]>([]);
+    const [manualExercises, setManualExercises] = useState<ManualExercise[]>([]);
     const [showEdit, setShowEdit] = useState(false);
-    const [selectedSession, setSelectedSession] = useState<any>(null);
-    const [editId, setEditId] = useState<any>(null);
+    const [selectedSession, setSelectedSession] = useState<Record<string, unknown> | null>(null);
+    const [editId, setEditId] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState('');
     const [editDate, setEditDate] = useState(new Date().toISOString().slice(0,16));
     const [editDuration, setEditDuration] = useState('45');
     const [editNotes, setEditNotes] = useState('');
-    const [editExercises, setEditExercises] = useState<any[]>([]);
+    const [editExercises, setEditExercises] = useState<ManualExercise[]>([]);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
-    const [selectedIds, setSelectedIds] = useState(new Set());
-    const [periodReport, setPeriodReport] = useState<any>(null);
-    const [periodAi, setPeriodAi] = useState({ status: 'idle', ai: null, error: '' });
-    const [periodPdf, setPeriodPdf] = useState<any>({ status: 'idle', url: null, blob: null, error: '' });
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [periodReport, setPeriodReport] = useState<PeriodReport | null>(null);
+    const [periodAi, setPeriodAi] = useState<PeriodAiState>({ status: 'idle', ai: null, error: '' });
+    const [periodPdf, setPeriodPdf] = useState<PeriodPdfState>({ status: 'idle', url: null, blob: null, error: '' });
     const [shareError, setShareError] = useState('');
 
     const toggleSelectionMode = () => {
@@ -157,7 +205,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         if (typeof days !== 'number') return { visibleHistory: filteredHistory, blockedCount: 0 };
 
         const cutoff = Date.now() - days * DAY_MS;
-        const visible: any[] = [];
+        const visible: WorkoutSummary[] = [];
         let blocked = 0;
 
         filteredHistory.forEach(item => {
@@ -180,15 +228,14 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         return { count, totalMinutes, avgMinutes };
     }, [visibleHistory]);
 
-    const calculateTotalVolumeFromLogs = (logs) => {
+    const calculateTotalVolumeFromLogs = (logs: unknown) => {
         try {
-            const safeLogs = logs && typeof logs === 'object' ? logs : {};
+            const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {};
             let volume = 0;
             Object.values(safeLogs).forEach((log) => {
-                if (!log || typeof log !== 'object') return;
-                const row: any = log as any;
-                const w = Number(String(row.weight ?? '').replace(',', '.'));
-                const r = Number(String(row.reps ?? '').replace(',', '.'));
+                if (!isRecord(log)) return;
+                const w = Number(String(log.weight ?? '').replace(',', '.'));
+                const r = Number(String(log.reps ?? '').replace(',', '.'));
                 if (!Number.isFinite(w) || !Number.isFinite(r)) return;
                 if (w <= 0 || r <= 0) return;
                 volume += w * r;
@@ -217,13 +264,13 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
             let totalVolumeKg = 0;
             let totalSets = 0;
             let totalReps = 0;
-            const uniqueDays = new Set();
-            const exerciseMap = new Map();
-            const sessionSummaries: any[] = [];
+            const uniqueDays = new Set<string>();
+            const exerciseMap = new Map<string, { name: string; sets: number; reps: number; volumeKg: number; sessions: Set<string> }>();
+            const sessionSummaries: Array<{ date: unknown; minutes: number; volumeKg: number }> = [];
             list.forEach((item) => {
-                const raw = item?.rawSession && typeof item.rawSession === 'object' ? item.rawSession : null;
-                const logs = raw?.logs && typeof raw.logs === 'object' ? raw.logs : {};
-                const exercises = Array.isArray(raw?.exercises) ? raw.exercises : [];
+                const raw = isRecord(item?.rawSession) ? (item.rawSession as Record<string, unknown>) : null;
+                const logs: Record<string, unknown> = raw && isRecord(raw?.logs) ? (raw.logs as Record<string, unknown>) : {};
+                const exercises: unknown[] = raw && Array.isArray(raw?.exercises) ? (raw.exercises as unknown[]) : [];
                 const v = calculateTotalVolumeFromLogs(logs);
                 const safeVolume = Number.isFinite(v) && v > 0 ? v : 0;
                 if (safeVolume > 0) totalVolumeKg += safeVolume;
@@ -239,18 +286,18 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 const sessionMinutes = Math.max(0, Math.round((Number(item?.totalTime ?? raw?.totalTime) || 0) / 60));
                 sessionSummaries.push({ date: dateValue, minutes: sessionMinutes, volumeKg: Math.max(0, Math.round(safeVolume || 0)) });
                 Object.entries(logs || {}).forEach(([key, log]) => {
-                    if (!log || typeof log !== 'object') return;
-                    const row: any = log as any;
-                    const w = Number(String(row.weight ?? '').replace(',', '.'));
-                    const r = Number(String(row.reps ?? '').replace(',', '.'));
+                    if (!isRecord(log)) return;
+                    const w = Number(String(log.weight ?? '').replace(',', '.'));
+                    const r = Number(String(log.reps ?? '').replace(',', '.'));
                     if (!Number.isFinite(w) || !Number.isFinite(r)) return;
                     if (w <= 0 || r <= 0) return;
                     totalSets += 1;
                     totalReps += r;
                     const exIdx = Number.parseInt(String(key || '').split('-')[0] || '', 10);
-                    const rawName = Number.isFinite(exIdx) ? exercises?.[exIdx]?.name : null;
+                    const ex = Number.isFinite(exIdx) ? exercises?.[exIdx] : null;
+                    const rawName = isRecord(ex) ? ex.name : null;
                     const name = String(rawName || '').trim() || 'Exercício';
-                    const current = exerciseMap.get(name) || { name, sets: 0, reps: 0, volumeKg: 0, sessions: new Set() };
+                    const current = exerciseMap.get(name) || { name, sets: 0, reps: 0, volumeKg: 0, sessions: new Set<string>() };
                     current.sets += 1;
                     current.reps += r;
                     current.volumeKg += w * r;
@@ -349,7 +396,12 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
             try {
                 setLoading(true);
                 const baseUserId = user?.id;
-                const hasTarget = !!(targetId || targetEmail);
+                const role = String((user as any)?.role || '').toLowerCase();
+                const canUseAdmin = role === 'admin' || role === 'teacher';
+                const tId = String(targetId || '').trim();
+                const tEmail = String(targetEmail || '').trim().toLowerCase();
+                const wantsOtherUser = (!!tId && tId !== safeUserId) || (!!tEmail && tEmail !== safeUserEmail);
+                const hasTarget = canUseAdmin && wantsOtherUser;
 
                 if (!baseUserId && !hasTarget) {
                     setHistory([]);
@@ -362,8 +414,10 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                     const qs = targetId
                         ? `id=${encodeURIComponent(targetId)}`
                         : `email=${encodeURIComponent(targetEmail || '')}`;
-                    const resp = await fetch(`/api/admin/workouts/history?${qs}`);
-                    const json = await resp.json();
+                    const json = await adminFetchJson<{ ok: boolean; rows?: unknown[]; error?: string }>(
+                        supabase as any,
+                        `/api/admin/workouts/history?${qs}`,
+                    );
                     if (!json?.ok) throw new Error(json?.error || 'Falha ao carregar histórico');
                     data = Array.isArray(json?.rows) ? json.rows : [];
                 } else {
@@ -410,31 +464,41 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const saveManualExisting = async () => {
         try {
             if (!selectedTemplate) throw new Error('Selecione um treino');
-            const exIds = (selectedTemplate.exercises || []).map(e => e.id).filter(Boolean);
-            let setsMap = {};
+            const sourceExercises = Array.isArray(selectedTemplate.exercises) ? selectedTemplate.exercises : [];
+            const exIds = sourceExercises.map(e => String((e as Record<string, unknown>)?.id ?? '')).filter(Boolean);
+            const setsMap: Record<string, Array<Record<string, unknown>>> = {};
             if (exIds.length > 0) {
                 const { data: setsData } = await supabase
                     .from('sets')
                     .select('exercise_id, set_number, reps, rpe, weight')
                     .in('exercise_id', exIds)
                     .order('set_number');
-                (setsData || []).forEach(s => {
-                    const arr = setsMap[s.exercise_id] || (setsMap[s.exercise_id] = []);
-                    arr.push(s);
+                (setsData || []).forEach((s) => {
+                    const row = isRecord(s) ? (s as Record<string, unknown>) : null;
+                    const exId = String(row?.exercise_id ?? '');
+                    if (!exId) return;
+                    const arr = setsMap[exId] || (setsMap[exId] = []);
+                    if (row) arr.push(row);
                 });
             }
-            const exercises = (manualExercises.length ? manualExercises : (selectedTemplate.exercises || []).map(e => ({
-                name: e.name || '',
-                sets: (setsMap[e.id] || []).length || (Number(e.sets) || 0),
-                reps: e.reps || '',
-                restTime: Number(e.rest_time) || Number(e.restTime) || 0,
-                cadence: e.cadence || '',
-                notes: e.notes || ''
-            })));
-            const logs: any = {};
+            const exercises: ManualExercise[] = manualExercises.length
+                ? manualExercises
+                : sourceExercises.map((e) => {
+                    const row = isRecord(e) ? e : {};
+                    const id = String(row.id ?? '');
+                    return {
+                        name: String(row.name ?? ''),
+                        sets: (id && setsMap[id] ? setsMap[id].length : 0) || (Number(row.sets) || 0),
+                        reps: String(row.reps ?? ''),
+                        restTime: Number(row.rest_time) || Number(row.restTime) || 0,
+                        cadence: String(row.cadence ?? ''),
+                        notes: String(row.notes ?? ''),
+                    };
+                });
+            const logs: Record<string, WorkoutLog> = {};
             exercises.forEach((ex, exIdx) => {
                 const count = Number(ex.sets) || 0;
-                const weights = ex.weights || [];
+                const weights = Array.isArray(ex.weights) ? ex.weights : [];
                 for (let sIdx = 0; sIdx < count; sIdx++) {
                     logs[`${exIdx}-${sIdx}`] = {
                         weight: weights[sIdx] ?? '',
@@ -480,7 +544,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 cadence: e.cadence || '',
                 notes: e.notes || ''
             }));
-            const logs: any = {};
+            const logs: Record<string, WorkoutLog> = {};
             exercises.forEach((ex, exIdx) => {
                 for (let sIdx = 0; sIdx < (Number(ex.sets) || 0); sIdx++) {
                     logs[`${exIdx}-${sIdx}`] = { weight: '', reps: ex.reps || '', done: true };
@@ -531,29 +595,37 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         const buildManualFromTemplate = async () => {
             if (!selectedTemplate) { setManualExercises([]); return; }
             const sourceExercises = Array.isArray(selectedTemplate?.exercises) ? selectedTemplate.exercises : [];
-            const exIds = sourceExercises.map(e => e.id).filter(Boolean);
-            let setsMap = {};
+            const exIds = sourceExercises.map(e => String((e as Record<string, unknown>)?.id ?? '')).filter(Boolean);
+            const setsMap: Record<string, Array<Record<string, unknown>>> = {};
             if (exIds.length > 0) {
                 const { data: setsData } = await supabase
                     .from('sets')
                     .select('exercise_id, set_number, reps, rpe, weight')
                     .in('exercise_id', exIds)
                     .order('set_number');
-                (setsData || []).forEach(s => {
-                    const arr = setsMap[s.exercise_id] || (setsMap[s.exercise_id] = []);
-                    arr.push(s);
+                (setsData || []).forEach((s) => {
+                    const row = isRecord(s) ? (s as Record<string, unknown>) : null;
+                    const exId = String(row?.exercise_id ?? '');
+                    if (!exId) return;
+                    const arr = setsMap[exId] || (setsMap[exId] = []);
+                    if (row) arr.push(row);
                 });
             }
-            const exs = sourceExercises.map(e => ({
-                name: e.name || '',
-                sets: (setsMap[e.id] || []).length || (Number(e.sets) || 0),
-                reps: e.reps || '',
-                restTime: Number(e.rest_time) || Number(e.restTime) || 0,
-                cadence: e.cadence || '',
-                notes: e.notes || '',
-                weights: (setsMap[e.id] || []).map(s => s.weight ?? ''),
-                repsPerSet: (setsMap[e.id] || []).map(s => s.reps ?? '')
-            }));
+            const exs: ManualExercise[] = sourceExercises.map((e) => {
+                const row = isRecord(e) ? e : {};
+                const id = String(row.id ?? '');
+                const setRows = id ? (setsMap[id] || []) : [];
+                return {
+                    name: String(row.name ?? ''),
+                    sets: setRows.length || (Number(row.sets) || 0),
+                    reps: String(row.reps ?? ''),
+                    restTime: Number(row.rest_time) || Number(row.restTime) || 0,
+                    cadence: String(row.cadence ?? ''),
+                    notes: String(row.notes ?? ''),
+                    weights: setRows.map(s => s.weight ?? ''),
+                    repsPerSet: setRows.map(s => s.reps ?? '')
+                };
+            });
             setManualExercises(exs);
         };
         if (selectedTemplate && manualTab === 'existing') buildManualFromTemplate();
@@ -651,7 +723,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const saveEdit = async () => {
         try {
             const exercises = editExercises.map(ex => ({ name: ex.name || '', sets: Number(ex.sets) || 0, reps: ex.reps || '', restTime: Number(ex.restTime) || 0, cadence: ex.cadence || '', notes: ex.notes || '' }));
-            const logs: any = {};
+            const logs: Record<string, WorkoutLog> = {};
             exercises.forEach((ex, exIdx) => {
                 const count = Number(ex.sets) || 0;
                 for (let sIdx = 0; sIdx < count; sIdx++) {
@@ -1169,7 +1241,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                                                     <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
                                                     <div className="grid grid-cols-4 gap-2">
                                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                            <input key={sIdx} value={ex.weights?.[sIdx] ?? ''} onChange={(e)=>updateManualExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
+                                                            <input key={sIdx} value={String(ex.weights?.[sIdx] ?? '')} onChange={(e)=>updateManualExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
                                                         ))}
                                                     </div>
                                                 </div>
@@ -1177,7 +1249,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                                                     <label className="text-[10px] text-neutral-500">Reps por série</label>
                                                     <div className="grid grid-cols-4 gap-2">
                                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                            <input key={sIdx} value={ex.repsPerSet?.[sIdx] ?? ''} onChange={(e)=>updateManualExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
+                                                            <input key={sIdx} value={String(ex.repsPerSet?.[sIdx] ?? '')} onChange={(e)=>updateManualExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
                                                         ))}
                                                     </div>
                                                 </div>
@@ -1434,7 +1506,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                                         <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
                                         <div className="grid grid-cols-4 gap-2">
                                             {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                <input key={sIdx} value={ex.weights?.[sIdx] ?? ''} onChange={(e)=>updateEditExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
+                                                <input key={sIdx} value={String(ex.weights?.[sIdx] ?? '')} onChange={(e)=>updateEditExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
                                             ))}
                                         </div>
                                     </div>
@@ -1442,7 +1514,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                                         <label className="text-[10px] text-neutral-500">Reps por série</label>
                                         <div className="grid grid-cols-4 gap-2">
                                             {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                <input key={sIdx} value={ex.repsPerSet?.[sIdx] ?? ''} onChange={(e)=>updateEditExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
+                                                <input key={sIdx} value={String(ex.repsPerSet?.[sIdx] ?? '')} onChange={(e)=>updateEditExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
                                             ))}
                                         </div>
                                     </div>

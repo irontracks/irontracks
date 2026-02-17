@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
-    const rawNames = (body as any)?.names ?? (body as any)?.name ?? []
+    const rawNames = (body as Record<string, unknown>)?.names ?? (body as Record<string, unknown>)?.name ?? []
     const names = Array.isArray(rawNames) ? rawNames : [rawNames]
 
     const normalized = Array.from(
@@ -46,13 +46,13 @@ export async function POST(req: Request) {
 
     const videos: Record<string, string> = {}
     for (const row of data || []) {
-      const key = String((row as any)?.normalized_name || '').trim()
-      const url = String((row as any)?.video_url || '').trim()
+      const key = String((row as Record<string, unknown>)?.normalized_name || '').trim()
+      const url = String((row as Record<string, unknown>)?.video_url || '').trim()
       if (key && url) videos[key] = url
     }
 
     return NextResponse.json({ ok: true, videos })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

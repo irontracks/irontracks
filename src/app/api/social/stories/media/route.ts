@@ -50,7 +50,7 @@ export async function GET(req: Request) {
     if (story?.is_deleted) return new Response('not_found', { status: 404 })
     if (story?.expires_at && new Date(String(story.expires_at)).getTime() <= Date.now()) return new Response('not_found', { status: 404 })
 
-    const authorId = String((story as any)?.author_id || '').trim()
+    const authorId = String((story as Record<string, unknown>)?.author_id || '').trim()
     if (!authorId) return new Response('not_found', { status: 404 })
     if (authorId !== userId) {
       const { data: follow, error: fErr } = await admin
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
     headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
     headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
     return new Response(null, { status: 307, headers })
-  } catch (e: any) {
+  } catch (e) {
     return new Response(e?.message ?? 'internal_error', { status: 500 })
   }
 }
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     if (sErr || !data?.signedUrl) return NextResponse.json({ ok: false, error: sErr?.message || 'failed' }, { status: 400 })
 
     return NextResponse.json({ ok: true, url: data.signedUrl })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -78,7 +78,7 @@ export async function POST(req: Request) {
       .eq('id', sub.id)
 
     return NextResponse.json({ ok: true, cancelled: true, id: sub.id })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

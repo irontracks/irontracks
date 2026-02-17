@@ -45,7 +45,7 @@ export async function sendBroadcastMessage(title: string, message: string): Prom
             user_id: p.id,
             title,
             message,
-            type: 'broadcast', // Must match database constraints if any
+            type: 'broadcast',
             read: false,
             created_at: new Date().toISOString()
         }))
@@ -121,7 +121,7 @@ export async function addTeacher(
 
         if (!nextName || !nextEmail) throw new Error('Missing name or email')
 
-        const payload: any = { name: nextName, email: nextEmail, status: nextStatus }
+        const payload: Record<string, string | null> = { name: nextName, email: nextEmail, status: nextStatus }
         if (nextPhone !== null) payload.phone = nextPhone
         if (nextBirthDate !== null) payload.birth_date = nextBirthDate
 
@@ -199,7 +199,7 @@ export async function updateTeacher(id: unknown, data: Record<string, unknown>):
             return s ? s : null
         }
 
-        const payload: any = {}
+        const payload: Record<string, unknown> = {}
         const nextName = normalizeString(data?.name)
         const nextEmail = normalizeString(data?.email)?.toLowerCase() || null
         const nextPhone = normalizeString(data?.phone)
@@ -637,14 +637,17 @@ export async function importAllData(json: Record<string, unknown>): Promise<Acti
                 created_by: w?.created_by ?? null
             }
 
-            let savedW: any = null
+            let savedW: { id: string } | null = null
             if (w?.id) {
                 const { data, error } = await adminDb
                     .from('workouts')
                     .upsert({ ...baseWorkout, id: w.id }, { onConflict: 'id' })
                     .select()
                     .single()
-                if (!error) savedW = data
+                if (!error) {
+                    const row = data && typeof data === 'object' ? (data as Record<string, unknown>) : null
+                    if (row?.id) savedW = { id: String(row.id) }
+                }
             }
 
             if (!savedW) {
@@ -653,7 +656,8 @@ export async function importAllData(json: Record<string, unknown>): Promise<Acti
                     .insert(baseWorkout)
                     .select()
                     .single()
-                savedW = data
+                const row = data && typeof data === 'object' ? (data as Record<string, unknown>) : null
+                if (row?.id) savedW = { id: String(row.id) }
             }
 
             if (!savedW?.id) continue
@@ -662,7 +666,7 @@ export async function importAllData(json: Record<string, unknown>): Promise<Acti
                 .from('exercises')
                 .select('id')
                 .eq('workout_id', savedW.id)
-            const exIds = (Array.isArray(existingExs) ? existingExs : []).map((x: any) => x?.id).filter(Boolean)
+            const exIds = (Array.isArray(existingExs) ? existingExs : []).map((x: Record<string, unknown>) => x?.id).filter(Boolean)
             if (exIds.length) await adminDb.from('sets').delete().in('exercise_id', exIds)
             await adminDb.from('exercises').delete().eq('workout_id', savedW.id)
 
@@ -679,14 +683,17 @@ export async function importAllData(json: Record<string, unknown>): Promise<Acti
                     order: e?.order ?? idx
                 }
 
-                let savedEx: any = null
+                let savedEx: { id: string } | null = null
                 if (e?.id) {
                     const { data, error } = await adminDb
                         .from('exercises')
                         .upsert({ ...baseExercise, id: e.id }, { onConflict: 'id' })
                         .select()
                         .single()
-                    if (!error) savedEx = data
+                    if (!error) {
+                        const row = data && typeof data === 'object' ? (data as Record<string, unknown>) : null
+                        if (row?.id) savedEx = { id: String(row.id) }
+                    }
                 }
                 if (!savedEx) {
                     const { data } = await adminDb
@@ -694,7 +701,8 @@ export async function importAllData(json: Record<string, unknown>): Promise<Acti
                         .insert(baseExercise)
                         .select()
                         .single()
-                    savedEx = data
+                    const row = data && typeof data === 'object' ? (data as Record<string, unknown>) : null
+                    if (row?.id) savedEx = { id: String(row.id) }
                 }
 
                 if (!savedEx?.id) continue

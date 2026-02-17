@@ -5,6 +5,8 @@ import { createClient } from '@/utils/supabase/client';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
 import { parseExerciseNotesToSetOverrides } from '@/utils/training/notesMethodParser';
+import { HelpHint } from '@/components/ui/HelpHint';
+import { HELP_TERMS } from '@/utils/help/terms';
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
@@ -1297,7 +1299,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">RPE</label>
+                                                <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                    RPE
+                                                    <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
+                                                </label>
                                                 <input
                                                     type="number"
                                                     value={exercise.rpe || ''}
@@ -1316,7 +1321,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Cad</label>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                    Cad
+                                                    <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
+                                                </label>
                                                 <input
                                                     type="text"
                                                     value={exercise.cadence || ''}
@@ -1325,7 +1333,23 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Método</label>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                    Método
+                                                    {(() => {
+                                                        const m = String(safeMethod || 'Normal');
+                                                        const term =
+                                                            m === 'Drop-set'
+                                                                ? HELP_TERMS.dropSet
+                                                                : m === 'Rest-Pause'
+                                                                    ? HELP_TERMS.restPause
+                                                                    : m === 'Cluster'
+                                                                        ? HELP_TERMS.cluster
+                                                                        : m === 'Bi-Set'
+                                                                            ? HELP_TERMS.biSet
+                                                                            : null;
+                                                        return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
+                                                    })()}
+                                                </label>
                                                 <select
                                                     value={safeMethod || 'Normal'}
                                                     onChange={e => updateExercise(index, 'method', e.target.value)}

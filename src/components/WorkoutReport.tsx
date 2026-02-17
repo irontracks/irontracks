@@ -14,6 +14,13 @@ import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 
 type AnyObj = Record<string, unknown>
 
+interface AiState {
+    loading: boolean
+    error: string | null
+    result: Record<string, unknown> | null
+    cached: boolean
+}
+
 interface WorkoutReportProps {
     session: AnyObj | null
     previousSession?: AnyObj | null
@@ -215,7 +222,7 @@ const computeMatchKey = (s: unknown): { originId: string | null; titleKey: strin
 };
 
 const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings, onUpgrade }: WorkoutReportProps) => {
-    const reportRef = useRef<any>(null);
+    const reportRef = useRef<HTMLDivElement | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showStory, setShowStory] = useState(false);
@@ -223,9 +230,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         return isFeatureEnabled(settings, FEATURE_KEYS.storiesV2);
     }, [settings]);
     const [showStoryPrompt, setShowStoryPrompt] = useState(false);
-    const [pdfUrl, setPdfUrl] = useState<any>(null);
-    const [pdfBlob, setPdfBlob] = useState<any>(null);
-    const pdfFrameRef = useRef<any>(null);
+    const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
+    const pdfFrameRef = useRef<HTMLIFrameElement | null>(null);
     const supabase = useMemo(() => {
         try {
             return createClient();
@@ -234,13 +241,13 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         }
     }, []);
     const previousFetchInFlightRef = useRef(false);
-    const [resolvedPreviousSession, setResolvedPreviousSession] = useState<any>(null);
+    const [resolvedPreviousSession, setResolvedPreviousSession] = useState<Record<string, unknown> | null>(null);
     const prevByExerciseFetchInFlightRef = useRef(false);
     const [prevByExercise, setPrevByExercise] = useState<{ logsByExercise: Record<string, unknown>; baseMsByExercise: Record<string, unknown> }>({ logsByExercise: {}, baseMsByExercise: {} });
     const [checkinsByKind, setCheckinsByKind] = useState<{ pre: AnyObj | null; post: AnyObj | null }>({ pre: null, post: null });
-    const [aiState, setAiState] = useState<any>(() => {
-        const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
-        return { status: existing ? 'ready' : 'idle', ai: existing, saved: false, error: '' };
+    const [aiState, setAiState] = useState<AiState>(() => {
+        const existing = session?.ai && typeof session.ai === 'object' ? (session.ai as Record<string, unknown>) : null;
+        return { loading: false, error: null, result: existing, cached: !!existing };
     });
     const [showCoachChat, setShowCoachChat] = useState(false);
     const { credits } = useVipCredits();
@@ -273,9 +280,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     useEffect(() => {
         const existing = session?.ai && typeof session.ai === 'object' ? session.ai : null;
-        setAiState((prev: AnyObj) => {
-            if (existing) return { ...prev, status: 'ready', ai: existing, error: '' };
-            if (prev?.status === 'ready') return prev;
+        setAiState((prev) => {
+            if (existing && typeof existing === 'object') return { ...prev, loading: false, error: null, result: existing as Record<string, unknown>, cached: true };
             return prev;
         });
     }, [session]);
@@ -466,8 +472,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             if (error) throw error;
 
             const candidates = Array.isArray(rows) ? rows : [];
-            const resolvedLogs: any = {};
-            const resolvedBaseMs: any = {};
+            const resolvedLogs: Record<string, unknown> = {};
+            const resolvedBaseMs: Record<string, number> = {};
             const remaining = new Set(Array.from(wanted.keys()));
 
             for (const r of candidates) {
@@ -556,7 +562,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             let volume = 0;
             Object.values(safeLogs).forEach((log) => {
                 if (!log || typeof log !== 'object') return;
-                const row: any = log as any;
+                const row = log as Record<string, unknown>;
                 const w = Number(String(row.weight ?? '').replace(',', '.'));
                 const r = Number(String(row.reps ?? '').replace(',', '.'));
                 if (!Number.isFinite(w) || !Number.isFinite(r)) return;
@@ -611,7 +617,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             if (fromPerExercise && Object.keys(fromPerExercise).length) return fromPerExercise;
         } catch {}
 
-        const out: any = {};
+        const out: Record<string, unknown> = {};
         if (effectivePreviousSession && Array.isArray(effectivePreviousSession?.exercises)) {
             const safePrevLogs = prevSessionLogs as Record<string, unknown>;
             (effectivePreviousSession.exercises as unknown[]).forEach((ex: unknown, exIdx: number) => {
@@ -620,7 +626,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 const exName = String(exObj?.name || '').trim();
                 const keyName = normalizeExerciseKey(exName);
                 if (!keyName) return;
-                const exLogs: any[] = [];
+                const exLogs: Array<Record<string, unknown>> = [];
                 Object.keys(safePrevLogs).forEach((key) => {
                     try {
                         const parts = String(key || '').split('-');
@@ -628,7 +634,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         const sIdx = Number(parts[1]);
                         if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx)) return;
                         if (eIdx !== exIdx) return;
-                        exLogs[sIdx] = safePrevLogs[key];
+                        const value = safePrevLogs[key]
+                        if (value && typeof value === 'object') exLogs[sIdx] = value as Record<string, unknown>;
                     } catch {
                         return;
                     }
@@ -651,8 +658,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     const handleApplyProgression = async () => {
         if (!session) return;
-        if (!aiState || !aiState.ai) return;
-        const items = Array.isArray(aiState.ai.progression) ? aiState.ai.progression : [];
+        const ai = aiState?.result && typeof aiState.result === 'object' ? (aiState.result as AnyObj) : null
+        if (!ai) return;
+        const items = Array.isArray(ai.progression) ? ai.progression : [];
         if (!items.length) return;
         if (applyState.status === 'loading') return;
         setApplyState({ status: 'loading', error: '', templateId: null });
@@ -710,7 +718,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             const prevForReport = applyCanonicalNamesToSession(prev, canonicalMap);
             const prevLogsForReport = remapPrevLogsByCanonical(prevLogsMap, canonicalMap);
             const prevBaseForReport = remapPrevBaseMsByCanonical(prevBaseMsMap, canonicalMap);
-            let aiToUse = aiState?.ai || session?.ai || null;
+            let aiToUse: unknown = aiState?.result || (session?.ai && typeof session.ai === 'object' ? session.ai : null) || null;
             if (!aiToUse) {
                 try {
                     const res = await generatePostWorkoutInsights({
@@ -719,7 +727,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     });
                     if (res?.ok && res?.ai) {
                         aiToUse = res.ai;
-                        setAiState({ status: 'ready', ai: res.ai || null, saved: !!res.saved, error: '' });
+                        setAiState({ loading: false, error: null, result: (res.ai && typeof res.ai === 'object' ? (res.ai as Record<string, unknown>) : null), cached: !!res.saved });
                     }
                 } catch {}
             }
@@ -767,8 +775,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     const handleGenerateAi = async () => {
         if (!session) return;
-        if (aiState?.status === 'loading') return;
-        setAiState((prev: AnyObj) => ({ ...(prev || {}), status: 'loading', error: '', saved: false }));
+        if (aiState?.loading) return;
+        setAiState((prev) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: true, error: null, cached: false }));
         try {
             const res = await generatePostWorkoutInsights({
                 workoutId: typeof session?.id === 'string' ? session.id : null,
@@ -779,21 +787,22 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     if (onUpgrade) onUpgrade();
                     else alert('Upgrade necessário para usar esta função.');
                 }
-                setAiState((prev: AnyObj) => ({ ...(prev || {}), status: 'error', error: String(res?.error || 'Falha ao gerar insights') }));
+                setAiState((prev) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: String(res?.error || 'Falha ao gerar insights'), cached: false }));
                 return;
             }
-            setAiState({ status: 'ready', ai: res.ai || null, saved: !!res.saved, error: '' });
+            setAiState({ loading: false, error: null, result: (res.ai && typeof res.ai === 'object' ? (res.ai as Record<string, unknown>) : null), cached: !!res.saved });
         } catch (e) {
-            setAiState((prev: AnyObj) => ({ ...(prev || {}), status: 'error', error: String(e?.message || e || 'Falha ao gerar insights') }));
+            setAiState((prev) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: String((e as AnyObj | null)?.message || e || 'Falha ao gerar insights'), cached: false }));
         }
     };
 
     const renderAiRating = () => {
-        const raw = aiState?.ai?.rating ?? aiState?.ai?.stars ?? aiState?.ai?.score ?? null;
+        const ai = aiState?.result && typeof aiState.result === 'object' ? (aiState.result as AnyObj) : null
+        const raw = ai?.rating ?? ai?.stars ?? ai?.score ?? null;
         const n = Number(raw);
         if (!Number.isFinite(n)) return null;
         const rating = Math.max(0, Math.min(5, Math.round(n)));
-        const reason = String(aiState?.ai?.rating_reason || aiState?.ai?.ratingReason || aiState?.ai?.reason || '').trim();
+        const reason = String(ai?.rating_reason || ai?.ratingReason || ai?.reason || '').trim();
         return (
             <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-4">
                 <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2">Avaliação da IA</div>
@@ -978,7 +987,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 return null;
             }
         };
-        const recs: any[] = [];
+        const recs: string[] = [];
         const preEnergy = toNumberOrNull(preCheckin?.energy);
         const preSoreness = toNumberOrNull(preCheckin?.soreness);
         const preTime = toNumberOrNull(preCheckin?.timeMinutes);
@@ -1020,6 +1029,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         const v = (m ? m[1] : workoutTitleRaw).trim();
         return v || 'Treino';
     })();
+    const ai = aiState?.result && typeof aiState.result === 'object' ? (aiState.result as AnyObj) : null
 
     return (
         <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white flex flex-col">
@@ -1215,12 +1225,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                             <button
                                 type="button"
                                 onClick={handleGenerateAi}
-                                disabled={aiState?.status === 'loading'}
+                                disabled={aiState?.loading}
                                 className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60 flex-col leading-none"
                             >
                                 <div className="flex items-center gap-2">
-                                    {aiState?.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                                    {aiState?.ai ? 'Regerar' : 'Gerar'}
+                                    {aiState?.loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+                                    {ai ? 'Regerar' : 'Gerar'}
                                 </div>
                                 {credits?.insights && (
                                     <span className="text-[9px] font-mono opacity-80">
@@ -1239,20 +1249,20 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         </div>
                     </div>
 
-                    {aiState?.status === 'error' && (
+                    {aiState?.error && (
                         <div className="mt-3 text-sm font-semibold text-red-300">{aiState?.error || 'Falha ao gerar insights.'}</div>
                     )}
 
-                    {aiState?.ai && (
+                    {ai && (
                         <div className="mt-4 space-y-3">
                             {renderAiRating()}
-                            {aiState.ai.metrics && typeof aiState.ai.metrics === 'object' && (
+                            {ai.metrics && typeof ai.metrics === 'object' && (
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Volume total</div>
                                         <div className="text-lg font-mono font-bold text-white">
                                             {(() => {
-                                                const v = Number(aiState.ai.metrics.totalVolumeKg || 0);
+                                                const v = Number((ai.metrics as AnyObj)?.totalVolumeKg || 0);
                                                 if (!Number.isFinite(v) || v <= 0) return '—';
                                                 return `${v.toLocaleString('pt-BR')}kg`;
                                             })()}
@@ -1262,7 +1272,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                         <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Séries concluídas</div>
                                         <div className="text-lg font-mono font-bold text-white">
                                             {(() => {
-                                                const v = Number(aiState.ai.metrics.totalSetsDone || 0);
+                                                const v = Number((ai.metrics as AnyObj)?.totalSetsDone || 0);
                                                 if (!Number.isFinite(v) || v <= 0) return '—';
                                                 return v.toString();
                                             })()}
@@ -1272,7 +1282,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                         <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Exercícios</div>
                                         <div className="text-lg font-mono font-bold text-white">
                                             {(() => {
-                                                const v = Number(aiState.ai.metrics.totalExercises || 0);
+                                                const v = Number((ai.metrics as AnyObj)?.totalExercises || 0);
                                                 if (!Number.isFinite(v) || v <= 0) return '—';
                                                 return v.toString();
                                             })()}
@@ -1282,12 +1292,13 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                         <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Top exercício</div>
                                         <div className="text-xs font-semibold text-neutral-100">
                                             {(() => {
-                                                const list = Array.isArray(aiState.ai.metrics.topExercises) ? aiState.ai.metrics.topExercises : [];
+                                                const list = Array.isArray((ai.metrics as AnyObj)?.topExercises) ? ((ai.metrics as AnyObj).topExercises as unknown[]) : [];
                                                 if (!list.length) return '—';
                                                 const first = list[0] && typeof list[0] === 'object' ? list[0] : null;
                                                 if (!first) return '—';
-                                                const name = String(first.name || '').trim() || '—';
-                                                const v = Number(first.volumeKg || 0);
+                                                const f = first as AnyObj
+                                                const name = String(f.name || '').trim() || '—';
+                                                const v = Number(f.volumeKg || 0);
                                                 const volumeLabel = Number.isFinite(v) && v > 0 ? `${v.toLocaleString('pt-BR')}kg` : '';
                                                 return volumeLabel ? `${name} • ${volumeLabel}` : name;
                                             })()}
@@ -1300,27 +1311,27 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                 <div className="md:col-span-2 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Resumo</div>
                                     <ul className="space-y-2">
-                                        {(Array.isArray(aiState.ai.summary) ? aiState.ai.summary : []).map((item: unknown, idx: number) => (
+                                        {(Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []).map((item: unknown, idx: number) => (
                                             <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                     ))}
                                 </ul>
 
-                                {Array.isArray(aiState.ai.highlights) && aiState.ai.highlights.length > 0 && (
+                                {Array.isArray(ai.highlights) && (ai.highlights as unknown[]).length > 0 && (
                                     <div className="mt-4">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Destaques</div>
                                         <ul className="space-y-2">
-                                            {aiState.ai.highlights.map((item: unknown, idx: number) => (
+                                            {(ai.highlights as unknown[]).map((item: unknown, idx: number) => (
                                                 <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                             ))}
                                         </ul>
                                     </div>
                                 )}
 
-                                {Array.isArray(aiState.ai.warnings) && aiState.ai.warnings.length > 0 && (
+                                {Array.isArray(ai.warnings) && (ai.warnings as unknown[]).length > 0 && (
                                     <div className="mt-4">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Atenção</div>
                                         <ul className="space-y-2">
-                                            {aiState.ai.warnings.map((item: unknown, idx: number) => (
+                                            {(ai.warnings as unknown[]).map((item: unknown, idx: number) => (
                                                 <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
                                             ))}
                                         </ul>
@@ -1330,13 +1341,13 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
                                 <div className="bg-black rounded-xl p-4 text-white">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Motivação</div>
-                                    <div className="text-sm font-semibold">{String(aiState.ai.motivation || '').trim() || '—'}</div>
+                                    <div className="text-sm font-semibold">{String(ai.motivation || '').trim() || '—'}</div>
 
-                                    {Array.isArray(aiState.ai.prs) && aiState.ai.prs.length > 0 && (
+                                    {Array.isArray(ai.prs) && (ai.prs as unknown[]).length > 0 && (
                                         <div className="mt-4">
                                             <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRs</div>
                                             <div className="space-y-2">
-                                                {aiState.ai.prs.map((p: unknown, idx: number) => {
+                                                {(ai.prs as unknown[]).map((p: unknown, idx: number) => {
                                                     const pr = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
                                                     return (
                                                     <div key={idx} className="text-xs text-neutral-200">
@@ -1351,7 +1362,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                     )}
 
                                     <div className="mt-4">
-                                        {aiState?.saved ? (
+                                        {aiState?.cached ? (
                                             <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-yellow-400">
                                                 <Check size={14} /> Salvo no histórico
                                             </div>
@@ -1361,7 +1372,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                     </div>
                                 </div>
 
-                                {Array.isArray(aiState.ai.progression) && aiState.ai.progression.length > 0 && (
+                                {Array.isArray(ai.progression) && (ai.progression as unknown[]).length > 0 && (
                                     <div className="md:col-span-3 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
                                         <div className="flex items-center justify-between gap-3 mb-3">
                                             <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Progressão sugerida (próximo treino)</div>
@@ -1389,7 +1400,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                             </div>
                                         )}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {aiState.ai.progression.map((rec: unknown, idx: number) => {
+                                            {(ai.progression as unknown[]).map((rec: unknown, idx: number) => {
                                                 const r = rec && typeof rec === 'object' ? (rec as AnyObj) : ({} as AnyObj)
                                                 return (
                                                 <div key={idx} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
@@ -1594,12 +1605,27 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                             }
 
                                             return (
-                                                <tr key={sIdx} className="border-b border-neutral-800">
-                                                    <td className="py-2 font-mono text-neutral-400 text-xs">#{sIdx + 1}</td>
-                                                    <td className="py-2 text-center font-semibold text-sm">{logObj.weight != null && String(logObj.weight) !== '' ? String(logObj.weight) : '-'}</td>
-                                                    <td className="py-2 text-center font-mono text-sm">{logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '-'}</td>
-                                                    <td className={`py-2 text-center text-[11px] uppercase ${rowClass}`}>{progressionText}</td>
-                                                </tr>
+                                                <>
+                                                    <tr key={sIdx} className="border-b border-neutral-800">
+                                                        <td className="py-2 font-mono text-neutral-400 text-xs">#{sIdx + 1}</td>
+                                                        <td className="py-2 text-center font-semibold text-sm">{logObj.weight != null && String(logObj.weight) !== '' ? String(logObj.weight) : '-'}</td>
+                                                        <td className="py-2 text-center font-mono text-sm">{logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '-'}</td>
+                                                        <td className={`py-2 text-center text-[11px] uppercase ${rowClass}`}>{progressionText}</td>
+                                                    </tr>
+                                                    {(() => {
+                                                        const noteRaw = logObj?.notes ?? logObj?.note ?? logObj?.observation ?? null;
+                                                        const note = noteRaw != null ? String(noteRaw).trim() : '';
+                                                        if (!note) return null;
+                                                        return (
+                                                            <tr key={`${sIdx}-note`} className="border-b border-neutral-800">
+                                                                <td className="pb-3 pt-1 text-[10px] uppercase tracking-widest text-neutral-500 font-black">Obs</td>
+                                                                <td className="pb-3 pt-1 text-xs text-neutral-200" colSpan={3}>
+                                                                    {note}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })()}
+                                                </>
                                             );
                                         })}
                                     </tbody>
@@ -1639,12 +1665,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     isVip={isVip}
                     onUpgrade={onUpgrade}
                     onSaveToReport={(summary: unknown) => {
-                        setAiState((prev: AnyObj) => {
-                            const base = prev && typeof prev === 'object' ? prev : {}
-                            const ai = base.ai && typeof base.ai === 'object' ? (base.ai as AnyObj) : {}
+                        setAiState((prev) => {
+                            const ai = prev?.result && typeof prev.result === 'object' ? (prev.result as AnyObj) : {}
                             const current = Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []
-                            return { ...base, ai: { ...ai, summary: [...current, summary] } }
-                        });
+                            return { ...prev, result: { ...ai, summary: [...current, summary] } }
+                        })
                     }}
                 />
             )}

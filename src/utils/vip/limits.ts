@@ -57,7 +57,7 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     .single()
   
   if (profile?.role === 'admin' || profile?.role === 'teacher') {
-    return { tier: 'admin', limits: UNLIMITED_LIMITS, source: 'role' }
+    return { tier: 'vip_elite', limits: UNLIMITED_LIMITS, source: 'role', debug: { role: profile?.role } }
   }
 
   // 2. Check Entitlements Table (preferred)

@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     if (!data?.id) return jsonError(404, 'not_found')
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

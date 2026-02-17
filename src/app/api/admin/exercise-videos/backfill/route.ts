@@ -23,7 +23,7 @@ export async function POST(req: Request) {
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
-    const limitRaw = Number((body as any)?.limit)
+    const limitRaw = Number((body as Record<string, unknown>)?.limit)
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, Math.floor(limitRaw))) : 20
 
     const admin = createAdminClient()
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
     const normalizedToName = new Map<string, string>()
     for (const r of exRows || []) {
-      const name = String((r as any)?.name || '').trim()
+      const name = String((r as Record<string, unknown>)?.name || '').trim()
       if (!name) continue
       const normalized = normalizeExerciseName(name)
       if (!normalized) continue
@@ -59,10 +59,12 @@ export async function POST(req: Request) {
 
     const libByNormalized = new Map<string, { id: string; video_url: string | null }>()
     for (const r of existingLib || []) {
-      const n = String((r as any)?.normalized_name || '').trim()
-      const id = String((r as any)?.id || '').trim()
+      const n = String((r as Record<string, unknown>)?.normalized_name || '').trim()
+      const id = String((r as Record<string, unknown>)?.id || '').trim()
       if (!n || !id) continue
-      libByNormalized.set(n, { id, video_url: (r as any)?.video_url ?? null })
+      const rawUrl = (r as Record<string, unknown>)?.video_url
+      const video_url = typeof rawUrl === 'string' ? rawUrl : null
+      libByNormalized.set(n, { id, video_url })
     }
 
     let processed = 0
@@ -120,7 +122,7 @@ export async function POST(req: Request) {
         const found = await searchYouTubeCandidates(q, 6)
         for (const it of found as any[]) {
           if (!it) continue
-          const videoId = String((it as any).videoId || '').trim()
+          const videoId = String((it as Record<string, unknown>).videoId || '').trim()
           if (!videoId || seen.has(videoId)) continue
           seen.add(videoId)
           candidates.push(it as any)
@@ -157,7 +159,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, processed, created, skipped })
-  } catch (e: any) {
+  } catch (e) {
     const msg = e?.message ? String(e.message) : String(e)
     const status = msg === 'missing_youtube_key' || msg === 'missing_gemini_key' ? 400 : 500
     return NextResponse.json({ ok: false, error: msg }, { status })

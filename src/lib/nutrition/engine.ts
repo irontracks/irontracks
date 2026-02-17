@@ -75,7 +75,7 @@ export interface MealLog {
   fat: number
 }
 
-export async function trackMeal(userId: string, meal: MealLog): Promise<void> {
+export async function trackMeal(userId: string, meal: MealLog, dateKey?: string): Promise<any> {
   try {
     const safeUserId = typeof userId === 'string' ? userId.trim() : ''
     if (!safeUserId) throw new Error('nutrition_invalid_user_id')
@@ -96,45 +96,25 @@ export async function trackMeal(userId: string, meal: MealLog): Promise<void> {
 
     if (typeof window !== 'undefined') throw new Error('nutrition_track_meal_server_only')
 
+    const resolvedDateKey = typeof dateKey === 'string' ? dateKey.trim() : ''
+    if (!resolvedDateKey) throw new Error('nutrition_invalid_date')
+
     const { createClient } = await import('../../utils/supabase/server')
     const supabase = await createClient()
 
-    const dateKey = new Date().toISOString().slice(0, 10)
+    const { data, error } = await supabase.rpc('nutrition_add_meal_entry', {
+      p_date: resolvedDateKey,
+      p_food_name: foodName,
+      p_calories: calories,
+      p_protein: protein,
+      p_carbs: carbs,
+      p_fat: fat,
+    })
 
-    const { data: existing, error: readError } = await supabase
-      .from('daily_nutrition_logs')
-      .select('calories,protein,carbs,fat')
-      .eq('user_id', safeUserId)
-      .eq('date', dateKey)
-      .maybeSingle()
-
-    if (readError) {
-      throw new Error(readError.message || 'nutrition_log_read_failed')
-    }
-
-    const currentCalories = Number(existing?.calories ?? 0)
-    const currentProtein = Number(existing?.protein ?? 0)
-    const currentCarbs = Number(existing?.carbs ?? 0)
-    const currentFat = Number(existing?.fat ?? 0)
-
-    const nextRow = {
-      user_id: safeUserId,
-      date: dateKey,
-      calories: Math.max(0, (Number.isFinite(currentCalories) ? currentCalories : 0) + calories),
-      protein: Math.max(0, (Number.isFinite(currentProtein) ? currentProtein : 0) + protein),
-      carbs: Math.max(0, (Number.isFinite(currentCarbs) ? currentCarbs : 0) + carbs),
-      fat: Math.max(0, (Number.isFinite(currentFat) ? currentFat : 0) + fat),
-      updated_at: new Date().toISOString(),
-    }
-
-    const { error: upsertError } = await supabase
-      .from('daily_nutrition_logs')
-      .upsert(nextRow, { onConflict: 'user_id,date' })
-
-    if (upsertError) {
-      throw new Error(upsertError.message || 'nutrition_log_upsert_failed')
-    }
-  } catch (e: any) {
+    if (error) throw new Error(error.message || 'nutrition_log_upsert_failed')
+    const row = Array.isArray(data) ? data[0] : null
+    return row || null
+  } catch (e) {
     throw new Error(e?.message || 'nutrition_track_meal_failed')
   }
 }

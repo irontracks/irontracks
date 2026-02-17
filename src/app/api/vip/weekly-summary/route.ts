@@ -40,8 +40,8 @@ const extractLogsStatsByExercise = (session: any) => {
       if (!exName) return
       const key = normalizeText(exName)
       if (!key) return
-      const w = Number(String((log as any)?.weight ?? '').replace(',', '.'))
-      const r = Number(String((log as any)?.reps ?? '').replace(',', '.'))
+      const w = Number(String((log as Record<string, unknown>)?.weight ?? '').replace(',', '.'))
+      const r = Number(String((log as Record<string, unknown>)?.reps ?? '').replace(',', '.'))
       if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return
       const volume = w * r
       const cur = byKey.get(key) || { exercise: exName, weight: 0, reps: 0, volume: 0 }
@@ -192,7 +192,7 @@ export async function GET() {
     const summaryText = lines.join('\n')
 
     return NextResponse.json({ ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

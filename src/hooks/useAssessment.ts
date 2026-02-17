@@ -236,7 +236,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       if (error) throw error;
       return normalizeAssessmentRow(data);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Erro ao buscar avaliação:', e);
       setError(e.message);
       return null;
@@ -264,7 +264,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       const normalized = (data || []).map(normalizeAssessmentRow);
       setAssessments(normalized);
       return normalized;
-    } catch (e: any) {
+    } catch (e) {
       console.error('Erro ao buscar avaliações do aluno:', e);
       setError(e.message);
       return [];
@@ -375,7 +375,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       setAssessments(prev => [normalized, ...prev]);
       
       return { success: true, data: normalized };
-    } catch (e: any) {
+    } catch (e) {
       console.error('Erro ao criar avaliação:', e);
       setError(e.message);
       return { success: false, error: e.message };
@@ -402,7 +402,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       setAssessments(prev => prev.map(a => a.id === id ? normalized : a));
 
       return { success: true, data: normalized };
-    } catch (e: any) {
+    } catch (e) {
       console.error('Erro ao atualizar avaliação:', e);
       setError(e.message);
       return { success: false, error: e.message };
@@ -426,7 +426,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       setAssessments(prev => prev.filter(a => a.id !== id));
 
       return { success: true };
-    } catch (e: any) {
+    } catch (e) {
       console.error('Erro ao excluir avaliação:', e);
       setError(e.message);
       return { success: false, error: e.message };

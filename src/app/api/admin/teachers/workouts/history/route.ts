@@ -37,9 +37,9 @@ export async function GET(req: Request) {
 
     const studentNameById = new Map<string, string>()
     for (const s of students || []) {
-      const uid = String((s as any)?.user_id || '').trim()
+      const uid = String((s as Record<string, unknown>)?.user_id || '').trim()
       if (!uid) continue
-      const nm = String((s as any)?.name || '').trim()
+      const nm = String((s as Record<string, unknown>)?.name || '').trim()
       if (nm) studentNameById.set(uid, nm)
     }
 
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
     const next_cursor = last?.date || last?.created_at ? { cursor_date: last?.date || null, cursor_created_at: last?.created_at || null } : null
 
     return NextResponse.json({ ok: true, rows: enriched, next_cursor }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

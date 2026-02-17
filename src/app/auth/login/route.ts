@@ -6,16 +6,30 @@ import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
-const getAppOrigin = (): string => {
-  const env = process.env.NEXT_PUBLIC_APP_URL || process.env.IRONTRACKS_PUBLIC_ORIGIN || ''
-  if (env) {
-    try { return new URL(env).origin } catch {}
+const resolvePublicOrigin = (request: Request) => {
+  const isLocalEnv = process.env.NODE_ENV === 'development'
+  const envOriginRaw = String(
+    process.env.IRONTRACKS_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || '',
+  ).trim()
+  if (envOriginRaw) {
+    try {
+      return new URL(envOriginRaw).origin
+    } catch {}
   }
-  // Desenvolvimento: fallback para localhost
-  if (process.env.NODE_ENV === 'development') {
-    return 'http://localhost:3000'
+
+  const host = String(request.headers.get('x-forwarded-host') || request.headers.get('host') || '').trim()
+  const proto = String(request.headers.get('x-forwarded-proto') || (isLocalEnv ? 'http' : 'https')).trim()
+  if (host) {
+    const base = `${proto}://${host}`
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
   }
-  return ''
+
+  try {
+    const base = new URL(request.url).origin
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+  } catch {
+    return isLocalEnv ? 'http://localhost:3000' : 'https://localhost'
+  }
 }
 
 const QuerySchema = z
@@ -33,10 +47,7 @@ export async function GET(request: Request) {
   const q = QuerySchema.parse(Object.fromEntries(url.searchParams.entries()))
   const next = q.next ?? '/dashboard'; const provider = q.provider
   const nextCookieName = 'it.auth.next'; const nextCookieMaxAgeSeconds = 60 * 5
-  const safeOrigin = getAppOrigin()
-  if (!safeOrigin) {
-    return NextResponse.redirect(new URL('/auth/error?error=missing_public_origin', request.url))
-  }
+  const safeOrigin = resolvePublicOrigin(request)
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL; const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -63,7 +74,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'oauth_failed')}`, safeOrigin))
     }
     oauthUrl = data?.url || null
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(e?.message || 'oauth_failed')}`, safeOrigin))
   }
 

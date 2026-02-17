@@ -66,7 +66,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
-    const content = String((msg as any).content || '').trim()
+    const content = String((msg as Record<string, unknown>).content || '').trim()
     const paths: string[] = []
     try {
       const payload = JSON.parse(content)
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     if (delErr) return NextResponse.json({ ok: false, error: delErr.message }, { status: 400 })
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

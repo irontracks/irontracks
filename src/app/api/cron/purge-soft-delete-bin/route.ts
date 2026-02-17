@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     .lte('purge_after', nowIso)
     .limit(500)
 
-  const ids = (rows || []).map((r) => String((r as any).id || '')).filter(Boolean)
+  const ids = (rows || []).map((r) => String((r as Record<string, unknown>).id || '')).filter(Boolean)
   if (ids.length) {
     await admin.from('soft_delete_bin').delete().in('id', ids)
   }

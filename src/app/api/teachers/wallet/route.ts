@@ -14,12 +14,13 @@ const ZodBodySchema = z
   })
   .passthrough()
 
-const isMissingColumn = (err: any, column: string) => {
-  const msg = String(err?.message || '').toLowerCase()
+const isMissingColumn = (err: unknown, column: string): boolean => {
+  const e = err && typeof err === 'object' ? (err as Record<string, unknown>) : {}
+  const msg = String(e?.message || '').toLowerCase()
   return msg.includes(column.toLowerCase()) && (msg.includes('could not find') || msg.includes('column'))
 }
 
-const canUseWalletFields = (err: any) => {
+const canUseWalletFields = (err: unknown): boolean => {
   return !isMissingColumn(err, 'asaas_wallet_id') && !isMissingColumn(err, 'asaas_account_id') && !isMissingColumn(err, 'asaas_account_status')
 }
 
@@ -57,7 +58,7 @@ export async function GET() {
         .maybeSingle()
     }
 
-    let teacher: any | null = null
+    let teacher: Record<string, unknown> | null = null
 
     let byUser = await fetchByUserId(selectFull)
     if (byUser?.error && !canUseWalletFields(byUser.error)) byUser = await fetchByUserId(selectFallback)
@@ -77,14 +78,15 @@ export async function GET() {
     if (teacher?.id && !teacher?.user_id) {
       const rowEmail = String(teacher?.email || '').toLowerCase().trim()
       if (rowEmail && normalizedEmail && rowEmail === normalizedEmail) {
-        await admin.from('teachers').update({ user_id: user.id }).eq('id', teacher.id)
+        await admin.from('teachers').update({ user_id: user.id }).eq('id', String(teacher.id))
         teacher = { ...(teacher || {}), user_id: user.id }
       }
     }
 
     return NextResponse.json({ ok: true, teacher: teacher || null })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
 }
 
@@ -128,7 +130,7 @@ export async function POST(req: Request) {
         .maybeSingle()
     }
 
-    let teacherRow: any | null = null
+    let teacherRow: Record<string, unknown> | null = null
 
     let byUser = await fetchByUserId(selectFull)
     if (byUser?.error && !canUseWalletFields(byUser.error)) byUser = await fetchByUserId(selectFallback)
@@ -142,7 +144,7 @@ export async function POST(req: Request) {
 
     if (!teacherRow) {
       const { data: profile } = await admin.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         email: normalizedEmail,
         name: String(profile?.display_name || normalizedEmail).trim(),
         status: 'active',
@@ -154,7 +156,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, teacher: inserted })
     }
 
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       asaas_wallet_id: walletId,
     }
     if (!teacherRow.user_id) updates.user_id = user.id
@@ -163,13 +165,14 @@ export async function POST(req: Request) {
     const { data: updated, error: updateErr } = await admin
       .from('teachers')
       .update(updates)
-      .eq('id', teacherRow.id)
+      .eq('id', String(teacherRow.id))
       .select(selectFull)
       .single()
     if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 400 })
 
     return NextResponse.json({ ok: true, teacher: updated })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
 }

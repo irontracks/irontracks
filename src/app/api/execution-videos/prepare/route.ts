@@ -94,7 +94,7 @@ export async function POST(req: Request) {
       { ok: true, submission_id: submissionId, bucket: bucketId, path: objectPath, token: signed.token, teacher_user_id: teacherId },
       { headers: { 'cache-control': 'no-store, max-age=0' } },
     )
-  } catch (e: any) {
+  } catch (e) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

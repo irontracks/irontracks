@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       }
     }
     return NextResponse.json({ ok: true, name })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -14,6 +14,8 @@ import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
+import { HelpHint } from '@/components/ui/HelpHint';
+import { HELP_TERMS } from '@/utils/help/terms';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -354,6 +356,14 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const [deloadSuggestions, setDeloadSuggestions] = useState<Record<string, unknown>>({});
   const [timerMinimized, setTimerMinimized] = useState<boolean>(false);
   const [currentExerciseIdx, setCurrentExerciseIdx] = useState<number>(0);
+  const [editExerciseOpen, setEditExerciseOpen] = useState<boolean>(false);
+  const [editExerciseIdx, setEditExerciseIdx] = useState<number | null>(null);
+  const [editExerciseDraft, setEditExerciseDraft] = useState<{ name: string; sets: string; restTime: string; method: string }>(() => ({
+    name: '',
+    sets: '3',
+    restTime: '60',
+    method: 'Normal',
+  }));
 
   const restPauseRefs = useRef<InputRefMap>({});
   const clusterRefs = useRef<InputRefMap>({});
@@ -501,9 +511,62 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     return isObject(cfg) ? cfg : null;
   };
 
+  const normalizeNaturalNote = (v: unknown) => {
+    try {
+      return String(v ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    } catch {
+      return String(v ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+  };
+
+  const inferDropSetStagesFromNote = (notes: unknown): number => {
+    const s = normalizeNaturalNote(notes);
+    if (!s) return 0;
+    if (!s.includes('drop')) return 0;
+    const isDouble = s.includes('duplo') || s.includes('dupla') || s.includes('2 drops') || s.includes('2drop');
+    const isTriple = s.includes('triplo') || s.includes('tripla') || s.includes('3 drops') || s.includes('3drop');
+    if (isTriple) return 4;
+    if (isDouble) return 3;
+    return 2;
+  };
+
+  const shouldInjectDropSetForSet = (ex: WorkoutExercise, setIdx: number, setsCount: number): number => {
+    const notes = String(ex?.notes ?? '').trim();
+    if (!notes) return 0;
+    const normalized = normalizeNaturalNote(notes);
+    if (!normalized.includes('drop')) return 0;
+    if (normalized.includes('em todas') || normalized.includes('todas as series') || normalized.includes('todas series')) {
+      return inferDropSetStagesFromNote(notes);
+    }
+    const wantsLast = normalized.includes('ultima') || normalized.includes('ultim');
+    if (!wantsLast) return 0;
+    if (setIdx !== Math.max(0, setsCount - 1)) return 0;
+    return inferDropSetStagesFromNote(notes);
+  };
+
   const getPlannedSet = (ex: WorkoutExercise, setIdx: number): UnknownRecord | null => {
     const sdArr: unknown[] = Array.isArray(ex.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex.set_details) ? (ex.set_details as unknown[]) : [];
     const sd = isObject(sdArr?.[setIdx]) ? (sdArr[setIdx] as UnknownRecord) : null;
+    const rawCfg = sd ? (sd.advanced_config ?? sd.advancedConfig ?? null) : null;
+    if (Array.isArray(rawCfg) && rawCfg.length > 0) return sd;
+
+    const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
+    const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0) || 0;
+    const inferredStages = shouldInjectDropSetForSet(ex, setIdx, setsCount);
+    if (inferredStages > 0) {
+      const stages = Array.from({ length: inferredStages }).map(() => ({ weight: null, reps: null }));
+      return {
+        ...(sd || {}),
+        it_auto: { ...(isObject(sd?.it_auto) ? (sd?.it_auto as UnknownRecord) : {}), label: 'Drop' },
+        advanced_config: stages,
+      };
+    }
+
     return sd;
   };
 
@@ -1386,7 +1449,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           }
           let suggestion = buildDeloadSuggestion(safeEx, safeIdx, aiSuggestion);
           if (!suggestion.ok) {
-            const missingWeight = String((suggestion as any).error || '').toLowerCase().includes('sem carga');
+            const missingWeight = String((suggestion as Record<string, unknown>).error || '').toLowerCase().includes('sem carga');
             if (missingWeight && !aiSuggestion) {
               aiSuggestion = await resolveAiSuggestionForExercise(suggestionDraft.ok ? suggestionDraft.name : name);
               const ai = aiSuggestion;
@@ -1405,7 +1468,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
             }
           }
           if (!suggestion.ok) {
-            const baseError = String((suggestion as any).error || '') || (!suggestionDraft.ok ? (suggestionDraft as any).error : '') || 'Sem dados suficientes para calcular o deload.';
+            const baseError = String((suggestion as Record<string, unknown>).error || '') || (!suggestionDraft.ok ? (suggestionDraft as Record<string, unknown>).error : '') || 'Sem dados suficientes para calcular o deload.';
             const baseErrorClean = String(baseError || '').replace(/^Deload indisponível:\s*/i, '');
             const reportMsg = reportHistoryStatus?.status === 'loading'
               ? 'Relatórios ainda carregando.'
@@ -1608,6 +1671,97 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
         await alert('Não foi possível adicionar série extra: ' + msg);
+      } catch {}
+    }
+  };
+
+  const openEditExercise = async (exIdx: unknown) => {
+    if (!workout) return;
+    const idx = Number(exIdx);
+    if (!Number.isFinite(idx) || idx < 0) return;
+    if (idx >= exercises.length) return;
+    try {
+      const ex = exercises[idx] && typeof exercises[idx] === 'object' ? exercises[idx] : ({} as WorkoutExercise);
+      const name = String(ex?.name || '').trim() || `Exercício ${idx + 1}`;
+      const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
+      const sdArrRaw: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
+      const setsCount = Math.max(setsHeader, Array.isArray(sdArrRaw) ? sdArrRaw.length : 0) || 1;
+      const restTimeNum = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+      const restTime = typeof restTimeNum === 'number' && Number.isFinite(restTimeNum) && restTimeNum > 0 ? restTimeNum : DEFAULT_EXTRA_EXERCISE_REST_TIME_S;
+      const method = String(ex?.method || 'Normal').trim() || 'Normal';
+
+      setEditExerciseDraft({ name, sets: String(setsCount), restTime: String(restTime), method });
+      setEditExerciseIdx(idx);
+      setEditExerciseOpen(true);
+    } catch (e: unknown) {
+      try {
+        const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
+        await alert('Não foi possível abrir a edição do exercício: ' + msg);
+      } catch {}
+    }
+  };
+
+  const saveEditExercise = async () => {
+    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    const idx = typeof editExerciseIdx === 'number' ? editExerciseIdx : -1;
+    if (idx < 0 || idx >= exercises.length) return;
+    const name = String(editExerciseDraft?.name || '').trim();
+    if (!name) {
+      try {
+        await alert('Informe o nome do exercício.', 'Editar exercício');
+      } catch {}
+      return;
+    }
+    const desiredSets = Math.max(1, Math.min(MAX_EXTRA_SETS_PER_EXERCISE, Number.parseInt(String(editExerciseDraft?.sets || '1'), 10) || 1));
+    const restParsed = parseTrainingNumber(editExerciseDraft?.restTime);
+    const restTime = typeof restParsed === 'number' && Number.isFinite(restParsed) && restParsed > 0 ? restParsed : null;
+    const method = String(editExerciseDraft?.method || 'Normal').trim() || 'Normal';
+
+    try {
+      const nextExercises = [...exercises];
+      const exRaw = nextExercises[idx] && typeof nextExercises[idx] === 'object' ? nextExercises[idx] : ({} as WorkoutExercise);
+      const setsHeader = Math.max(0, Number.parseInt(String(exRaw?.sets ?? '0'), 10) || 0);
+      const sdArrRaw: unknown[] = Array.isArray(exRaw?.setDetails) ? (exRaw.setDetails as unknown[]) : Array.isArray(exRaw?.set_details) ? (exRaw.set_details as unknown[]) : [];
+      const sdArr = Array.isArray(sdArrRaw) ? [...sdArrRaw] : [];
+      const previousSetsCount = Math.max(setsHeader, sdArr.length);
+
+      const nextSetDetails: unknown[] = [];
+      for (let i = 0; i < desiredSets; i += 1) {
+        const current = sdArr[i];
+        const currentObj = current && typeof current === 'object' ? (current as UnknownRecord) : null;
+        const setNumber = i + 1;
+        if (currentObj) {
+          nextSetDetails.push({ ...currentObj, set_number: (currentObj.set_number ?? currentObj.setNumber) ?? setNumber });
+        } else {
+          nextSetDetails.push({ set_number: setNumber, weight: null, reps: '', rpe: null, notes: null, is_warmup: false, advanced_config: null });
+        }
+      }
+
+      nextExercises[idx] = {
+        ...exRaw,
+        name,
+        method,
+        sets: desiredSets,
+        restTime,
+        setDetails: nextSetDetails,
+      };
+
+      const nextLogs: Record<string, unknown> = { ...(logs && typeof logs === 'object' ? logs : {}) };
+      if (previousSetsCount > desiredSets) {
+        for (let i = desiredSets; i < previousSetsCount; i += 1) {
+          try {
+            delete nextLogs[`${idx}-${i}`];
+          } catch {}
+        }
+      }
+
+      props.onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+      setEditExerciseOpen(false);
+      setEditExerciseIdx(null);
+    } catch (e: unknown) {
+      try {
+        const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
+        await alert('Não foi possível salvar a edição do exercício: ' + msg);
       } catch {}
     }
   };
@@ -1898,11 +2052,14 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     return (
       <div className="space-y-1" key={key}>
         {isHeaderRow && (
-          <div className="hidden sm:flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 font-bold px-1">
+          <div className="hidden sm:flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 font-bold px-1 group">
             <div className="w-10">Série</div>
             <div className="w-24">Peso (kg)</div>
             <div className="w-24">Reps</div>
-            <div className="w-24">RPE</div>
+            <div className="w-24 inline-flex items-center gap-1">
+              RPE
+              <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
+            </div>
             <div className="ml-auto flex items-center gap-2">Ações</div>
           </div>
         )}
@@ -2086,7 +2243,15 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
+              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+                {modeLabel === 'SST' ? 'SST' : 'Rest-P'}
+                <HelpHint
+                  title={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).title}
+                  text={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).text}
+                  tooltip={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).tooltip}
+                  className="h-4 w-4 text-[10px]"
+                />
+              </span>
               <span className="text-xs text-neutral-400 whitespace-normal">{modeLabel === 'SST' ? 'SST' : 'REST-P'} • Intra {pauseSec || 0}s • Total: {total || 0} reps</span>
             </div>
             <button
@@ -2236,7 +2401,10 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Cluster</span>
+              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+                Cluster
+                <HelpHint title={HELP_TERMS.cluster.title} text={HELP_TERMS.cluster.text} tooltip={HELP_TERMS.cluster.tooltip} className="h-4 w-4 text-[10px]" />
+              </span>
               <span className="text-xs text-neutral-400 whitespace-normal">
                 {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
               </span>
@@ -2383,7 +2551,15 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
             <span className="text-xs font-black">Abrir</span>
           </button>
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">{modeLabel || 'Drop'}</span>
+            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+              {modeLabel || 'Drop'}
+              <HelpHint
+                title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
+                text={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).text}
+                tooltip={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).tooltip}
+                className="h-4 w-4 text-[10px]"
+              />
+            </span>
             <span className="text-xs text-neutral-400 truncate">Etapas {stagesCount} • Total: {total || 0} reps</span>
           </div>
           <button
@@ -2500,16 +2676,36 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           className="w-full flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"
         >
           <div className="min-w-0 text-left flex-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <Dumbbell size={16} className="text-yellow-500" />
-              <h3 className="font-black text-white truncate">{name}</h3>
+              <h3 className="font-black text-white truncate flex-1">{name}</h3>
+              {collapsedNow ? <ChevronDown size={18} className="text-neutral-400" /> : <ChevronUp size={18} className="text-neutral-400" />}
             </div>
             <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
               <span className="font-mono">{setsCount} sets</span>
               <span className="opacity-30">•</span>
               <span className="font-mono">{restTime ? `${restTime}s` : '-'}</span>
               <span className="opacity-30">•</span>
-              <span className="truncate">{String(ex?.method || 'Normal')}</span>
+              {(() => {
+                const methodLabel = String(ex?.method || 'Normal');
+                const methodKey =
+                  methodLabel === 'Drop-set'
+                    ? 'dropSet'
+                    : methodLabel === 'Rest-Pause'
+                      ? 'restPause'
+                      : methodLabel === 'Cluster'
+                        ? 'cluster'
+                        : methodLabel === 'Bi-Set'
+                          ? 'biSet'
+                        : null;
+                const term = methodKey ? (HELP_TERMS as any)[methodKey] : null;
+                return (
+                  <span className="truncate inline-flex items-center gap-1 group">
+                    <span className="truncate">{methodLabel}</span>
+                    {term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null}
+                  </span>
+                );
+              })()}
             </div>
             {observation ? (
               <div className="mt-2 rounded-xl bg-neutral-900/50 border border-yellow-500/20 px-3 py-2">
@@ -2564,14 +2760,38 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
                 setCurrentExerciseIdx(exIdx);
                 await openDeloadModal(ex, exIdx);
               }}
-              className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
+              className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 group"
             >
               {isReportLoading ? <Loader2 size={14} className="animate-spin" /> : <ArrowDown size={14} />}
-              <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">{isReportLoading ? 'Carregando' : 'Deload'}</span>
+              <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60 inline-flex items-center gap-1">
+                {isReportLoading ? 'Carregando' : 'Deload'}
+                {!isReportLoading ? (
+                  <HelpHint
+                    title={HELP_TERMS.deload.title}
+                    text={HELP_TERMS.deload.text}
+                    tooltip={HELP_TERMS.deload.tooltip}
+                    className="h-4 w-4 text-[10px]"
+                  />
+                ) : null}
+              </span>
             </button>
-            <div className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400">
-              {collapsedNow ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-            </div>
+            <button
+              type="button"
+              onClick={async (e) => {
+                try {
+                  e.preventDefault();
+                  e.stopPropagation();
+                } catch {}
+                setCurrentExerciseIdx(exIdx);
+                await openEditExercise(exIdx);
+              }}
+              className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
+              title="Editar exercício"
+              aria-label="Editar exercício"
+            >
+              <Pencil size={14} />
+              <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">Editar</span>
+            </button>
           </div>
         </div>
 
@@ -3701,6 +3921,91 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
                 className="flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
               >
                 Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editExerciseOpen && editExerciseIdx != null && (
+        <div className="fixed inset-0 z-[95] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}>
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-lg font-black text-white truncate">Editar exercício</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <input
+                  value={String(editExerciseDraft?.name ?? '')}
+                  onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                  placeholder="Ex: Supino reto"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(editExerciseDraft?.sets ?? '')}
+                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="3"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(editExerciseDraft?.restTime ?? '')}
+                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="60"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Método</label>
+                <select
+                  value={String(editExerciseDraft?.method ?? 'Normal')}
+                  onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, method: String(e.target.value || 'Normal') }))}
+                  className="mt-2 w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="Normal">Normal</option>
+                  <option value="Drop-set">Drop-set</option>
+                  <option value="Rest-Pause">Rest-Pause</option>
+                  <option value="Cluster">Cluster</option>
+                  <option value="Bi-Set">Bi-Set</option>
+                  <option value="Cardio">Cardio</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-800 flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}
+                className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveEditExercise}
+                className="flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center justify-center gap-2"
+              >
+                <Save size={16} />
+                Salvar
               </button>
             </div>
           </div>

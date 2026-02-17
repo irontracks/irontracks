@@ -1,6 +1,14 @@
-type AnyRecord = Record<string, any>
+interface FinishWorkoutInput {
+  workout: Record<string, unknown>
+  elapsedSeconds: number
+  logs: Record<string, unknown>
+  ui: Record<string, unknown>
+  postCheckin?: Record<string, unknown> | null
+}
 
-const isObject = (v: any) => v && typeof v === 'object' && !Array.isArray(v)
+type AnyRecord = Record<string, unknown>
+
+const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 export const buildFinishWorkoutPayload = ({
   workout,
@@ -8,13 +16,7 @@ export const buildFinishWorkoutPayload = ({
   logs,
   ui,
   postCheckin,
-}: {
-  workout: any
-  elapsedSeconds: any
-  logs: any
-  ui: any
-  postCheckin: any
-}) => {
+}: FinishWorkoutInput) => {
   const w = isObject(workout) ? (workout as AnyRecord) : {}
   const exercisesRaw = Array.isArray(w.exercises) ? w.exercises : []
   const safeExercises = exercisesRaw
@@ -34,17 +36,17 @@ export const buildFinishWorkoutPayload = ({
         setDetails: Array.isArray(e?.setDetails) ? e.setDetails : Array.isArray(e?.set_details) ? e.set_details : [],
       }
     })
-    .filter((x) => x && typeof x === 'object' && String((x as any).name || '').length > 0)
+    .filter((x) => x !== null && typeof x === 'object' && 'name' in x && String((x as { name?: unknown }).name ?? '').trim().length > 0)
 
   return {
     workoutTitle: String(w?.title || 'Treino'),
     date: new Date().toISOString(),
     totalTime: elapsedSeconds,
     realTotalTime: elapsedSeconds,
-    logs: logs && typeof logs === 'object' ? logs : {},
+    logs: isObject(logs) ? logs : {},
     exercises: safeExercises,
     originWorkoutId: w?.id ?? null,
-    preCheckin: ui?.preCheckin ?? null,
-    postCheckin,
+    preCheckin: isObject(ui) ? (ui as Record<string, unknown>)?.preCheckin ?? null : null,
+    postCheckin: postCheckin ?? null,
   }
 }

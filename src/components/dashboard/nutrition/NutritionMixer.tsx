@@ -1,21 +1,22 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { motion } from 'framer-motion'
-
 import { logMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { isIosNative } from '@/utils/platform'
+import { createClient } from '@/utils/supabase/client'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
-type RecentMeal = {
+type MealEntry = {
   id: string
-  at: string
-  meal: MealLog
+  created_at: string
+  food_name: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
 }
-
-const DEFAULT_RECENTS_LIMIT = 8
 
 function safeNumber(value: any): number {
   const n = Number(value)
@@ -37,21 +38,6 @@ function formatClock(iso: string) {
   }
 }
 
-function makeId(seed: string) {
-  try {
-    if (typeof globalThis.crypto !== 'undefined' && 'randomUUID' in globalThis.crypto) {
-      return (globalThis.crypto as any).randomUUID() as string
-    }
-  } catch {}
-  let base = seed
-  try {
-    if (typeof globalThis.btoa === 'function') base = globalThis.btoa(seed)
-  } catch {
-    base = seed
-  }
-  return String(base).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24) || `${Date.now()}`
-}
-
 function Meter({
   label,
   unit,
@@ -64,31 +50,28 @@ function Meter({
   goal: number
 }) {
   const safeValue = safeNumber(value)
-  const safeGoal = Math.max(1, safeNumber(goal))
-  const ratio = safeValue / safeGoal
+  const safeGoal = Math.max(0, safeNumber(goal))
+  const ratio = safeGoal > 0 ? safeValue / safeGoal : 0
   const pct = clamp01(ratio)
-  const clipping = ratio > 1
-  const barClass = clipping ? 'bg-red-500' : 'bg-yellow-500'
-  const glowClass = clipping ? 'shadow-[0_0_24px_rgba(239,68,68,0.35)]' : 'shadow-[0_0_24px_rgba(234,179,8,0.25)]'
+  const clipping = safeGoal > 0 && ratio > 1
+  const barClass = clipping ? 'bg-red-500/80' : 'bg-yellow-500/80'
 
   return (
-    <div className="rounded-xl bg-neutral-800 border border-neutral-700 p-4">
-      <div className="flex items-baseline justify-between">
-        <div className="text-xs uppercase tracking-widest text-neutral-400">{label}</div>
-        <div className={clipping ? 'text-xs font-black text-red-400' : 'text-xs font-black text-yellow-400'}>
-          {Math.round(safeValue)} / {Math.round(safeGoal)}{unit}
+    <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wide text-neutral-400">{label}</div>
+          <div className="mt-1 text-base font-semibold text-neutral-100">
+            {Math.round(safeValue)}
+            <span className="text-neutral-500">/{Math.round(safeGoal || 0)}{unit}</span>
+          </div>
+        </div>
+        <div className={clipping ? 'text-xs font-semibold text-red-300' : 'text-xs font-semibold text-neutral-300'}>
+          {Math.round(pct * 100)}%
         </div>
       </div>
-      <div className="mt-4 h-44 rounded-xl bg-zinc-950 border border-neutral-700 overflow-hidden flex items-end">
-        <motion.div
-          className={`w-full ${barClass} ${glowClass}`}
-          animate={{ height: `${Math.round(pct * 100)}%` }}
-          transition={{ type: 'spring', stiffness: 140, damping: 18 }}
-        />
-      </div>
-      <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
-        <div>{clipping ? 'CLIP' : 'OK'}</div>
-        <div>{Math.round(pct * 100)}%</div>
+      <div className="mt-3 h-1.5 rounded-full bg-neutral-800 overflow-hidden">
+        <div className={`h-full ${barClass}`} style={{ width: `${Math.round(pct * 100)}%` }} />
       </div>
     </div>
   )
@@ -107,71 +90,157 @@ export default function NutritionMixer({
   schemaMissing?: boolean
   canViewMacros?: boolean
 }) {
+  const supabase = useMemo(() => createClient(), [])
   const [totals, setTotals] = useState<Totals>({
     calories: safeNumber(initialTotals?.calories),
     protein: safeNumber(initialTotals?.protein),
     carbs: safeNumber(initialTotals?.carbs),
     fat: safeNumber(initialTotals?.fat),
   })
+  const [goalsState, setGoalsState] = useState<Totals>({
+    calories: safeNumber(goals?.calories),
+    protein: safeNumber(goals?.protein),
+    carbs: safeNumber(goals?.carbs),
+    fat: safeNumber(goals?.fat),
+  })
   const safeGoals = useMemo(
     () => ({
+      calories: safeNumber(goalsState?.calories),
+      protein: safeNumber(goalsState?.protein),
+      carbs: safeNumber(goalsState?.carbs),
+      fat: safeNumber(goalsState?.fat),
+    }),
+    [goalsState?.calories, goalsState?.protein, goalsState?.carbs, goalsState?.fat],
+  )
+  const [entries, setEntries] = useState<MealEntry[]>([])
+  const [input, setInput] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const hideVipCtas = useMemo(() => isIosNative(), [])
+  const [goalsOpen, setGoalsOpen] = useState(false)
+  const [goalsDraft, setGoalsDraft] = useState<Totals>(() => ({
+    calories: safeNumber(goals?.calories),
+    protein: safeNumber(goals?.protein),
+    carbs: safeNumber(goals?.carbs),
+    fat: safeNumber(goals?.fat),
+  }))
+  const [goalsSaving, setGoalsSaving] = useState(false)
+  const [goalsError, setGoalsError] = useState('')
+  const [entryBusyId, setEntryBusyId] = useState('')
+  const [entriesError, setEntriesError] = useState('')
+  const [entriesTick, setEntriesTick] = useState(0)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiUpgrade, setAiUpgrade] = useState(false)
+  const [entriesLoading, setEntriesLoading] = useState(false)
+
+  useEffect(() => {
+    setTotals({
+      calories: safeNumber(initialTotals?.calories),
+      protein: safeNumber(initialTotals?.protein),
+      carbs: safeNumber(initialTotals?.carbs),
+      fat: safeNumber(initialTotals?.fat),
+    })
+  }, [initialTotals?.calories, initialTotals?.protein, initialTotals?.carbs, initialTotals?.fat])
+
+  useEffect(() => {
+    const next = {
       calories: safeNumber(goals?.calories),
       protein: safeNumber(goals?.protein),
       carbs: safeNumber(goals?.carbs),
       fat: safeNumber(goals?.fat),
-    }),
-    [goals?.calories, goals?.protein, goals?.carbs, goals?.fat],
-  )
-  const [recents, setRecents] = useState<RecentMeal[]>([])
-  const [input, setInput] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
-  const inputRef = useRef<HTMLInputElement>(null)
-  const hideVipCtas = useMemo(() => isIosNative(), [])
-
-  const storageKey = useMemo(() => `nutrition_recent_meals_${dateKey}`, [dateKey])
+    }
+    setGoalsState(next)
+    setGoalsDraft(next)
+  }, [goals?.calories, goals?.protein, goals?.carbs, goals?.fat])
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey)
-      const nextRecents = (() => {
-        if (!raw) return []
-        const parsed = JSON.parse(raw)
-        const list = Array.isArray(parsed) ? parsed : []
-        return list
-          .filter((x) => x && typeof x === 'object')
-          .map((x) => {
-            const meal = (x as any).meal
-            return {
-              id: String((x as any).id || ''),
-              at: String((x as any).at || ''),
-              meal: {
-                foodName: String(meal?.foodName || ''),
-                calories: safeNumber(meal?.calories),
-                protein: safeNumber(meal?.protein),
-                carbs: safeNumber(meal?.carbs),
-                fat: safeNumber(meal?.fat),
-              },
-            } satisfies RecentMeal
-          })
-          .filter((x) => x.id && x.meal.foodName)
-          .slice(0, DEFAULT_RECENTS_LIMIT)
-      })()
-
-      if (typeof queueMicrotask === 'function') queueMicrotask(() => setRecents(nextRecents))
-      else setTimeout(() => setRecents(nextRecents), 0)
-    } catch {
-      try {
-        if (typeof queueMicrotask === 'function') queueMicrotask(() => setRecents([]))
-        else setTimeout(() => setRecents([]), 0)
-      } catch {}
+    if (schemaMissing) {
+      setEntries([])
+      return
     }
-  }, [storageKey])
+    let cancelled = false
+    ;(async () => {
+      try {
+        setEntriesLoading(true)
+        setEntriesError('')
+        const { data, error } = await supabase
+          .from('nutrition_meal_entries')
+          .select('id, created_at, food_name, calories, protein, carbs, fat')
+          .eq('date', dateKey)
+          .order('created_at', { ascending: false })
+          .limit(20)
+        if (cancelled) return
+        if (error) throw error
+        const list = Array.isArray(data) ? data : []
+        const mapped = list
+          .map((r: any) => ({
+            id: String(r?.id || '').trim(),
+            created_at: String(r?.created_at || '').trim(),
+            food_name: String(r?.food_name || '').trim(),
+            calories: safeNumber(r?.calories),
+            protein: safeNumber(r?.protein),
+            carbs: safeNumber(r?.carbs),
+            fat: safeNumber(r?.fat),
+          }))
+          .filter((r: MealEntry) => Boolean(r.id))
+        setEntries(mapped)
+      } catch {
+        if (!cancelled) setEntriesError('Falha ao carregar lançamentos.')
+      } finally {
+        if (!cancelled) setEntriesLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [dateKey, entriesTick, schemaMissing, supabase])
 
-  const persistRecents = (next: RecentMeal[]) => {
+  const saveGoals = async () => {
+    if (goalsSaving) return
+    setGoalsSaving(true)
+    setGoalsError('')
     try {
-      localStorage.setItem(storageKey, JSON.stringify(next.slice(0, DEFAULT_RECENTS_LIMIT)))
-    } catch {}
+      const { data: auth } = await supabase.auth.getUser()
+      const userId = String(auth?.user?.id || '').trim()
+      if (!userId) {
+        setGoalsError('Você precisa estar logado.')
+        return
+      }
+      const { data: latest } = await supabase
+        .from('nutrition_goals')
+        .select('id')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const payload = {
+        user_id: userId,
+        calories: safeNumber(goalsDraft.calories),
+        protein: safeNumber(goalsDraft.protein),
+        carbs: safeNumber(goalsDraft.carbs),
+        fat: safeNumber(goalsDraft.fat),
+        updated_at: new Date().toISOString(),
+      }
+      if (latest?.id) {
+        const { error } = await supabase.from('nutrition_goals').update(payload).eq('id', latest.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('nutrition_goals').insert(payload)
+        if (error) throw error
+      }
+      setGoalsState({
+        calories: safeNumber(goalsDraft.calories),
+        protein: safeNumber(goalsDraft.protein),
+        carbs: safeNumber(goalsDraft.carbs),
+        fat: safeNumber(goalsDraft.fat),
+      })
+      setGoalsOpen(false)
+    } catch (e) {
+      setGoalsError(e?.message ? String(e.message) : 'Falha ao salvar metas.')
+    } finally {
+      setGoalsSaving(false)
+    }
   }
 
   const handleSubmit = () => {
@@ -181,179 +250,398 @@ export default function NutritionMixer({
     setError(null)
     startTransition(async () => {
       try {
-        const res = await logMealAction(text)
+        const res = await logMealAction(text, dateKey)
         if (!res?.ok) {
-          setError(String((res as any)?.error || 'Falha ao processar a refeição.'))
+          setError(String((res as Record<string, unknown>)?.error || 'Falha ao processar a refeição.'))
           return
         }
 
-        const meal = (res as any).meal as MealLog | undefined
+        const meal = (res as Record<string, unknown>).meal as MealLog | undefined
+        const entry = (res as Record<string, unknown>).entry as any
         if (!meal) {
           setError('Falha ao processar a refeição.')
           return
         }
 
-        const nowIso = new Date().toISOString()
-        const nextItem: RecentMeal = {
-          id: makeId(`${nowIso}:${meal.foodName}`),
-          at: nowIso,
-          meal,
+        if (entry && typeof entry === 'object') {
+          const nextTotals = {
+            calories: safeNumber(entry?.totals_calories),
+            protein: safeNumber(entry?.totals_protein),
+            carbs: safeNumber(entry?.totals_carbs),
+            fat: safeNumber(entry?.totals_fat),
+          }
+          if (nextTotals.calories || nextTotals.protein || nextTotals.carbs || nextTotals.fat) setTotals(nextTotals)
+
+          const entryId = String(entry?.entry_id || entry?.id || '').trim()
+          const entryCreatedAt = String(entry?.created_at || new Date().toISOString()).trim()
+          const entryFoodName = String(entry?.food_name || meal.foodName || 'Refeição').trim()
+          const nextEntry: MealEntry = {
+            id: entryId || `${Date.now()}`,
+            created_at: entryCreatedAt,
+            food_name: entryFoodName,
+            calories: safeNumber(entry?.calories ?? meal.calories),
+            protein: safeNumber(entry?.protein ?? meal.protein),
+            carbs: safeNumber(entry?.carbs ?? meal.carbs),
+            fat: safeNumber(entry?.fat ?? meal.fat),
+          }
+          setEntries((prev) => [nextEntry, ...(Array.isArray(prev) ? prev : [])].slice(0, 20))
+        } else {
+          setTotals((prev) => ({
+            calories: safeNumber(prev?.calories) + safeNumber(meal.calories),
+            protein: safeNumber(prev?.protein) + safeNumber(meal.protein),
+            carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs),
+            fat: safeNumber(prev?.fat) + safeNumber(meal.fat),
+          }))
         }
-
-        setTotals((prev) => ({
-          calories: safeNumber(prev?.calories) + safeNumber(meal.calories),
-          protein: safeNumber(prev?.protein) + safeNumber(meal.protein),
-          carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs),
-          fat: safeNumber(prev?.fat) + safeNumber(meal.fat),
-        }))
-
-        setRecents((prev) => {
-          const next = [nextItem, ...(Array.isArray(prev) ? prev : [])].slice(0, DEFAULT_RECENTS_LIMIT)
-          persistRecents(next)
-          return next
-        })
 
         setInput('')
         try {
           if (typeof queueMicrotask === 'function') queueMicrotask(() => inputRef.current?.focus())
           else setTimeout(() => inputRef.current?.focus(), 0)
         } catch {}
-      } catch (e: any) {
+      } catch (e) {
         setError(e?.message || 'Falha ao processar a refeição.')
       }
     })
   }
 
+  const deleteEntry = async (id: string) => {
+    const entryId = String(id || '').trim()
+    if (!entryId) return
+    if (entryBusyId) return
+    const ok = typeof window !== 'undefined' ? window.confirm('Remover este lançamento?') : false
+    if (!ok) return
+    setEntryBusyId(entryId)
+    setError(null)
+    try {
+      const { data, error } = await supabase.rpc('nutrition_delete_meal_entry', { p_entry_id: entryId })
+      if (error) throw error
+      const row = Array.isArray(data) ? data[0] : null
+      if (row && typeof row === 'object') {
+        setTotals({
+          calories: safeNumber((row as any)?.totals_calories),
+          protein: safeNumber((row as any)?.totals_protein),
+          carbs: safeNumber((row as any)?.totals_carbs),
+          fat: safeNumber((row as any)?.totals_fat),
+        })
+      }
+      setEntries((prev) => (Array.isArray(prev) ? prev : []).filter((x) => x.id !== entryId))
+    } catch (e) {
+      setError(e?.message ? String(e.message) : 'Falha ao remover lançamento.')
+    } finally {
+      setEntryBusyId('')
+    }
+  }
+
+  const submitOrFocus = () => {
+    const t = input.trim()
+    if (t && !isPending && !schemaMissing) {
+      handleSubmit()
+      return
+    }
+    try {
+      inputRef.current?.focus()
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } catch {}
+  }
+
+  const estimateWithAi = async () => {
+    const text = input.trim()
+    if (!text) return
+    if (schemaMissing) return
+    if (aiBusy) return
+    setAiBusy(true)
+    setAiUpgrade(false)
+    setError(null)
+    try {
+      const res = await fetch('/api/ai/nutrition-estimate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, dateKey }),
+      })
+      const json = await res.json().catch(() => null)
+      if (!json?.ok) {
+        const needsUpgrade = !!json?.upgradeRequired || String(json?.error || '') === 'vip_required'
+        setAiUpgrade(needsUpgrade)
+        setError(needsUpgrade ? 'Disponível para assinantes VIP Pro.' : String(json?.error || 'Falha ao estimar com IA.'))
+        return
+      }
+      const row = json?.row
+      if (row && typeof row === 'object') {
+        setTotals({
+          calories: safeNumber(row?.totals_calories),
+          protein: safeNumber(row?.totals_protein),
+          carbs: safeNumber(row?.totals_carbs),
+          fat: safeNumber(row?.totals_fat),
+        })
+        const nextEntry: MealEntry = {
+          id: String(row?.entry_id || row?.id || `${Date.now()}`),
+          created_at: String(row?.created_at || new Date().toISOString()),
+          food_name: String(row?.food_name || 'Refeição'),
+          calories: safeNumber(row?.calories),
+          protein: safeNumber(row?.protein),
+          carbs: safeNumber(row?.carbs),
+          fat: safeNumber(row?.fat),
+        }
+        setEntries((prev) => [nextEntry, ...(Array.isArray(prev) ? prev : [])].slice(0, 20))
+      }
+      setInput('')
+      try {
+        inputRef.current?.focus()
+      } catch {}
+    } catch (e) {
+      setError(e?.message ? String(e.message) : 'Falha ao estimar com IA.')
+    } finally {
+      setAiBusy(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-white px-4 py-6 md:px-8 md:py-10">
-      <div className="mx-auto w-full max-w-5xl">
-        <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-5 md:p-7">
-          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div className="text-xs uppercase tracking-[0.35em] text-neutral-400">THE METABOLIC MIXER</div>
-              <div className="mt-2 text-2xl md:text-3xl font-black text-white">Nutrition Console</div>
-              <div className="mt-1 text-sm text-neutral-400">Data: {dateKey}</div>
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800/60 shadow-[0_12px_40px_rgba(0,0,0,0.35)] p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[11px] uppercase tracking-wide text-neutral-400">Hoje</div>
+            <div className="mt-1 text-3xl font-semibold tracking-tight">
+              <span className={safeNumber(totals?.calories) > safeNumber(safeGoals?.calories) ? 'text-red-300' : 'text-white'}>
+                {Math.round(totals.calories)}
+              </span>
+              <span className="text-neutral-500"> kcal</span>
             </div>
-            <div className="rounded-xl bg-neutral-800 border border-neutral-700 px-4 py-3">
-              <div className="text-xs uppercase tracking-widest text-neutral-400">KCAL</div>
-              <div className="mt-1 text-xl font-black">
-                <span className={safeNumber(totals?.calories) > safeNumber(safeGoals?.calories) ? 'text-red-400' : 'text-yellow-400'}>
-                  {Math.round(totals.calories)}
-                </span>
-                <span className="text-neutral-500"> / {Math.round(safeGoals.calories)}</span>
-              </div>
+            <div className="mt-1 text-sm text-neutral-400">
+              Meta: <span className="text-neutral-200 font-semibold">{Math.round(safeGoals.calories)} kcal</span>
             </div>
           </div>
+          <div className="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+            {safeNumber(totals?.calories) > safeNumber(safeGoals?.calories) ? 'Acima da meta' : 'Dentro da meta'}
+          </div>
+        </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {canViewMacros ? (
-              <>
-                <Meter label="PROTEÍNA" unit="g" value={totals.protein} goal={safeGoals.protein} />
-                <Meter label="CARBO" unit="g" value={totals.carbs} goal={safeGoals.carbs} />
-                <Meter label="GORDURA" unit="g" value={totals.fat} goal={safeGoals.fat} />
-              </>
-            ) : hideVipCtas ? (
-              <div className="md:col-span-3 rounded-xl bg-neutral-800 border border-neutral-700 p-6 flex flex-col items-center justify-center text-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                </div>
-                <div>
-                    <h3 className="text-white font-bold text-lg">Macros Indisponíveis</h3>
-                    <p className="text-neutral-400 text-sm max-w-sm mx-auto mt-1">Esse recurso está indisponível no iOS no momento.</p>
-                </div>
-              </div>
-            ) : (
-              <div className="md:col-span-3 rounded-xl bg-neutral-800 border border-neutral-700 p-6 flex flex-col items-center justify-center text-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-700 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                </div>
-                <div>
-                    <h3 className="text-white font-bold text-lg">Macros Bloqueados</h3>
-                    <p className="text-neutral-400 text-sm max-w-sm mx-auto mt-1">Assine o plano PRO para ver a divisão detalhada de Proteína, Carbo e Gordura.</p>
-                </div>
-                <button 
-                    onClick={() => window.location.href = '/marketplace'}
-                    className="mt-2 px-6 py-2 rounded-lg bg-yellow-500 text-black font-black text-sm uppercase tracking-wide hover:bg-yellow-400"
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          {canViewMacros ? (
+            <>
+              <Meter label="Proteína" unit="g" value={totals.protein} goal={safeGoals.protein} />
+              <Meter label="Carbo" unit="g" value={totals.carbs} goal={safeGoals.carbs} />
+              <Meter label="Gordura" unit="g" value={totals.fat} goal={safeGoals.fat} />
+            </>
+          ) : (
+            <div className="col-span-3 rounded-2xl bg-neutral-900/50 border border-neutral-800/60 p-4">
+              <div className="text-sm font-semibold text-white">Macros no plano Pro</div>
+              <div className="mt-1 text-xs text-neutral-400">Ative para ver proteína, carbo e gordura detalhados.</div>
+              {!hideVipCtas ? (
+                <button
+                  type="button"
+                  onClick={() => (window.location.href = '/marketplace')}
+                  className="mt-3 inline-flex items-center justify-center rounded-xl bg-yellow-500 text-black font-semibold px-4 py-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition duration-300"
                 >
-                    Desbloquear Macros
+                  Ver planos
                 </button>
-              </div>
-            )}
-          </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </div>
 
-          <div className="mt-6 rounded-xl bg-neutral-800 border border-neutral-700 p-4 md:p-5">
-            <div className="text-xs uppercase tracking-widest text-neutral-400">The Fader</div>
-            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
+      <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800/60 p-4">
+        <div className="text-sm font-semibold text-neutral-200">Adicionar refeição</div>
+        <div className="mt-1 text-xs text-neutral-400">Ex.: 150g frango + 100g arroz</div>
+        <div className="mt-3">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if ((e as any).shiftKey) return
+                e.preventDefault()
+                if (!isPending && !schemaMissing) handleSubmit()
+              }
+            }}
+            disabled={isPending || !!schemaMissing}
+            rows={3}
+            className="w-full rounded-2xl bg-neutral-950 border border-neutral-800/60 px-4 py-3 text-sm font-semibold text-neutral-100 placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-yellow-500/30 resize-none"
+            placeholder={schemaMissing ? 'Nutrição não configurada no banco.' : 'Digite sua refeição...'}
+          />
+        </div>
+
+        {schemaMissing ? (
+          <div className="mt-3 rounded-2xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-sm text-yellow-100">
+            Aplique as migrations <span className="font-semibold">20251227120000_nutrition_core.sql</span> e{' '}
+            <span className="font-semibold">20260217190000_nutrition_meal_entries.sql</span> no Supabase.
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="mt-3 rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">{error}</div>
+              {aiUpgrade ? (
+                <button
+                  type="button"
+                  onClick={() => (window.location.href = '/marketplace')}
+                  className="shrink-0 rounded-xl bg-yellow-500 px-3 py-2 text-xs font-semibold text-black hover:bg-yellow-400"
+                >
+                  Ver planos
+                </button>
+              ) : null}
+            </div>
+            {String(error).startsWith('Não reconheci:') && !aiUpgrade ? (
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={estimateWithAi}
+                  disabled={aiBusy}
+                  className="rounded-xl bg-neutral-950/40 border border-neutral-800/60 px-3 py-2 text-xs font-semibold text-neutral-100 hover:bg-neutral-950 disabled:opacity-60"
+                >
+                  {aiBusy ? 'Estimando...' : 'Estimar com IA'}
+                </button>
+                {!hideVipCtas ? <div className="text-xs text-neutral-300">VIP Pro</div> : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800/60 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-neutral-200">Lançamentos</div>
+          <div className="flex items-center gap-4">
+            <button type="button" onClick={() => setEntriesTick((v) => v + 1)} className="text-xs text-yellow-400 hover:text-yellow-300 transition">
+              Atualizar
+            </button>
+            <button type="button" onClick={() => setGoalsOpen((v) => !v)} className="text-xs text-neutral-300 hover:text-white transition">
+              {goalsOpen ? 'Fechar metas' : 'Metas'}
+            </button>
+          </div>
+        </div>
+
+        {goalsOpen ? (
+          <div className="mt-3 rounded-2xl bg-neutral-950 border border-neutral-800/60 p-4">
+            <div className="grid grid-cols-2 gap-2">
               <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    if (!isPending && !schemaMissing) handleSubmit()
-                  }
-                }}
-                disabled={isPending || !!schemaMissing}
-                placeholder={
-                  schemaMissing
-                    ? 'Nutrição não configurada no banco. Aplique a migration.'
-                    : 'O que você comeu? Ex: 150g frango + 100g arroz'
-                }
-                className="w-full rounded-xl bg-zinc-950 border border-neutral-700 px-4 py-4 text-base font-semibold text-white placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-yellow-500/40"
+                value={String(goalsDraft.calories)}
+                onChange={(e) => setGoalsDraft((p) => ({ ...p, calories: safeNumber(e.target.value) }))}
+                inputMode="numeric"
+                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                placeholder="Kcal"
+                aria-label="Meta de calorias"
               />
+              <input
+                value={String(goalsDraft.protein)}
+                onChange={(e) => setGoalsDraft((p) => ({ ...p, protein: safeNumber(e.target.value) }))}
+                inputMode="numeric"
+                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                placeholder="Proteína"
+                aria-label="Meta de proteína"
+                disabled={!canViewMacros}
+              />
+              <input
+                value={String(goalsDraft.carbs)}
+                onChange={(e) => setGoalsDraft((p) => ({ ...p, carbs: safeNumber(e.target.value) }))}
+                inputMode="numeric"
+                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                placeholder="Carbo"
+                aria-label="Meta de carboidratos"
+                disabled={!canViewMacros}
+              />
+              <input
+                value={String(goalsDraft.fat)}
+                onChange={(e) => setGoalsDraft((p) => ({ ...p, fat: safeNumber(e.target.value) }))}
+                inputMode="numeric"
+                className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-3 text-neutral-100 font-semibold"
+                placeholder="Gordura"
+                aria-label="Meta de gordura"
+                disabled={!canViewMacros}
+              />
+            </div>
+            {goalsError ? <div className="mt-3 text-sm text-red-200">{goalsError}</div> : null}
+            {!canViewMacros && !hideVipCtas ? <div className="mt-3 text-xs text-neutral-400">Macros liberado no VIP Pro.</div> : null}
+            <div className="mt-3 flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setGoalsOpen(false)} className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 px-4 py-2 text-xs font-semibold text-neutral-200 hover:bg-neutral-900 transition">
+                Cancelar
+              </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (!isPending && !schemaMissing) handleSubmit()
-                }}
-                disabled={isPending || !!schemaMissing}
-                className="inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-4 font-black text-black hover:bg-yellow-400 disabled:opacity-60"
+                onClick={saveGoals}
+                disabled={goalsSaving}
+                className="rounded-2xl bg-yellow-500 px-4 py-2 text-xs font-semibold text-black hover:bg-yellow-400 disabled:opacity-60 shadow-lg shadow-yellow-500/20 active:scale-95 transition duration-300"
               >
-                {isPending ? 'Processando…' : 'Lançar'}
+                {goalsSaving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
-            {schemaMissing && (
-              <div className="mt-3 rounded-xl border border-yellow-500/20 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-100">
-                Banco de dados de nutrição não configurado. Rode a migration{' '}
-                <span className="font-black">20251227120000_nutrition_core.sql</span> no Supabase.
-              </div>
-            )}
-            {error && (
-              <div className="mt-3 rounded-xl border border-red-900/60 bg-red-950/30 px-4 py-3 text-sm text-red-200">
-                {error}
-              </div>
-            )}
           </div>
+        ) : null}
 
-          <div className="mt-6 rounded-xl bg-neutral-800 border border-neutral-700 p-4 md:p-5">
-            <div className="flex items-center justify-between">
-              <div className="text-xs uppercase tracking-widest text-neutral-400">Log</div>
-              <div className="text-xs text-neutral-500">Últimos lançamentos (local)</div>
-            </div>
-            <div className="mt-3 space-y-2">
-              {(Array.isArray(recents) ? recents : []).length === 0 ? (
-                <div className="rounded-xl bg-zinc-950 border border-neutral-700 px-4 py-4 text-sm text-neutral-500">
-                  Nenhuma refeição registrada hoje.
-                </div>
-              ) : (
-                (Array.isArray(recents) ? recents : []).map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-xl bg-zinc-950 border border-neutral-700 px-4 py-3 flex items-start justify-between gap-4"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-black text-white truncate">{item.meal.foodName}</div>
-                      <div className="mt-1 text-xs text-neutral-500">
-                        {formatClock(item.at)} · P {Math.round(item.meal.protein)}g · C {Math.round(item.meal.carbs)}g · G {Math.round(item.meal.fat)}g
-                      </div>
-                    </div>
-                    <div className="text-sm font-black text-yellow-400 whitespace-nowrap">{Math.round(item.meal.calories)} kcal</div>
-                  </div>
-                ))
-              )}
-            </div>
+        {entriesError ? (
+          <div className="mt-3 rounded-2xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200 flex items-center justify-between gap-3">
+            <div className="min-w-0">{entriesError}</div>
+            <button
+              type="button"
+              onClick={() => setEntriesTick((v) => v + 1)}
+              className="shrink-0 rounded-xl bg-neutral-900/60 border border-neutral-800/60 px-3 py-2 text-xs font-semibold text-neutral-200 hover:bg-neutral-900"
+            >
+              Tentar novamente
+            </button>
           </div>
+        ) : null}
+
+        <div className="mt-3 space-y-3">
+          {entriesLoading ? (
+            <div className="rounded-2xl bg-neutral-950/40 border border-neutral-800/60 p-5">
+              <div className="h-4 w-32 rounded bg-neutral-800/70 animate-pulse" />
+              <div className="mt-3 h-3 w-56 rounded bg-neutral-800/60 animate-pulse" />
+              <div className="mt-5 h-12 rounded-2xl bg-neutral-800/40 border border-neutral-800/60 animate-pulse" />
+            </div>
+          ) : (Array.isArray(entries) ? entries : []).length === 0 ? (
+            <div className="rounded-2xl bg-neutral-950/40 border border-neutral-800/60 p-5 text-center">
+              <div className="text-sm font-semibold text-white">Sem refeições hoje</div>
+              <div className="mt-1 text-xs text-neutral-400">Adicione um lançamento para começar.</div>
+              <button
+                type="button"
+                onClick={submitOrFocus}
+                className="mt-4 inline-flex items-center justify-center rounded-2xl bg-yellow-500 text-black font-semibold px-4 py-2 shadow-lg shadow-yellow-500/20 active:scale-95 transition duration-300"
+              >
+                Adicionar refeição
+              </button>
+            </div>
+          ) : (
+            (Array.isArray(entries) ? entries : []).map((item) => (
+              <div key={item.id} className="rounded-2xl bg-neutral-950/40 border border-neutral-800/60 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-white truncate">{item.food_name}</div>
+                    <div className="mt-1 text-xs text-neutral-400">
+                      {formatClock(item.created_at)} · P {Math.round(item.protein)}g · C {Math.round(item.carbs)}g · G {Math.round(item.fat)}g
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-semibold text-neutral-200 whitespace-nowrap">{Math.round(item.calories)} kcal</div>
+                    <button
+                      type="button"
+                      disabled={entryBusyId === item.id}
+                      onClick={() => deleteEntry(item.id)}
+                      className="h-9 px-3 rounded-xl bg-neutral-900/60 border border-neutral-800/60 text-xs font-semibold text-neutral-200 hover:bg-neutral-900 disabled:opacity-60"
+                    >
+                      {entryBusyId === item.id ? '...' : 'Remover'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/80 backdrop-blur border-t border-neutral-800/60">
+        <div className="mx-auto max-w-md px-4 py-3">
+          <button
+            type="button"
+            onClick={submitOrFocus}
+            disabled={!!schemaMissing}
+            className="w-full h-12 rounded-2xl bg-yellow-500 text-black font-semibold shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 active:scale-95 transition duration-300 disabled:opacity-60"
+          >
+            {isPending ? 'Processando...' : input.trim() ? 'Lançar refeição' : 'Adicionar refeição'}
+          </button>
         </div>
       </div>
     </div>

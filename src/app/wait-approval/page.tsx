@@ -29,6 +29,11 @@ export default async function WaitApprovalPage() {
     redirect("/dashboard");
   }
 
+  const { data: student } = await supabase.from("students").select("id").eq("user_id", user.id).maybeSingle();
+  if (student?.id) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center p-6 text-center">
       <div className="max-w-md w-full bg-neutral-900 border border-neutral-800 rounded-2xl p-8 shadow-2xl animate-in fade-in zoom-in duration-500">

@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 400 })
 
     return NextResponse.json({ ok: true, updated: updates.length })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

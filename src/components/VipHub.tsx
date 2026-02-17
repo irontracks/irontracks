@@ -1,13 +1,17 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Crown, Sparkles, ArrowRight, Lock, MessageSquare, CalendarDays, TrendingUp, Trash2, Zap, BarChart3, ChefHat } from 'lucide-react'
+import { Crown, Sparkles, ArrowRight, Lock, MessageSquare, CalendarDays, TrendingUp, Trash2, Zap, BarChart3, ChefHat, FileText } from 'lucide-react'
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { createWorkout } from '@/actions/workout-actions'
 import { vipPlaybooks } from '@/content/vipPlaybooks'
 import { isIosNative } from '@/utils/platform'
+import VipPeriodizationPanel from '@/components/vip/VipPeriodizationPanel'
+import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
+import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
+import { useVipCredits } from '@/hooks/useVipCredits'
 
-export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab }) {
+export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab, onStartSession, onOpenWizard, onOpenHistory, onOpenReport }) {
   const isLocked = !!locked
   const hideVipCtas = useMemo(() => isIosNative(), [])
   const name = useMemo(() => String(user?.displayName || user?.name || '').trim(), [user?.displayName, user?.name])
@@ -16,6 +20,10 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const [messages, setMessages] = useState<any[]>([])
   const [busy, setBusy] = useState(false)
   const [vipStatus, setVipStatus] = useState<any>(null)
+  const { credits } = useVipCredits()
+  const chatRef = useRef<HTMLDivElement | null>(null)
+  const [weeklyOpen, setWeeklyOpen] = useState(false)
+  const [insightsOpen, setInsightsOpen] = useState(false)
   
   // Load VIP Status
   useEffect(() => {
@@ -254,121 +262,268 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     )
   }
 
+  const tierLabel =
+    vipStatus?.tier?.includes('elite') || vipStatus?.tier === 'admin'
+      ? 'Membro Elite'
+      : vipStatus?.tier?.includes('pro')
+        ? 'Membro Pro'
+        : 'Membro Start'
+
+  const historyDays = vipStatus?.limits?.history_days
+  const historySubtitle = historyDays == null ? 'Histórico ilimitado' : `Histórico: ${Number(historyDays) || 0} dias`
+  const macrosEnabled = !!vipStatus?.limits?.nutrition_macros
+  const nutritionSubtitle = macrosEnabled ? 'Macros liberado' : 'Macros (Pro+)'
+
+  const openNutrition = () => {
+    try {
+      window.location.href = '/dashboard/nutrition'
+    } catch {}
+  }
+
+  const openChat = () => {
+    try {
+      if (chatRef.current) chatRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch {}
+  }
+
+  const chip = (label: string, used: any, limit: any) => {
+    const u = Number(used || 0)
+    const l = limit == null ? null : Number(limit)
+    const unlimited = l != null && l > 1000
+    const txt = unlimited ? `${label}: ∞` : l != null && Number.isFinite(l) ? `${label}: ${u}/${l}` : `${label}: ${u}`
+    const danger = !unlimited && l != null && Number.isFinite(l) && l > 0 && u >= l
+    const cls = danger ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-neutral-800 bg-neutral-900/40 text-neutral-200'
+    return <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-xl border ${cls}`}>{txt}</div>
+  }
+
   return (
     <div className="space-y-4">
-        {/* Dashboard Header */}
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center text-black shadow-lg shadow-yellow-500/20">
-                        <Crown size={20} fill="currentColor" />
-                    </div>
-                    <div>
-                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">
-                            {vipStatus?.tier?.includes('elite') ? 'Membro Elite' : vipStatus?.tier?.includes('pro') ? 'Membro Pro' : 'Membro Start'}
-                        </div>
-                        <div className="text-white font-bold text-sm">Painel do Atleta</div>
-                    </div>
-                </div>
-                {renderLimitBar()}
+      <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-500 to-yellow-600 flex items-center justify-center text-black shadow-lg shadow-yellow-500/20">
+              <Crown size={20} fill="currentColor" />
             </div>
-
-            {/* Quick Stats / Shortcuts */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-                <div className="p-3 rounded-xl bg-neutral-950/50 border border-neutral-800 flex flex-col items-center justify-center text-center gap-1">
-                    <MessageSquare size={18} className="text-blue-400" />
-                    <div className="text-xs font-bold text-neutral-300">Coach Chat</div>
-                </div>
-                <div className="p-3 rounded-xl bg-neutral-950/50 border border-neutral-800 flex flex-col items-center justify-center text-center gap-1 opacity-60">
-                    <Zap size={18} className="text-yellow-400" />
-                    <div className="text-xs font-bold text-neutral-300">Wizard</div>
-                </div>
-                <div className="p-3 rounded-xl bg-neutral-950/50 border border-neutral-800 flex flex-col items-center justify-center text-center gap-1 opacity-60">
-                    <ChefHat size={18} className="text-green-400" />
-                    <div className="text-xs font-bold text-neutral-300">Nutrição</div>
-                </div>
-                <div className="p-3 rounded-xl bg-neutral-950/50 border border-neutral-800 flex flex-col items-center justify-center text-center gap-1 opacity-60">
-                    <BarChart3 size={18} className="text-purple-400" />
-                    <div className="text-xs font-bold text-neutral-300">Histórico</div>
-                </div>
+            <div>
+              <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{tierLabel}</div>
+              <div className="text-white font-bold text-sm">Dashboard VIP</div>
             </div>
+          </div>
+          {renderLimitBar()}
         </div>
 
-        {/* Chat Interface (Preserved) */}
-        <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden flex flex-col h-[600px]">
-             {/* ... Chat UI ... */}
-             <div className="p-4 border-b border-neutral-800 bg-neutral-900/60 backdrop-blur flex justify-between items-center">
-                <div className="text-sm font-black text-white flex items-center gap-2">
-                    <Sparkles size={16} className="text-yellow-500" />
-                    Coach IA
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setMessages([])}
-                  className="text-xs font-bold text-neutral-500 hover:text-white flex items-center gap-1"
-                >
-                  <Trash2 size={12} />
-                  Limpar
-                </button>
-             </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {credits?.chat ? chip('Chat', credits.chat.used, credits.chat.limit) : null}
+          {credits?.wizard ? chip('Wizard', credits.wizard.used, credits.wizard.limit) : null}
+          {credits?.insights ? chip('Insights', credits.insights.used, credits.insights.limit) : null}
+        </div>
 
-             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
-                {messages.length === 0 && (
-                    <div className="text-center py-10 text-neutral-500">
-                        <p className="text-sm">Olá, {name.split(' ')[0]}.</p>
-                        <p className="text-xs mt-1">Como posso ajudar no seu treino hoje?</p>
-                    </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
+          <button
+            type="button"
+            onClick={openChat}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <MessageSquare size={18} className="text-blue-400" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Coach IA</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">Pergunte e ajuste hoje</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenWizard?.()}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Zap size={18} className="text-yellow-400" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Wizard</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">Gere treino rápido</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setInsightsOpen((v) => !v)}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} className="text-purple-300" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Insights</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">Relatórios e PRs</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onOpenHistory?.()}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <BarChart3 size={18} className="text-purple-400" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Histórico</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">{historySubtitle}</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWeeklyOpen((v) => !v)}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <TrendingUp size={18} className="text-green-400" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Resumo</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">Últimos 7 dias</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={openNutrition}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <ChefHat size={18} className="text-green-400" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Nutrição</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">{nutritionSubtitle}</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setWeeklyOpen(true)}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-neutral-200" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Relatório</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">Atalhos e dados</div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                const el = document.getElementById('vip-periodization')
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+              } catch {}
+            }}
+            className="min-h-[56px] p-3 rounded-2xl bg-neutral-950/50 border border-neutral-800 hover:bg-neutral-900/50 transition-colors flex flex-col items-start justify-center gap-1 text-left"
+          >
+            <div className="flex items-center gap-2">
+              <CalendarDays size={18} className="text-yellow-400" />
+              <div className="text-xs font-black text-white uppercase tracking-widest">Periodização</div>
+            </div>
+            <div className="text-[11px] text-neutral-400">Programa completo</div>
+          </button>
+        </div>
+      </div>
+
+      {weeklyOpen ? <VipWeeklySummaryCard /> : null}
+
+      {insightsOpen ? <VipInsightsPanel onOpenHistory={() => onOpenHistory?.()} onOpenReport={(s) => onOpenReport?.(s)} /> : null}
+
+      <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Em breve</div>
+            <div className="text-white font-black text-sm">Recursos extras do VIP</div>
+          </div>
+          <button type="button" onClick={() => (window.location.href = '/marketplace')} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white">
+            Ver detalhes <ArrowRight size={14} />
+          </button>
+        </div>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="rounded-xl border border-neutral-800 bg-black/30 px-3 py-3">
+            <div className="text-xs font-black text-white">Chef IA</div>
+            <div className="text-[11px] text-neutral-400">Planos e receitas</div>
+          </div>
+          <div className="rounded-xl border border-neutral-800 bg-black/30 px-3 py-3">
+            <div className="text-xs font-black text-white">Modo offline</div>
+            <div className="text-[11px] text-neutral-400">Sync inteligente</div>
+          </div>
+          <div className="rounded-xl border border-neutral-800 bg-black/30 px-3 py-3">
+            <div className="text-xs font-black text-white">Analytics avançado</div>
+            <div className="text-[11px] text-neutral-400">Dash de performance</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="vip-periodization">
+        <VipPeriodizationPanel locked={isLocked} onStartSession={onStartSession} onOpenWorkoutEditor={onOpenWorkoutEditor} />
+      </div>
+
+      <div ref={chatRef} className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden flex flex-col h-[600px]">
+        <div className="p-4 border-b border-neutral-800 bg-neutral-900/60 backdrop-blur flex justify-between items-center">
+          <div className="text-sm font-black text-white flex items-center gap-2">
+            <Sparkles size={16} className="text-yellow-500" />
+            Coach IA
+          </div>
+          <button
+            type="button"
+            onClick={() => setMessages([])}
+            className="text-xs font-bold text-neutral-500 hover:text-white flex items-center gap-1"
+          >
+            <Trash2 size={12} />
+            Limpar
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+          {messages.length === 0 && (
+            <div className="text-center py-10 text-neutral-500">
+              <p className="text-sm">Olá, {name.split(' ')[0]}.</p>
+              <p className="text-xs mt-1">Como posso ajudar no seu treino hoje?</p>
+            </div>
+          )}
+          {messages.map((m) => (
+            <div key={m.id} className={`flex ${m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
+                  m.isLimit
+                    ? 'bg-red-500/10 border border-red-500/30 text-red-200'
+                    : m.role === 'assistant'
+                      ? 'bg-neutral-800 text-neutral-200'
+                      : 'bg-yellow-500/10 border border-yellow-500/20 text-white'
+                }`}
+              >
+                {m.text}
+                {m.isLimit && !hideVipCtas && (
+                  <button onClick={() => window.location.href = '/marketplace'} className="block mt-2 text-xs font-black uppercase text-yellow-500 hover:underline">
+                    Fazer Upgrade
+                  </button>
                 )}
-                {messages.map((m) => (
-                    <div key={m.id} className={`flex ${m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
-                        <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${
-                            m.isLimit 
-                                ? 'bg-red-500/10 border border-red-500/30 text-red-200' 
-                                : m.role === 'assistant' 
-                                    ? 'bg-neutral-800 text-neutral-200' 
-                                    : 'bg-yellow-500/10 border border-yellow-500/20 text-white'
-                        }`}>
-                            {m.text}
-                            {m.isLimit && !hideVipCtas && (
-                                <button 
-                                    onClick={() => window.location.href = '/marketplace'}
-                                    className="block mt-2 text-xs font-black uppercase text-yellow-500 hover:underline"
-                                >
-                                    Fazer Upgrade
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ))}
-             </div>
-
-             <div className="p-4 border-t border-neutral-800 bg-neutral-900">
-                <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-                    {presets.map(p => (
-                        <button key={p} onClick={() => setDraft(p)} className="whitespace-nowrap px-3 py-1.5 rounded-lg bg-neutral-800 text-xs text-neutral-300 hover:bg-neutral-700">
-                            {p}
-                        </button>
-                    ))}
-                </div>
-                <div className="flex gap-2">
-                    <input 
-                        ref={inputRef}
-                        value={draft}
-                        onChange={e => setDraft(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && send()}
-                        placeholder="Digite sua mensagem..."
-                        className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 text-sm text-white focus:border-yellow-500 focus:outline-none"
-                    />
-                    <button 
-                        onClick={send}
-                        disabled={busy}
-                        className="bg-yellow-500 text-black font-bold px-4 rounded-xl hover:bg-yellow-400 disabled:opacity-50"
-                    >
-                        Enviar
-                    </button>
-                </div>
-             </div>
+              </div>
+            </div>
+          ))}
         </div>
+
+        <div className="p-4 border-t border-neutral-800 bg-neutral-900">
+          <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+            {presets.map((p) => (
+              <button key={p} onClick={() => setDraft(p)} className="whitespace-nowrap px-3 py-1.5 rounded-lg bg-neutral-800 text-xs text-neutral-300 hover:bg-neutral-700">
+                {p}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && send()}
+              placeholder="Digite sua mensagem..."
+              className="flex-1 bg-neutral-950 border border-neutral-800 rounded-xl px-4 text-sm text-white focus:border-yellow-500 focus:outline-none"
+            />
+            <button onClick={send} disabled={busy} className="bg-yellow-500 text-black font-bold px-4 rounded-xl hover:bg-yellow-400 disabled:opacity-50">
+              Enviar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

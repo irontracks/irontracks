@@ -30,7 +30,7 @@ export async function GET(req: Request) {
         wizard_weekly: wizardUsage.currentUsage
       }
     })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 })
   }
 }

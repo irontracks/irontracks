@@ -15,7 +15,8 @@ const resolveSoundOpts = (opts) => {
 
 const ensureCtx = (opts) => {
     if (typeof window === 'undefined') return null;
-    const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+    const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
+    const AC = w.AudioContext || w.webkitAudioContext;
     if (!AC) return null;
     const allowCreate = !!(opts && typeof opts === 'object' && opts.create);
     if (!__ctx || __ctx.state === 'closed') {

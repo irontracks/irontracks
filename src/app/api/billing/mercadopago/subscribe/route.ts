@@ -50,7 +50,10 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (anyActive?.id && String(anyActive.status || '') === 'pending') {
       const ageMs = Date.now() - new Date(String(anyActive.created_at || '')).getTime()
-      const initPoint = String((anyActive as any)?.metadata?.mercadopago?.init_point || '').trim()
+      const meta = (anyActive as Record<string, unknown>)?.metadata
+      const metaObj = meta && typeof meta === 'object' ? (meta as Record<string, unknown>) : ({} as Record<string, unknown>)
+      const mp = metaObj?.mercadopago && typeof metaObj.mercadopago === 'object' ? (metaObj.mercadopago as Record<string, unknown>) : ({} as Record<string, unknown>)
+      const initPoint = String(mp?.init_point || '').trim()
       if (String(anyActive.plan_id || '') === planId && String(anyActive.provider || '') === 'mercadopago' && initPoint) {
         return NextResponse.json({ ok: true, subscription: { id: anyActive.id, status: anyActive.status }, redirect_url: initPoint, resumed: true })
       }
@@ -125,7 +128,7 @@ export async function POST(req: Request) {
       redirect_url: initPoint || null,
       provider_subscription_id: providerSubscriptionId,
     })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

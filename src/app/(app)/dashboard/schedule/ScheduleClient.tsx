@@ -146,7 +146,7 @@ export default function SchedulePage() {
           date: baseDate,
         }))
         await loadStudentsForCoach()
-      } catch (e: any) {
+      } catch (e) {
         if (!isMounted) return
         setError(e?.message || 'Erro ao carregar agenda.')
       } finally {
@@ -170,7 +170,7 @@ export default function SchedulePage() {
       try {
         setLoading(true)
         await loadAppointmentsForDate(selectedDate)
-      } catch (e: any) {
+      } catch (e) {
         if (isCancelled) return
         setError(e?.message || 'Erro ao carregar agenda.')
       } finally {
@@ -296,7 +296,7 @@ export default function SchedulePage() {
 
       setIsModalOpen(false)
       setEditingAppointment(null)
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || 'Erro ao salvar agendamento.')
     } finally {
       setSaving(false)
@@ -340,7 +340,7 @@ export default function SchedulePage() {
       if (deleteError) throw deleteError
       const targetDate = selectedDate || toDateInputValue(new Date())
       await loadAppointmentsForDate(targetDate)
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || 'Erro ao excluir agendamento.')
     } finally {
       setSaving(false)

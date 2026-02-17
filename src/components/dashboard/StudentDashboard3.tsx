@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2 } from 'lucide-react'
+import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2, Crown } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import BadgesGallery from './BadgesGallery'
@@ -58,6 +58,7 @@ export type DashboardWorkout = {
   title?: string
   notes?: string | null
   exercises?: any[]
+  exercises_count?: number | null
   archived_at?: string | null
   sort_order?: number
   created_at?: string | null
@@ -118,9 +119,15 @@ type Props = {
 }
 
 export default function StudentDashboard(props: Props) {
+  const supabase = useMemo(() => createClient(), [])
   const workouts = Array.isArray(props.workouts) ? props.workouts : []
   const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [workoutsTab, setWorkoutsTab] = useState<'normal' | 'periodized'>('normal')
+  const [periodizedLoading, setPeriodizedLoading] = useState(false)
+  const [periodizedLoaded, setPeriodizedLoaded] = useState(false)
+  const [periodizedWorkouts, setPeriodizedWorkouts] = useState<DashboardWorkout[]>([])
+  const [periodizedError, setPeriodizedError] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [checkinsOpen, setCheckinsOpen] = useState(false)
@@ -139,7 +146,7 @@ export default function StudentDashboard(props: Props) {
   const [pendingAction, setPendingAction] = useState<
     | {
         workoutKey: string
-        type: 'start' | 'restore' | 'share' | 'duplicate' | 'edit' | 'delete'
+        type: 'open' | 'start' | 'restore' | 'share' | 'duplicate' | 'edit' | 'delete'
       }
     | null
   >(null)
@@ -150,8 +157,16 @@ export default function StudentDashboard(props: Props) {
   const showIronRank = props.settings?.showIronRank !== false
   const showBadges = props.settings?.showBadges !== false
   const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
-  const archivedCount = workouts.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0)
-  const visibleWorkouts = showArchived ? workouts : workouts.filter((w) => !w?.archived_at)
+  const isPeriodizedWorkout = (w: DashboardWorkout) => {
+    const title = String((w as any)?.title || (w as any)?.name || '').trim()
+    return title.startsWith('VIP •')
+  }
+  const workoutsForTab =
+    workoutsTab === 'periodized'
+      ? (periodizedLoaded ? periodizedWorkouts : workouts.filter(isPeriodizedWorkout))
+      : workouts.filter((w) => !isPeriodizedWorkout(w))
+  const archivedCount = workoutsForTab.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0)
+  const visibleWorkouts = showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archived_at)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -159,6 +174,118 @@ export default function StudentDashboard(props: Props) {
       isMountedRef.current = false
     }
   }, [])
+
+  useEffect(() => {
+    if (props.view !== 'dashboard') return
+    if (workoutsTab !== 'periodized') return
+    setPeriodizedLoaded(false)
+    setPeriodizedWorkouts([])
+    setPeriodizedError('')
+  }, [props.view, workoutsTab])
+
+  useEffect(() => {
+    if (workoutsTab !== 'periodized') return
+    if (periodizedLoaded) return
+    if (periodizedLoading) return
+    let cancelled = false
+    setPeriodizedLoading(true)
+    setPeriodizedError('')
+    ;(async () => {
+      try {
+        const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
+        const json = await res.json().catch(() => null)
+        if (cancelled) return
+        if (!json?.ok) {
+          const msg = String(json?.error || 'Falha ao carregar periodização.')
+          setPeriodizedWorkouts([])
+          setPeriodizedLoaded(true)
+          setPeriodizedError(msg)
+          return
+        }
+        const rows = Array.isArray(json?.workouts) ? json.workouts : []
+        const ids = rows.map((r: any) => String(r?.workout_id || '').trim()).filter(Boolean)
+        const countById = new Map<string, number>()
+        rows.forEach((r: any) => {
+          const id = String(r?.workout_id || '').trim()
+          const n = Number(r?.exercise_count)
+          if (!id) return
+          if (!Number.isFinite(n)) return
+          countById.set(id, Math.max(0, Math.floor(n)))
+        })
+        if (ids.length === 0) {
+          setPeriodizedWorkouts([])
+          setPeriodizedLoaded(true)
+          setPeriodizedError(json?.program?.id ? 'Programa encontrado, mas sem treinos vinculados.' : '')
+          return
+        }
+
+        const { data, error } = await supabase
+          .from('workouts')
+          .select(
+            `
+            id,
+            user_id,
+            created_by,
+            name,
+            notes,
+            archived_at,
+            sort_order,
+            created_at
+          `,
+          )
+          .in('id', ids)
+          .limit(ids.length)
+
+        if (cancelled) return
+        if (error) {
+          setPeriodizedWorkouts([])
+          setPeriodizedLoaded(true)
+          setPeriodizedError(String((error as any)?.message || 'Falha ao carregar treinos periodizados.'))
+          return
+        }
+
+        const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+        const mapped = (Array.isArray(data) ? data : [])
+          .filter((w: any) => isRecord(w))
+          .map((w: any) => {
+            const workout = w as Record<string, unknown>
+            const wid = workout.id != null ? String(workout.id) : ''
+            return {
+              id: workout.id != null ? String(workout.id) : undefined,
+              title: String(workout.name ?? ''),
+              notes: workout.notes as any,
+              exercises: [] as any,
+              exercises_count: wid ? (countById.get(wid) ?? null) : null,
+              user_id: workout.user_id != null ? String(workout.user_id) : undefined,
+              created_by: workout.created_by != null ? String(workout.created_by) : undefined,
+              archived_at: (workout as any).archived_at ?? null,
+              sort_order: typeof (workout as any).sort_order === 'number' ? ((workout as any).sort_order as number) : ((workout as any).sort_order == null ? 0 : Number((workout as any).sort_order) || 0),
+              created_at: (workout as any).created_at ?? null,
+            } as DashboardWorkout
+          })
+
+        const byId = new Map<string, DashboardWorkout>()
+        mapped.forEach((w: DashboardWorkout) => {
+          const id = String(w?.id || '').trim()
+          if (id) byId.set(id, w)
+        })
+        const ordered = ids.map((id) => byId.get(id)).filter(Boolean) as DashboardWorkout[]
+        setPeriodizedWorkouts(ordered)
+        setPeriodizedLoaded(true)
+      } catch {
+        if (!cancelled) {
+          setPeriodizedWorkouts([])
+          setPeriodizedLoaded(true)
+          setPeriodizedError('Falha ao carregar treinos periodizados.')
+        }
+      } finally {
+        if (!cancelled) setPeriodizedLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [periodizedLoaded, periodizedLoading, supabase, workoutsTab])
 
   const safeSetPendingAction = (next: typeof pendingAction) => {
     if (!isMountedRef.current) return
@@ -178,6 +305,102 @@ export default function StudentDashboard(props: Props) {
     } finally {
       safeSetPendingAction(null)
     }
+  }
+
+  const isPeriodizedWorkoutFullyLoaded = (w: DashboardWorkout) => {
+    const exs = Array.isArray(w?.exercises) ? (w.exercises as any[]) : []
+    if (exs.length === 0) return false
+    return exs.some((e) => Array.isArray((e as any)?.setDetails))
+  }
+
+  const loadWorkoutFullById = async (workoutId: string): Promise<DashboardWorkout | null> => {
+    const id = String(workoutId || '').trim()
+    if (!id) return null
+    const { data, error } = await supabase
+      .from('workouts')
+      .select(
+        `
+        id,
+        user_id,
+        created_by,
+        name,
+        notes,
+        archived_at,
+        sort_order,
+        created_at,
+        exercises (
+          id,
+          name,
+          notes,
+          video_url,
+          rest_time,
+          cadence,
+          method,
+          "order",
+          sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config )
+        )
+      `,
+      )
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error || !data?.id) return null
+
+    const workout: Record<string, unknown> = data as any
+    const rawExercises = Array.isArray(workout?.exercises) ? (workout.exercises as unknown[]) : []
+    const exs = rawExercises
+      .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
+      .sort((a, b) => (Number((a as any).order) || 0) - (Number((b as any).order) || 0))
+      .map((e) => {
+        const isCardio = String((e as any).method || '').toLowerCase() === 'cardio'
+        const dbSets = Array.isArray((e as any).sets) ? ((e as any).sets as unknown[]).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object')) : []
+        const sortedSets = dbSets.slice().sort((aSet, bSet) => (Number((aSet as any)?.set_number) || 0) - (Number((bSet as any)?.set_number) || 0))
+        const setsCount = sortedSets.length || (isCardio ? 1 : 4)
+        const setDetails = sortedSets.map((s, idx) => ({
+          set_number: (s as any)?.set_number ?? idx + 1,
+          reps: (s as any)?.reps ?? null,
+          rpe: (s as any)?.rpe ?? null,
+          weight: (s as any)?.weight ?? null,
+          is_warmup: !!((s as any)?.is_warmup ?? (s as any)?.isWarmup),
+          advanced_config: (s as any)?.advanced_config ?? (s as any)?.advancedConfig ?? null,
+        }))
+        const nonEmptyReps = setDetails.map((s: any) => s.reps).filter((r: any) => r !== null && r !== undefined && r !== '')
+        const defaultReps = isCardio ? '20' : '10'
+        let repsHeader = defaultReps
+        if (nonEmptyReps.length > 0) {
+          const uniqueReps = Array.from(new Set(nonEmptyReps))
+          repsHeader = uniqueReps.length === 1 ? String(uniqueReps[0] ?? defaultReps) : String(nonEmptyReps[0] ?? defaultReps)
+        }
+        const rpeValues = setDetails.map((s: any) => s.rpe).filter((v: any) => v !== null && v !== undefined && !Number.isNaN(Number(v)))
+        const defaultRpe = isCardio ? 5 : 8
+        const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe
+        return {
+          id: (e as any).id,
+          name: (e as any).name,
+          notes: (e as any).notes,
+          videoUrl: (e as any).video_url,
+          restTime: (e as any).rest_time,
+          cadence: (e as any).cadence,
+          method: (e as any).method,
+          sets: setsCount,
+          reps: repsHeader,
+          rpe: rpeHeader,
+          setDetails,
+        }
+      })
+      .filter(Boolean)
+
+    return {
+      id: workout.id != null ? String(workout.id) : undefined,
+      title: String(workout.name ?? ''),
+      notes: workout.notes as any,
+      exercises: exs as any,
+      user_id: workout.user_id != null ? String(workout.user_id) : undefined,
+      created_by: workout.created_by != null ? String(workout.created_by) : undefined,
+      archived_at: (workout as any).archived_at ?? null,
+      sort_order: typeof (workout as any).sort_order === 'number' ? ((workout as any).sort_order as number) : ((workout as any).sort_order == null ? 0 : Number((workout as any).sort_order) || 0),
+      created_at: (workout as any).created_at ?? null,
+    } as DashboardWorkout
   }
 
   useEffect(() => {
@@ -652,7 +875,42 @@ export default function StudentDashboard(props: Props) {
 
           <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Meus Treinos</h3>
+              <div className="inline-flex items-center rounded-xl bg-neutral-900/40 border border-neutral-800 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowArchived(false)
+                    setWorkoutsTab('normal')
+                  }}
+                  className={
+                    workoutsTab === 'normal'
+                      ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
+                      : 'min-h-[44px] px-3 py-2 text-neutral-300 font-bold text-xs uppercase tracking-widest hover:bg-neutral-800'
+                  }
+                >
+                  Meus Treinos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowArchived(false)
+                    setPeriodizedLoaded(false)
+                    setPeriodizedWorkouts([])
+                    setPeriodizedError('')
+                    setWorkoutsTab('periodized')
+                  }}
+                  className={
+                    workoutsTab === 'periodized'
+                      ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
+                      : 'min-h-[44px] px-3 py-2 text-neutral-300 font-bold text-xs uppercase tracking-widest hover:bg-neutral-800'
+                  }
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    <Crown size={12} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
+                    Treinos Periodizados
+                  </span>
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 {archivedCount > 0 ? (
                   <button
@@ -839,7 +1097,35 @@ export default function StudentDashboard(props: Props) {
                 <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
                   <Dumbbell size={32} />
                 </div>
-                <p>Nenhum treino criado.</p>
+                <p>
+                  {workoutsTab === 'periodized'
+                    ? periodizedLoading
+                      ? 'Carregando treinos periodizados...'
+                      : 'Nenhum treino periodizado criado.'
+                    : 'Nenhum treino criado.'}
+                </p>
+                {workoutsTab === 'periodized' && periodizedError ? (
+                  <div className="mt-3 inline-flex items-center justify-center">
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
+                      {periodizedError}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPeriodizedLoaded(false)
+                        setPeriodizedWorkouts([])
+                        setPeriodizedError('')
+                      }}
+                      className="ml-2 min-h-[36px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                ) : workoutsTab === 'periodized' && !periodizedLoading ? (
+                  <p className="mt-2 text-xs text-neutral-500">
+                    Crie sua periodização na aba VIP para ela aparecer aqui.
+                  </p>
+                ) : null}
               </div>
             )}
 
@@ -854,12 +1140,31 @@ export default function StudentDashboard(props: Props) {
                 onClick={() => {
                   const key = getWorkoutKey(w, idx)
                   if (isWorkoutBusy(key)) return
+                  if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                    runWorkoutAction(key, 'open', async () => {
+                      const id = String(w?.id || '').trim()
+                      const full = await loadWorkoutFullById(id)
+                      if (!full) {
+                        setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                        return
+                      }
+                      if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                        setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                        return
+                      }
+                      setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                      props.onQuickView(full)
+                    })
+                    return
+                  }
                   props.onQuickView(w)
                 }}
               >
                 <div className="relative z-10">
                   <h3 className="font-bold text-white text-lg uppercase mb-1 pr-32 leading-tight">{String(w?.title || 'Treino')}</h3>
-                  <p className="text-xs text-neutral-400 font-mono mb-4">{Array.isArray(w?.exercises) ? w.exercises.length : 0} EXERCÍCIOS</p>
+                  <p className="text-xs text-neutral-400 font-mono mb-4">
+                    {(Number.isFinite(Number((w as any)?.exercises_count)) ? Math.max(0, Math.floor(Number((w as any).exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} EXERCÍCIOS
+                  </p>
                   {w?.archived_at ? (
                     <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
                       ARQUIVADO
@@ -876,7 +1181,24 @@ export default function StudentDashboard(props: Props) {
                           await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
                           return
                         }
-                        await runWorkoutAction(key, 'start', () => props.onStartSession(w))
+                        await runWorkoutAction(key, 'start', async () => {
+                          if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                            const id = String(w?.id || '').trim()
+                            const full = await loadWorkoutFullById(id)
+                            if (!full) {
+                              setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                              return
+                            }
+                            if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                              setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                              return
+                            }
+                            setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                            await props.onStartSession(full)
+                            return
+                          }
+                          await props.onStartSession(w)
+                        })
                       }}
                       data-tour="workout-start"
                       disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}

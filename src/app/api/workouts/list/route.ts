@@ -20,7 +20,7 @@ export async function GET() {
 
     const rows = data || []
     return NextResponse.json({ ok: true, rows })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

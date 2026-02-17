@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

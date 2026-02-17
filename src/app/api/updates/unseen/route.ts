@@ -61,7 +61,7 @@ export async function GET(req: Request) {
     })
 
     return NextResponse.json({ ok: true, updates: filtered.slice(0, limit) })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

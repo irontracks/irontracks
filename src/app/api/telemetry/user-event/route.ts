@@ -67,8 +67,9 @@ export async function POST(req: Request) {
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
-    const rawEvents = Array.isArray((body as any)?.events) ? (body as any).events : (body ? [body] : [])
-    const events: IncomingEvent[] = rawEvents.filter(Boolean).slice(0, 50)
+    const rawFromBody = (body as Record<string, unknown>)?.events
+    const rawEvents = Array.isArray(rawFromBody) ? (rawFromBody as unknown[]) : body ? [body] : []
+    const events: IncomingEvent[] = rawEvents.filter(Boolean).slice(0, 50) as IncomingEvent[]
 
     if (!events.length) return NextResponse.json({ ok: true, inserted: 0 })
 
@@ -111,7 +112,7 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     return NextResponse.json({ ok: true, inserted: rows.length })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -110,7 +110,7 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
             }))
             .filter((r: any) => !!r.userId)
         )
-      } catch (e: any) {
+      } catch (e) {
         if (cancelled) return
         const raw = String(e?.message ?? e)
         const lower = raw.toLowerCase()

@@ -15,8 +15,18 @@ import { VideoCompositor } from '@/lib/video/VideoCompositor'
 
 interface StoryComposerProps {
   open: boolean
-  session: any // We'll refine this if possible, but keeping flexible for now to avoid breaking existing calls
+  session: SessionLite
   onClose: () => void
+}
+
+interface SessionLite {
+  id?: string
+  name?: string
+  date?: string
+  exercises?: unknown[]
+  logs?: Record<string, unknown>
+  elapsedSeconds?: number
+  [key: string]: unknown
 }
 
 interface Metrics {
@@ -69,7 +79,7 @@ const DEFAULT_LIVE_POSITIONS: LivePositions = {
 
 // --- Helpers ---
 
-const safeString = (v: any): string => {
+const safeString = (v: unknown): string => {
   try {
     return String(v ?? '').trim()
   } catch {
@@ -81,7 +91,7 @@ const isIOSUserAgent = (ua: string): boolean => {
   const s = String(ua || '')
   if (/(iPad|iPhone|iPod)/i.test(s)) return true
   try {
-    const nav: any = typeof navigator !== 'undefined' ? navigator : null
+    const nav = typeof navigator !== 'undefined' ? navigator : null
     if (nav && nav.platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1) return true
   } catch {
   }
@@ -92,7 +102,7 @@ const pickFirstSupportedMime = (candidates: string[]): string => {
   try {
     return (Array.isArray(candidates) ? candidates : []).find((t) => {
       try {
-        return !!(t && typeof (MediaRecorder as any)?.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(t))
+        return !!(t && typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(t))
       } catch {
         return false
       }
@@ -130,10 +140,12 @@ const guessMediaKind = (mime: string, ext: string): 'video' | 'image' | 'unknown
   return 'unknown'
 }
 
-const formatDatePt = (v: any): string => {
+const formatDatePt = (v: unknown): string => {
   try {
     if (!v) return ''
-    const d = v?.toDate ? v.toDate() : v instanceof Date ? v : new Date(v)
+    const vObj = v && typeof v === 'object' ? (v as Record<string, unknown>) : null
+    const raw = vObj?.toDate && typeof vObj.toDate === 'function' ? (vObj.toDate as () => unknown)() : v
+    const d = raw instanceof Date ? raw : new Date(raw as string | number | Date)
     if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   } catch {
@@ -141,7 +153,7 @@ const formatDatePt = (v: any): string => {
   }
 }
 
-const formatDuration = (totalSeconds: any): string => {
+const formatDuration = (totalSeconds: unknown): string => {
   const sec = Number(totalSeconds) || 0
   if (sec <= 0) return '0min'
   const h = Math.floor(sec / 3600)
@@ -150,13 +162,13 @@ const formatDuration = (totalSeconds: any): string => {
   return `${m}min`
 }
 
-const calculateTotalVolume = (logs: any): number => {
+const calculateTotalVolume = (logs: Record<string, unknown>): number => {
   try {
-    if (!logs || typeof logs !== 'object') return 0
     let total = 0
-    Object.values(logs).forEach((log: any) => {
-      const w = Number(String(log?.weight ?? '').replace(',', '.'))
-      const r = Number(String(log?.reps ?? '').replace(',', '.'))
+    Object.values(logs).forEach((log: unknown) => {
+      const l = log && typeof log === 'object' ? (log as Record<string, unknown>) : {}
+      const w = Number(String(l?.weight ?? '').replace(',', '.'))
+      const r = Number(String(l?.reps ?? '').replace(',', '.'))
       if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) {
         total += w * r
       }
@@ -167,7 +179,7 @@ const calculateTotalVolume = (logs: any): number => {
   }
 }
 
-const computeKcal = ({ session, volume }: { session: any; volume: number }): number => {
+const computeKcal = ({ session, volume }: { session: SessionLite; volume: number }): number => {
   try {
     const existing = Number(session?.calories) || Number(session?.kcal)
     if (Number.isFinite(existing) && existing > 0) return Math.round(existing)
@@ -198,7 +210,7 @@ const fitCover = ({ canvasW, canvasH, imageW, imageH }: { canvasW: number; canva
   return { scale: coverScale, dw, dh }
 }
 
-const clamp01 = (n: any) => Math.max(0, Math.min(1, Number(n) || 0))
+const clamp01 = (n: unknown): number => Math.max(0, Math.min(1, Number(n) || 0))
 
 const clampPctWithSize = ({ pos, size }: { pos: LivePosition; size: { w: number; h: number } }) => {
   const px = clamp01(pos?.x)
@@ -603,11 +615,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const metrics: Metrics = useMemo(() => {
     const title = safeString(session?.workoutTitle || session?.name || 'Treino')
     const date = formatDatePt(session?.date || session?.completed_at || session?.completedAt || session?.created_at)
-    const logs = session?.logs && typeof session.logs === 'object' ? session.logs : {}
+    const logs = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {}
     const volume = calculateTotalVolume(logs)
     const totalTime = Number(session?.totalTime) || 0
     const kcal = Number.isFinite(Number(kcalEstimate)) && Number(kcalEstimate) > 0 ? Number(kcalEstimate) : computeKcal({ session, volume })
-    const teamCountRaw = session?.team?.participantsCount ?? session?.teamParticipantsCount ?? session?.teamSessionParticipantsCount
+    const teamObj = session?.team && typeof session.team === 'object' ? (session.team as Record<string, unknown>) : null
+    const teamCountRaw = teamObj?.participantsCount ?? session?.teamParticipantsCount ?? session?.teamSessionParticipantsCount
     const teamCount = Number(teamCountRaw)
     return {
       title,
@@ -1053,7 +1066,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         try {
           await navigator.share({ files: [file], title: 'Story IronTracks' })
           shared = true
-        } catch (shareErr: any) {
+        } catch (shareErr) {
           const name = String(shareErr?.name || '').trim()
           // If user cancelled, stop here
           if (name === 'AbortError') {
@@ -1070,7 +1083,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         downloadBlob(result.blob, result.filename)
         setInfo('Baixado com sucesso!')
       }
-    } catch (e: any) {
+    } catch (e) {
       const name = String(e?.name || '').trim()
       if (name === 'AbortError') return
       const msg = String(e?.message || '').trim()
@@ -1093,7 +1106,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       if (!uid) throw new Error('unauthorized')
 
       let path = ''
-      let meta: any = {}
+      let meta: Record<string, unknown> = {}
       
       if (mediaKind === 'video') {
         if (!selectedFile) throw new Error('Selecione um vídeo primeiro.')
@@ -1176,7 +1189,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         window.setTimeout(() => onClose?.(), 1000)
       } catch {}
 
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
       const msg = String(err?.message || '').trim()
       setError(msg || 'Falha ao publicar story.')

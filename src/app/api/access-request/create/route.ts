@@ -113,7 +113,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: inserted?.id ?? null })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Access Request Error:', error)
     return NextResponse.json({ ok: false, error: 'Erro interno do servidor.' }, { status: 500 })
   }

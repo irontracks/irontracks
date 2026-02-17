@@ -36,8 +36,8 @@ const extractJsonFromModelText = (text: string) => {
 const normalizeDraft = (draft: any) => {
   const d = draft && typeof draft === 'object' ? draft : null
   if (!d) return null
-  const title = String((d as any).title || '').trim() || 'Treino'
-  const exsRaw = Array.isArray((d as any).exercises) ? (d as any).exercises : []
+  const title = String((d as Record<string, unknown>).title || '').trim() || 'Treino'
+  const exsRaw = Array.isArray((d as Record<string, unknown>).exercises) ? ((d as Record<string, unknown>).exercises as unknown[]) : []
   const exercises = exsRaw
     .map((e: any) => {
       const name = String(e?.name || '').trim()
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const days = Math.max(2, Math.min(6, Number((answers as any)?.daysPerWeek || 3) || 3))
+    const days = Math.max(2, Math.min(6, Number((answers as Record<string, unknown>)?.daysPerWeek || 3) || 3))
     const schema =
       mode === 'program'
         ? `{ \"drafts\": [{ \"title\": string, \"exercises\": [{\"name\": string, \"sets\": number, \"reps\": string, \"restTime\": number, \"notes\": string}] }] }`
@@ -142,20 +142,20 @@ export async function POST(req: Request) {
     if (!parsed) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
     if (mode === 'program') {
-      const draftsRaw = Array.isArray((parsed as any)?.drafts) ? (parsed as any).drafts : []
-      const normalized = draftsRaw.map(normalizeDraft).filter(Boolean)
+      const draftsRaw = Array.isArray((parsed as Record<string, unknown>)?.drafts) ? ((parsed as Record<string, unknown>).drafts as unknown[]) : []
+      const normalized = draftsRaw.map((d) => normalizeDraft(d)).filter(Boolean)
       const validated = z.array(DraftSchema).safeParse(normalized)
       if (!validated.success) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
       await incrementVipUsage(supabase, userId, 'wizard')
       return NextResponse.json({ ok: true, drafts: validated.data })
     }
 
-    const draftNormalized = normalizeDraft((parsed as any)?.draft)
+    const draftNormalized = normalizeDraft((parsed as Record<string, unknown>)?.draft)
     const draftValidated = DraftSchema.safeParse(draftNormalized)
     if (!draftValidated.success) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
     await incrementVipUsage(supabase, userId, 'wizard')
     return NextResponse.json({ ok: true, draft: draftValidated.data })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

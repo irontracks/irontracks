@@ -51,7 +51,7 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
     const buffer = Buffer.from(arrayBuffer);
     const base64 = buffer.toString("base64");
 
-    const mimeType = (blob as any).type || "application/octet-stream";
+    const mimeType = blob.type || "application/octet-stream";
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: IRON_SCANNER_MODEL });
@@ -146,7 +146,7 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
     }
 
     return { ok: true, workoutTitle: workoutTitle || undefined, exercises };
-  } catch (e: any) {
+  } catch (e) {
     const raw = e?.message ? String(e.message) : String(e);
     let msg = raw || "Erro inesperado ao processar treino";
 

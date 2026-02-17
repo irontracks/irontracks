@@ -25,7 +25,7 @@ export async function GET() {
 
     const alreadySeen = !!data?.user_id
     return NextResponse.json({ ok: true, hasVip: true, alreadySeen, shouldShow: !alreadySeen })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

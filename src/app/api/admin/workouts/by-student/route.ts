@@ -69,7 +69,7 @@ export async function GET(req: Request) {
       .order('name')
 
     return NextResponse.json({ ok: true, rows: rows || [] })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

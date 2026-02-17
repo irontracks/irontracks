@@ -42,8 +42,8 @@ export async function GET(req: Request) {
     const byType = new Map<string, number>()
 
     for (const r of rows) {
-      const name = safeStr((r as any)?.event_name || '', 120)
-      const type = safeStr((r as any)?.event_type || '', 80)
+      const name = safeStr((r as Record<string, unknown>)?.event_name || '', 120)
+      const type = safeStr((r as Record<string, unknown>)?.event_type || '', 80)
       if (name) byName.set(name, (byName.get(name) || 0) + 1)
       if (type) byType.set(type, (byType.get(type) || 0) + 1)
     }
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
       .slice(0, 20)
 
     return NextResponse.json({ ok: true, days, total: rows.length, topEvents, topTypes })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -238,7 +238,7 @@ export default function MuscleMapCard(props: Props) {
   const weakestInView = useMemo(() => {
     const muscles = state.data?.muscles && typeof state.data.muscles === 'object' ? state.data.muscles : {}
     const list = Object.entries(muscles)
-      .map(([id, m]) => ({ id, ratio: Number((m as any)?.ratio || 0), view: (m as any)?.view }))
+      .map(([id, m]) => ({ id, ratio: Number((m as Record<string, unknown>)?.ratio || 0), view: (m as Record<string, unknown>)?.view }))
       .filter((x) => x.view === view)
       .sort((a, b) => a.ratio - b.ratio)
     return list[0]?.id ? (list[0].id as MuscleId) : null
@@ -254,7 +254,7 @@ export default function MuscleMapCard(props: Props) {
   const musclesForView = useMemo(() => {
     const data = state.data
     const items = data?.muscles && typeof data.muscles === 'object' ? data.muscles : {}
-    return Object.fromEntries(Object.entries(items).filter(([, v]) => v && typeof v === 'object' && (v as any).view === view))
+    return Object.fromEntries(Object.entries(items).filter(([, v]) => v && typeof v === 'object' && (v as Record<string, unknown>).view === view))
   }, [state.data, view])
 
   const selectedInfo = useMemo(() => {
@@ -281,7 +281,7 @@ export default function MuscleMapCard(props: Props) {
   const weakMuscles = useMemo(() => {
     const muscles = state.data?.muscles && typeof state.data.muscles === 'object' ? state.data.muscles : {}
     return Object.entries(muscles)
-      .map(([id, m]) => ({ id, label: String((m as any)?.label || id), ratio: Number((m as any)?.ratio || 0), sets: Number((m as any)?.sets || 0), minSets: Number((m as any)?.minSets || 0), view: (m as any)?.view }))
+      .map(([id, m]) => ({ id, label: String((m as Record<string, unknown>)?.label || id), ratio: Number((m as Record<string, unknown>)?.ratio || 0), sets: Number((m as Record<string, unknown>)?.sets || 0), minSets: Number((m as Record<string, unknown>)?.minSets || 0), view: (m as Record<string, unknown>)?.view }))
       .filter((x) => x.view === view)
       .sort((a, b) => a.ratio - b.ratio)
       .slice(0, 3)

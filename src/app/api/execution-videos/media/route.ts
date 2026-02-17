@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     if (signedErr || !signed?.signedUrl) return jsonError(400, signedErr?.message || 'signed_url_failed')
 
     return NextResponse.json({ ok: true, url: signed.signedUrl }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

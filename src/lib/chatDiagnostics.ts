@@ -35,7 +35,7 @@ export async function runChatDiagnostics(supabase: any, userId: string) {
     logInfo('chatDiagnostics', 'Finished', report)
   } catch (e) {
     report.ok = false
-    report.error = (e as any)?.message ?? String(e)
+    report.error = (e as Record<string, unknown>)?.message ?? String(e)
     logError('chatDiagnostics', e)
   }
   return report

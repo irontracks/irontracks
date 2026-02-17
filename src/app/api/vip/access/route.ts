@@ -15,7 +15,7 @@ export async function GET() {
     const entitlement = await getVipPlanLimits(supabase, user.id)
     const hasVip = entitlement.tier !== 'free'
     return NextResponse.json({ ok: true, hasVip, role, entitlement })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 
 export type IrontracksRole = 'admin' | 'teacher' | 'user'
-export type RouteAuthFail = { ok: false; response: NextResponse<any>; supabase?: undefined; user?: undefined; role?: undefined }
-export type RouteAuthOk = { ok: true; supabase: any; user: any; role: IrontracksRole; response?: undefined }
+export type RouteAuthFail = { ok: false; response: NextResponse<{ ok: false; error: string }>; supabase?: undefined; user?: undefined; role?: undefined }
+export type RouteAuthOk = { ok: true; supabase: SupabaseClient; user: User; role: IrontracksRole; response?: undefined }
 
 const getAdminEmail = () => {
   const envEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
@@ -12,7 +14,7 @@ const getAdminEmail = () => {
 }
 
 export const jsonError = (status: number, error: string) => {
-  return NextResponse.json({ ok: false, error }, { status })
+  return NextResponse.json({ ok: false as const, error }, { status })
 }
 
 export const getInternalSecret = () => {

@@ -15,32 +15,84 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 
+interface ChatUser {
+    uid: string
+    displayName: string
+    photoUrl?: string | null
+    email?: string | null
+}
+
+interface ChannelState {
+    channelId: string
+    hostId: string
+    guestId: string
+}
+
+interface MessageRow {
+    id: string
+    user_id: string
+    content?: string | null
+    created_at: string
+    attachments?: unknown[]
+    [key: string]: unknown
+}
+
+interface ChatDirectScreenProps {
+    user: Record<string, unknown> | null
+    targetUser?: Record<string, unknown> | null
+    otherUserId?: string
+    otherUserName?: string
+    otherUserPhoto?: string | null
+    onClose: () => void
+}
+
 const CHAT_MEDIA_PREVIEW_SIZE = 800;
 
-const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherUserPhoto, onClose }) => {
-    const [messages, setMessages] = useState<any[]>([]);
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const toMessageRow = (raw: Record<string, unknown>): MessageRow => {
+    const id = String(raw.id ?? '').trim()
+    const userId = String(raw.sender_id ?? raw.user_id ?? '').trim()
+    const createdAt = String(raw.created_at ?? '').trim()
+    const content = raw.content == null ? null : String(raw.content)
+    const attachments = Array.isArray(raw.attachments) ? raw.attachments : undefined
+    return {
+        ...(raw as Record<string, unknown>),
+        id,
+        user_id: userId,
+        created_at: createdAt,
+        content,
+        attachments,
+    }
+}
+
+const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherUserPhoto, onClose }: ChatDirectScreenProps) => {
+    const [messages, setMessages] = useState<MessageRow[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [nowMs, setNowMs] = useState(0);
-    const [otherUser, setOtherUser] = useState<any>(null);
+    const [otherUser, setOtherUser] = useState<ChatUser | null>(null);
     const [isTyping, setIsTyping] = useState(false);
-    const [channelId, setChannelId] = useState<any>(null);
-    const [oldestCreatedAt, setOldestCreatedAt] = useState<any>(null);
+    const [channelId, setChannelId] = useState<string | null>(null);
+    const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     
     const { alert, prompt, confirm } = useDialog();
     const supabase = useMemo(() => createClient(), []);
-    const messagesEndRef = useRef<any>(null);
-    const scrollContainerRef = useRef<any>(null);
-    const typingTimeoutRef = useRef<any>(null);
+    const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     
     const [showEmoji, setShowEmoji] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const fileInputRef = useRef<any>(null);
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [debugChat, setDebugChat] = useState(false);
 
-    const handleDeleteMessage = async (message) => {
+    const userObj: Record<string, unknown> = isRecord(user) ? user : {}
+    const targetObj: Record<string, unknown> = isRecord(targetUser) ? targetUser : {}
+
+    const handleDeleteMessage = async (message: MessageRow) => {
         const id = message?.id ? String(message.id) : '';
         if (!id) return;
         const ok = await confirm('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar' });
@@ -55,14 +107,15 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             if (!res.ok || !json?.ok) throw new Error(json?.error || 'Erro ao deletar mensagem.');
             setMessages((prev) => prev.filter((m) => String(m?.id || '') !== id));
         } catch (e) {
-            await alert(e?.message || 'Erro ao deletar mensagem.');
+            const msg = (e as Record<string, unknown>)?.message
+            await alert(typeof msg === 'string' ? msg : 'Erro ao deletar mensagem.');
         }
     };
 
-    const resolvedOtherUserId = targetUser?.id ?? otherUserId;
-    const resolvedOtherUserName = targetUser?.display_name ?? targetUser?.name ?? otherUserName;
-    const resolvedOtherUserPhoto = targetUser?.photo_url ?? targetUser?.photoURL ?? otherUserPhoto;
-    const safeUserId = user?.id ? String(user.id) : '';
+    const resolvedOtherUserId = String(targetObj?.id ?? otherUserId ?? '').trim();
+    const resolvedOtherUserName = String(targetObj?.display_name ?? targetObj?.name ?? otherUserName ?? '').trim();
+    const resolvedOtherUserPhoto = (targetObj?.photo_url ?? targetObj?.photoURL ?? otherUserPhoto) as string | null | undefined;
+    const safeUserId = userObj?.id ? String(userObj.id) : '';
 
     useEffect(() => {
         const tick = () => setNowMs(Date.now());
@@ -89,7 +142,14 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 .single();
 
             if (error) throw error;
-            setOtherUser(data);
+            const row: Record<string, unknown> = isRecord(data) ? data : {}
+            const normalized: ChatUser = {
+                uid: String(row.id ?? resolvedOtherUserId),
+                displayName: String(row.display_name ?? resolvedOtherUserName ?? 'Usuário'),
+                photoUrl: row.photo_url != null ? String(row.photo_url) : null,
+                email: null,
+            }
+            setOtherUser({ ...normalized, last_seen: row.last_seen ?? null } as ChatUser);
         } catch (error) {
             console.error('Erro ao carregar usuário:', error);
         }
@@ -101,18 +161,20 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 const err = new Error('Usuário inválido para iniciar conversa.');
                 throw err;
             }
-            const { data: channelId, error } = await supabase
+            const { data: channelIdRes, error } = await supabase
                 .rpc('get_or_create_direct_channel', {
                     user1: safeUserId,
                     user2: resolvedOtherUserId
                 });
 
             if (error) throw error;
-            setChannelId(channelId);
-            return channelId;
+            const nextChannelId = String(channelIdRes ?? '').trim()
+            if (!nextChannelId) throw new Error('Canal inválido.')
+            setChannelId(nextChannelId);
+            return nextChannelId;
         } catch (error) {
             console.error('Erro ao obter canal:', error);
-            const msg = error?.message || String(error || '');
+            const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
             if (/dm_blocked/i.test(msg) || /row-level security/i.test(msg) || /policy/i.test(msg)) {
                 await alert('Não foi possível iniciar a conversa. Um dos usuários desativou mensagens diretas nas configurações.');
             } else if (/forbidden/i.test(msg)) {
@@ -124,7 +186,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         }
     }, [alert, resolvedOtherUserId, safeUserId, supabase]);
 
-    const markMessagesAsRead = useCallback(async (targetChannelId) => {
+    const markMessagesAsRead = useCallback(async (targetChannelId: string) => {
         const safeChannelId = String(targetChannelId || '').trim();
         if (!safeChannelId) return;
         try {
@@ -135,13 +197,13 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 .eq('sender_id', resolvedOtherUserId)
                 .eq('is_read', false);
         } catch (error) {
-            const msg = String(error?.message || error || '');
+            const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
             if (msg.includes('Abort') || msg.includes('ERR_ABORTED')) return;
             console.error('Erro ao marcar como lido:', error);
         }
     }, [resolvedOtherUserId, supabase]);
 
-    const loadMessages = useCallback(async (channelId, beforeTs = null) => {
+    const loadMessages = useCallback(async (channelId: string, beforeTs: string | null = null) => {
         try {
             let query = supabase
                 .from('direct_messages')
@@ -158,21 +220,28 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
             if (error) throw error;
 
-            const msgs = data || [];
-            const senderIds = Array.from(new Set(msgs.map(m => m.sender_id).filter(Boolean)));
-            let profilesMap = {};
+            const rawRows: Array<Record<string, unknown>> = Array.isArray(data) ? data.filter(isRecord) : [];
+            const senderIds = Array.from(new Set(rawRows.map((m) => String(m.sender_id ?? m.user_id ?? '')).filter(Boolean)));
+            const profilesMap: Record<string, Record<string, unknown>> = {};
             if (senderIds.length > 0) {
                 const { data: profiles } = await supabase
                     .from('profiles')
                     .select('id, display_name, photo_url')
                     .in('id', senderIds);
-                (profiles || []).forEach(p => { profilesMap[p.id] = p; });
+                (Array.isArray(profiles) ? profiles.filter(isRecord) : []).forEach((p: Record<string, unknown>) => {
+                    const pid = String(p.id ?? '').trim()
+                    if (pid) profilesMap[pid] = p
+                });
             }
-            const withSenders = msgs.map(m => ({ ...m, sender: profilesMap[m.sender_id] }));
+            const withSenders: MessageRow[] = rawRows.map((m) => {
+                const senderId = String(m.sender_id ?? m.user_id ?? '').trim()
+                const base = toMessageRow(m)
+                return { ...base, sender: profilesMap[senderId] ?? null }
+            });
             setMessages(prev => {
                 const merged = beforeTs ? [...withSenders, ...prev] : withSenders;
-                const seen = new Set();
-                const dedup: any[] = [];
+                const seen = new Set<string>();
+                const dedup: MessageRow[] = [];
                 for (const m of merged) { if (!seen.has(m.id)) { seen.add(m.id); dedup.push(m); } }
                 return dedup;
             });
@@ -185,16 +254,16 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
             await markMessagesAsRead(channelId);
         } catch (error) {
-            const msg = String(error?.message || error || '');
+            const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
             if (msg.includes('Abort') || msg.includes('ERR_ABORTED')) {
                 return;
             }
             console.error('Erro ao carregar mensagens:', error);
-            await alert('Erro ao carregar mensagens: ' + (error?.message || 'Desconhecido'));
+            await alert('Erro ao carregar mensagens: ' + msg);
         }
     }, [alert, markMessagesAsRead, supabase]);
 
-    const setupRealtime = useCallback((channelId) => {
+    const setupRealtime = useCallback((channelId: string) => {
         const subscription = supabase
             .channel(`chat:${channelId}`)
             .on('postgres_changes',
@@ -204,11 +273,11 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     table: 'direct_messages',
                     filter: `channel_id=eq.${channelId}`
                 },
-                async (payload) => {
+                async (payload: Record<string, unknown>) => {
                     try {
-                        const newMessage = payload?.new && typeof payload.new === 'object' ? payload.new : null
-                        if (!newMessage) return
-                        const senderId = newMessage?.sender_id ? String(newMessage.sender_id) : ''
+                        const newMessageRaw = isRecord(payload?.new) ? (payload.new as Record<string, unknown>) : null
+                        if (!newMessageRaw) return
+                        const senderId = String(newMessageRaw?.sender_id ?? newMessageRaw?.user_id ?? '').trim()
 
                         let senderData = null
                         if (senderId) {
@@ -217,23 +286,20 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                 .select('display_name, photo_url')
                                 .eq('id', senderId)
                                 .maybeSingle()
-                            senderData = data || null
+                            senderData = isRecord(data) ? data : null
                         }
 
-                        const messageWithSender = {
-                            ...newMessage,
-                            sender: senderData
-                        }
+                        const messageWithSender: MessageRow = { ...toMessageRow(newMessageRaw), sender: senderData }
 
                         setMessages((prev) => {
                             const safePrev = Array.isArray(prev) ? prev : []
-                            const msgId = newMessage?.id ? String(newMessage.id) : ''
+                            const msgId = newMessageRaw?.id ? String(newMessageRaw.id) : ''
                             if (msgId && safePrev.some((m) => String(m?.id || '') === msgId)) return safePrev
                             return [...safePrev, messageWithSender]
                         })
 
-                        const myId = user?.id ? String(user.id) : ''
-                        if (senderId && myId && senderId !== myId && !newMessage?.is_read) {
+                        const myId = userObj?.id ? String(userObj.id) : ''
+                        if (senderId && myId && senderId !== myId && newMessageRaw?.is_read !== true) {
                             await markMessagesAsRead(channelId)
                         }
                     } catch (e) {
@@ -247,7 +313,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, [markMessagesAsRead, supabase, user?.id]);
+    }, [markMessagesAsRead, supabase, userObj?.id]);
 
     useEffect(() => {
         let unsubscribe;
@@ -285,7 +351,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         return () => el.removeEventListener('scroll', onScroll);
     }, [hasMore, loadingMore, oldestCreatedAt, channelId, loadMessages]);
 
-    const handleSendMessage = async (e: any) => {
+    const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!newMessage.trim() || !channelId || !safeUserId) {
             if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
@@ -307,11 +373,12 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
             const optimistic = {
                 ...inserted,
-                sender: { display_name: user?.displayName || null, photo_url: user?.photoURL || null }
+                sender: { display_name: userObj?.displayName || null, photo_url: userObj?.photoURL || null }
             };
             setMessages(prev => {
                 if (prev.find(m => m.id === optimistic.id)) return prev;
-                return [...prev, optimistic];
+                const row = isRecord(optimistic) ? optimistic : {}
+                return [...prev, toMessageRow(row)];
             });
 
             await supabase
@@ -319,9 +386,9 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 .update({ last_message_at: new Date().toISOString() })
                 .eq('id', channelId);
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('Erro ao enviar mensagem:', error);
-            const msg = error?.message || String(error || '');
+            const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
             await alert('Erro ao enviar mensagem: ' + msg);
             setNewMessage(message);
         }
@@ -329,8 +396,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
     const handleAttachClick = () => { fileInputRef.current?.click() }
 
-    const handleFileSelected = async (e: any) => {
-        const files = Array.from(e?.target?.files || []) as File[]
+    const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []) as File[]
         if (!files.length || !channelId || !safeUserId) {
             if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
             return
@@ -343,19 +410,19 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 if (!isImage && !isVideo) continue
 
                 const pathBase = `${channelId}/${Date.now()}_${file.name.replace(/\s+/g,'_')}`
-                let payload: any = null;
+                let payload: Record<string, unknown> | null = null;
 
                 if (isImage) {
-                    const compressed: any = await compressImage(file, { maxWidth: 1280, quality: 0.8 })
-                    const thumb: any = await generateImageThumbnail(file, { thumbWidth: 360 })
+                    const compressed = (await compressImage(file, { maxWidth: 1280, quality: 0.8 })) as Blob
+                    const thumb = (await generateImageThumbnail(file, { thumbWidth: 360 })) as Blob
                     
                     const signMain = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}.jpg` }) }).then(r => r.json())
                     if (!signMain.ok) throw new Error(signMain.error)
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signMain.path, signMain.token, compressed as any)
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signMain.path, signMain.token, compressed)
                     
                     const signThumb = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}_thumb.jpg` }) }).then(r => r.json())
                     if (!signThumb.ok) throw new Error(signThumb.error)
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signThumb.path, signThumb.token, thumb as any)
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signThumb.path, signThumb.token, thumb)
                     
                     const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signMain.path)
                     const { data: pubThumb } = await supabase.storage.from('chat-media').getPublicUrl(signThumb.path)
@@ -365,7 +432,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     if (file.size > 200 * 1024 * 1024) { await alert('Vídeo acima de 200MB. Comprima antes.'); continue }
                     const signVid = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}` }) }).then(r => r.json())
                     if (!signVid.ok) throw new Error(signVid.error)
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file as any)
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file)
                     const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signVid.path)
                     payload = { type: 'video', media_url: pub.publicUrl }
                 }
@@ -378,11 +445,15 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     });
                 }
             }
-        } catch (err) { console.error(err); await alert('Falha ao enviar mídia: '+(err?.message || String(err))) }
+        } catch (err) {
+            console.error(err);
+            const msg = (err as Record<string, unknown>)?.message
+            await alert('Falha ao enviar mídia: ' + (typeof msg === 'string' ? msg : String(err)))
+        }
         finally { setUploading(false); e.target.value = '' }
     }
 
-    const insertEmoji = (emoji) => { setNewMessage(prev => prev + emoji); setShowEmoji(false) }
+    const insertEmoji = (emoji: string) => { setNewMessage(prev => prev + emoji); setShowEmoji(false) }
 
     const handleAddGif = async () => {
         const url = await prompt('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
@@ -399,13 +470,14 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     }
 
     const isUserOnline = () => {
-        if (!otherUser?.last_seen || !nowMs) return false;
-        const diff = nowMs - new Date(otherUser.last_seen).getTime();
+        const lastSeen = (otherUser as unknown as Record<string, unknown>)?.last_seen
+        if (!lastSeen || !nowMs) return false;
+        const diff = nowMs - new Date(String(lastSeen)).getTime();
         return diff < 5 * 60 * 1000;
     };
 
-    const formatTime = (timestamp) => {
-        return new Date(timestamp).toLocaleTimeString([], {
+    const formatTime = (timestamp: unknown) => {
+        return new Date(String(timestamp ?? '')).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit'
         });
@@ -440,23 +512,23 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 						</button>
 				
 					<div className="flex items-center gap-3 justify-center w-full">
-						{(otherUser?.photo_url || resolvedOtherUserPhoto) ? (
+						{(otherUser?.photoUrl || resolvedOtherUserPhoto) ? (
 							<Image
-								src={otherUser?.photo_url || resolvedOtherUserPhoto}
+								src={otherUser?.photoUrl || resolvedOtherUserPhoto || ''}
 								width={36}
 								height={36}
 								className="w-10 h-10 rounded-full object-cover ring-2 ring-yellow-500/20"
-								alt={otherUser?.display_name || resolvedOtherUserName}
+								alt={otherUser?.displayName || resolvedOtherUserName}
 							/>
 						) : (
 							<div className="w-10 h-10 bg-neutral-900 border border-neutral-800 rounded-full flex items-center justify-center font-black text-white ring-2 ring-yellow-500/20">
-								{otherUser?.display_name?.[0] || resolvedOtherUserName?.[0] || '?'}
+								{otherUser?.displayName?.[0] || resolvedOtherUserName?.[0] || '?'}
 							</div>
 						)}
 						
 						<div className="min-w-0 text-center">
 							<h3 className="font-black tracking-tight text-white truncate max-w-[56vw] mx-auto">
-								{otherUser?.display_name || resolvedOtherUserName || 'Usuário'}
+								{otherUser?.displayName || resolvedOtherUserName || 'Usuário'}
 							</h3>
 							<div className="flex items-center justify-center gap-1.5 text-[11px]">
 								{isUserOnline() ? (
@@ -486,14 +558,15 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 					<div className="text-center py-10 text-neutral-500">
 						<div className="text-lg mb-2">💬</div>
 						<p className="font-semibold">Comece a conversa</p>
-						<p className="text-sm">Envie uma mensagem para {otherUser?.display_name || otherUserName}</p>
+						<p className="text-sm">Envie uma mensagem para {otherUser?.displayName || otherUserName}</p>
 					</div>
 				) : (
 					<>
-						{messages.map((message, index) => {
-							const isMyMessage = safeUserId ? message.sender_id === safeUserId : false;
-							const prevSenderId = messages?.[index - 1]?.sender_id;
-							const showAvatar = !isMyMessage && (index === 0 || prevSenderId !== message.sender_id);
+						{messages.map((message: MessageRow, index: number) => {
+							const isMyMessage = safeUserId ? message.user_id === safeUserId : false;
+							const prevSenderId = messages?.[index - 1]?.user_id;
+							const showAvatar = !isMyMessage && (index === 0 || prevSenderId !== message.user_id);
+                            const senderObj = isRecord(message.sender) ? (message.sender as Record<string, unknown>) : null;
 							
 							return (
 								<div
@@ -501,17 +574,17 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 									className={`flex gap-3 ${isMyMessage ? 'flex-row-reverse' : ''} ${!showAvatar && !isMyMessage ? 'ml-11' : ''}`}
 								>
 									{!isMyMessage && showAvatar && (
-										message.sender?.photo_url ? (
+										senderObj?.photo_url ? (
 											<Image
-												src={message.sender.photo_url}
+												src={String(senderObj.photo_url)}
 												width={32}
 												height={32}
 												className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 object-cover self-end mb-1"
-												alt={message.sender.display_name}
+												alt={String(senderObj.display_name ?? 'Usuário')}
 											/>
 										) : (
 											<div className="w-8 h-8 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center font-black text-[10px] self-end mb-1">
-												{message.sender?.display_name?.[0] || '?'}
+												{String(senderObj?.display_name ?? '?')[0] || '?'}
 											</div>
 										)
 									)}
@@ -523,17 +596,22 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 									}`}> 
 										{!isMyMessage && (
 											<p className="text-[10px] font-bold text-neutral-400 mb-1">
-												{message.sender?.display_name || 'Usuário'}
+												{String(senderObj?.display_name ?? 'Usuário')}
 											</p>
 										)}
                                         {(() => {
-                                            let payload = null;
-                                            try { if (typeof message.content === 'string' && message.content.startsWith('{')) payload = JSON.parse(message.content); } catch {}
+                                            let payload: Record<string, unknown> | null = null;
+                                            try {
+                                                if (typeof message.content === 'string' && message.content.startsWith('{')) {
+                                                    const parsed: unknown = JSON.parse(message.content);
+                                                    payload = isRecord(parsed) ? parsed : null;
+                                                }
+                                            } catch {}
                                             
                                             if (payload?.type === 'image')
                                                 return (
                                                     <Image
-                                                        src={payload.thumb_url || payload.media_url}
+                                                        src={String(payload.thumb_url ?? payload.media_url ?? '')}
                                                         alt="imagem"
                                                         width={CHAT_MEDIA_PREVIEW_SIZE}
                                                         height={CHAT_MEDIA_PREVIEW_SIZE}
@@ -547,11 +625,11 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                                         }}
                                                     />
                                                 );
-                                            if (payload?.type === 'video') return <video src={payload.media_url} controls playsInline className="rounded-lg max-h-64 w-full" />;
+                                            if (payload?.type === 'video') return <video src={String(payload.media_url ?? '')} controls playsInline className="rounded-lg max-h-64 w-full" />;
                                             if (payload?.type === 'gif')
                                                 return (
                                                     <Image
-                                                        src={payload.media_url}
+                                                        src={String(payload.media_url ?? '')}
                                                         alt="gif"
                                                         width={CHAT_MEDIA_PREVIEW_SIZE}
                                                         height={CHAT_MEDIA_PREVIEW_SIZE}
@@ -560,7 +638,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                                     />
                                                 );
                                             
-                                            return <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{payload?.text ?? message.content}</p>;
+                                            return <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{String(payload?.text ?? message.content ?? '')}</p>;
                                         })()}
                                         <div className="flex items-center justify-between gap-2 mt-1">
                                             {isMyMessage ? (
