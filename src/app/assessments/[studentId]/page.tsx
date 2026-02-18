@@ -1,6 +1,14 @@
 import AssessmentHistory from '@/components/assessment/AssessmentHistory';
+import { StudentIdParamSchema } from '@/schemas/params';
+import { notFound } from 'next/navigation';
 
 export default async function AssessmentHistoryPage({ params }: { params: Promise<{ studentId: string }> }) {
   const p = await params;
-  return <AssessmentHistory studentId={p.studentId} />;
+  const parsed = StudentIdParamSchema.safeParse(p);
+  
+  if (!parsed.success) {
+    return notFound();
+  }
+
+  return <AssessmentHistory studentId={parsed.data.studentId} />;
 }

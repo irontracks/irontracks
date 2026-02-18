@@ -5,17 +5,17 @@ import { DialogProvider } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import { BackButton } from '@/components/ui/BackButton';
+import { StudentIdParamSchema } from '@/schemas/params';
 
 export default function NewAssessmentPage() {
   const router = useRouter();
-  const params = useParams<{ studentId?: string | string[] }>();
-  const rawStudentId = params?.studentId;
-  const studentId = Array.isArray(rawStudentId)
-    ? rawStudentId[0]
-    : rawStudentId;
+  const params = useParams();
+  const rawId = Array.isArray(params?.studentId) ? params.studentId[0] : params?.studentId;
+  const result = StudentIdParamSchema.safeParse({ studentId: rawId });
+
   const studentName = 'Aluno';
 
-  if (!studentId) {
+  if (!result.success) {
     return (
       <DialogProvider>
         <GlobalDialog />
@@ -31,6 +31,9 @@ export default function NewAssessmentPage() {
       </DialogProvider>
     );
   }
+
+  const { studentId } = result.data;
+
   return (
     <DialogProvider>
       <GlobalDialog />
