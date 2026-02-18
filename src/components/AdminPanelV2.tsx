@@ -15,6 +15,7 @@ import {
     ShieldAlert
 } from 'lucide-react';
 import { AdminPanelProvider, useAdminPanel } from './admin-panel/AdminPanelContext';
+import { useAdminPanelController } from './admin-panel/useAdminPanelController';
 import { DashboardTab } from './admin-panel/DashboardTab';
 import { StudentsTab } from './admin-panel/StudentsTab';
 import { TeachersTab } from './admin-panel/TeachersTab';
@@ -183,8 +184,9 @@ export type AdminPanelProps = {
 };
 
 const AdminPanelV2: React.FC<AdminPanelProps> = (props) => {
+    const controller = useAdminPanelController(props);
     return (
-        <AdminPanelProvider {...props}>
+        <AdminPanelProvider value={controller}>
             <AdminPanelContent />
         </AdminPanelProvider>
     );
