@@ -1,0 +1,13 @@
+.next/
+node_modules/
+out/
+build/
+public/
+ios/
+_archive/
+_legacy_backup/
+_macro_mixer_orig/
+snapshots/
+*.sql
+*.md
+package-lock.json
