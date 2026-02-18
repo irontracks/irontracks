@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const QuerySchema = z.object({
+  status: z.enum(['pending', 'approved', 'rejected', 'all']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+})
 
 export async function GET(req: Request) {
   try {
@@ -12,11 +20,10 @@ export async function GET(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const offset = (page - 1) * limit
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const offset = (q.page - 1) * q.limit
 
     const admin = createAdminClient()
 
@@ -26,8 +33,8 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
-    if (status && status !== 'all') {
-      query = query.eq('status', status)
+    if (q.status && q.status !== 'all') {
+      query = query.eq('status', q.status)
     }
 
     const { data, error, count } = await query
@@ -40,13 +47,14 @@ export async function GET(req: Request) {
       ok: true,
       data,
       meta: {
-        page,
-        limit,
+        page: q.page,
+        limit: q.limit,
         total: count,
-        totalPages: Math.ceil((count || 0) / limit)
+        totalPages: Math.ceil((count || 0) / q.limit)
       }
     })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

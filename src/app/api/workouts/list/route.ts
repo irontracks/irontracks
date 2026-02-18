@@ -18,9 +18,15 @@ export async function GET() {
     const { data, error } = await query
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    const rows = data || []
+    interface WorkoutRow {
+      id: string
+      name: string
+      user_id: string
+    }
+    const rows: WorkoutRow[] = (data || []) as unknown as WorkoutRow[]
     return NextResponse.json({ ok: true, rows })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

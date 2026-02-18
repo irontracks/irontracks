@@ -1,14 +1,23 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
-const safeStr = (v: any, max = 200) => {
+const safeStr = (v: unknown, max = 200): string => {
   const s = typeof v === 'string' ? v.trim() : String(v ?? '').trim()
   if (!s) return ''
   return s.length > max ? s.slice(0, max) : s
 }
+
+const QuerySchema = z.object({
+  search: z.string().max(100).optional(),
+  role: z.enum(['admin', 'teacher', 'user']).optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+})
 
 export async function GET(req: Request) {
   try {
@@ -18,36 +27,43 @@ export async function GET(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const url = new URL(req.url)
-    const q = safeStr(url.searchParams.get('q') || '', 80)
-    const role = safeStr(url.searchParams.get('role') || '', 20).toLowerCase()
-    const limit = Math.min(300, Math.max(1, Number(url.searchParams.get('limit') || 150) || 150))
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const search = safeStr(q.search, 80)
+    const role = q.role
+    const limit = q.limit
+    const offset = q.offset
 
     const admin = createAdminClient()
 
     let query = admin.from('profiles').select('id, display_name, photo_url, role, last_seen, email').order('last_seen', { ascending: false })
-    if (q) {
-      const like = `%${q}%`
+    if (search) {
+      const like = `%${search}%`
       query = query.or(`display_name.ilike.${like},email.ilike.${like}`)
     }
-    if (role === 'admin' || role === 'teacher' || role === 'user') {
+    if (role) {
       query = query.eq('role', role)
     }
 
-    const { data, error } = await query.limit(limit)
+    const { data, error } = await query.range(offset, offset + limit - 1)
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    const users = (Array.isArray(data) ? data : []).map((p: any) => ({
-      id: String(p?.id || '').trim(),
-      displayName: p?.display_name != null ? String(p.display_name) : null,
-      photoUrl: p?.photo_url != null ? String(p.photo_url) : null,
-      role: p?.role != null ? String(p.role) : null,
-      lastSeen: p?.last_seen != null ? String(p.last_seen) : null,
-      email: p?.email != null ? String(p.email) : null,
-    }))
+    const users = (Array.isArray(data) ? data : []).map((row) => {
+      const p = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
+      return {
+        id: safeStr(p.id, 64),
+        displayName: p.display_name != null ? String(p.display_name) : null,
+        photoUrl: p.photo_url != null ? String(p.photo_url) : null,
+        role: p.role != null ? String(p.role) : null,
+        lastSeen: p.last_seen != null ? String(p.last_seen) : null,
+        email: p.email != null ? String(p.email) : null,
+      }
+    })
 
     return NextResponse.json({ ok: true, users })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

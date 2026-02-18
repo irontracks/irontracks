@@ -21,11 +21,11 @@ export const getAdminAuthHeaders = async (supabase: SupabaseClient) => {
   }
 }
 
-export const adminFetchJson = async <T = any>(
+export const adminFetchJson = async <T extends { ok?: boolean } = any>(
   supabase: SupabaseClient,
   url: string,
   init?: RequestInit,
-): Promise<{ ok: false; error: string } | (T & { ok?: boolean })> => {
+): Promise<{ ok: false; error: string } | T> => {
   const authHeaders = await getAdminAuthHeaders(supabase)
   const headers = { ...(init?.headers || {}), ...authHeaders } as Record<string, string>
   const res = await fetch(url, { ...(init || {}), headers })

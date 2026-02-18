@@ -74,7 +74,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
           text: msg,
           senderName: 'Comunidade',
           displayName: 'Comunidade',
-          photoURL: null,
+          photoURL: undefined,
           type: 'info',
         })
         return
@@ -433,7 +433,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
 
       setFollowRequests((prev) => prev.filter((r) => r.follower_id !== fid))
     } catch (e) {
-      if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
+      const message = e instanceof Error ? e.message : String(e)
+      if (typeof window !== 'undefined') window.alert(message)
     } finally {
       setBusyRequestId('')
     }
@@ -479,7 +480,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         await loadAll(userId)
       } catch {}
     } catch (e) {
-      if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
+      const message = e instanceof Error ? e.message : String(e)
+      if (typeof window !== 'undefined') window.alert(message)
     } finally {
       setBusyId('')
     }
@@ -523,7 +525,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         return next
       })
     } catch (e) {
-      showMessage(String(e?.message ?? e))
+      const message = e instanceof Error ? e.message : String(e)
+      showMessage(message)
     } finally {
       setBusyId('')
     }
@@ -552,7 +555,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         return next
       })
     } catch (e) {
-      if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
+      const message = e instanceof Error ? e.message : String(e)
+      if (typeof window !== 'undefined') window.alert(message)
     } finally {
       setBusyId('')
     }
@@ -814,7 +818,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                       }
                       setCommunitySettingsOpen(false)
                     } catch (e) {
-                      if (typeof window !== 'undefined') window.alert(String(e?.message ?? e))
+                      const message = e instanceof Error ? e.message : String(e)
+                      if (typeof window !== 'undefined') window.alert(message)
                     }
                   }}
                   className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50"

@@ -329,7 +329,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 let lastWorkoutMs = 0;
                 nonTemplate.forEach((w) => {
                     try {
-                        const raw = w.date || w.completed_at || w.created_at;
+                        const raw: any = (w as any).date || (w as any).completed_at || w.created_at;
                         if (!raw) return;
                         const d = raw?.toDate ? raw.toDate() : new Date(raw);
                         const t = d?.getTime ? d.getTime() : NaN;
@@ -5636,7 +5636,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                 </div>
                                 < div className="p-4 max-h-[75vh] overflow-y-auto" >
                                     <AdminWorkoutEditor
-                                        initialData={editingTemplate}
+                                        initialData={editingTemplate as any}
                                         onSave={async (data: AdminWorkout) => {
                                             try {
                                                 const res = await updateWorkout(String(editingTemplate.id || ''), data);
@@ -5702,7 +5702,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                 </div>
                                 < div className="p-4 max-h-[75vh] overflow-y-auto" >
                                     <AdminWorkoutEditor
-                                        initialData={editingStudentWorkout}
+                                        initialData={editingStudentWorkout as any}
                                         onSave={async (data: AdminWorkout) => {
                                             try {
                                                 const targetUserId = selectedStudent?.user_id ? String(selectedStudent.user_id) : '';

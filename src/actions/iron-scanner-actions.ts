@@ -147,7 +147,7 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
 
     return { ok: true, workoutTitle: workoutTitle || undefined, exercises };
   } catch (e) {
-    const raw = e?.message ? String(e.message) : String(e);
+    const raw = e instanceof Error ? e.message : String(e);
     let msg = raw || "Erro inesperado ao processar treino";
 
     const upper = msg.toUpperCase();

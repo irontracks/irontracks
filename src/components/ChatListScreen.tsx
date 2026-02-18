@@ -9,15 +9,22 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 
+interface ChatUser {
+    id: string;
+    display_name?: string | null;
+    photo_url?: string | null;
+    last_seen?: string | null;
+    [key: string]: unknown;
+}
+
 interface ChatListScreenProps {
     user: { id: string | number } | null;
     onClose: () => void;
-    onSelectUser?: (u: any) => void;
+    onSelectUser?: (u: ChatUser) => void;
     onSelectChannel?: (ch: { channel_id: string; other_user_id: string; other_user_name: string | null; other_user_photo: string | null }) => void;
 }
-
 const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatListScreenProps) => {
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<ChatUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [nowMs, setNowMs] = useState(0);
     const { alert } = useDialog();
@@ -51,7 +58,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                 .limit(200);
 
             if (error) throw error;
-            setUsers(data || []);
+            setUsers((data || []) as ChatUser[]);
         } catch (error) {
             console.error('Erro ao carregar contatos:', error);
             // @ts-ignore
@@ -119,7 +126,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
         return `${Math.floor(hours / 24)}d`;
     };
 
-    const handleOpenChat = async (targetUser: any) => {
+    const handleOpenChat = async (targetUser: ChatUser) => {
         try {
             const safeTargetId = targetUser?.id ? String(targetUser.id) : '';
             if (!safeUserId || !safeTargetId) {

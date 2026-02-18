@@ -238,7 +238,7 @@ export async function processAssessmentDocument(formData: FormData): Promise<Ass
 
     return { ok: true, formData: formOut };
   } catch (e) {
-    const raw = e?.message ? String(e.message) : String(e);
+    const raw = e instanceof Error ? e.message : String(e);
     let msg = raw || "Erro inesperado ao processar avaliação";
     const upper = msg.toUpperCase();
     if (upper.includes("NOT_FOUND") && upper.includes("MODEL")) {

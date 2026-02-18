@@ -133,7 +133,7 @@ export async function addTeacher(
         try {
             await tryInsert(payload)
         } catch (err) {
-            const msg = String(err?.message || err || '')
+            const msg = err instanceof Error ? err.message : String(err || '')
             if (msg.includes("Could not find the 'birth_date' column") || msg.includes('birth_date')) {
                 const { birth_date, ...rest } = payload
                 await tryInsert(rest)
@@ -218,7 +218,7 @@ export async function updateTeacher(id: unknown, data: Record<string, unknown>):
         try {
             await tryUpdate(payload)
         } catch (err) {
-            const msg = String(err?.message || err || '')
+            const msg = err instanceof Error ? err.message : String(err || '')
             if (msg.includes("Could not find the 'birth_date' column") || msg.includes('birth_date')) {
                 const { birth_date, ...rest } = payload
                 await tryUpdate(rest)
@@ -383,7 +383,7 @@ export async function assignWorkoutToStudent(
                     }
                     throw error;
                 } catch (e) {
-                    const msg = (e?.message || '').toLowerCase();
+                    const msg = (e instanceof Error ? e.message : String(e)).toLowerCase();
                     if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
                         const reduced = { ...payload };
                         delete reduced.advanced_config;

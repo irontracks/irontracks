@@ -1,4 +1,6 @@
 
+import type { Workout, Exercise } from '@/types/app'
+
 export interface AdminUser {
   id: string;
   email?: string;
@@ -20,9 +22,9 @@ export interface AdminUser {
   experience_level?: string;
   gym_access?: boolean;
   active?: boolean;
-  workouts?: any[];
-  last_workout?: any;
-  [key: string]: any; // Allow dynamic properties for compatibility
+  workouts?: Workout[];
+  last_workout?: Workout | null;
+  [key: string]: unknown;
 }
 
 export interface AdminTeacher extends AdminUser {
@@ -36,7 +38,7 @@ export interface AdminStudent extends AdminUser {
   teacher_name?: string;
   last_workout_date?: string;
   workouts_count?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ErrorReport {
@@ -52,7 +54,7 @@ export interface ErrorReport {
   browser_info?: string;
   os_info?: string;
   meta?: Record<string, unknown>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface ExecutionVideo {
@@ -66,19 +68,19 @@ export interface ExecutionVideo {
   status: 'pending' | 'reviewed' | 'approved' | 'rejected' | string;
   created_at: string;
   workout_id?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface AdminWorkoutTemplate {
   id: string;
   title: string;
   description?: string;
-  exercises: any[];
+  exercises: Exercise[];
   created_at: string;
   updated_at?: string;
   is_public?: boolean;
   owner_id?: string;
   tags?: string[];
   difficulty?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }

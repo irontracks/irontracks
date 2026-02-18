@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { isIosNative } from '@/utils/platform';
+import type { Exercise } from '@/types/app';
 
 interface CoachChatModalProps {
     isOpen: boolean;
@@ -11,6 +12,13 @@ interface CoachChatModalProps {
     isVip?: boolean;
     onSaveToReport?: (summary: string) => void;
     onUpgrade?: () => void;
+}
+
+interface CoachMessage {
+    role: 'assistant' | 'user' | 'system';
+    content?: string;
+    isBlock?: boolean;
+    [key: string]: unknown;
 }
 
 export default function CoachChatModal({
@@ -23,12 +31,12 @@ export default function CoachChatModal({
     onUpgrade
 }: CoachChatModalProps) {
     const { credits } = useVipCredits();
-    const [messages, setMessages] = useState<any[]>([]);
+    const [messages, setMessages] = useState<CoachMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showSavePrompt, setShowSavePrompt] = useState(false);
-    const messagesEndRef = useRef<any>(null);
-    const inputRef = useRef<any>(null);
+    const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const inputRef = useRef<HTMLInputElement | null>(null);
 
     const analyzeSession = useCallback(() => {
         setIsLoading(true);
@@ -45,11 +53,11 @@ export default function CoachChatModal({
 
             const anomalies: unknown[] = [];
             if (session && previousSession) {
-                const currentExs = session.exercises || [];
-                const prevExs = previousSession.exercises || [];
+                const currentExs: Exercise[] = Array.isArray(session.exercises) ? (session.exercises as Exercise[]) : [];
+                const prevExs: Exercise[] = Array.isArray(previousSession.exercises) ? (previousSession.exercises as Exercise[]) : [];
                 
-                currentExs.forEach((curr: any) => {
-                    const prev = prevExs.find((p: any) => p.name === curr.name);
+                currentExs.forEach((curr: Exercise) => {
+                    const prev = prevExs.find((p: Exercise) => p.name === curr.name);
                     if (prev) {
                         const currWeight = Number(curr.sets?.[0]?.weight || 0);
                         const prevWeight = Number(prev.sets?.[0]?.weight || 0);

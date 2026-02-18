@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
 const UPDATE_PROMPT_COOLDOWN_MS = 2 * 60 * 60 * 1000
 const UPDATE_BATCH_SIZE_MULTIPLIER = 5
 const UPDATE_MIN_BATCH = 5
+
+const QuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(5).default(1),
+})
 
 export async function GET(req: Request) {
   try {
@@ -14,9 +20,10 @@ export async function GET(req: Request) {
     const supabase = auth.supabase
     const user = auth.user
 
-    const url = new URL(req.url)
-    const limitRaw = Number(url.searchParams.get('limit') || 1) || 1
-    const limit = Math.max(1, Math.min(5, limitRaw))
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const limit = q.limit
     const batchSize = Math.max(UPDATE_MIN_BATCH, limit * UPDATE_BATCH_SIZE_MULTIPLIER)
 
     const nowIso = new Date().toISOString()
@@ -62,6 +69,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, updates: filtered.slice(0, limit) })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

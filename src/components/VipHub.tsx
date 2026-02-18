@@ -7,6 +7,7 @@ import VipPeriodizationPanel from '@/components/vip/VipPeriodizationPanel'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
 import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
 import { useVipCredits } from '@/hooks/useVipCredits'
+import type { Workout } from '@/types/app'
 
 interface VipHubProps {
   user: {
@@ -14,12 +15,18 @@ interface VipHubProps {
     name?: string | null
   } | null
   locked?: boolean
-  onOpenWorkoutEditor?: (workout?: any) => void
+  onOpenWorkoutEditor?: (workout?: Workout) => void
   onOpenVipTab?: () => void
-  onStartSession?: (workout: any) => void
+  onStartSession?: (workout: Workout) => void
   onOpenWizard?: () => void
   onOpenHistory?: () => void
-  onOpenReport?: (s?: any) => void
+  onOpenReport?: (s?: Record<string, unknown>) => void
+}
+
+interface ChatAction {
+  label: string
+  action: string
+  [key: string]: unknown
 }
 
 interface ChatMessage {
@@ -27,9 +34,9 @@ interface ChatMessage {
   role: string
   text: string
   isLimit?: boolean
-  dataUsed?: any[]
-  followUps?: any[]
-  actions?: any[]
+  dataUsed?: Record<string, unknown>[]
+  followUps?: string[]
+  actions?: ChatAction[]
 }
 
 interface VipStatus {
@@ -107,8 +114,9 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       let tid = String(threadId || '').trim()
       if (!tid) {
         const tRes = await fetch('/api/vip/chat/thread', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const tJson = await tRes.json().catch((): any => null)
-        tid = String(tJson?.thread?.id || '').trim()
+        const tJson = await tRes.json().catch(() => null) as Record<string, unknown> | null
+        const thread = tJson && typeof tJson === 'object' ? (tJson.thread as Record<string, unknown> | undefined) : undefined
+        tid = String(thread?.id || '').trim()
         if (tid) setThreadId(tid)
       }
       if (tid) {
@@ -117,14 +125,14 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ thread_id: tid, role: 'user', content: text }),
-        }).catch((): any => null)
+        }).catch(() => null)
       }
       const res = await fetch('/api/ai/vip-coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text, mode }),
       })
-      const json = await res.json().catch((): any => null)
+      const json = await res.json().catch(() => null) as Record<string, unknown> | null
 
       // Handle Limit Reached
       if (res.status === 403 && json?.upgradeRequired) {
@@ -138,19 +146,37 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         return
       }
 
-      if (!json || !json.ok) {
+      if (!json || json.ok !== true) {
         const err = String(json?.error || 'Falha ao consultar a IA.').trim()
-        const msg = { id: `${id}-a`, role: 'assistant', text: err, actions: [] as any[] }
+        const msg: ChatMessage = { id: `${id}-a`, role: 'assistant', text: err, actions: [] }
         setMessages((prev) => [...(Array.isArray(prev) ? prev : []), msg].slice(-60))
         return
       }
-      const assistant = {
+      const dataUsed = Array.isArray(json.dataUsed)
+        ? (json.dataUsed as unknown[]).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object')
+        : []
+      const followUps = Array.isArray(json.followUps)
+        ? (json.followUps as unknown[]).map((f) => String(f || '').trim()).filter(Boolean)
+        : []
+      const actions = Array.isArray(json.actions)
+        ? (json.actions as unknown[])
+          .map((a) => {
+            if (!a || typeof a !== 'object') return null
+            const obj = a as Record<string, unknown>
+            const label = String(obj.label ?? obj.text ?? '').trim()
+            const action = String(obj.action ?? '').trim()
+            if (!label || !action) return null
+            return { ...(obj as ChatAction), label, action }
+          })
+          .filter((a): a is ChatAction => Boolean(a))
+        : []
+      const assistant: ChatMessage = {
         id: `${id}-a`,
         role: 'assistant',
-        text: String(json?.answer || '').trim(),
-        dataUsed: Array.isArray(json?.dataUsed) ? json.dataUsed : [],
-        followUps: Array.isArray(json?.followUps) ? json.followUps : [],
-        actions: Array.isArray(json?.actions) ? json.actions : [],
+        text: String(json.answer || '').trim(),
+        dataUsed,
+        followUps,
+        actions,
       }
       setMessages((prev) => [...(Array.isArray(prev) ? prev : []), assistant].slice(-60))
 
@@ -184,26 +210,54 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       ; (async () => {
         try {
           const tRes = await fetch('/api/vip/chat/thread', { method: 'GET', credentials: 'include', cache: 'no-store' })
-          const tJson = await tRes.json().catch((): any => null)
-          const tid = String(tJson?.thread?.id || '').trim()
+          const tJson = await tRes.json().catch(() => null) as Record<string, unknown> | null
+          const thread = tJson && typeof tJson === 'object' ? (tJson.thread as Record<string, unknown> | undefined) : undefined
+          const tid = String(thread?.id || '').trim()
           if (!tid) return
           if (cancelled) return
           setThreadId(tid)
           const mRes = await fetch(`/api/vip/chat/messages?thread_id=${encodeURIComponent(tid)}&limit=80`, { method: 'GET', credentials: 'include', cache: 'no-store' })
-          const mJson = await mRes.json().catch((): any => null)
+          const mJson = await mRes.json().catch(() => null) as Record<string, unknown> | null
           if (cancelled) return
           const rows = Array.isArray(mJson?.messages) ? mJson.messages : []
-          const parsed = rows.map((r: any) => {
-            const role = String(r?.role || '').trim()
-            const raw = String(r?.content || '')
+          const parsed = rows.map((r: unknown) => {
+            const obj = r && typeof r === 'object' ? (r as Record<string, unknown>) : {}
+            const role = String(obj.role || '').trim()
+            const raw = String(obj.content || '')
             // Simple parsing
             if (role === 'assistant' && raw.trim().startsWith('{')) {
               try {
                 const p = JSON.parse(raw)
-                return { id: r.id, role, text: p.text || p.answer || raw, dataUsed: p.dataUsed, followUps: p.followUps, actions: p.actions }
+                return {
+                  id: String((obj.id ?? '') || String(Date.now())),
+                  role,
+                  text: String(p.text || p.answer || raw),
+                  dataUsed: Array.isArray(p.dataUsed)
+                    ? (p.dataUsed as unknown[]).filter((x): x is Record<string, unknown> => x !== null && typeof x === 'object')
+                    : undefined,
+                  followUps: Array.isArray(p.followUps)
+                    ? (p.followUps as unknown[]).map((f) => String(f || '').trim()).filter(Boolean)
+                    : undefined,
+                  actions: Array.isArray(p.actions)
+                    ? (p.actions as unknown[])
+                      .map((a) => {
+                        if (!a || typeof a !== 'object') return null
+                        const ao = a as Record<string, unknown>
+                        const label = String(ao.label ?? ao.text ?? '').trim()
+                        const action = String(ao.action ?? '').trim()
+                        if (!label || !action) return null
+                        return { ...(ao as ChatAction), label, action }
+                      })
+                      .filter((a): a is ChatAction => Boolean(a))
+                    : undefined,
+                } as ChatMessage
               } catch { }
             }
-            return { id: r.id, role, text: raw }
+            return {
+              id: String((obj.id ?? '') || String(Date.now())),
+              role,
+              text: raw,
+            } as ChatMessage
           })
           setMessages(parsed.slice(-60))
         } catch {
@@ -303,7 +357,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     } catch { }
   }
 
-  const chip = (label: string, used: any, limit: any) => {
+  const chip = (label: string, used: number | null | undefined, limit: number | null | undefined) => {
     const u = Number(used || 0)
     const l = limit == null ? null : Number(limit)
     const unlimited = l != null && l > 1000

@@ -8,12 +8,11 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { errorResponse } from '@/utils/api'
 
 import {
   VipPeriodizationQuestionnaire,
   buildWorkoutPlan,
-  estimate1Rm,
-  parseSessionFromNotes,
 } from '@/utils/vip/periodization'
 import { vipPeriodizationExerciseSeed } from '@/data/vipPeriodizationExercises'
 
@@ -45,45 +44,77 @@ const safeString = (v: unknown) => {
   }
 }
 
+interface LogEntry {
+  weight?: unknown
+  reps?: unknown
+  done?: boolean | string
+  isDone?: boolean | string
+  completed?: boolean | string
+}
+
+interface SessionData {
+  workout?: { exercises?: unknown[] }
+  logs?: Record<string, LogEntry>
+}
+
 const safeNumber = (v: unknown): number | null => {
   const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
   return Number.isFinite(n) ? Number(n) : null
 }
 
-const buildUser1rmMapFromHistory = (history: Array<{ created_at: string; notes: string | null }>) => {
+const parseSession = (notes: unknown): SessionData | null => {
+  try {
+    const raw = String(notes || '').trim()
+    if (!raw) return null
+    const obj = JSON.parse(raw)
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj as SessionData
+    return null
+  } catch {
+    return null
+  }
+}
+
+const buildUser1rmMapFromHistory = (history: Array<{ created_at: string; notes: unknown }>) => {
   const byEx = new Map<string, number>()
 
   for (const row of history) {
-    const session = parseSessionFromNotes(row.notes)
+    const session = parseSession(row.notes)
     if (!session) continue
-    const workout = session.workout && typeof session.workout === 'object' ? (session.workout as Record<string, unknown>) : null
-    const exercises = workout && Array.isArray((workout as any).exercises) ? ((workout as any).exercises as unknown[]) : []
+    
+    const w = session.workout
+    const exercises = Array.isArray(w?.exercises) ? (w?.exercises as unknown[]) : []
     const namesByIdx = new Map<number, string>()
+    
     exercises.forEach((ex, idx) => {
-      const name = ex && typeof ex === 'object' ? safeString((ex as any).name || '') : ''
+      const name = safeString((ex as Record<string, unknown>)?.name)
       if (name) namesByIdx.set(idx, normalizeExerciseName(name))
     })
-    const logs = session.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : null
+
+    const logs = session.logs
     if (!logs) continue
 
     for (const [key, v] of Object.entries(logs)) {
-      const parts = String(key || '').split('-')
+      const parts = key.split('-')
       const exIdx = Number(parts[0])
       if (!Number.isFinite(exIdx)) continue
+      
       const exNameNorm = namesByIdx.get(exIdx) || ''
       if (!exNameNorm) continue
-      const log = v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null
+      
+      const log = v as LogEntry
       if (!log) continue
-      const doneRaw = (log as any).done ?? (log as any).isDone ?? (log as any).completed ?? null
-      const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
-      const w = safeNumber((log as any).weight)
-      const r = safeNumber((log as any).reps)
-      if (!done && (w == null || r == null)) continue
-      if (w == null || r == null) continue
-      const est = estimate1Rm(w, r)
-      if (est == null) continue
-      const cur = byEx.get(exNameNorm) || 0
-      if (est > cur) byEx.set(exNameNorm, est)
+      
+      const doneRaw = log.done ?? log.isDone ?? log.completed ?? null
+      const done = doneRaw == null ? true : doneRaw === true || String(doneRaw).toLowerCase() === 'true'
+      const weight = safeNumber(log.weight)
+      const reps = safeNumber(log.reps)
+
+      if (!done && (weight == null || reps == null)) continue
+      if (weight != null && reps != null && weight > 0 && reps > 0) {
+        const est = weight * (1 + reps / 30)
+        const cur = byEx.get(exNameNorm) || 0
+        if (est > cur) byEx.set(exNameNorm, est)
+      }
     }
   }
 
@@ -96,19 +127,19 @@ const ensureExerciseLibrarySeeded = async (admin: ReturnType<typeof createAdminC
   if (Number.isFinite(n) && n >= 150) return { ok: true as const, seeded: false as const, total: n }
 
   const rows = vipPeriodizationExerciseSeed.map((ex) => {
-    const display = safeString((ex as any).display_name_pt)
+    const display = safeString(ex.display_name_pt)
     const normalized = normalizeExerciseName(display)
     return {
       display_name_pt: display,
       normalized_name: normalized,
       video_url: null as string | null,
       aliases: null as string[] | null,
-      primary_muscle: safeString((ex as any).primary_muscle) || null,
-      secondary_muscles: Array.isArray((ex as any).secondary_muscles) ? (ex as any).secondary_muscles : [],
-      equipment: Array.isArray((ex as any).equipment) ? (ex as any).equipment : [],
-      difficulty: safeString((ex as any).difficulty) || null,
-      environments: Array.isArray((ex as any).environments) ? (ex as any).environments : [],
-      is_compound: !!(ex as any).is_compound,
+      primary_muscle: safeString(ex.primary_muscle) || null,
+      secondary_muscles: Array.isArray(ex.secondary_muscles) ? ex.secondary_muscles : [],
+      equipment: Array.isArray(ex.equipment) ? ex.equipment : [],
+      difficulty: safeString(ex.difficulty) || null,
+      environments: Array.isArray(ex.environments) ? ex.environments : [],
+      is_compound: !!ex.is_compound,
     }
   })
 
@@ -144,7 +175,8 @@ const generateProgramOverviewWithGemini = async (q: VipPeriodizationQuestionnair
     `- Equipamentos: ${(q.equipment || []).join(', ') || 'não informado'}`,
     `- Limitações: ${q.limitations || 'nenhuma'}`,
   ].join('\n')
-  const result = await model.generateContent([{ text: prompt }] as any)
+  
+  const result = await (model.generateContent as (parts: Array<{ text: string }>) => Promise<any>)([{ text: prompt }])
   const text = String((await result?.response?.text()) || '').trim()
   return text || null
 }
@@ -175,7 +207,7 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(120)
 
-    const history = Array.isArray(historyRows) ? (historyRows as any[]) : []
+    const history = (historyRows || []) as Array<{ created_at: string; notes: unknown }>
     const oneRmMap = buildUser1rmMapFromHistory(history)
 
     const plan = buildWorkoutPlan(q, {
@@ -203,7 +235,11 @@ export async function POST(req: Request) {
         .eq('user_id', userId)
         .eq('program_id', prevProgramId)
         .limit(500)
-      const prevWorkoutIds = (Array.isArray(prevLinks) ? prevLinks : []).map((r: any) => String(r?.workout_id || '').trim()).filter(Boolean)
+      
+      const prevWorkoutIds = (prevLinks || [])
+        .map((r) => String((r as any)?.workout_id || '').trim())
+        .filter(Boolean)
+
       if (prevWorkoutIds.length) {
         await admin
           .from('workouts')
@@ -212,7 +248,9 @@ export async function POST(req: Request) {
           .eq('is_template', true)
           .in('id', prevWorkoutIds)
       }
-      await admin.from('vip_periodization_programs').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', existingActive.id)
+      await admin.from('vip_periodization_programs')
+        .update({ status: 'completed', updated_at: new Date().toISOString() })
+        .eq('id', existingActive.id)
     }
 
     const programId = crypto.randomUUID()
@@ -304,6 +342,6 @@ export async function POST(req: Request) {
       weeks: plan.weeks,
     })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return errorResponse(e)
   }
 }

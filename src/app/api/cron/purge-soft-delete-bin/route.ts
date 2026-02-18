@@ -5,6 +5,8 @@ import { getInternalSecret, hasValidInternalSecret } from '@/utils/auth/route'
 export const dynamic = 'force-dynamic'
 
 const isAuthorized = (req: Request) => {
+  const authHeader = req.headers.get('authorization')
+  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) return true
   if (hasValidInternalSecret(req)) return true
   try {
     const url = new URL(req.url)
@@ -42,4 +44,3 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ ok: true, purged: ids.length })
 }
-

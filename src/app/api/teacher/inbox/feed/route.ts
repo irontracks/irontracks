@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,6 +46,11 @@ const normalizeCoachInboxSettings = (raw: unknown): CoachInboxConfig => {
     const x = Math.floor(n)
     return Math.max(min, Math.min(max, x))
   }
+
+const QuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+  offset: z.coerce.number().int().min(0).default(0),
+})
   return {
     churnDays: toInt(s?.churnDays, 1, 60, COACH_INBOX_DEFAULTS.churnDays),
     volumeDropPct: toInt(s?.volumeDropPct, 5, 90, COACH_INBOX_DEFAULTS.volumeDropPct),
@@ -75,8 +82,10 @@ export async function GET(req: Request) {
   if (!auth.ok) return auth.response
 
   try {
-    const url = new URL(req.url)
-    const limit = clampNumber(Number(url.searchParams.get('limit') || 50), 1, 200)
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const limit = clampNumber(q.limit, 1, 100)
     const now = new Date()
     const since7 = new Date(now.getTime() - 7 * DAY_MS)
     const since14 = new Date(now.getTime() - 14 * DAY_MS)
@@ -363,11 +372,11 @@ export async function GET(req: Request) {
     }
 
     items.sort((a, b) => (b.score || 0) - (a.score || 0))
-    const sliced = items.slice(0, limit)
+    const sliced = items.slice(q.offset, q.offset + limit)
 
     return NextResponse.json({ ok: true, items: sliced }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e) {
-    const msg = (e as Record<string, unknown>)?.message
-    return jsonError(500, typeof msg === 'string' ? msg : String(e))
+    const msg = e instanceof Error ? e.message : String(e)
+    return jsonError(500, msg)
   }
 }

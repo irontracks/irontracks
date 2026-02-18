@@ -1,14 +1,22 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
-const safeStr = (v: any, max = 200) => {
+const safeStr = (v: unknown, max = 200): string => {
   const s = typeof v === 'string' ? v.trim() : String(v ?? '').trim()
   if (!s) return ''
   return s.length > max ? s.slice(0, max) : s
 }
+
+const QuerySchema = z.object({
+  user_id: z.string().uuid().optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+})
 
 export async function GET(req: Request) {
   try {
@@ -18,20 +26,27 @@ export async function GET(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const url = new URL(req.url)
-    const userId = safeStr(url.searchParams.get('user_id') || '', 64)
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const userId = safeStr(q.user_id, 64)
     if (!userId) return NextResponse.json({ ok: false, error: 'user_id required' }, { status: 400 })
 
-    const daysRaw = Number(url.searchParams.get('days') || 7) || 7
-    const days = Math.min(90, Math.max(1, Math.round(daysRaw)))
-    const fromIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+    const fromIso = q.from && typeof q.from === 'string' && q.from.trim() ? q.from : null
+    const toIso = q.to && typeof q.to === 'string' && q.to.trim() ? q.to : null
+
+    const now = Date.now()
+    const defaultFrom = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const from = fromIso || defaultFrom
+    const to = toIso || new Date().toISOString()
 
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('user_activity_events')
       .select('event_name, event_type')
       .eq('user_id', userId)
-      .gte('created_at', fromIso)
+      .gte('created_at', from)
+      .lte('created_at', to)
       .order('created_at', { ascending: false })
       .limit(2000)
 
@@ -58,8 +73,12 @@ export async function GET(req: Request) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 20)
 
+    const msRange = new Date(to).getTime() - new Date(from).getTime()
+    const days = Math.max(1, Math.round(msRange / (24 * 60 * 60 * 1000)))
+
     return NextResponse.json({ ok: true, days, total: rows.length, topEvents, topTypes })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

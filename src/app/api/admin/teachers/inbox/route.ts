@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer, jsonError } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,6 +13,12 @@ const clampNumber = (n: number, min: number, max: number) => {
   if (!Number.isFinite(n)) return min
   return Math.max(min, Math.min(max, n))
 }
+
+const QuerySchema = z.object({
+  teacher_id: z.string().uuid('teacher_id inválido').optional(),
+  teacher_user_id: z.string().uuid('teacher_user_id inválido').optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+})
 
 const COACH_INBOX_DEFAULTS = {
   churnDays: 7,
@@ -70,11 +78,13 @@ export async function GET(req: Request) {
   }
 
   try {
-    const url = new URL(req.url)
-    const teacher_user_id = String(url.searchParams.get('teacher_user_id') || '').trim()
-    if (!teacher_user_id) return jsonError(400, 'missing teacher_user_id')
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
 
-    const limit = clampNumber(Number(url.searchParams.get('limit') || 50), 1, 200)
+    const teacherId = (q.teacher_id ?? q.teacher_user_id)?.trim()
+    if (!teacherId) return jsonError(400, 'missing teacher_id')
+
+    const limit = clampNumber(q.limit, 1, 200)
     const now = new Date()
     const since7 = new Date(now.getTime() - 7 * DAY_MS)
     const since14 = new Date(now.getTime() - 14 * DAY_MS)
@@ -85,7 +95,7 @@ export async function GET(req: Request) {
       const { data: prefRow } = await admin
         .from('user_settings')
         .select('preferences')
-        .eq('user_id', teacher_user_id)
+        .eq('user_id', teacherId)
         .maybeSingle()
       const prefs = prefRow?.preferences && typeof prefRow.preferences === 'object' ? prefRow.preferences : null
       if (prefs) {
@@ -97,7 +107,7 @@ export async function GET(req: Request) {
     const { data: students, error: stErr } = await admin
       .from('students')
       .select('user_id, name')
-      .eq('teacher_id', teacher_user_id)
+      .eq('teacher_id', teacherId)
       .limit(1000)
     if (stErr) return jsonError(400, stErr.message)
 
@@ -237,7 +247,7 @@ export async function GET(req: Request) {
     const { data: states, error: stStateErr } = await admin
       .from('coach_inbox_states')
       .select('coach_id, student_user_id, kind, status, snooze_until')
-      .eq('coach_id', teacher_user_id)
+      .eq('coach_id', teacherId)
       .in('student_user_id', studentUserIds)
       .limit(5000)
     if (stStateErr) return jsonError(400, stStateErr.message)
@@ -340,7 +350,7 @@ export async function GET(req: Request) {
     items.sort((a, b) => (b.score || 0) - (a.score || 0))
     return NextResponse.json({ ok: true, items: items.slice(0, limit) }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e) {
-    const msg = (e as Record<string, unknown>)?.message
-    return jsonError(500, typeof msg === 'string' ? msg : String(e))
+    const msg = e instanceof Error ? e.message : String(e)
+    return jsonError(500, msg)
   }
 }

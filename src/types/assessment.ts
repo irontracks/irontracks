@@ -152,7 +152,7 @@ export interface AssessmentStep {
   id: string;
   title: string;
   description: string;
-  component: React.ComponentType<any>;
+  component: React.ComponentType<Record<string, unknown>>;
 }
 
 export interface ValidationRule {

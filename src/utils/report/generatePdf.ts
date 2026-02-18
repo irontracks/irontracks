@@ -1,4 +1,53 @@
-export async function generateAssessmentPdf(formData: any, results: any, studentName: string): Promise<Blob> {
+interface AssessmentFormData {
+  assessment_date?: string | null
+  weight?: number | string | null
+  height?: number | string | null
+  age?: number | string | null
+  gender?: string | null
+  arm_circ?: number | null
+  chest_circ?: number | null
+  waist_circ?: number | null
+  hip_circ?: number | null
+  thigh_circ?: number | null
+  calf_circ?: number | null
+  triceps_skinfold?: number | null
+  biceps_skinfold?: number | null
+  subscapular_skinfold?: number | null
+  suprailiac_skinfold?: number | null
+  abdominal_skinfold?: number | null
+  thigh_skinfold?: number | null
+  calf_skinfold?: number | null
+  observations?: string | null
+  [key: string]: unknown
+}
+
+interface BodyComposition {
+  bodyFatPercentage?: number | null
+  sumOfSkinfolds?: number | null
+  leanMass?: number | null
+  fatMass?: number | null
+  bmi?: number | null
+  bmr?: number | null
+  tdee?: number | null
+  [key: string]: unknown
+}
+
+interface AssessmentResults {
+  bodyComposition?: BodyComposition | null
+  bmr?: number | null
+  bmi?: number | null
+  leanMass?: number | null
+  fatMass?: number | null
+  bmiClassification?: string | null
+  bodyFatClassification?: string | null
+  [key: string]: unknown
+}
+
+export async function generateAssessmentPdf(
+  formData: AssessmentFormData,
+  results: AssessmentResults,
+  studentName: string
+): Promise<Blob> {
   try {
     const data = formData && typeof formData === 'object' ? formData : {};
     const metrics = results && typeof results === 'object' ? results : {};
@@ -12,9 +61,9 @@ export async function generateAssessmentPdf(formData: any, results: any, student
     const age = Number.parseInt(String(data?.age ?? '0'), 10) || 0;
     const gender = String(data?.gender || '').toUpperCase();
 
-    const bodyComposition = metrics?.bodyComposition && typeof metrics.bodyComposition === 'object'
+    const bodyComposition = (metrics?.bodyComposition && typeof metrics.bodyComposition === 'object'
       ? metrics.bodyComposition
-      : {};
+      : {}) as BodyComposition;
 
     const bodyFatPercentage = Number(bodyComposition?.bodyFatPercentage ?? 0) || 0;
     const sumOfSkinfolds = Number(bodyComposition?.sumOfSkinfolds ?? 0) || 0;

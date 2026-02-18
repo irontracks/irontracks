@@ -106,10 +106,11 @@ export async function createWorkout(workout: Record<string, unknown>): Promise<A
     } catch {}
     return { ok: true, data: { id: String(workoutId) } }
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
     try {
-      trackUserEvent('workout_create_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+      trackUserEvent('workout_create_error', { type: 'workout', metadata: { message } })
     } catch {}
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    return { ok: false, error: message }
   }
 }
 
@@ -146,10 +147,11 @@ export async function updateWorkout(id: string, workout: Record<string, unknown>
     } catch {}
     return { ok: true, data: { id: String(savedId || workoutId) } }
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
     try {
-      trackUserEvent('workout_update_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+      trackUserEvent('workout_update_error', { type: 'workout', metadata: { message } })
     } catch {}
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    return { ok: false, error: message }
   }
 }
 
@@ -168,10 +170,11 @@ export async function deleteWorkout(id: string): Promise<ActionResult> {
     } catch {}
     return { ok: true, data: undefined }
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
     try {
-      trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message: e?.message ? String(e.message) : String(e) } })
+      trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message } })
     } catch {}
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    return { ok: false, error: message }
   }
 }
 
@@ -186,7 +189,8 @@ export async function setWorkoutArchived(id: string, archived = true): Promise<A
     void archivedAt
     return { ok: true, data: undefined }
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -201,7 +205,8 @@ export async function setWorkoutSortOrder(ids: string[]): Promise<ActionResult> 
     }
     return { ok: true, data: undefined }
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -237,7 +242,8 @@ export async function generatePostWorkoutInsights(
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as unknown as ActionResult<Record<string, unknown>>
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -255,7 +261,8 @@ export async function generateExerciseMuscleMap(
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao mapear exercícios' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -273,7 +280,8 @@ export async function getMuscleMapWeek(
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -291,7 +299,8 @@ export async function getMuscleMapDay(
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular do dia' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -309,7 +318,8 @@ export async function backfillExerciseMuscleMaps(
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao reprocessar histórico' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -327,7 +337,8 @@ export async function applyProgressionToNextTemplate(
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao aplicar progressão' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -339,7 +350,8 @@ export async function getIronRankLeaderboard(limit = 100) {
     if (error) return { ok: false, error: error.message }
     return { ok: true, data: Array.isArray(data) ? data : [] }
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -472,7 +484,8 @@ export async function getLatestWorkoutPrs(): Promise<ActionResult<Record<string,
       },
     } as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e), prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message, prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
   }
 }
 
@@ -531,9 +544,9 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
     let currentStreak = 0
     let bestStreak = 0
 
-    const todayKey = toDayKey(new Date())
+    const todayKey = toDayKey(new Date()) || ''
     const hasToday = daySet.has(todayKey)
-    const startKey = hasToday ? todayKey : toDayKey(new Date(Date.now() - 24 * 60 * 60 * 1000))
+    const startKey = hasToday ? todayKey : toDayKey(new Date(Date.now() - 24 * 60 * 60 * 1000)) || ''
     if (daySet.has(startKey)) {
       let cursor = startKey
       while (daySet.has(cursor)) {
@@ -588,7 +601,8 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
       },
     }
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 
@@ -647,7 +661,8 @@ export async function generatePeriodReportInsights(input: unknown) {
 
     return { ok: true, ai }
   } catch (e) {
-    return { ok: false, error: e?.message ? String(e.message) : String(e) }
+    const message = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: message }
   }
 }
 

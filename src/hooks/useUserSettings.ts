@@ -8,7 +8,6 @@ export const DEFAULT_SETTINGS = DEFAULT_USER_SETTINGS
 
 const STORAGE_KEY = 'irontracks.userSettings.v1'
 const TABLE_MISSING_KEY = 'irontracks.userSettings.user_settings_table_missing.v1'
-void UserSettingsSchema
 
 const safeJsonParse = (raw: string): unknown => {
   try {

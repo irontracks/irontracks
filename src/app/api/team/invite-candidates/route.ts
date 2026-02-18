@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const QuerySchema = z.object({
+  q: z.string().min(1).max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+})
 
 export async function GET(req: Request) {
   try {
@@ -14,9 +21,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
-    const url = new URL(req.url)
-    const rawQ = url.searchParams.get('q') || ''
-    const q = rawQ.trim()
+    const { data: qParams, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const search = qParams.q?.trim() ?? ''
+    const limit = qParams.limit
 
     let items: unknown[] = []
 
@@ -26,8 +35,8 @@ export async function GET(req: Request) {
       .eq('teacher_id', user.id)
       .order('name', { ascending: true })
 
-    if (q) {
-      studentsQuery = studentsQuery.ilike('name', `%${q}%`)
+    if (search) {
+      studentsQuery = studentsQuery.ilike('name', `%${search}%`)
     }
 
     const { data: students, error: studentsError } = await studentsQuery
@@ -35,34 +44,31 @@ export async function GET(req: Request) {
       throw studentsError
     }
 
-    const studentsList = Array.isArray(students)
-      ? students.filter((s) => s && s.user_id)
-      : []
+    const studentsList = Array.isArray(students) ? students.filter((s) => s && s.user_id) : []
 
-    // Fetch profile data (last_seen, photo) for these students
-    let studentProfilesMap = new Map<string, any>()
+    const studentProfilesMap = new Map<string, any>()
     if (studentsList.length > 0) {
-      const ids = studentsList.map(s => s.user_id)
+      const ids = studentsList.map((s) => s.user_id)
       const { data: spData } = await supabase
         .from('profiles')
         .select('id, last_seen, photo_url')
         .in('id', ids)
-      
+
       if (spData) {
-        spData.forEach((p: any) => {
+        for (const p of spData as any[]) {
           if (p && p.id) studentProfilesMap.set(String(p.id), p)
-        })
+        }
       }
     }
 
     const studentItems = studentsList.map((s) => {
-        const p = studentProfilesMap.get(String(s.user_id))
-        return {
-            id: s.user_id,
-            displayName: s.name || s.email || 'Atleta',
-            photoURL: p?.photo_url || null,
-            lastSeen: p?.last_seen || null,
-        }
+      const p = studentProfilesMap.get(String(s.user_id))
+      return {
+        id: s.user_id,
+        displayName: s.name || s.email || 'Atleta',
+        photoURL: p?.photo_url || null,
+        lastSeen: p?.last_seen || null,
+      }
     })
 
     items = studentItems
@@ -78,10 +84,10 @@ export async function GET(req: Request) {
       .from('profiles')
       .select('id, display_name, photo_url, last_seen')
       .order('last_seen', { ascending: false })
-      .limit(40)
+      .limit(limit)
 
-    if (q) {
-      profilesQuery = profilesQuery.ilike('display_name', `%${q}%`)
+    if (search) {
+      profilesQuery = profilesQuery.ilike('display_name', `%${search}%`)
     }
 
     const { data: profiles, error: profilesError } = await profilesQuery
@@ -103,7 +109,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, items })
   } catch (e) {
-    const message = e?.message ?? String(e)
+    const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

@@ -97,9 +97,9 @@ function InAppNotifyBinder({ bind }: { bind?: ((notify: ((payload: unknown) => v
     const safeBind = typeof bind === 'function' ? bind : null;
     useEffect(() => {
         if (!safeBind) return;
-        safeBind(notify);
+        safeBind(notify as (payload: unknown) => void);
         return () => {
-            try { safeBind(null); } catch {}
+            try { safeBind(null); } catch { }
         };
     }, [notify, safeBind]);
     return null;
@@ -107,84 +107,84 @@ function InAppNotifyBinder({ bind }: { bind?: ((notify: ((payload: unknown) => v
 
 const mapWorkoutRow = (w: unknown) => {
     const workout = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-	const rawExercises = Array.isArray(workout?.exercises) ? (workout.exercises as unknown[]) : [];
-	const exs = rawExercises
-		.filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
-		.sort((a: Record<string, unknown>, b: Record<string, unknown>) => (Number(a.order) || 0) - (Number(b.order) || 0))
-		.map((e: Record<string, unknown>) => {
-			try {
-				const isCardio = String(e.method || '').toLowerCase() === 'cardio';
-				const dbSets = Array.isArray(e.sets)
-					? (e.sets as unknown[]).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
-					: [];
+    const rawExercises = Array.isArray(workout?.exercises) ? (workout.exercises as unknown[]) : [];
+    const exs = rawExercises
+        .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
+        .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (Number(a.order) || 0) - (Number(b.order) || 0))
+        .map((e: Record<string, unknown>) => {
+            try {
+                const isCardio = String(e.method || '').toLowerCase() === 'cardio';
+                const dbSets = Array.isArray(e.sets)
+                    ? (e.sets as unknown[]).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
+                    : [];
 
-				const sortedSets = dbSets
-					.slice()
-					.sort((aSet: Record<string, unknown>, bSet: Record<string, unknown>) => (Number(aSet?.set_number) || 0) - (Number(bSet?.set_number) || 0));
+                const sortedSets = dbSets
+                    .slice()
+                    .sort((aSet: Record<string, unknown>, bSet: Record<string, unknown>) => (Number(aSet?.set_number) || 0) - (Number(bSet?.set_number) || 0));
 
-				const setsCount = sortedSets.length || (isCardio ? 1 : 4);
+                const setsCount = sortedSets.length || (isCardio ? 1 : 4);
 
-				const setDetails = sortedSets.map((s: Record<string, unknown>, idx: number) => ({
-					set_number: s?.set_number ?? idx + 1,
-					reps: s?.reps ?? null,
-					rpe: s?.rpe ?? null,
-					weight: s?.weight ?? null,
-					is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-					advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
-				}));
+                const setDetails = sortedSets.map((s: Record<string, unknown>, idx: number) => ({
+                    set_number: s?.set_number ?? idx + 1,
+                    reps: s?.reps ?? null,
+                    rpe: s?.rpe ?? null,
+                    weight: s?.weight ?? null,
+                    is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
+                    advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                }));
 
-				const nonEmptyReps = setDetails
-					.map((s: { reps: unknown }) => s.reps)
-					.filter((r: unknown) => r !== null && r !== undefined && r !== '');
-				const defaultReps = isCardio ? '20' : '10';
-				let repsHeader = defaultReps;
-				if (nonEmptyReps.length > 0) {
-					const uniqueReps = Array.from(new Set(nonEmptyReps));
-					repsHeader = uniqueReps.length === 1 ? String(uniqueReps[0] ?? defaultReps) : String(nonEmptyReps[0] ?? defaultReps);
-				}
+                const nonEmptyReps = setDetails
+                    .map((s: { reps: unknown }) => s.reps)
+                    .filter((r: unknown) => r !== null && r !== undefined && r !== '');
+                const defaultReps = isCardio ? '20' : '10';
+                let repsHeader = defaultReps;
+                if (nonEmptyReps.length > 0) {
+                    const uniqueReps = Array.from(new Set(nonEmptyReps));
+                    repsHeader = uniqueReps.length === 1 ? String(uniqueReps[0] ?? defaultReps) : String(nonEmptyReps[0] ?? defaultReps);
+                }
 
-				const rpeValues = setDetails
-					.map((s: { rpe: unknown }) => s.rpe)
-					.filter((v: unknown) => v !== null && v !== undefined && !Number.isNaN(Number(v)));
-				const defaultRpe = isCardio ? 5 : 8;
-				const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe;
+                const rpeValues = setDetails
+                    .map((s: { rpe: unknown }) => s.rpe)
+                    .filter((v: unknown) => v !== null && v !== undefined && !Number.isNaN(Number(v)));
+                const defaultRpe = isCardio ? 5 : 8;
+                const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe;
 
-				return {
-					id: e.id,
-					name: e.name,
-					notes: e.notes,
-					videoUrl: e.video_url,
-					restTime: e.rest_time,
-					cadence: e.cadence,
-					method: e.method,
-					sets: setsCount,
-					reps: repsHeader,
-					rpe: rpeHeader,
-					setDetails,
-				};
-			} catch (mapErr) {
-				console.error('Erro ao mapear exercício', {
-					workoutId: workout?.id,
-					exerciseId: e?.id,
-					error: mapErr,
-				});
-				return null;
-			}
-		})
-		.filter(Boolean);
+                return {
+                    id: e.id,
+                    name: e.name,
+                    notes: e.notes,
+                    videoUrl: e.video_url,
+                    restTime: e.rest_time,
+                    cadence: e.cadence,
+                    method: e.method,
+                    sets: setsCount,
+                    reps: repsHeader,
+                    rpe: rpeHeader,
+                    setDetails,
+                };
+            } catch (mapErr) {
+                console.error('Erro ao mapear exercício', {
+                    workoutId: workout?.id,
+                    exerciseId: e?.id,
+                    error: mapErr,
+                });
+                return null;
+            }
+        })
+        .filter(Boolean);
 
-	return {
-		id: workout.id != null ? String(workout.id) : undefined,
-		title: String(workout.name ?? ''),
-		notes: workout.notes,
-		exercises: exs,
-		is_template: !!workout.is_template,
-		user_id: workout.user_id != null ? String(workout.user_id) : undefined,
-		created_by: workout.created_by != null ? String(workout.created_by) : undefined,
+    return {
+        id: workout.id != null ? String(workout.id) : undefined,
+        title: String(workout.name ?? ''),
+        notes: workout.notes,
+        exercises: exs,
+        is_template: !!workout.is_template,
+        user_id: workout.user_id != null ? String(workout.user_id) : undefined,
+        created_by: workout.created_by != null ? String(workout.created_by) : undefined,
         archived_at: workout.archived_at ?? null,
         sort_order: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
         created_at: workout.created_at ?? null,
-	};
+    };
 };
 
 function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
@@ -263,7 +263,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!user?.id) return
         fetch('/api/vip/status').then(r => r.json()).then(d => {
             if (d?.ok) setVipStatus(d)
-        }).catch(() => {})
+        }).catch(() => { })
     }, [user?.id])
 
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
@@ -282,8 +282,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [showCompleteProfile, setShowCompleteProfile] = useState(false);
 
     // Estado Global da Sessão Ativa
-	const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null);
-	const suppressForeignFinishToastUntilRef = useRef(0);
+    const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null);
+    const suppressForeignFinishToastUntilRef = useRef(0);
     const [sessionTicker, setSessionTicker] = useState(0);
     const [editActiveOpen, setEditActiveOpen] = useState(false);
     const [editActiveDraft, setEditActiveDraft] = useState<Record<string, unknown> | null>(null);
@@ -341,7 +341,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const key = getTourLocalKey(safeUid)
             if (!key) return
             window.localStorage.setItem(key, JSON.stringify({ version: TOUR_VERSION, status: safeStatus, at: Date.now() }))
-        } catch {}
+        } catch { }
     }, [TOUR_VERSION, getTourLocalKey])
     const wasTourSeenEver = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
@@ -363,7 +363,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const key = getTourSeenKey(safeUid)
             if (!key) return
             window.localStorage.setItem(key, '1')
-        } catch {}
+        } catch { }
     }, [getTourSeenKey])
     const wasTourAutoOpenedThisSession = useCallback((uid: unknown) => {
         const safeUid = uid ? String(uid) : ''
@@ -385,7 +385,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const key = getTourAutoOpenedKey(safeUid)
             if (!key) return
             window.sessionStorage.setItem(key, '1')
-        } catch {}
+        } catch { }
     }, [getTourAutoOpenedKey])
 
     const supabase = useRef(createClient()).current;
@@ -442,13 +442,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             window.addEventListener('irontracks.offlineQueueChanged', onChanged)
             window.addEventListener('online', onOnline)
             window.addEventListener('offline', onOffline)
-        } catch {}
+        } catch { }
         return () => {
             try {
                 window.removeEventListener('irontracks.offlineQueueChanged', onChanged)
                 window.removeEventListener('online', onOnline)
                 window.removeEventListener('offline', onOffline)
-            } catch {}
+            } catch { }
         }
     }, [refreshSyncState, runFlushQueue])
 
@@ -480,7 +480,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 event: ev,
                 payload: enriched,
             })
-        } catch {}
+        } catch { }
     }, [supabase, user?.id, user?.role])
 
     const upsertTourFlags = useCallback(async (patch: unknown) => {
@@ -497,52 +497,53 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             await supabase.from('user_settings').upsert(payload, { onConflict: 'user_id' })
             return { ok: true }
         } catch (e) {
-            return { ok: false, error: e?.message ?? String(e) }
+            const message = e instanceof Error ? e.message : String(e)
+            return { ok: false, error: message }
         }
     }, [TOUR_VERSION, supabase, user?.id, userSettingsApi?.settings])
 
     useEffect(() => {
         if (!user?.id) return
         let cancelled = false
-        ;(async () => {
-            try {
-                const uid = String(user.id)
-                const localDismissal = readLocalTourDismissal(uid)
-                if (localDismissal) {
-                    // Defensive: if the user already dismissed locally (offline, blocked RLS, etc.), never auto-open again.
-                    const completed = localDismissal.status === 'completed'
-                    const skipped = localDismissal.status === 'skipped'
+            ; (async () => {
+                try {
+                    const uid = String(user.id)
+                    const localDismissal = readLocalTourDismissal(uid)
+                    if (localDismissal) {
+                        // Defensive: if the user already dismissed locally (offline, blocked RLS, etc.), never auto-open again.
+                        const completed = localDismissal.status === 'completed'
+                        const skipped = localDismissal.status === 'skipped'
+                        setTourBoot({ loaded: true, completed, skipped })
+                        return
+                    }
+
+                    const { data } = await supabase
+                        .from('user_settings')
+                        .select('tour_version, tour_completed_at, tour_skipped_at')
+                        .eq('user_id', user.id)
+                        .maybeSingle()
+
+                    if (cancelled) return
+
+                    const dbVersion = Number(data?.tour_version || 0) || 0
+                    // Only force a new auto-open when the DB explicitly says an older version was seen.
+                    // If dbVersion is missing/0 but completed_at exists, we respect completed/skipped to avoid annoying loops.
+                    const needsNewVersion = dbVersion > 0 && dbVersion < TOUR_VERSION
+                    const completed = needsNewVersion ? false : !!data?.tour_completed_at
+                    const skipped = needsNewVersion ? false : !!data?.tour_skipped_at
                     setTourBoot({ loaded: true, completed, skipped })
-                    return
+
+                    const shouldOpen = !wasTourSeenEver(uid) && !wasTourAutoOpenedThisSession(uid) && (!completed && !skipped)
+                    if (shouldOpen) {
+                        markTourAutoOpenedThisSession(uid)
+                        markTourSeenEver(uid)
+                        await logTourEvent('tour_started', { auto: true, version: TOUR_VERSION })
+                        setTourOpen(true)
+                    }
+                } catch {
+                    if (!cancelled) setTourBoot((prev) => ({ ...prev, loaded: true }))
                 }
-
-                const { data } = await supabase
-                    .from('user_settings')
-                    .select('tour_version, tour_completed_at, tour_skipped_at')
-                    .eq('user_id', user.id)
-                    .maybeSingle()
-
-                if (cancelled) return
-
-                const dbVersion = Number(data?.tour_version || 0) || 0
-                // Only force a new auto-open when the DB explicitly says an older version was seen.
-                // If dbVersion is missing/0 but completed_at exists, we respect completed/skipped to avoid annoying loops.
-                const needsNewVersion = dbVersion > 0 && dbVersion < TOUR_VERSION
-                const completed = needsNewVersion ? false : !!data?.tour_completed_at
-                const skipped = needsNewVersion ? false : !!data?.tour_skipped_at
-                setTourBoot({ loaded: true, completed, skipped })
-
-                const shouldOpen = !wasTourSeenEver(uid) && !wasTourAutoOpenedThisSession(uid) && (!completed && !skipped)
-                if (shouldOpen) {
-                    markTourAutoOpenedThisSession(uid)
-                    markTourSeenEver(uid)
-                    await logTourEvent('tour_started', { auto: true, version: TOUR_VERSION })
-                    setTourOpen(true)
-                }
-            } catch {
-                if (!cancelled) setTourBoot((prev) => ({ ...prev, loaded: true }))
-            }
-        })()
+            })()
         return () => {
             cancelled = true
         }
@@ -559,13 +560,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 if (seen === '1') return;
                 window.sessionStorage.setItem(key, '1');
             }
-        } catch {}
+        } catch { }
         try {
-            fetch('/api/social/presence/ping', { method: 'POST' }).catch(() => {});
-        } catch {}
+            fetch('/api/social/presence/ping', { method: 'POST' }).catch(() => { });
+        } catch { }
         try {
-            fetch('/api/profiles/ping', { method: 'POST' }).catch(() => {});
-        } catch {}
+            fetch('/api/profiles/ping', { method: 'POST' }).catch(() => { });
+        } catch { }
     }, [user?.id]);
 
     useEffect(() => {
@@ -574,7 +575,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         const t = setTimeout(() => {
             try {
                 router.replace('/?next=/dashboard');
-            } catch {}
+            } catch { }
         }, 150);
         return () => {
             clearTimeout(t);
@@ -587,26 +588,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!uid) return
         if (!userSettingsApi?.loaded) return
         const prefs = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
-        if (prefs?.whatsNewAutoOpen === false) return
-        ;(async () => {
-            try {
-                const res = await fetch(`/api/updates/unseen?limit=1`)
-                const data = await res.json().catch(() => ({}))
-                const updates = Array.isArray(data?.updates) ? data.updates : []
-                const first = updates[0] || null
-                if (!first) return
+        if ((prefs as Record<string, unknown>)?.whatsNewAutoOpen === false) return
+            ; (async () => {
                 try {
-                    await fetch('/api/updates/mark-prompted', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ updateId: String(first.id) })
-                    })
-                } catch {}
-                whatsNewShownRef.current = true
-                setWhatsNewOpen(true)
-                setPendingUpdate(first)
-            } catch {}
-        })()
+                    const res = await fetch(`/api/updates/unseen?limit=1`)
+                    const data = await res.json().catch(() => ({}))
+                    const updates = Array.isArray(data?.updates) ? data.updates : []
+                    const first = updates[0] || null
+                    if (!first) return
+                    try {
+                        await fetch('/api/updates/mark-prompted', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ updateId: String(first.id) })
+                        })
+                    } catch { }
+                    whatsNewShownRef.current = true
+                    setWhatsNewOpen(true)
+                    setPendingUpdate(first)
+                } catch { }
+            })()
     }, [user?.id, userSettingsApi?.loaded, userSettingsApi?.settings])
 
     const closeWhatsNew = useCallback(async () => {
@@ -620,7 +621,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ updateId })
                     })
-                } catch {}
+                } catch { }
                 setPendingUpdate(null)
                 return
             }
@@ -629,9 +630,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const prev = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
             const nextSeenAt = Date.now()
             const next = { ...(prev || {}), whatsNewLastSeenId: String(entry.id), whatsNewLastSeenAt: nextSeenAt }
-            try { userSettingsApi?.setSettings?.(next) } catch {}
-            try { await userSettingsApi?.save?.(next) } catch {}
-        } catch {}
+            try { userSettingsApi?.setSettings?.(next as any) } catch { }
+            try { await userSettingsApi?.save?.(next as any) } catch { }
+        } catch { }
     }, [userSettingsApi, pendingUpdate])
     const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
 
@@ -643,7 +644,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const url = new URL(window.location.href);
             url.searchParams.set('tab', tabValue);
             window.history.replaceState({}, '', url);
-        } catch {}
+        } catch { }
     }, []);
 
     const removeUrlTabParam = useCallback(() => {
@@ -652,7 +653,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const url = new URL(window.location.href);
             url.searchParams.delete('tab');
             window.history.replaceState({}, '', url);
-        } catch {}
+        } catch { }
     }, []);
 
     const openAdminPanel = useCallback((tab: unknown) => {
@@ -663,7 +664,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 if (tab) sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, String(tab));
                 if (tab) setUrlTabParam(tab);
             }
-        } catch {}
+        } catch { }
     }, [setUrlTabParam]);
 
     const closeAdminPanel = useCallback(() => {
@@ -673,7 +674,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 sessionStorage.removeItem(ADMIN_PANEL_OPEN_KEY);
                 sessionStorage.removeItem(ADMIN_PANEL_TAB_KEY);
             }
-        } catch {}
+        } catch { }
         removeUrlTabParam();
     }, [removeUrlTabParam]);
 
@@ -700,10 +701,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             try {
                 sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
                 sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, tab);
-            } catch {}
+            } catch { }
             if (!urlTab && tab) setUrlTabParam(tab);
             setShowAdminPanel(true);
-        } catch {}
+        } catch { }
     }, [setUrlTabParam, user?.role]);
 
     const resolveExerciseVideos = useCallback(async (exercises: unknown): Promise<{ exercises: Array<Record<string, unknown>>; updates: Array<Record<string, unknown>> }> => {
@@ -763,7 +764,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 .slice(0, 100);
             if (!filtered.length) return;
             await Promise.allSettled(filtered.map((r: { id: string; url: string }) => supabase.from('exercises').update({ video_url: r.url }).eq('id', r.id)));
-        } catch {}
+        } catch { }
     }, [supabase]);
 
     const signOutInFlightRef = useRef(false);
@@ -773,7 +774,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const generateExerciseKey = useCallback(() => {
         try {
             if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-        } catch {}
+        } catch { }
         return `ex_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     }, []);
 
@@ -785,11 +786,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const exercisesInitial = exercisesRaw
                 .filter((ex: unknown): ex is Record<string, unknown> => Boolean(ex && typeof ex === 'object'))
                 .map((ex: Record<string, unknown>) => {
-                const existing = ex?._itx_exKey ? String(ex._itx_exKey) : '';
-                const fromId = ex?.id != null ? `id_${String(ex.id)}` : '';
-                const nextKey = existing || fromId || generateExerciseKey();
-                return { ...ex, _itx_exKey: nextKey };
-            });
+                    const existing = ex?._itx_exKey ? String(ex._itx_exKey) : '';
+                    const fromId = ex?.id != null ? `id_${String(ex.id)}` : '';
+                    const nextKey = existing || fromId || generateExerciseKey();
+                    return { ...ex, _itx_exKey: nextKey };
+                });
 
             const seen = new Set<string>();
             const exercises = exercisesInitial.map((ex: Record<string, unknown>) => {
@@ -814,12 +815,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>);
             const exercises = Array.isArray(w.exercises)
                 ? (w.exercises as unknown[]).map((ex: unknown) => {
-                      if (!ex || typeof ex !== 'object') return ex;
-                      const obj = ex as Record<string, unknown>
-                      const { _itx_exKey, ...rest } = obj;
-                      void _itx_exKey
-                      return rest;
-                  })
+                    if (!ex || typeof ex !== 'object') return ex;
+                    const obj = ex as Record<string, unknown>
+                    const { _itx_exKey, ...rest } = obj;
+                    void _itx_exKey
+                    return rest;
+                })
                 : w.exercises;
             return { ...w, exercises };
         } catch {
@@ -867,10 +868,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
                 const headerSets = Number.parseInt(String(exObj?.sets ?? ''), 10) || 0;
                 const details = Array.isArray(exObj?.setDetails)
-                  ? (exObj.setDetails as unknown[])
-                  : Array.isArray(exObj?.set_details)
-                    ? (exObj.set_details as unknown[])
-                    : [];
+                    ? (exObj.setDetails as unknown[])
+                    : Array.isArray(exObj?.set_details)
+                        ? (exObj.set_details as unknown[])
+                        : [];
                 const maxSets = headerSets || (Array.isArray(details) ? details.length : 0);
                 if (maxSets && setIdx >= maxSets) return;
                 result[`${newIdx}-${setIdx}`] = v;
@@ -896,9 +897,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 try {
                     document.cookie = `${name}=; Max-Age=0; path=/`;
                     document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-                } catch {}
+                } catch { }
             });
-        } catch {}
+        } catch { }
     }, []);
 
     const clearSupabaseStorageBestEffort = useCallback(() => {
@@ -913,23 +914,23 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) keys.push(k);
             }
             keys.forEach((k) => {
-                try { ls.removeItem(k); } catch {}
+                try { ls.removeItem(k); } catch { }
             });
-        } catch {}
+        } catch { }
     }, []);
 
-		const clearClientSessionState = useCallback(() => {
-		try {
-			localStorage.removeItem('activeSession');
-			localStorage.removeItem('appView');
-			if (user?.id) {
-				localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`);
-				localStorage.removeItem(`irontracks.appView.v2.${user.id}`);
-			}
-		} catch {}
-		setActiveSession(null);
-		setView('dashboard');
-	}, [user?.id]);
+    const clearClientSessionState = useCallback(() => {
+        try {
+            localStorage.removeItem('activeSession');
+            localStorage.removeItem('appView');
+            if (user?.id) {
+                localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`);
+                localStorage.removeItem(`irontracks.appView.v2.${user.id}`);
+            }
+        } catch { }
+        setActiveSession(null);
+        setView('dashboard');
+    }, [user?.id]);
 
     const safeSignOut = useCallback(async (scope = 'local') => {
         if (signOutInFlightRef.current) return;
@@ -941,7 +942,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             try {
                 clearSupabaseCookiesBestEffort();
                 clearSupabaseStorageBestEffort();
-            } catch {}
+            } catch { }
         } finally {
             signOutInFlightRef.current = false;
         }
@@ -968,7 +969,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         try {
                             localStorage.setItem(scopedKey, JSON.stringify(parsed));
                             localStorage.removeItem('activeSession');
-                        } catch {}
+                        } catch { }
                     }
                 }
             }
@@ -976,7 +977,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             try {
                 localStorage.removeItem(scopedKey);
                 localStorage.removeItem('activeSession');
-            } catch {}
+            } catch { }
         }
 
         const loadServer = async () => {
@@ -1000,7 +1001,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 displayName: 'Sistema',
                                 photoURL: null,
                             });
-                        } catch {}
+                        } catch { }
                     }
                     return;
                 }
@@ -1021,8 +1022,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 setView('active');
                 try {
                     localStorage.setItem(scopedKey, JSON.stringify(state));
-                } catch {}
-            } catch {}
+                } catch { }
+            } catch { }
         };
 
         loadServer();
@@ -1053,17 +1054,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     (payload: Record<string, unknown>) => {
                         try {
                             if (!mounted) return;
-						const ev = String(payload?.eventType || '').toUpperCase();
-						if (ev === 'DELETE') {
-							if (Date.now() < (suppressForeignFinishToastUntilRef.current || 0)) {
-								suppressForeignFinishToastUntilRef.current = 0;
-								return;
-							}
-							setActiveSession(null);
-							setView((prev) => (prev === 'active' ? 'dashboard' : prev));
-							try {
-								localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
-							} catch {}
+                            const ev = String(payload?.eventType || '').toUpperCase();
+                            if (ev === 'DELETE') {
+                                if (Date.now() < (suppressForeignFinishToastUntilRef.current || 0)) {
+                                    suppressForeignFinishToastUntilRef.current = 0;
+                                    return;
+                                }
+                                setActiveSession(null);
+                                setView((prev) => (prev === 'active' ? 'dashboard' : prev));
+                                try {
+                                    localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
+                                } catch { }
                                 try {
                                     inAppNotify({
                                         text: 'Treino finalizado em outro dispositivo.',
@@ -1071,7 +1072,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         displayName: 'Sistema',
                                         photoURL: null,
                                     });
-                                } catch {}
+                                } catch { }
                                 return;
                             }
 
@@ -1084,14 +1085,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     setView((prev) => (prev === 'active' ? 'dashboard' : prev));
                                     try {
                                         localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
-                                    } catch {}
+                                    } catch { }
                                 }
                             }
-                        } catch {}
+                        } catch { }
                     }
                 )
                 .subscribe();
-        } catch {}
+        } catch { }
 
         return () => {
             mounted = false;
@@ -1100,13 +1101,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             } catch {
                 try {
                     if (channel) createClient().removeChannel(channel);
-                } catch {}
+                } catch { }
             }
         };
     }, [supabase, user?.id, inAppNotify]);
 
     useEffect(() => {
-        const handler = () => { try { unlockAudio(); } catch {} };
+        const handler = () => { try { unlockAudio(); } catch { } };
         document.addEventListener('touchstart', handler, { once: true });
         document.addEventListener('click', handler, { once: true });
         return () => {
@@ -1169,7 +1170,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const id = setTimeout(() => {
                 try {
                     localStorage.setItem(key, payload);
-                } catch {}
+                } catch { }
             }, 250);
             return () => clearTimeout(id);
         } catch {
@@ -1185,9 +1186,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             if (serverSessionSyncRef.current?.timer) {
                 try {
                     clearTimeout(serverSessionSyncRef.current.timer);
-                } catch {}
+                } catch { }
             }
-        } catch {}
+        } catch { }
 
         const key = (() => {
             try {
@@ -1218,7 +1219,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     displayName: 'Sistema',
                                     photoURL: null,
                                 });
-                            } catch {}
+                            } catch { }
                         }
                     }
                     return;
@@ -1255,10 +1256,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 displayName: 'Sistema',
                                 photoURL: null,
                             });
-                        } catch {}
+                        } catch { }
                     }
                 }
-            } catch {}
+            } catch { }
         };
 
         let timerId = null;
@@ -1267,15 +1268,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             timerId = setTimeout(() => {
                 try {
                     run();
-                } catch {}
+                } catch { }
             }, 900);
-            serverSessionSyncRef.current.timer = timerId;
-        } catch {}
+            serverSessionSyncRef.current.timer = timerId as any;
+        } catch { }
 
         return () => {
             try {
                 if (timerId) clearTimeout(timerId);
-            } catch {}
+            } catch { }
         };
     }, [activeSession, supabase, user?.id, inAppNotify]);
 
@@ -1398,7 +1399,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!baseUserObj?.id) {
             try {
                 if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
-            } catch {}
+            } catch { }
             return
         }
         const meta = baseUserObj?.user_metadata && typeof baseUserObj.user_metadata === 'object' ? (baseUserObj.user_metadata as Record<string, unknown>) : {}
@@ -1420,20 +1421,20 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         const uid = user?.id ? String(user.id) : ''
         if (!uid) return
         let cancelled = false
-        ;(async () => {
-            try {
-                const res = await fetch('/api/vip/access', { method: 'GET', credentials: 'include', cache: 'no-store' })
-                const json = await res.json().catch((): unknown => null)
-                if (cancelled) return
-                if (json && json.ok) {
-                    setVipAccess({ loaded: true, hasVip: !!json.hasVip })
-                    return
+            ; (async () => {
+                try {
+                    const res = await fetch('/api/vip/access', { method: 'GET', credentials: 'include', cache: 'no-store' })
+                    const json = await res.json().catch((): unknown => null)
+                    if (cancelled) return
+                    if (json && json.ok) {
+                        setVipAccess({ loaded: true, hasVip: !!json.hasVip })
+                        return
+                    }
+                    setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
+                } catch {
+                    if (!cancelled) setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
                 }
-                setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
-            } catch {
-                if (!cancelled) setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
-            }
-        })()
+            })()
         return () => { cancelled = true }
     }, [user?.id])
 
@@ -1455,13 +1456,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 clearClientSessionState()
                                 if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
                             })
-                            .catch(() => {})
+                            .catch(() => { })
                         return
                     }
-                } catch {}
+                } catch { }
             })
             return () => {
-                try { sub?.subscription?.unsubscribe?.() } catch {}
+                try { sub?.subscription?.unsubscribe?.() } catch { }
             }
         } catch {
             return
@@ -1478,26 +1479,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         try {
             document.addEventListener('visibilitychange', onVisibility);
             window.addEventListener('pageshow', onPageShow);
-        } catch {}
+        } catch { }
         return () => {
             try {
                 document.removeEventListener('visibilitychange', onVisibility);
                 window.removeEventListener('pageshow', onPageShow);
-            } catch {}
+            } catch { }
         };
     }, [restoreAdminPanelIfNeeded]);
 
     // Sync Profile Separately (Optimized)
     useEffect(() => {
         if (user?.id) {
-             const syncProfile = async () => {
-                 try {
+            const syncProfile = async () => {
+                try {
                     return
-                 } catch (e) {
+                } catch (e) {
                     console.error('Erro ao sincronizar perfil:', e);
-                 }
-             };
-             syncProfile();
+                }
+            };
+            syncProfile();
         }
     }, [supabase, user?.id]);
 
@@ -1570,7 +1571,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     const totalEx = mapped.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0);
                     setStats({ workouts: mapped.length, exercises: totalEx, activeStreak: 0 });
                 }
-            } catch {}
+            } catch { }
         };
         run();
         return () => {
@@ -1578,13 +1579,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
     }, [user?.id]);
 
-	// Fetch Workouts
-	const fetchWorkouts = useCallback(async (specificUser = user) => {
+    // Fetch Workouts
+    const fetchWorkouts = useCallback(async (specificUser = user) => {
         if (isFetching.current) return;
         isFetching.current = true;
-        
-		try {
-			const currentUser = specificUser;
+
+        try {
+            const currentUser = specificUser;
 
             if (!currentUser?.id) {
                 console.warn("DASHBOARD: Usuário não identificado ao buscar treinos.");
@@ -1601,7 +1602,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         const totalEx = cachedWorkouts.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0)
                         setStats({ workouts: cachedWorkouts.length, exercises: totalEx, activeStreak: 0 })
                     }
-                } catch {}
+                } catch { }
                 return
             }
 
@@ -1697,7 +1698,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             .order('name', { ascending: true })
                             .limit(500)
                         data = await hydrateWorkouts(Array.isArray(myAllBase) ? myAllBase : [])
-                    } catch {}
+                    } catch { }
                 }
 
                 // 3. Fetch Student Workouts
@@ -1719,7 +1720,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             if (!id) continue
                             if (!seen.has(id)) { seen.add(id); combined.push(w) }
                         }
-                    } catch {}
+                    } catch { }
                     try {
                         const { data: swByStudentBase } = await supabase
                             .from('workouts')
@@ -1734,7 +1735,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             if (!id) continue
                             if (!seen.has(id)) { seen.add(id); combined.push(w) }
                         }
-                    } catch {}
+                    } catch { }
                     studentData = combined
                 }
             } else {
@@ -1758,7 +1759,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         if (!anyErr && Array.isArray(anyRows) && anyRows.length) {
                             data = await hydrateWorkouts(anyRows);
                         }
-                    } catch {}
+                    } catch { }
                 }
 
                 if (!data.length) {
@@ -1789,7 +1790,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             }
                             data = merged;
                         }
-                    } catch {}
+                    } catch { }
                 }
 
                 if (!data.length) {
@@ -1812,14 +1813,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 } as Record<string, unknown>)
                             });
                         }
-                    } catch {}
+                    } catch { }
                 }
             }
 
-			if (Array.isArray(data)) {
-				const mappedRaw = data
-					.map((row) => mapWorkoutRow(row))
-					.filter(Boolean);
+            if (Array.isArray(data)) {
+                const mappedRaw = data
+                    .map((row) => mapWorkoutRow(row))
+                    .filter(Boolean);
                 const mapped = mappedRaw.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
                     const ao = Number.isFinite(Number(a?.sort_order)) ? Number(a.sort_order) : 0
                     const bo = Number.isFinite(Number(b?.sort_order)) ? Number(b.sort_order) : 0
@@ -1829,7 +1830,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                 try {
                     await cacheSetWorkouts({ userId: currentUser?.id, workouts: mapped })
-                } catch {}
+                } catch { }
 
                 if (role === 'admin' || role === 'teacher') {
                     setWorkouts(mapped)
@@ -1847,10 +1848,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         for (const s of (studentsList || [])) {
                             const sid = s.user_id || s.id
                             if (!sid) continue
-                            nameById.set(sid, { name: s.name || String(sid).slice(0,8), email: s.email || '' })
+                            nameById.set(sid, { name: s.name || String(sid).slice(0, 8), email: s.email || '' })
                         }
                         const folders = Array.from(byStudent.entries()).map(([sid, list]) => {
-                            const info = nameById.get(sid) || { name: String(sid).slice(0,8), email: '' }
+                            const info = nameById.get(sid) || { name: String(sid).slice(0, 8), email: '' }
                             return { id: sid, name: info.name, email: info.email, workouts: list }
                         }).filter(f => (f.workouts || []).length > 0)
                         setStudentFolders(folders)
@@ -1879,7 +1880,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         const nameByCoach = new Map(profiles.map((p) => [p.id, p.display_name || String(p.id).slice(0, 8)]))
                         const folders = Array.from(byCoach.entries()).map(([cid, list]) => ({
                             id: cid,
-                            name: `Treinos compartilhados de ${nameByCoach.get(cid) || String(cid).slice(0,8)}`,
+                            name: `Treinos compartilhados de ${nameByCoach.get(cid) || String(cid).slice(0, 8)}`,
                             email: '',
                             workouts: list
                         }))
@@ -1888,21 +1889,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         setStudentFolders([])
                     }
                 }
-                
-				// Atualiza estatísticas
-				const totalEx = mapped.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0);
-				setStats({ 
-					workouts: mapped.length, 
-					exercises: totalEx, 
-					activeStreak: 0 // Placeholder
-				});
+
+                // Atualiza estatísticas
+                const totalEx = mapped.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0);
+                setStats({
+                    workouts: mapped.length,
+                    exercises: totalEx,
+                    activeStreak: 0 // Placeholder
+                });
             } else {
                 console.warn('Fetch sem dados; mantendo estado atual');
             }
-		} catch (e) {
-			const msg = e?.message ?? String(e);
-			if (msg.includes('Failed to fetch') || msg.includes('ERR_ABORTED')) {
-				// Dev HMR aborts or transient network; ignore quietly
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            if (msg.includes('Failed to fetch') || msg.includes('ERR_ABORTED')) {
+                // Dev HMR aborts or transient network; ignore quietly
                 try {
                     const cached = await cacheGetWorkouts()
                     const cachedObj = cached && typeof cached === 'object' ? (cached as Record<string, unknown>) : null
@@ -1912,12 +1913,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         const totalEx = cachedWorkouts.reduce((acc: number, w: Record<string, unknown>) => acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0), 0)
                         setStats({ workouts: cachedWorkouts.length, exercises: totalEx, activeStreak: 0 })
                     }
-                } catch {}
-				return;
-			}
-			console.error("Erro ao buscar:", { message: msg, error: e });
-		} finally { isFetching.current = false; }
-	}, [supabase, user]); // Depende apenas do usuário para evitar loops de busca
+                } catch { }
+                return;
+            }
+            console.error("Erro ao buscar:", { message: msg, error: e });
+        } finally { isFetching.current = false; }
+    }, [supabase, user]); // Depende apenas do usuário para evitar loops de busca
 
     useEffect(() => {
         if (user) {
@@ -1934,7 +1935,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     const arr = JSON.parse(cached);
                     if (Array.isArray(arr) && arr.length > 0) setWorkouts(arr);
                 }
-            } catch {}
+            } catch { }
         }
     }, [user, workouts.length]);
 
@@ -1974,8 +1975,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const handleLogout = async () => {
         const ok = await confirm("Deseja realmente sair da sua conta?", "Sair");
         if (!ok) return;
-        try { clearClientSessionState(); } catch {}
-        try { window.location.href = '/auth/logout'; } catch {}
+        try { clearClientSessionState(); } catch { }
+        try { window.location.href = '/auth/logout'; } catch { }
     };
 
     const handleSaveProfile = async () => {
@@ -2006,7 +2007,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             setProfileIncomplete(false);
             setShowCompleteProfile(false);
         } catch (e) {
-            await alert('Erro ao salvar perfil: ' + (e?.message || String(e || '')));
+            const message = e instanceof Error ? e.message : String(e || '')
+            await alert('Erro ao salvar perfil: ' + message);
         } finally {
             setSavingProfile(false);
         }
@@ -2056,14 +2058,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 }
             }
         } catch (e) {
-            console.warn('Falha ao salvar check-in pré-treino:', e?.message || String(e || ''))
+            const message = e instanceof Error ? e.message : String(e || '')
+            console.warn('Falha ao salvar check-in pré-treino:', message)
         }
         let resolvedExercises = exercisesList;
         try {
             const resolved = await resolveExerciseVideos(exercisesList);
             resolvedExercises = Array.isArray(resolved?.exercises) ? resolved.exercises : exercisesList;
             persistExerciseVideoUrls(resolved?.updates || []);
-        } catch {}
+        } catch { }
         {
             const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
             const enabled = s ? s.enableSounds !== false : true
@@ -2093,13 +2096,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ workout_id: wid, workout_title: title }),
-            }).catch(() => {});
-        } catch {}
+            }).catch(() => { });
+        } catch { }
         {
             const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
             const allowPrompt = s ? s.notificationPermissionPrompt !== false : true
             if (allowPrompt && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-            Notification.requestPermission().catch((e: unknown) => console.warn('Erro permissão notificação:', String((e as Error)?.message ?? e)));
+                Notification.requestPermission().catch((e: unknown) => console.warn('Erro permissão notificação:', String((e as Error)?.message ?? e)));
             }
         }
     };
@@ -2128,21 +2131,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setActiveSession((prev) => (prev ? { ...prev, timerTargetTime: null, timerContext: null } : prev));
     };
 
-	const handleFinishSession = async (sessionData: unknown, showReport?: boolean) => {
-		suppressForeignFinishToastUntilRef.current = Date.now() + 8000;
+    const handleFinishSession = async (sessionData: unknown, showReport?: boolean) => {
+        suppressForeignFinishToastUntilRef.current = Date.now() + 8000;
         try {
             if (user?.id) {
                 localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`);
             }
             localStorage.removeItem('activeSession');
-        } catch {}
-		setActiveSession(null);
-		if (showReport === false) {
-			setView('dashboard');
-			return;
-		}
+        } catch { }
+        setActiveSession(null);
+        if (showReport === false) {
+            setView('dashboard');
+            return;
+        }
         setReportBackView('dashboard');
-        setReportData({ current: sessionData, previous: null });
+        setReportData({ current: sessionData, previous: null } as any);
         setView('report');
     };
 
@@ -2151,25 +2154,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setCurrentWorkout({ title: '', exercises: [] as any[] })
         setView('edit')
     }
-	const handleCreateWorkout = () => { setCreateWizardOpen(true) };
+    const handleCreateWorkout = () => { setCreateWizardOpen(true) };
 
-	const handleEditWorkout = async (workout: unknown) => {
+    const handleEditWorkout = async (workout: unknown) => {
         const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : null
-		if (!w || !w.id) return;
-		try {
-			const supabase = createClient();
-			const { data, error } = await supabase
-				.from('workouts')
-				.select('*, exercises(*, sets(*))')
-				.eq('id', w.id)
-				.maybeSingle();
-			if (error) throw error;
-			if (!data) {
-				setCurrentWorkout(w as unknown as ActiveSession);
-				setView('edit');
-				return;
-			}
-			const mapped = mapWorkoutRow(data);
+        if (!w || !w.id) return;
+        try {
+            const supabase = createClient();
+            const { data, error } = await supabase
+                .from('workouts')
+                .select('*, exercises(*, sets(*))')
+                .eq('id', w.id)
+                .maybeSingle();
+            if (error) throw error;
+            if (!data) {
+                setCurrentWorkout(w as unknown as ActiveSession);
+                setView('edit');
+                return;
+            }
+            const mapped = mapWorkoutRow(data);
             try {
                 const mappedObj = mapped && typeof mapped === 'object' ? (mapped as Record<string, unknown>) : ({} as Record<string, unknown>)
                 const resolved = await resolveExerciseVideos(mappedObj?.exercises || []);
@@ -2179,12 +2182,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             } catch {
                 setCurrentWorkout(mapped as unknown as ActiveSession);
             }
-			setView('edit');
-		} catch (e) {
-			const msg = e?.message || String(e || '');
-			await alert('Erro ao carregar treino para edição: ' + msg);
-		}
-	};
+            setView('edit');
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e || '');
+            await alert('Erro ao carregar treino para edição: ' + msg);
+        }
+    };
 
     const handleSaveWorkout = useCallback(async (workoutToSave?: unknown) => {
         const wRaw = workoutToSave || currentWorkout;
@@ -2203,7 +2206,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 return created;
             }
         } catch (e) {
-            const msg = e?.message ? String(e.message) : String(e || 'Falha ao salvar treino');
+            const msg = e instanceof Error ? e.message : String(e || 'Falha ao salvar treino');
             return { ok: false, error: msg };
         }
     }, [currentWorkout, user]);
@@ -2219,17 +2222,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 await updateWorkout(String(cleanedObj.id), cleanedObj);
                 try {
                     await fetchWorkouts();
-                } catch {}
+                } catch { }
                 return { ok: true, mode: 'update' };
             }
 
             const created = await createWorkout(cleanedObj);
             try {
                 await fetchWorkouts();
-            } catch {}
+            } catch { }
             return { ok: true, mode: 'create', id: created?.ok ? created.data.id : null };
         } catch (e) {
-            const msg = e?.message ? String(e.message) : String(e);
+            const msg = e instanceof Error ? e.message : String(e);
             return { ok: false, error: msg || 'Falha ao salvar treino' };
         }
     }, [fetchWorkouts, normalizeWorkoutForEditor, stripWorkoutInternalKeys]);
@@ -2262,7 +2265,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             editActiveBaseRef.current = base;
             setEditActiveDraft(nextBase);
             setEditActiveOpen(true);
-        } catch {}
+        } catch { }
     }, [activeSession?.workout, normalizeWorkoutForEditor]);
 
     const handleCloseActiveWorkoutEditor = useCallback(() => {
@@ -2271,7 +2274,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             setEditActiveDraft(null);
             editActiveBaseRef.current = null;
             editActiveAddExerciseRef.current = false;
-        } catch {}
+        } catch { }
     }, []);
 
     const handleSaveActiveWorkoutEditor = useCallback(async (workoutFromEditor: unknown) => {
@@ -2292,18 +2295,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         return res;
     }, [handleSaveWorkout, normalizeWorkoutForEditor, reindexSessionLogsAfterWorkoutEdit, stripWorkoutInternalKeys]);
 
-	const handleDeleteWorkout = async (id: string, title: unknown) => {
-		const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
-		if (!(await confirm(`Apagar o treino "${name}"?`, "Excluir Treino"))) return;
-		try {
-			const res = await deleteWorkout(id);
-			if (!res?.ok) {
-				await alert("Erro: " + (res?.error || 'Falha ao excluir treino'));
-				return;
-			}
-			await fetchWorkouts();
-		} catch (e) { await alert("Erro: " + (e?.message ?? String(e))); }
-	};
+    const handleDeleteWorkout = async (id: string, title: unknown) => {
+        const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
+        if (!(await confirm(`Apagar o treino "${name}"?`, "Excluir Treino"))) return;
+        try {
+            const res = await deleteWorkout(id);
+            if (!res?.ok) {
+                await alert("Erro: " + (res?.error || 'Falha ao excluir treino'));
+                return;
+            }
+            await fetchWorkouts();
+        } catch (e) {
+            const message = e instanceof Error ? e.message : String(e)
+            await alert("Erro: " + message);
+        }
+    };
 
     const handleRestoreWorkout = async (workout: unknown) => {
         const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
@@ -2319,20 +2325,24 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             }
             await fetchWorkouts()
         } catch (e) {
-            await alert('Erro: ' + (e?.message ?? String(e)))
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro: ' + message)
         }
     }
 
-	const handleDuplicateWorkout = async (workout: unknown) => {
+    const handleDuplicateWorkout = async (workout: unknown) => {
         const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
-		if (!(await confirm(`Duplicar "${String(w.title || '')}"?`, "Duplicar Treino"))) return;
-		const newWorkout = { ...w, title: `${String(w.title || '')} (Cópia)` };
-		delete (newWorkout as Record<string, unknown>).id;
-		try {
-			await createWorkout(newWorkout as Record<string, unknown>);
-			await fetchWorkouts();
-		} catch (e) { await alert("Erro ao duplicar: " + (e?.message ?? String(e))); }
-	};
+        if (!(await confirm(`Duplicar "${String(w.title || '')}"?`, "Duplicar Treino"))) return;
+        const newWorkout = { ...w, title: `${String(w.title || '')} (Cópia)` };
+        delete (newWorkout as Record<string, unknown>).id;
+        try {
+            await createWorkout(newWorkout as Record<string, unknown>);
+            await fetchWorkouts();
+        } catch (e) {
+            const message = e instanceof Error ? e.message : String(e)
+            await alert("Erro ao duplicar: " + message);
+        }
+    };
 
     const handleBulkEditWorkouts = async (items: unknown) => {
         try {
@@ -2377,7 +2387,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 await alert('Lista salva.')
             }
         } catch (e) {
-            await alert('Erro ao salvar lista: ' + (e?.message ?? String(e)))
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro ao salvar lista: ' + message)
         }
     }
 
@@ -2402,6 +2413,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
             let changed = 0
             for (const item of candidates) {
+                if (!item) continue
                 const w = item.workout
                 const idx = item.dayIndex
                 const id = String(w?.id || '').trim()
@@ -2415,10 +2427,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             }
             try {
                 await fetchWorkouts()
-            } catch {}
+            } catch { }
             await alert(`Padronização concluída: ${changed} treinos atualizados.`)
         } catch (e) {
-            await alert('Erro ao padronizar nomes: ' + (e?.message ?? String(e)))
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro ao padronizar nomes: ' + message)
         }
     }
 
@@ -2448,10 +2461,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             }
             try {
                 await fetchWorkouts()
-            } catch {}
+            } catch { }
             await alert(`Padronização concluída: ${updated} treinos atualizados.`)
         } catch (e) {
-            await alert('Erro ao padronizar títulos: ' + (e?.message ?? String(e)))
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro ao padronizar títulos: ' + message)
         }
     }
 
@@ -2484,6 +2498,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             let updated = 0
             const updatedWorkouts: Array<{ title: string; changesCount: number }> = [];
             for (const item of candidates) {
+                if (!item) continue
                 const w = item.workout
                 const id = String(w?.id || '').trim()
                 if (!id) continue
@@ -2496,7 +2511,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             }
             try {
                 await fetchWorkouts()
-            } catch {}
+            } catch { }
             const lines = updatedWorkouts
                 .slice(0, 10)
                 .map((it) => `• ${it.title}${it.changesCount ? ` (${it.changesCount} exercício(s))` : ''}`)
@@ -2505,7 +2520,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const detail = lines ? `\n\nTreinos atualizados:\n${lines}${more}` : ''
             await alert(`Normalização concluída: ${updated} treinos atualizados.${detail}`)
         } catch (e) {
-            await alert('Erro ao normalizar exercícios: ' + (e?.message ?? String(e)))
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro ao normalizar exercícios: ' + message)
         }
     }
 
@@ -2613,7 +2629,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             setDuplicatesOpen(false)
             setDuplicateGroups([])
         } catch (e) {
-            await alert('Erro ao arquivar duplicados: ' + (e?.message ?? String(e)))
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro ao arquivar duplicados: ' + message)
         } finally {
             setDuplicatesBusy(false)
         }
@@ -2674,7 +2691,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             setDuplicatesOpen(false)
             setDuplicateGroups([])
         } catch (e) {
-            await alert('Erro ao mesclar duplicados: ' + (e?.message ?? String(e)))
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro ao mesclar duplicados: ' + message)
         } finally {
             setDuplicatesBusy(false)
         }
@@ -2685,20 +2703,23 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setShowExportModal(true);
     };
 
-	const handleExportPdf = async () => {
-		if (!exportWorkout) return;
-		try {
-			const html = workoutPlanHtml(exportWorkout as unknown as any, user);
-			const win = window.open('', '_blank');
-			if (!win) return;
-			win.document.open();
-			win.document.write(html);
-			win.document.close();
-			win.focus();
-			setTimeout(() => { try { win.print(); } catch {} }, 300);
-			setShowExportModal(false);
-		} catch (e) { await alert('Erro ao gerar PDF: ' + (e?.message ?? String(e))); }
-	};
+    const handleExportPdf = async () => {
+        if (!exportWorkout || !user) return;
+        try {
+            const html = workoutPlanHtml(exportWorkout as unknown as any, user);
+            const win = window.open('', '_blank');
+            if (!win) return;
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+            setTimeout(() => { try { win.print(); } catch { } }, 300);
+            setShowExportModal(false);
+        } catch (e) {
+            const message = e instanceof Error ? e.message : String(e)
+            await alert('Erro ao gerar PDF: ' + message);
+        }
+    };
 
     const handleExportJson = () => {
         if (!exportWorkout) return;
@@ -2707,7 +2728,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${(exportWorkout.title || 'treino').replace(/\s+/g,'_')}.json`;
+        a.download = `${(exportWorkout.title || 'treino').replace(/\s+/g, '_')}.json`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         setShowExportModal(false);
     };
@@ -2762,7 +2783,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!file) return;
         try {
             setShowJsonImportModal(false);
-        } catch {}
+        } catch { }
 
         const reader = new FileReader();
         reader.onload = async (event: ProgressEvent<FileReader>) => {
@@ -2773,14 +2794,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     await fetchWorkouts();
                     await alert("Dados importados com sucesso!", "Sucesso");
                 }
-		} catch (err) {
-			await alert("Erro ao ler arquivo JSON: " + (err?.message ?? String(err)));
-		} finally {
-            try {
-                if (input) input.value = '';
-            } catch {}
-		}
-	};
+            } catch (err) {
+                const message = err instanceof Error ? err.message : String(err)
+                await alert("Erro ao ler arquivo JSON: " + message);
+            } finally {
+                try {
+                    if (input) input.value = '';
+                } catch { }
+            }
+        };
         reader.readAsText(file);
     };
 
@@ -2800,7 +2822,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     return (
         <InAppNotificationsProvider
-            userId={user?.id || null}
+            userId={user?.id || undefined}
             settings={userSettingsApi?.settings ?? null}
             onOpenMessages={() => setView('chat')}
             onOpenNotifications={() => {
@@ -2808,95 +2830,95 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 setHasUnreadNotification(false);
             }}
         >
-        <InAppNotifyBinder bind={bindInAppNotify} />
-        <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
-            <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
-                <IncomingInviteModal onStartSession={handleStartSession} />
-                <InviteAcceptedModal />
-                <GuidedTour
-                    open={Boolean(tourOpen)}
-                    steps={getTourSteps({
-                        role: user?.role,
-                        hasCommunity: (userSettingsApi?.settings?.moduleCommunity !== false),
-                    })}
-                    actions={{
-                        openAdminPanel: (tab: unknown) => {
-                            try {
-                                const safe = String(tab || 'dashboard').trim() || 'dashboard'
-                                openAdminPanel(safe)
-                            } catch {}
-                        },
-                    }}
-                    onEvent={(name: unknown, payload: unknown) => {
-                        logTourEvent(name, payload)
-                    }}
-                    onComplete={async () => {
-                        setTourOpen(false)
-                        setTourBoot((prev) => ({ ...prev, completed: true, skipped: false }))
-                        try { writeLocalTourDismissal(user?.id, 'completed') } catch {}
-                        const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
-                        if (!res?.ok) {
-                            console.warn('Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
-                        }
-                        await logTourEvent('tour_completed', { version: TOUR_VERSION })
-                    }}
-                    onSkip={async () => {
-                        setTourOpen(false)
-                        setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
-                        try { writeLocalTourDismissal(user?.id, 'skipped') } catch {}
-                        const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
-                        if (!res?.ok) {
-                            console.warn('Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
-                        }
-                        await logTourEvent('tour_skipped', { version: TOUR_VERSION })
-                    }}
-                    onCancel={async () => {
-                        setTourOpen(false)
-                        setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
-                        try { writeLocalTourDismissal(user?.id, 'skipped') } catch {}
-                        const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
-                        if (!res?.ok) {
-                            console.warn('Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
-                        }
-                        await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
-                    }}
-                />
+            <InAppNotifyBinder bind={bindInAppNotify} />
+            <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
+                <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
+                    <IncomingInviteModal onStartSession={handleStartSession} />
+                    <InviteAcceptedModal />
+                    <GuidedTour
+                        open={Boolean(tourOpen)}
+                        steps={getTourSteps({
+                            role: user?.role,
+                            hasCommunity: (userSettingsApi?.settings?.moduleCommunity !== false),
+                        })}
+                        actions={{
+                            openAdminPanel: (tab: unknown) => {
+                                try {
+                                    const safe = String(tab || 'dashboard').trim() || 'dashboard'
+                                    openAdminPanel(safe)
+                                } catch { }
+                            },
+                        }}
+                        onEvent={(name: unknown, payload: unknown) => {
+                            logTourEvent(name, payload)
+                        }}
+                        onComplete={async () => {
+                            setTourOpen(false)
+                            setTourBoot((prev) => ({ ...prev, completed: true, skipped: false }))
+                            try { writeLocalTourDismissal(user?.id, 'completed') } catch { }
+                            const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
+                            if (!res?.ok) {
+                                console.warn('Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
+                            }
+                            await logTourEvent('tour_completed', { version: TOUR_VERSION })
+                        }}
+                        onSkip={async () => {
+                            setTourOpen(false)
+                            setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
+                            try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
+                            const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                            if (!res?.ok) {
+                                console.warn('Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
+                            }
+                            await logTourEvent('tour_skipped', { version: TOUR_VERSION })
+                        }}
+                        onCancel={async () => {
+                            setTourOpen(false)
+                            setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
+                            try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
+                            const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                            if (!res?.ok) {
+                                console.warn('Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
+                            }
+                            await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
+                        }}
+                    />
 
-                {/* Header */}
-                {isHeaderVisible && (
-                    <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
-                        <div 
-                            className="flex items-center cursor-pointer group"
-                            onClick={() => setView('dashboard')}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Dumbbell size={18} className="text-yellow-500 opacity-25" />
-                                <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
-                                    IRON<span className="text-yellow-500">TRACKS</span>
-                                </h1>
+                    {/* Header */}
+                    {isHeaderVisible && (
+                        <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
+                            <div
+                                className="flex items-center cursor-pointer group"
+                                onClick={() => setView('dashboard')}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <Dumbbell size={18} className="text-yellow-500 opacity-25" />
+                                    <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
+                                        IRON<span className="text-yellow-500">TRACKS</span>
+                                    </h1>
+                                </div>
+                                <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50"></div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
+                                        {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
+                                    </span>
+                                    {vipAccess?.hasVip && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setView('vip')
+                                            }}
+                                            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15"
+                                        >
+                                            <Crown size={11} className="text-yellow-500 fill-yellow-500" />
+                                            <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                            <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50"></div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
-                                    {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
-                                </span>
-                                {vipAccess?.hasVip && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setView('vip')
-                                        }}
-                                        className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15"
-                                    >
-                                        <Crown size={11} className="text-yellow-500 fill-yellow-500" />
-                                        <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-4">
+
+                            <div className="flex items-center gap-4">
                                 {(() => {
                                     const pending = Number(syncState?.pending || 0)
                                     const failed = Number(syncState?.failed || 0)
@@ -2932,898 +2954,898 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     return null
                                 })()}
                                 <HeaderActionsMenu
-                                user={user as any}
-                                isCoach={isCoach}
-                                hasUnreadChat={hasUnreadChat}
-                                hasUnreadNotification={hasUnreadNotification}
-                                onOpenAdmin={() => {
-                                    if (typeof window !== 'undefined') {
-                                        const url = new URL(window.location.href);
-                                        url.searchParams.delete('view');
-                                        window.history.replaceState({}, '', url);
-                                    }
-                                    const tab = (() => {
-                                        try {
-                                            const url = new URL(window.location.href);
-                                            const current = String(url.searchParams.get('tab') || '').trim();
-                                            if (current) return current;
-                                        } catch {}
-                                        try {
-                                            const stored = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
-                                            if (stored) return stored;
-                                        } catch {}
-                                        return 'dashboard';
-                                    })();
-                                    openAdminPanel(tab);
-                                }}
-                                onOpenChatList={() => setView('chatList')}
-                                onOpenGlobalChat={() => setView('globalChat')}
-                                onOpenHistory={() => setView('history')}
-                                onOpenNotifications={() => {
-                                    setShowNotifCenter(true);
-                                    setHasUnreadNotification(false);
-                                }}
-                                onOpenSchedule={() => router.push('/dashboard/schedule')}
-                                onOpenWallet={() => setView('vip')}
-                                onOpenSettings={() => setSettingsOpen(true)}
-                                onOpenTour={async () => {
-                                    try {
-                                        await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
-                                    } catch {}
-                                    setTourOpen(true)
-                                }}
-                                onLogout={handleLogout}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {isCoach && coachPending && (
-                    <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center">
-                        Sua conta de Professor está pendente. <button className="underline" onClick={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!'); } else { await alert('Falha ao ativar: ' + (j.error || '')); } } catch (e) { await alert('Erro: ' + (e?.message ?? String(e))); } }}>Aceitar</button>
-                    </div>
-                )}
-
-                {/* Main Content */}
-                <div
-                    className="flex-1 overflow-y-auto custom-scrollbar relative"
-                    style={({
-                        ['--dashboard-sticky-top' as unknown as keyof React.CSSProperties]: isHeaderVisible
-                            ? 'calc(4rem + env(safe-area-inset-top))'
-                            : '0px',
-                        paddingTop: isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : undefined,
-                    } as React.CSSProperties)}
-                >
-                    {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
-                        <StudentDashboard
-                            workouts={Array.isArray(workouts) ? workouts : []}
-                            profileIncomplete={Boolean(profileIncomplete)}
-                            onOpenCompleteProfile={() => setShowCompleteProfile(true)}
-                            view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
-                            onChangeView={(next: string) => setView(next)}
-                            assessmentsContent={
-                                (user?.id || initialUserObj?.id) ? (
-                                    <ErrorBoundary>
-                                        <Suspense fallback={<div className="p-4 text-neutral-400">Carregando…</div>}>
-                                            <AssessmentHistory studentId={String(user?.id || initialUserObj?.id || '')} onClose={() => setView('dashboard')} />
-                                        </Suspense>
-                                    </ErrorBoundary>
-                                ) : null
-                            }
-                            communityContent={(user?.id || initialUserObj?.id) ? <CommunityClient embedded /> : null}
-                            vipContent={
-                                <VipHub
                                     user={user as any}
-                                    locked={!vipAccess?.hasVip}
-                                    onOpenWorkoutEditor={(w: unknown) => handleEditWorkout(w)}
-                                    onOpenVipTab={() => setView('vip')}
-                                    onStartSession={(w: unknown) => handleStartSession(w)}
-                                    onOpenWizard={() => setCreateWizardOpen(true)}
+                                    isCoach={isCoach}
+                                    hasUnreadChat={hasUnreadChat}
+                                    hasUnreadNotification={hasUnreadNotification}
+                                    onOpenAdmin={() => {
+                                        if (typeof window !== 'undefined') {
+                                            const url = new URL(window.location.href);
+                                            url.searchParams.delete('view');
+                                            window.history.replaceState({}, '', url);
+                                        }
+                                        const tab = (() => {
+                                            try {
+                                                const url = new URL(window.location.href);
+                                                const current = String(url.searchParams.get('tab') || '').trim();
+                                                if (current) return current;
+                                            } catch { }
+                                            try {
+                                                const stored = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
+                                                if (stored) return stored;
+                                            } catch { }
+                                            return 'dashboard';
+                                        })();
+                                        openAdminPanel(tab);
+                                    }}
+                                    onOpenChatList={() => setView('chatList')}
+                                    onOpenGlobalChat={() => setView('globalChat')}
                                     onOpenHistory={() => setView('history')}
-                                    onOpenReport={(s: unknown) => {
-                                        setReportBackView('vip');
-                                        setReportData({ current: s, previous: null });
-                                        setView('report');
+                                    onOpenNotifications={() => {
+                                        setShowNotifCenter(true);
+                                        setHasUnreadNotification(false);
                                     }}
-                                />
-                            }
-                            vipLabel="VIP"
-                            vipLocked={!vipAccess?.hasVip}
-                            vipEnabled={true}
-                            settings={userSettingsApi?.settings ?? null}
-                            onCreateWorkout={handleCreateWorkout}
-                            onQuickView={(w) => setQuickViewWorkout(w)}
-                            onStartSession={(w) => handleStartSession(w)}
-                            onRestoreWorkout={(w) => handleRestoreWorkout(w)}
-                            onShareWorkout={(w) => handleShareWorkout(w)}
-                            onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
-                            onEditWorkout={(w) => handleEditWorkout(w)}
-                            onDeleteWorkout={(id, title) => handleDeleteWorkout(id, title)}
-                            onBulkEditWorkouts={handleBulkEditWorkouts}
-                            currentUserId={String(user?.id || initialUserObj?.id || '')}
-                            exportingAll={Boolean(exportingAll)}
-                            onExportAll={handleExportAllWorkouts}
-                            streakStats={streakStats}
-                            onOpenJsonImport={() => setShowJsonImportModal(true)}
-                            onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
-                            onNormalizeExercises={handleNormalizeExercises}
-                            onOpenDuplicates={handleOpenDuplicates}
-                            onApplyTitleRule={handleApplyTitleRule}
-                            onOpenIronScanner={async () => {
-                                try {
-                                    openManualWorkoutEditor()
-                                    await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
-                                } catch {}
-                            }}
-                        />
-                    )}
-
-                    <WorkoutWizardModal
-                        isOpen={createWizardOpen}
-                        onClose={() => setCreateWizardOpen(false)}
-                        onManual={() => openManualWorkoutEditor()}
-                        onGenerate={async (answers, options) => {
-                            const mode = String(options?.mode || 'single').trim().toLowerCase();
-                            try {
-                                const res = await fetch('/api/ai/workout-wizard', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ answers, mode }),
-                                })
-                                const data = await res.json().catch((): unknown => null)
-                                if (!res.ok) {
-                                    const msg = data?.error ? String(data.error) : 'Falha ao gerar treino com IA.'
-                                    throw new Error(msg)
-                                }
-                                if (mode === 'program') {
-                                    const drafts = Array.isArray(data?.drafts) ? data.drafts : null
-                                    if (drafts && drafts.length) return { drafts }
-                                    if (data?.ok === false && Array.isArray(data?.drafts) && data.drafts.length) return { drafts: data.drafts }
-                                    throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
-                                }
-                                const draft = data?.draft && typeof data.draft === 'object' ? data.draft : null
-                                if (draft?.exercises && Array.isArray(draft.exercises) && draft.exercises.length > 0) return draft
-                                if (data?.ok === false && data?.draft) return data.draft
-                                throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
-                            } catch (e) {
-                                const msg = e?.message ? String(e.message) : String(e)
-                                const lower = msg.toLowerCase()
-                                const isConfig = lower.includes('api de ia não configurada') || lower.includes('google_generative_ai_api_key')
-                                if (isConfig) throw e
-                                if (mode === 'program') {
-                                    const days = Math.max(2, Math.min(6, Number(answers?.daysPerWeek || 3) || 3))
-                                    const drafts: Array<Record<string, unknown>> = [];
-                                    for (let i = 0; i < days; i++) {
-                                        drafts.push(generateWorkoutFromWizard(answers, i))
-                                    }
-                                    return { drafts }
-                                }
-                                return generateWorkoutFromWizard(answers, 0)
-                            }
-                        }}
-                        onSaveDrafts={async (drafts) => {
-                            const list = Array.isArray(drafts) ? drafts : []
-                            if (!list.length) return
-                            try {
-                                for (let i = 0; i < list.length; i += 1) {
-                                    const d = list[i]
-                                    const baseTitle = String(d?.title || 'Treino').trim() || 'Treino'
-                                    const finalTitle = formatProgramWorkoutTitle(baseTitle, i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
-                                    const exercises = Array.isArray(d?.exercises) ? d.exercises : []
-                                    const res = await createWorkout({ title: finalTitle, exercises })
-                                    if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino'))
-                                }
-                                try {
-                                    await fetchWorkouts()
-                                } catch {}
-                                setCreateWizardOpen(false)
-                                await alert(`Plano salvo: ${list.length} treinos criados.`)
-                            } catch (e) {
-                                const msg = e?.message ? String(e.message) : String(e)
-                                await alert('Erro ao salvar plano: ' + msg)
-                            }
-                        }}
-                        onUseDraft={(draft) => {
-                            try {
-                                const title = String(draft?.title || '').trim() || 'Treino'
-                                const exercises = Array.isArray(draft?.exercises) ? draft.exercises : []
-                                setCurrentWorkout({ title, exercises })
-                                setView('edit')
-                            } finally {
-                                setCreateWizardOpen(false)
-                            }
-                        }}
-                    />
-
-					{view === 'edit' && (
-						<ExerciseEditor
-							workout={currentWorkout as unknown as Workout}
-							onCancel={() => setView('dashboard')}
-							onChange={(w) => setCurrentWorkout(w as unknown as any)}
-							onSave={handleSaveWorkout}
-							onSaved={() => {
-								fetchWorkouts().catch(() => {});
-								setView('dashboard');
-							}}
-						/>
-					)}
-
-                    {view === 'active' && activeSession && (
-                        <ActiveWorkout
-                            session={activeSession as unknown as any}
-                            user={user as any}
-                            settings={userSettingsApi?.settings ?? null}
-                            onUpdateLog={handleUpdateSessionLog}
-                            onFinish={handleFinishSession}
-                            onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
-                            onBack={() => setView('dashboard')}
-                            onStartTimer={handleStartTimer}
-                            isCoach={isCoach}
-                            onUpdateSession={(updates: unknown) =>
-                                setActiveSession((prev) => {
-                                    if (!prev) return prev
-                                    const u = updates && typeof updates === 'object' ? (updates as Record<string, unknown>) : {}
-                                    return { ...prev, ...(u as Partial<ActiveWorkoutSession>) }
-                                })
-                            }
-                            nextWorkout={nextWorkout}
-                            onEditWorkout={() => handleOpenActiveWorkoutEditor()}
-                            onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
-                        />
-                    )}
-
-                    {editActiveOpen && view === 'active' && editActiveDraft && (
-                        <div
-                            className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
-                            onClick={() => handleCloseActiveWorkoutEditor()}
-                        >
-                            <div
-                                className="w-full max-w-5xl h-[92vh] bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <ExerciseEditor
-                                    workout={editActiveDraft}
-                                    onCancel={() => handleCloseActiveWorkoutEditor()}
-                                    onChange={(w: unknown) => setEditActiveDraft(normalizeWorkoutForEditor(w))}
-                                    onSave={handleSaveActiveWorkoutEditor}
-                                    onSaved={() => {
-                                        fetchWorkouts().catch(() => {});
-                                        handleCloseActiveWorkoutEditor();
+                                    onOpenSchedule={() => router.push('/dashboard/schedule')}
+                                    onOpenWallet={() => setView('vip')}
+                                    onOpenSettings={() => setSettingsOpen(true)}
+                                    onOpenTour={async () => {
+                                        try {
+                                            await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
+                                        } catch { }
+                                        setTourOpen(true)
                                     }}
+                                    onLogout={handleLogout}
                                 />
                             </div>
                         </div>
                     )}
 
-                    {view === 'history' && (
-                        <HistoryList
-                            user={user as any}
-                            settings={userSettingsApi?.settings ?? null}
-                            onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
-                            onBack={() => setView('dashboard')}
-                            targetId={user?.id || ''}
-                            targetEmail={user?.email ? String(user.email) : ''}
-                            readOnly={false}
-                            title="Histórico"
-                            vipLimits={vipStatus?.limits}
-                            onUpgrade={() => setView('vip')}
-                        />
-                    )}
-
-                    {/* Evolução removida conforme solicitação */}
-
-                    {view === 'report' && reportData.current && (
-                        <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe">
-                            <WorkoutReport
-                                session={reportData.current}
-                                previousSession={reportData.previous}
-                                user={user as any}
-                                isVip={vipAccess?.hasVip}
-                                settings={userSettingsApi?.settings ?? null}
-                                onUpgrade={() => setView('vip')}
-                                onClose={() => setView(reportBackView || 'dashboard')}
-                            />
+                    {isCoach && coachPending && (
+                        <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center">
+                            Sua conta de Professor está pendente. <button className="underline" onClick={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!'); } else { await alert('Falha ao ativar: ' + (j.error || '')); } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m); } }}>Aceitar</button>
                         </div>
                     )}
 
-                    {duplicatesOpen && (
-                        <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => !duplicatesBusy && setDuplicatesOpen(false)}>
-                            <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Ferramentas</div>
-                                        <div className="text-white font-black text-lg truncate">Duplicados</div>
-                                        <div className="text-xs text-neutral-400 truncate">{Array.isArray(duplicateGroups) ? `${duplicateGroups.length} grupos` : ''}</div>
+                    {/* Main Content */}
+                    <div
+                        className="flex-1 overflow-y-auto custom-scrollbar relative"
+                        style={({
+                            ['--dashboard-sticky-top' as unknown as keyof React.CSSProperties]: isHeaderVisible
+                                ? 'calc(4rem + env(safe-area-inset-top))'
+                                : '0px',
+                            paddingTop: isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : undefined,
+                        } as React.CSSProperties)}
+                    >
+                        {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
+                            <StudentDashboard
+                                workouts={Array.isArray(workouts) ? workouts : []}
+                                profileIncomplete={Boolean(profileIncomplete)}
+                                onOpenCompleteProfile={() => setShowCompleteProfile(true)}
+                                view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
+                                onChangeView={(next: string) => setView(next)}
+                                assessmentsContent={
+                                    (user?.id || initialUserObj?.id) ? (
+                                        <ErrorBoundary>
+                                            <Suspense fallback={<div className="p-4 text-neutral-400">Carregando…</div>}>
+                                                <AssessmentHistory studentId={String(user?.id || initialUserObj?.id || '')} onClose={() => setView('dashboard')} />
+                                            </Suspense>
+                                        </ErrorBoundary>
+                                    ) : null
+                                }
+                                communityContent={(user?.id || initialUserObj?.id) ? <CommunityClient embedded /> : null}
+                                vipContent={
+                                    <VipHub
+                                        user={user as any}
+                                        locked={!vipAccess?.hasVip}
+                                        onOpenWorkoutEditor={(w: unknown) => handleEditWorkout(w)}
+                                        onOpenVipTab={() => setView('vip')}
+                                        onStartSession={(w: unknown) => handleStartSession(w)}
+                                        onOpenWizard={() => setCreateWizardOpen(true)}
+                                        onOpenHistory={() => setView('history')}
+                                        onOpenReport={(s: unknown) => {
+                                            setReportBackView('vip');
+                                            setReportData({ current: s, previous: null } as any);
+                                            setView('report');
+                                        }}
+                                    />
+                                }
+                                vipLabel="VIP"
+                                vipLocked={!vipAccess?.hasVip}
+                                vipEnabled={true}
+                                settings={userSettingsApi?.settings ?? null}
+                                onCreateWorkout={handleCreateWorkout}
+                                onQuickView={(w) => setQuickViewWorkout(w)}
+                                onStartSession={(w) => handleStartSession(w)}
+                                onRestoreWorkout={(w) => handleRestoreWorkout(w)}
+                                onShareWorkout={(w) => handleShareWorkout(w)}
+                                onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
+                                onEditWorkout={(w) => handleEditWorkout(w)}
+                                onDeleteWorkout={(id, title) => handleDeleteWorkout(id, String(title || ''))}
+                                onBulkEditWorkouts={handleBulkEditWorkouts}
+                                currentUserId={String(user?.id || initialUserObj?.id || '')}
+                                exportingAll={Boolean(exportingAll)}
+                                onExportAll={handleExportAllWorkouts}
+                                streakStats={streakStats}
+                                onOpenJsonImport={() => setShowJsonImportModal(true)}
+                                onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
+                                onNormalizeExercises={handleNormalizeExercises}
+                                onOpenDuplicates={handleOpenDuplicates}
+                                onApplyTitleRule={handleApplyTitleRule}
+                                onOpenIronScanner={async () => {
+                                    try {
+                                        openManualWorkoutEditor()
+                                        await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
+                                    } catch { }
+                                }}
+                            />
+                        )}
+
+                        <WorkoutWizardModal
+                            isOpen={createWizardOpen}
+                            onClose={() => setCreateWizardOpen(false)}
+                            onManual={() => openManualWorkoutEditor()}
+                            onGenerate={async (answers, options) => {
+                                const mode = String(options?.mode || 'single').trim().toLowerCase();
+                                try {
+                                    const res = await fetch('/api/ai/workout-wizard', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ answers, mode }),
+                                    })
+                                    const data = await res.json().catch((): unknown => null)
+                                    if (!res.ok) {
+                                        const msg = data?.error ? String(data.error) : 'Falha ao gerar treino com IA.'
+                                        throw new Error(msg)
+                                    }
+                                    if (mode === 'program') {
+                                        const drafts = Array.isArray(data?.drafts) ? data.drafts : null
+                                        if (drafts && drafts.length) return { drafts }
+                                        if (data?.ok === false && Array.isArray(data?.drafts) && data.drafts.length) return { drafts: data.drafts }
+                                        throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
+                                    }
+                                    const draft = data?.draft && typeof data.draft === 'object' ? data.draft : null
+                                    if (draft?.exercises && Array.isArray(draft.exercises) && draft.exercises.length > 0) return draft
+                                    if (data?.ok === false && data?.draft) return data.draft
+                                    throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
+                                } catch (e) {
+                                    const msg = e?.message ? String(e.message) : String(e)
+                                    const lower = msg.toLowerCase()
+                                    const isConfig = lower.includes('api de ia não configurada') || lower.includes('google_generative_ai_api_key')
+                                    if (isConfig) throw e
+                                    if (mode === 'program') {
+                                        const days = Math.max(2, Math.min(6, Number(answers?.daysPerWeek || 3) || 3))
+                                        const drafts: Array<Record<string, unknown>> = [];
+                                        for (let i = 0; i < days; i++) {
+                                            drafts.push(generateWorkoutFromWizard(answers, i))
+                                        }
+                                        return { drafts }
+                                    }
+                                    return generateWorkoutFromWizard(answers, 0)
+                                }
+                            }}
+                            onSaveDrafts={async (drafts) => {
+                                const list = Array.isArray(drafts) ? drafts : []
+                                if (!list.length) return
+                                try {
+                                    for (let i = 0; i < list.length; i += 1) {
+                                        const d = list[i]
+                                        const baseTitle = String(d?.title || 'Treino').trim() || 'Treino'
+                                        const finalTitle = formatProgramWorkoutTitle(baseTitle, i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
+                                        const exercises = Array.isArray(d?.exercises) ? d.exercises : []
+                                        const res = await createWorkout({ title: finalTitle, exercises })
+                                        if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino'))
+                                    }
+                                    try {
+                                        await fetchWorkouts()
+                                    } catch { }
+                                    setCreateWizardOpen(false)
+                                    await alert(`Plano salvo: ${list.length} treinos criados.`)
+                                } catch (e) {
+                                    const msg = e?.message ? String(e.message) : String(e)
+                                    await alert('Erro ao salvar plano: ' + msg)
+                                }
+                            }}
+                            onUseDraft={(draft) => {
+                                try {
+                                    const title = String(draft?.title || '').trim() || 'Treino'
+                                    const exercises = Array.isArray(draft?.exercises) ? draft.exercises : []
+                                    setCurrentWorkout({ title, exercises })
+                                    setView('edit')
+                                } finally {
+                                    setCreateWizardOpen(false)
+                                }
+                            }}
+                        />
+
+                        {view === 'edit' && (
+                            <ExerciseEditor
+                                workout={currentWorkout as unknown as Workout}
+                                onCancel={() => setView('dashboard')}
+                                onChange={(w) => setCurrentWorkout(w as unknown as any)}
+                                onSave={handleSaveWorkout}
+                                onSaved={() => {
+                                    fetchWorkouts().catch(() => { });
+                                    setView('dashboard');
+                                }}
+                            />
+                        )}
+
+                        {view === 'active' && activeSession && (
+                            <ActiveWorkout
+                                session={activeSession as unknown as any}
+                                user={user as any}
+                                settings={userSettingsApi?.settings ?? null}
+                                onUpdateLog={handleUpdateSessionLog}
+                                onFinish={handleFinishSession}
+                                onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
+                                onBack={() => setView('dashboard')}
+                                onStartTimer={handleStartTimer}
+                                isCoach={isCoach}
+                                onUpdateSession={(updates: unknown) =>
+                                    setActiveSession((prev) => {
+                                        if (!prev) return prev
+                                        const u = updates && typeof updates === 'object' ? (updates as Record<string, unknown>) : {}
+                                        return { ...prev, ...(u as Partial<ActiveWorkoutSession>) }
+                                    })
+                                }
+                                nextWorkout={nextWorkout}
+                                onEditWorkout={() => handleOpenActiveWorkoutEditor()}
+                                onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
+                            />
+                        )}
+
+                        {editActiveOpen && view === 'active' && editActiveDraft && (
+                            <div
+                                className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
+                                onClick={() => handleCloseActiveWorkoutEditor()}
+                            >
+                                <div
+                                    className="w-full max-w-5xl h-[92vh] bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <ExerciseEditor
+                                        workout={editActiveDraft}
+                                        onCancel={() => handleCloseActiveWorkoutEditor()}
+                                        onChange={(w: unknown) => setEditActiveDraft(normalizeWorkoutForEditor(w))}
+                                        onSave={handleSaveActiveWorkoutEditor}
+                                        onSaved={() => {
+                                            fetchWorkouts().catch(() => { });
+                                            handleCloseActiveWorkoutEditor();
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'history' && (
+                            <HistoryList
+                                user={user as any}
+                                settings={userSettingsApi?.settings ?? null}
+                                onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
+                                onBack={() => setView('dashboard')}
+                                targetId={user?.id || ''}
+                                targetEmail={user?.email ? String(user.email) : ''}
+                                readOnly={false}
+                                title="Histórico"
+                                vipLimits={vipStatus?.limits}
+                                onUpgrade={() => setView('vip')}
+                            />
+                        )}
+
+                        {/* Evolução removida conforme solicitação */}
+
+                        {view === 'report' && reportData.current && (
+                            <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe">
+                                <WorkoutReport
+                                    session={reportData.current}
+                                    previousSession={reportData.previous}
+                                    user={user as any}
+                                    isVip={vipAccess?.hasVip}
+                                    settings={userSettingsApi?.settings ?? null}
+                                    onUpgrade={() => setView('vip')}
+                                    onClose={() => setView(reportBackView || 'dashboard')}
+                                />
+                            </div>
+                        )}
+
+                        {duplicatesOpen && (
+                            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => !duplicatesBusy && setDuplicatesOpen(false)}>
+                                <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Ferramentas</div>
+                                            <div className="text-white font-black text-lg truncate">Duplicados</div>
+                                            <div className="text-xs text-neutral-400 truncate">{Array.isArray(duplicateGroups) ? `${duplicateGroups.length} grupos` : ''}</div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setDuplicatesOpen(false)}
+                                            disabled={duplicatesBusy}
+                                            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center disabled:opacity-50"
+                                            aria-label="Fechar"
+                                        >
+                                            <X size={18} />
+                                        </button>
                                     </div>
+                                    <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                                        {(Array.isArray(duplicateGroups) ? duplicateGroups : []).map((g, idx) => {
+                                            const items = Array.isArray(g?.items) ? g.items : []
+                                            const score = Number(g?.score || 0)
+                                            const base = items[0]
+                                            return (
+                                                <div key={`dup-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Similaridade</div>
+                                                            <div className="text-white font-black truncate">{String((base as Record<string, unknown>)?.title ?? 'Treino')}</div>
+                                                            <div className="text-xs text-neutral-400">{Math.round(score * 100)}%</div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                disabled={duplicatesBusy}
+                                                                onClick={() => handleMergeDuplicateGroup(g)}
+                                                                className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-50"
+                                                            >
+                                                                Mesclar
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                disabled={duplicatesBusy}
+                                                                onClick={() => handleArchiveDuplicateGroup(g)}
+                                                                className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
+                                                            >
+                                                                Arquivar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-3 space-y-2">
+                                                        {items.map((w: unknown, wi: number) => {
+                                                            const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                                            const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
+                                                            return (
+                                                                <div key={`dup-item-${idx}-${wi}`} className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900/40 border border-neutral-800 px-3 py-2">
+                                                                    <div className="min-w-0">
+                                                                        <div className="text-sm font-bold text-white truncate">{String(wo?.title || 'Treino')}</div>
+                                                                        <div className="text-[11px] text-neutral-500 font-mono">{exCount} EXERCÍCIOS</div>
+                                                                    </div>
+                                                                    <div className="text-[11px] font-bold text-neutral-500">{wi === 0 ? 'BASE' : 'DUP'}</div>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {showExportModal && exportWorkout && (
+                            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
+                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                                        <h3 className="font-bold text-white">Como deseja exportar?</h3>
+                                        <BackButton onClick={() => setShowExportModal(false)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <button onClick={handleExportPdf} className="w-full px-4 py-3 bg-yellow-500 text-black font-bold rounded-xl">Baixar PDF</button>
+                                        <button onClick={handleExportJson} className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl">Baixar JSON</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {openStudent && (
+                            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpenStudent(null)}>
+                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                                        <h3 className="font-bold text-white">Treinos de {String((isRecord(openStudent) ? openStudent.name : '') ?? '')}</h3>
+                                        <BackButton onClick={() => setOpenStudent(null)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
+                                    </div>
+                                    <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto">
+                                        {(() => {
+                                            const s = isRecord(openStudent) ? openStudent : {}
+                                            const list = Array.isArray(s.workouts) ? s.workouts : []
+                                            if (list.length !== 0) return null
+                                            return (
+                                                <p className="text-neutral-500 text-sm">Nenhum treino encontrado.</p>
+                                            )
+                                        })()}
+                                        {(() => {
+                                            const s = isRecord(openStudent) ? openStudent : {}
+                                            const list = Array.isArray(s.workouts) ? s.workouts : []
+                                            return list.map((w: unknown, idx: number) => {
+                                                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                                const id = String(wo?.id || '').trim() || `w-${idx}`
+                                                const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
+                                                return (
+                                                    <div key={id} className="p-3 rounded-xl border border-neutral-700 bg-neutral-800">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-white font-bold text-sm">{String(wo?.title || '')}</span>
+                                                            <span className="text-xs text-neutral-400">{exCount} exercícios</span>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'chat' && (
+                            <div className="absolute inset-0 z-50 bg-neutral-900">
+                                <ChatScreen user={user as any} onClose={() => setView('dashboard')} />
+                            </div>
+                        )}
+
+                        {view === 'globalChat' && (
+                            <div className="absolute inset-0 z-50 bg-neutral-900">
+                                <ChatScreen user={user as any} onClose={() => setView('dashboard')} />
+                            </div>
+                        )}
+
+                        {view === 'chatList' && (
+                            <div className="absolute inset-0 z-50 bg-neutral-900">
+                                <ChatListScreen
+                                    user={user as any}
+                                    onClose={() => setView('dashboard')}
+                                    onSelectUser={() => { }}
+                                    onSelectChannel={(c: unknown) => {
+                                        const ch = isRecord(c) ? c : {}
+                                        const channelId = String(ch.channel_id ?? ch.channelId ?? '')
+                                        const otherUserId = String(ch.other_user_id ?? ch.otherUserId ?? ch.user_id ?? ch.userId ?? '')
+                                        const otherUserName = String(ch.other_user_name ?? ch.otherUserName ?? ch.displayName ?? '')
+                                        const photoUrlRaw = ch.other_user_photo ?? ch.otherUserPhoto ?? ch.photoUrl ?? null
+                                        const photoUrl = photoUrlRaw != null ? String(photoUrlRaw) : null
+                                        setDirectChat({
+                                            channelId,
+                                            userId: otherUserId,
+                                            displayName: otherUserName || undefined,
+                                            photoUrl,
+                                            other_user_id: otherUserId,
+                                            other_user_name: otherUserName || undefined,
+                                            other_user_photo: photoUrl,
+                                        })
+                                        setView('directChat')
+                                    }}
+                                />
+                            </div>
+                        )}
+
+                        {view === 'directChat' && directChat && (
+                            <div className="absolute inset-0 z-50 bg-neutral-900">
+                                <ChatDirectScreen
+                                    user={user as any}
+                                    targetUser={directChat}
+                                    otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
+                                    otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
+                                    otherUserPhoto={directChat.other_user_photo ?? directChat.photoUrl ?? null}
+                                    onClose={() => setView('chatList')}
+                                />
+                            </div>
+                        )}
+
+                        {view === 'admin' && (
+                            <div className="fixed inset-0 z-[60]">
+                                <AdminPanelV2 user={user as any} onClose={() => setView('dashboard')} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Modals & Overlays */}
+                    {showCompleteProfile && (
+                        <div className="fixed inset-0 z-[85] bg-black/80 flex items-center justify-center p-4">
+                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <h3 className="font-black text-white">Completar Perfil</h3>
                                     <button
                                         type="button"
-                                        onClick={() => setDuplicatesOpen(false)}
-                                        disabled={duplicatesBusy}
-                                        className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center disabled:opacity-50"
+                                        onClick={() => setShowCompleteProfile(false)}
+                                        className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
                                         aria-label="Fechar"
                                     >
                                         <X size={18} />
                                     </button>
                                 </div>
-                                <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                                    {(Array.isArray(duplicateGroups) ? duplicateGroups : []).map((g, idx) => {
-                                        const items = Array.isArray(g?.items) ? g.items : []
-                                        const score = Number(g?.score || 0)
-                                        const base = items[0]
+
+                                <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">
+                                    Nome de Exibição
+                                </label>
+                                <input
+                                    value={profileDraftName}
+                                    onChange={(e) => setProfileDraftName(e.target.value)}
+                                    placeholder="Ex: João Silva"
+                                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
+                                />
+
+                                <div className="flex gap-2 mt-5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCompleteProfile(false)}
+                                        disabled={savingProfile}
+                                        className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleSaveProfile}
+                                        disabled={savingProfile}
+                                        className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50"
+                                    >
+                                        {savingProfile ? 'Salvando...' : 'Salvar'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showImportModal && (
+                        <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
+                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
+                                <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
+                                <input
+                                    value={importCode}
+                                    onChange={e => setImportCode(e.target.value)}
+                                    placeholder="Cole o código do treino aqui"
+                                    className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase"
+                                />
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
+                                    <button onClick={handleImportWorkout} className="flex-1 p-3 bg-blue-600 rounded-xl font-bold text-white">Importar</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showJsonImportModal && (
+                        <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
+                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
+                                <Upload size={48} className="mx-auto text-blue-500 mb-4" />
+                                <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
+                                <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
+
+                                <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
+                                    Selecionar Arquivo
+                                    <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
+                                </label>
+
+                                <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {shareCode && (
+                        <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
+                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
+                                <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black"><Check size={32} /></div>
+                                <h3 className="font-bold text-white mb-2">Link Gerado!</h3>
+                                <p className="text-neutral-400 text-sm mb-6">Envie este código para seu aluno ou amigo.</p>
+                                <div className="bg-black p-4 rounded-xl font-mono text-yellow-500 text-xl mb-4 tracking-widest select-all">
+                                    {shareCode}
+                                </div>
+                                <button onClick={() => setShareCode(null)} className="w-full p-3 bg-neutral-800 rounded-xl font-bold text-white">Fechar</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {quickViewWorkout && (
+                        <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQuickViewWorkout(null)}>
+                            <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                <div className="p-4 flex justify-between items-center border-b border-neutral-800">
+                                    <h3 className="font-bold text-white">{String(quickViewWorkout?.title || '')}</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setQuickViewWorkout(null)}
+                                        className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors py-2 px-3 rounded-xl hover:bg-neutral-800 active:opacity-70"
+                                        aria-label="Voltar"
+                                    >
+                                        <ArrowLeft size={20} />
+                                        <span className="font-semibold text-sm">Voltar</span>
+                                    </button>
+                                </div>
+                                <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+                                    {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex: unknown, idx: number) => {
+                                        const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
                                         return (
-                                            <div key={`dup-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-4">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <div className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Similaridade</div>
-                                                        <div className="text-white font-black truncate">{String((base as Record<string, unknown>)?.title ?? 'Treino')}</div>
-                                                        <div className="text-xs text-neutral-400">{Math.round(score * 100)}%</div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            disabled={duplicatesBusy}
-                                                            onClick={() => handleMergeDuplicateGroup(g)}
-                                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-50"
-                                                        >
-                                                            Mesclar
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            disabled={duplicatesBusy}
-                                                            onClick={() => handleArchiveDuplicateGroup(g)}
-                                                            className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
-                                                        >
-                                                            Arquivar
-                                                        </button>
-                                                    </div>
+                                            <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
+                                                <div className="flex justify-between items-center">
+                                                    <h4 className="font-bold text-white text-sm">{String(e?.name || '—')}</h4>
+                                                    <span className="text-xs text-neutral-400">{(parseInt(String(e?.sets ?? '')) || 0)} x {String(e?.reps || '-')}</span>
                                                 </div>
-                                                <div className="mt-3 space-y-2">
-                                                    {items.map((w: unknown, wi: number) => {
-                                                        const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                                        const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
-                                                        return (
-                                                            <div key={`dup-item-${idx}-${wi}`} className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900/40 border border-neutral-800 px-3 py-2">
-                                                                <div className="min-w-0">
-                                                                    <div className="text-sm font-bold text-white truncate">{String(wo?.title || 'Treino')}</div>
-                                                                    <div className="text-[11px] text-neutral-500 font-mono">{exCount} EXERCÍCIOS</div>
-                                                                </div>
-                                                                <div className="text-[11px] font-bold text-neutral-500">{wi === 0 ? 'BASE' : 'DUP'}</div>
-                                                            </div>
-                                                        )
-                                                    })}
+                                                <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
+                                                    <Clock size={14} className="text-yellow-500" /><span>Descanso: {e?.restTime ? `${parseInt(String(e.restTime))}s` : '-'}</span>
                                                 </div>
+                                                {e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
                                             </div>
                                         )
                                     })}
+                                    {(!Array.isArray(quickViewWorkout?.exercises) || quickViewWorkout.exercises.length === 0) && (
+                                        <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
+                                    )}
+                                </div>
+                                <div className="p-4 border-t border-neutral-800 flex gap-2">
+                                    <button onClick={() => { const w = quickViewWorkout; setQuickViewWorkout(null); handleStartSession(w); }} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl">Iniciar Treino</button>
+                                    <button onClick={() => setQuickViewWorkout(null)} className="flex-1 p-3 bg-neutral-800 text-white font-bold rounded-xl">Fechar</button>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {showExportModal && exportWorkout && (
-                        <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
+                    {showNotifCenter && (
+                        <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setShowNotifCenter(false)}>
                             <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                    <h3 className="font-bold text-white">Como deseja exportar?</h3>
-                                    <BackButton onClick={() => setShowExportModal(false)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
-                                </div>
-                                <div className="p-4 space-y-3">
-                                    <button onClick={handleExportPdf} className="w-full px-4 py-3 bg-yellow-500 text-black font-bold rounded-xl">Baixar PDF</button>
-                                    <button onClick={handleExportJson} className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl">Baixar JSON</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {openStudent && (
-                        <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpenStudent(null)}>
-                            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                    <h3 className="font-bold text-white">Treinos de {String((isRecord(openStudent) ? openStudent.name : '') ?? '')}</h3>
-                                    <BackButton onClick={() => setOpenStudent(null)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
-                                </div>
-                                <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto">
-                                    {(() => {
-                                        const s = isRecord(openStudent) ? openStudent : {}
-                                        const list = Array.isArray(s.workouts) ? s.workouts : []
-                                        if (list.length !== 0) return null
-                                        return (
-                                        <p className="text-neutral-500 text-sm">Nenhum treino encontrado.</p>
-                                        )
-                                    })()}
-                                    {(() => {
-                                        const s = isRecord(openStudent) ? openStudent : {}
-                                        const list = Array.isArray(s.workouts) ? s.workouts : []
-                                        return list.map((w: unknown, idx: number) => {
-                                        const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                        const id = String(wo?.id || '').trim() || `w-${idx}`
-                                        const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
-                                        return (
-                                            <div key={id} className="p-3 rounded-xl border border-neutral-700 bg-neutral-800">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-white font-bold text-sm">{String(wo?.title || '')}</span>
-                                                    <span className="text-xs text-neutral-400">{exCount} exercícios</span>
-                                                </div>
-                                            </div>
-                                        )
-                                        })
-                                    })()}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {view === 'chat' && (
-                        <div className="absolute inset-0 z-50 bg-neutral-900">
-                            <ChatScreen user={user as any} onClose={() => setView('dashboard')} />
-                        </div>
-                    )}
-
-                    {view === 'globalChat' && (
-                        <div className="absolute inset-0 z-50 bg-neutral-900">
-                            <ChatScreen user={user as any} onClose={() => setView('dashboard')} />
-                        </div>
-                    )}
-
-                    {view === 'chatList' && (
-                        <div className="absolute inset-0 z-50 bg-neutral-900">
-                            <ChatListScreen
-                                user={user as any}
-                                onClose={() => setView('dashboard')}
-                                onSelectUser={() => {}}
-                                onSelectChannel={(c: unknown) => {
-                                    const ch = isRecord(c) ? c : {}
-                                    const channelId = String(ch.channel_id ?? ch.channelId ?? '')
-                                    const otherUserId = String(ch.other_user_id ?? ch.otherUserId ?? ch.user_id ?? ch.userId ?? '')
-                                    const otherUserName = String(ch.other_user_name ?? ch.otherUserName ?? ch.displayName ?? '')
-                                    const photoUrlRaw = ch.other_user_photo ?? ch.otherUserPhoto ?? ch.photoUrl ?? null
-                                    const photoUrl = photoUrlRaw != null ? String(photoUrlRaw) : null
-                                    setDirectChat({
-                                        channelId,
-                                        userId: otherUserId,
-                                        displayName: otherUserName || undefined,
-                                        photoUrl,
-                                        other_user_id: otherUserId,
-                                        other_user_name: otherUserName || undefined,
-                                        other_user_photo: photoUrl,
-                                    })
-                                    setView('directChat')
-                                }}
-                            />
-                        </div>
-                    )}
-
-                    {view === 'directChat' && directChat && (
-                        <div className="absolute inset-0 z-50 bg-neutral-900">
-                            <ChatDirectScreen
-                                user={user as any}
-                                targetUser={directChat}
-                                otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
-                                otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
-                                otherUserPhoto={directChat.other_user_photo ?? directChat.photoUrl ?? null}
-                                onClose={() => setView('chatList')}
-                            />
-                        </div>
-                    )}
-
-                    {view === 'admin' && (
-                        <div className="fixed inset-0 z-[60]">
-                            <AdminPanelV2 user={user as any} onClose={() => setView('dashboard')} />
-                        </div>
-                    )}
-                </div>
-
-                {/* Modals & Overlays */}
-                {showCompleteProfile && (
-                    <div className="fixed inset-0 z-[85] bg-black/80 flex items-center justify-center p-4">
-                        <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
-                            <div className="flex items-center justify-between gap-3 mb-4">
-                                <h3 className="font-black text-white">Completar Perfil</h3>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCompleteProfile(false)}
-                                    className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
-                                    aria-label="Fechar"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-
-                            <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">
-                                Nome de Exibição
-                            </label>
-                            <input
-                                value={profileDraftName}
-                                onChange={(e) => setProfileDraftName(e.target.value)}
-                                placeholder="Ex: João Silva"
-                                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
-                            />
-
-                            <div className="flex gap-2 mt-5">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCompleteProfile(false)}
-                                    disabled={savingProfile}
-                                    className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleSaveProfile}
-                                    disabled={savingProfile}
-                                    className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50"
-                                >
-                                    {savingProfile ? 'Salvando...' : 'Salvar'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                {showImportModal && (
-                    <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
-                        <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
-                            <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
-                            <input
-                                value={importCode}
-                                onChange={e => setImportCode(e.target.value)}
-                                placeholder="Cole o código do treino aqui"
-                                className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase"
-                            />
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
-                                <button onClick={handleImportWorkout} className="flex-1 p-3 bg-blue-600 rounded-xl font-bold text-white">Importar</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
-                {showJsonImportModal && (
-                     <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
-                        <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
-                            <Upload size={48} className="mx-auto text-blue-500 mb-4" />
-                            <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
-                            <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
-                            
-                            <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
-                                Selecionar Arquivo
-                                <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
-                            </label>
-                            
-                            <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
-                        </div>
-                    </div>
-                )}
-
-                {shareCode && (
-                    <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
-                        <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
-                            <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black"><Check size={32} /></div>
-                            <h3 className="font-bold text-white mb-2">Link Gerado!</h3>
-                            <p className="text-neutral-400 text-sm mb-6">Envie este código para seu aluno ou amigo.</p>
-                            <div className="bg-black p-4 rounded-xl font-mono text-yellow-500 text-xl mb-4 tracking-widest select-all">
-                                {shareCode}
-                            </div>
-                            <button onClick={() => setShareCode(null)} className="w-full p-3 bg-neutral-800 rounded-xl font-bold text-white">Fechar</button>
-                        </div>
-                    </div>
-                )}
-
-                {quickViewWorkout && (
-                    <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQuickViewWorkout(null)}>
-                        <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            <div className="p-4 flex justify-between items-center border-b border-neutral-800">
-                                <h3 className="font-bold text-white">{String(quickViewWorkout?.title || '')}</h3>
-                                <button
-                                    type="button"
-                                    onClick={() => setQuickViewWorkout(null)}
-                                    className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors py-2 px-3 rounded-xl hover:bg-neutral-800 active:opacity-70"
-                                    aria-label="Voltar"
-                                >
-                                    <ArrowLeft size={20} />
-                                    <span className="font-semibold text-sm">Voltar</span>
-                                </button>
-                            </div>
-                            <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
-                                {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex: unknown, idx: number) => {
-                                    const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                    return (
-                                        <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
-                                            <div className="flex justify-between items-center">
-                                                <h4 className="font-bold text-white text-sm">{String(e?.name || '—')}</h4>
-                                                <span className="text-xs text-neutral-400">{(parseInt(String(e?.sets ?? '')) || 0)} x {String(e?.reps || '-')}</span>
-                                            </div>
-                                            <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
-                                                <Clock size={14} className="text-yellow-500" /><span>Descanso: {e?.restTime ? `${parseInt(String(e.restTime))}s` : '-'}</span>
-                                            </div>
-                                            {e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
-                                        </div>
-                                    )
-                                })}
-                                {(!Array.isArray(quickViewWorkout?.exercises) || quickViewWorkout.exercises.length === 0) && (
-                                    <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
-                                )}
-                            </div>
-                            <div className="p-4 border-t border-neutral-800 flex gap-2">
-                                <button onClick={() => { const w = quickViewWorkout; setQuickViewWorkout(null); handleStartSession(w); }} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl">Iniciar Treino</button>
-                                <button onClick={() => setQuickViewWorkout(null)} className="flex-1 p-3 bg-neutral-800 text-white font-bold rounded-xl">Fechar</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {showNotifCenter && (
-                    <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setShowNotifCenter(false)}>
-                        <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            <div className="p-4 flex justify-between items-center border-b border-neutral-800">
-                                <h3 className="font-bold text-white">Notificações</h3>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowNotifCenter(false)}
-                                    className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
-                                    aria-label="Fechar"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-                            <div className="p-4 relative">
-                                <NotificationCenter user={user as any} onStartSession={handleStartSession} embedded initialOpen />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {activeSession?.timerTargetTime && (
-                    <RestTimerOverlay
-                        targetTime={activeSession.timerTargetTime}
-                        context={activeSession.timerContext}
-                        settings={userSettingsApi?.settings ?? null}
-                        onClose={handleCloseTimer}
-                        onFinish={handleCloseTimer}
-                    />
-                )}
-
-                {activeSession && view !== 'active' && (
-                    <div className="fixed bottom-0 left-0 right-0 z-[1100]">
-                        <div className="bg-neutral-900/95 backdrop-blur border-t border-neutral-800 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
-                            <div className="flex items-center gap-4">
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-bold text-white truncate">{activeSession.workout?.title || 'Treino em andamento'}</h3>
-                                    <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
-                                        <span className="font-mono text-yellow-500">{(() => { const end = sessionTicker || activeSession.startedAt; const s = Math.max(0, Math.floor((end - activeSession.startedAt) / 1000)); const m = Math.floor(s/60), sec = s%60; return `${m}:${String(sec).padStart(2,'0')}`; })()}</span>
-                                        <span className="text-neutral-500">tempo atual</span>
-                                        <span className="opacity-30">•</span>
-                                        <span className="font-mono text-neutral-200">{(() => { const list = Array.isArray(activeSession.workout?.exercises) ? activeSession.workout.exercises : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>
-                                        <span className="text-neutral-500">estimado total</span>
-                                    </div>
-                                    <div className="h-1 bg-neutral-700 rounded-full overflow-hidden mt-2">
-                                        {(() => {
-                                            const exCount = (activeSession.workout?.exercises || []).length;
-                                            let percent = 0;
-                                            if (exCount) {
-                                                const done = new Set();
-                                                if (activeSession.logs) {
-                                                    Object.keys(activeSession.logs).forEach(k => {
-                                                        const i = parseInt(k.split('-')[0]) || 0;
-                                                        done.add(i);
-                                                    });
-                                                }
-                                                const current = Math.min(done.size, exCount);
-                                                percent = Math.round((current / exCount) * 100);
-                                            }
-                                            return <div className="h-full bg-yellow-500" style={{ width: `${percent}%` }}></div>
-                                        })()}
-                                    </div>
-                                </div>
-                                <button className="shrink-0 px-4 py-2 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400" onClick={() => setView('active')}>Voltar pro treino</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Admin Panel Modal controlled by State */}
-                {showAdminPanel && (
-                    <AdminPanelV2 user={user as any} onClose={closeAdminPanel} />
-                )}
-
-                {whatsNewOpen && (
-                    <WhatsNewModal
-                        isOpen={whatsNewOpen}
-                        entry={pendingUpdate ? null : getLatestWhatsNew()}
-                        update={pendingUpdate ? {
-                            id: String(pendingUpdate?.id || ''),
-                            version: pendingUpdate?.version || null,
-                            title: String(pendingUpdate?.title || ''),
-                            description: String(pendingUpdate?.description || ''),
-                            release_date: String(pendingUpdate?.release_date || pendingUpdate?.releaseDate || '') || null,
-                        } : null}
-                        onClose={closeWhatsNew}
-                    />
-                )}
-
-                {preCheckinOpen && (
-                    <div
-                        className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-                        onClick={() => {
-                            setPreCheckinOpen(false)
-                            const r = preCheckinResolveRef.current
-                            preCheckinResolveRef.current = null
-                            if (typeof r === 'function') r(null)
-                        }}
-                    >
-                        <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
-                                    <div className="text-white font-black text-lg truncate">Pré-treino</div>
-                                    <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setPreCheckinOpen(false)
-                                        const r = preCheckinResolveRef.current
-                                        preCheckinResolveRef.current = null
-                                        if (typeof r === 'function') r(null)
-                                    }}
-                                    className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-                                    aria-label="Fechar"
-                                >
-                                    <X size={18} />
-                                </button>
-                            </div>
-                            <div className="p-4 space-y-4">
-                                <div className="space-y-2">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Energia (1–5)</div>
-                                    <div className="grid grid-cols-5 gap-2">
-                                        {[1, 2, 3, 4, 5].map((n) => (
-                                            <button
-                                                key={n}
-                                                type="button"
-                                                onClick={() => setPreCheckinDraft((prev) => ({ ...prev, energy: String(n) }))}
-                                                className={
-                                                    String(preCheckinDraft?.energy || '') === String(n)
-                                                        ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                                                        : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                                                }
-                                            >
-                                                {n}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
-                                    <select
-                                        value={String(preCheckinDraft?.soreness ?? '')}
-                                        onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
-                                        className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                                <div className="p-4 flex justify-between items-center border-b border-neutral-800">
+                                    <h3 className="font-bold text-white">Notificações</h3>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNotifCenter(false)}
+                                        className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                                        aria-label="Fechar"
                                     >
-                                        <option value="">Não informar</option>
-                                        {Array.from({ length: 11 }).map((_, i) => (
-                                            <option key={i} value={String(i)}>
-                                                {i}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <X size={18} />
+                                    </button>
                                 </div>
-
-                                <div className="space-y-2">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tempo disponível</div>
-                                    <div className="grid grid-cols-5 gap-2">
-                                        {[30, 45, 60, 90, 120].map((n) => (
-                                            <button
-                                                key={n}
-                                                type="button"
-                                                onClick={() => setPreCheckinDraft((prev) => ({ ...prev, timeMinutes: String(n) }))}
-                                                className={
-                                                    String(preCheckinDraft?.timeMinutes || '') === String(n)
-                                                        ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                                                        : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                                                }
-                                            >
-                                                {n}m
-                                            </button>
-                                        ))}
-                                    </div>
+                                <div className="p-4 relative">
+                                    <NotificationCenter user={user as any} onStartSession={handleStartSession} embedded initialOpen />
                                 </div>
-
-                                <div className="space-y-2">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
-                                    <textarea
-                                        value={String(preCheckinDraft?.notes || '')}
-                                        onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
-                                        className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                                        placeholder="Ex.: pouco sono, dor no joelho, viagem…"
-                                    />
-                                </div>
-                            </div>
-                            <div className="p-4 border-t border-neutral-800 flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setPreCheckinOpen(false)
-                                        const r = preCheckinResolveRef.current
-                                        preCheckinResolveRef.current = null
-                                        if (typeof r === 'function') r(null)
-                                    }}
-                                    className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
-                                >
-                                    Pular
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setPreCheckinOpen(false)
-                                        const r = preCheckinResolveRef.current
-                                        preCheckinResolveRef.current = null
-                                        if (typeof r === 'function') r(preCheckinDraft)
-                                    }}
-                                    className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
-                                >
-                                    Continuar
-                                </button>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                {settingsOpen && (
-                    <SettingsModal
-                        isOpen={settingsOpen}
-                        onClose={() => setSettingsOpen(false)}
-                        settings={userSettingsApi?.settings ?? null}
-                        userRole={user?.role || ''}
-                        saving={Boolean(userSettingsApi?.saving)}
-                        onOpenWhatsNew={async () => {
-                            setSettingsOpen(false)
-                            if (!pendingUpdate) {
+                    {activeSession?.timerTargetTime && (
+                        <RestTimerOverlay
+                            targetTime={activeSession.timerTargetTime}
+                            context={activeSession.timerContext}
+                            settings={userSettingsApi?.settings ?? null}
+                            onClose={handleCloseTimer}
+                            onFinish={handleCloseTimer}
+                        />
+                    )}
+
+                    {activeSession && view !== 'active' && (
+                        <div className="fixed bottom-0 left-0 right-0 z-[1100]">
+                            <div className="bg-neutral-900/95 backdrop-blur border-t border-neutral-800 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-white truncate">{activeSession.workout?.title || 'Treino em andamento'}</h3>
+                                        <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
+                                            <span className="font-mono text-yellow-500">{(() => { const end = sessionTicker || activeSession.startedAt; const s = Math.max(0, Math.floor((end - activeSession.startedAt) / 1000)); const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
+                                            <span className="text-neutral-500">tempo atual</span>
+                                            <span className="opacity-30">•</span>
+                                            <span className="font-mono text-neutral-200">{(() => { const list = Array.isArray(activeSession.workout?.exercises) ? activeSession.workout.exercises : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>
+                                            <span className="text-neutral-500">estimado total</span>
+                                        </div>
+                                        <div className="h-1 bg-neutral-700 rounded-full overflow-hidden mt-2">
+                                            {(() => {
+                                                const exCount = (activeSession.workout?.exercises || []).length;
+                                                let percent = 0;
+                                                if (exCount) {
+                                                    const done = new Set();
+                                                    if (activeSession.logs) {
+                                                        Object.keys(activeSession.logs).forEach(k => {
+                                                            const i = parseInt(k.split('-')[0]) || 0;
+                                                            done.add(i);
+                                                        });
+                                                    }
+                                                    const current = Math.min(done.size, exCount);
+                                                    percent = Math.round((current / exCount) * 100);
+                                                }
+                                                return <div className="h-full bg-yellow-500" style={{ width: `${percent}%` }}></div>
+                                            })()}
+                                        </div>
+                                    </div>
+                                    <button className="shrink-0 px-4 py-2 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400" onClick={() => setView('active')}>Voltar pro treino</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Admin Panel Modal controlled by State */}
+                    {showAdminPanel && (
+                        <AdminPanelV2 user={user as any} onClose={closeAdminPanel} />
+                    )}
+
+                    {whatsNewOpen && (
+                        <WhatsNewModal
+                            isOpen={whatsNewOpen}
+                            entry={pendingUpdate ? null : getLatestWhatsNew()}
+                            update={pendingUpdate ? {
+                                id: String(pendingUpdate?.id || ''),
+                                version: pendingUpdate?.version || null,
+                                title: String(pendingUpdate?.title || ''),
+                                description: String(pendingUpdate?.description || ''),
+                                release_date: String(pendingUpdate?.release_date || pendingUpdate?.releaseDate || '') || null,
+                            } : null}
+                            onClose={closeWhatsNew}
+                        />
+                    )}
+
+                    {preCheckinOpen && (
+                        <div
+                            className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+                            onClick={() => {
+                                setPreCheckinOpen(false)
+                                const r = preCheckinResolveRef.current
+                                preCheckinResolveRef.current = null
+                                if (typeof r === 'function') r(null)
+                            }}
+                        >
+                            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                                        <div className="text-white font-black text-lg truncate">Pré-treino</div>
+                                        <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPreCheckinOpen(false)
+                                            const r = preCheckinResolveRef.current
+                                            preCheckinResolveRef.current = null
+                                            if (typeof r === 'function') r(null)
+                                        }}
+                                        className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                                        aria-label="Fechar"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+                                <div className="p-4 space-y-4">
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Energia (1–5)</div>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {[1, 2, 3, 4, 5].map((n) => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    onClick={() => setPreCheckinDraft((prev) => ({ ...prev, energy: String(n) }))}
+                                                    className={
+                                                        String(preCheckinDraft?.energy || '') === String(n)
+                                                            ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
+                                                            : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
+                                                    }
+                                                >
+                                                    {n}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
+                                        <select
+                                            value={String(preCheckinDraft?.soreness ?? '')}
+                                            onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
+                                            className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                                        >
+                                            <option value="">Não informar</option>
+                                            {Array.from({ length: 11 }).map((_, i) => (
+                                                <option key={i} value={String(i)}>
+                                                    {i}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tempo disponível</div>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {[30, 45, 60, 90, 120].map((n) => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    onClick={() => setPreCheckinDraft((prev) => ({ ...prev, timeMinutes: String(n) }))}
+                                                    className={
+                                                        String(preCheckinDraft?.timeMinutes || '') === String(n)
+                                                            ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
+                                                            : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
+                                                    }
+                                                >
+                                                    {n}m
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
+                                        <textarea
+                                            value={String(preCheckinDraft?.notes || '')}
+                                            onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
+                                            className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
+                                            placeholder="Ex.: pouco sono, dor no joelho, viagem…"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="p-4 border-t border-neutral-800 flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPreCheckinOpen(false)
+                                            const r = preCheckinResolveRef.current
+                                            preCheckinResolveRef.current = null
+                                            if (typeof r === 'function') r(null)
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+                                    >
+                                        Pular
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPreCheckinOpen(false)
+                                            const r = preCheckinResolveRef.current
+                                            preCheckinResolveRef.current = null
+                                            if (typeof r === 'function') r(preCheckinDraft)
+                                        }}
+                                        className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
+                                    >
+                                        Continuar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {settingsOpen && (
+                        <SettingsModal
+                            isOpen={settingsOpen}
+                            onClose={() => setSettingsOpen(false)}
+                            settings={userSettingsApi?.settings ?? null}
+                            userRole={user?.role || ''}
+                            saving={Boolean(userSettingsApi?.saving)}
+                            onOpenWhatsNew={async () => {
+                                setSettingsOpen(false)
+                                if (!pendingUpdate) {
+                                    try {
+                                        const res = await fetch(`/api/updates/unseen?limit=1`)
+                                        const data = await res.json().catch(() => ({}))
+                                        const updates = Array.isArray(data?.updates) ? data.updates : []
+                                        const first = updates[0] || null
+                                        if (first) {
+                                            try {
+                                                await fetch('/api/updates/mark-prompted', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({ updateId: String(first.id) })
+                                                })
+                                            } catch { }
+                                            setPendingUpdate(first)
+                                        }
+                                    } catch { }
+                                }
+                                setWhatsNewOpen(true)
+                            }}
+                            onSave={async (next: unknown) => {
                                 try {
-                                    const res = await fetch(`/api/updates/unseen?limit=1`)
-                                    const data = await res.json().catch(() => ({}))
-                                    const updates = Array.isArray(data?.updates) ? data.updates : []
-                                    const first = updates[0] || null
-                                    if (first) {
-                                        try {
-                                            await fetch('/api/updates/mark-prompted', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ updateId: String(first.id) })
-                                            })
-                                        } catch {}
-                                        setPendingUpdate(first)
+                                    const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})
+                                    const res = await userSettingsApi?.save?.(safeNext)
+                                    if (!res?.ok) {
+                                        await alert('Falha ao salvar: ' + (res?.error || ''))
+                                        return false
                                     }
-                                } catch {}
-                            }
-                            setWhatsNewOpen(true)
-                        }}
-                        onSave={async (next: unknown) => {
-                            try {
-                                const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})
-                                const res = await userSettingsApi?.save?.(safeNext)
-                                if (!res?.ok) {
-                                    await alert('Falha ao salvar: ' + (res?.error || ''))
+                                    return true
+                                } catch (e) {
+                                    await alert('Falha ao salvar: ' + (e?.message ?? String(e)))
                                     return false
                                 }
-                                return true
-                            } catch (e) {
-                                await alert('Falha ao salvar: ' + (e?.message ?? String(e)))
-                                return false
-                            }
-                        }}
+                            }}
+                        />
+                    )}
+
+                    <OfflineSyncModal
+                        open={offlineSyncOpen}
+                        onClose={() => setOfflineSyncOpen(false)}
+                        userId={user?.id}
                     />
-                )}
 
-                <OfflineSyncModal
-                    open={offlineSyncOpen}
-                    onClose={() => setOfflineSyncOpen(false)}
-                    userId={user?.id}
-                />
-
-                <WelcomeFloatingWindow user={user as any} onClose={() => {}} />
-            </div>
-        </TeamWorkoutProvider>
+                    <WelcomeFloatingWindow user={user as any} onClose={() => { }} />
+                </div>
+            </TeamWorkoutProvider>
         </InAppNotificationsProvider>
     );
 }

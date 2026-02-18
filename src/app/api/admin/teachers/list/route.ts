@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
+import { z } from 'zod'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const QuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  search: z.string().max(100).optional(),
+})
 
 export async function GET(req: Request) {
   try {
@@ -17,10 +25,22 @@ export async function GET(req: Request) {
       const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
       if (role !== 'admin') return jsonError(403, 'forbidden')
     }
-    const { data: rows, error } = await admin
+
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    let query = admin
       .from('teachers')
       .select('id, name, email, status, created_at, user_id, asaas_wallet_id, asaas_account_id, asaas_account_status')
       .order('name')
+      .range(q?.offset || 0, (q?.offset || 0) + (q?.limit || 50) - 1)
+
+    if (q?.search) {
+      query = query.ilike('name', `%${q.search}%`)
+    }
+
+    const { data: rows, error } = await query
+
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     const teachers = rows || []
@@ -88,6 +108,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, teachers: result })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

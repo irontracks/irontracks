@@ -1,10 +1,4 @@
-interface FinishWorkoutInput {
-  workout: Record<string, unknown>
-  elapsedSeconds: number
-  logs: Record<string, unknown>
-  ui: Record<string, unknown>
-  postCheckin?: Record<string, unknown> | null
-}
+import { type FinishWorkoutInput } from '@/schemas/workout'
 
 type AnyRecord = Record<string, unknown>
 
@@ -25,7 +19,7 @@ export const buildFinishWorkoutPayload = ({
       const e = ex as AnyRecord
       return {
         name: String(e?.name || '').trim(),
-        sets: Number(e?.sets) || (Array.isArray(e?.setDetails) ? e.setDetails.length : 0),
+        sets: Number(e?.sets) || (Array.isArray(e?.setDetails) ? (e.setDetails as unknown[]).length : 0),
         reps: e?.reps ?? '',
         rpe: e?.rpe ?? null,
         cadence: e?.cadence ?? null,

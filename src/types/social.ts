@@ -33,7 +33,7 @@ export type AppNotification = {
   read: boolean
   recipient_id?: string
   sender_id?: string | null
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, unknown> | null
   is_read?: boolean
 }
 

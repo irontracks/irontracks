@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,14 +31,21 @@ const mediaKindFromPath = (path: string): 'image' | 'video' => {
 
 const asRecord = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {})
 
+const QuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(300).default(200),
+  signedSeconds: z.coerce.number().int().min(60).max(3600).default(600),
+})
+
 export async function GET(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const url = new URL(req.url)
-    const limit = Math.min(300, Math.max(1, Number(url.searchParams.get('limit') || 200) || 200))
-    const signedSeconds = Math.min(3600, Math.max(60, Number(url.searchParams.get('signedSeconds') || 600) || 600))
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const limit = q.limit
+    const signedSeconds = q.signedSeconds
 
     const userId = String(auth.user.id || '').trim()
     if (!userId) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })

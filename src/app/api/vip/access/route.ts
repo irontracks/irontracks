@@ -16,6 +16,7 @@ export async function GET() {
     const hasVip = entitlement.tier !== 'free'
     return NextResponse.json({ ok: true, hasVip, role, entitlement })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

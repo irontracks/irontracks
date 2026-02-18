@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +10,14 @@ const clamp = (n: number, min: number, max: number) => {
   if (!Number.isFinite(n)) return min
   return Math.max(min, Math.min(max, n))
 }
+
+const QuerySchema = z.object({
+  teacher_id: z.string().uuid('teacher_id inválido').optional(),
+  teacher_user_id: z.string().uuid('teacher_user_id inválido').optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(80),
+  cursor_date: z.string().optional(),
+  cursor_created_at: z.string().optional(),
+})
 
 export async function GET(req: Request) {
   try {
@@ -17,18 +27,23 @@ export async function GET(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const url = new URL(req.url)
-    const teacher_user_id = String(url.searchParams.get('teacher_user_id') || '').trim()
-    const limit = clamp(Number(url.searchParams.get('limit') || 80), 1, 200)
-    const cursorDate = String(url.searchParams.get('cursor_date') || '').trim()
-    const cursorCreatedAt = String(url.searchParams.get('cursor_created_at') || '').trim()
-    if (!teacher_user_id) return NextResponse.json({ ok: false, error: 'missing teacher_user_id' }, { status: 400 })
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const teacherId = (q.teacher_id ?? q.teacher_user_id)?.trim()
+    if (!teacherId) {
+      return NextResponse.json({ ok: false, error: 'missing teacher_id' }, { status: 400 })
+    }
+
+    const limit = clamp(q.limit, 1, 200)
+    const cursorDate = String(q.cursor_date ?? '').trim()
+    const cursorCreatedAt = String(q.cursor_created_at ?? '').trim()
 
     const admin = createAdminClient()
     const { data: students, error: stErr } = await admin
       .from('students')
       .select('user_id, name')
-      .eq('teacher_id', teacher_user_id)
+      .eq('teacher_id', teacherId)
       .limit(5000)
     if (stErr) return NextResponse.json({ ok: false, error: stErr.message }, { status: 400 })
 
@@ -41,7 +56,7 @@ export async function GET(req: Request) {
       if (!uid) continue
       const nm = String((s as Record<string, unknown>)?.name || '').trim()
       if (nm) studentNameById.set(uid, nm)
-    }
+  }
 
     let q = admin
       .from('workouts')
@@ -49,8 +64,6 @@ export async function GET(req: Request) {
       .in('user_id', studentUserIds)
       .eq('is_template', false)
       .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(limit)
 
     if (cursorDate) q = q.lt('date', cursorDate)
     if (cursorCreatedAt) q = q.lt('created_at', cursorCreatedAt)
@@ -68,6 +81,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, rows: enriched, next_cursor }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

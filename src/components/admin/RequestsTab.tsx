@@ -4,11 +4,25 @@ import React, { useEffect, useState } from 'react'
 import { Check, X, Loader2, Calendar, Mail, Phone, User, Clock, GraduationCap } from 'lucide-react'
 import { useDialog } from '@/contexts/DialogContext'
 
+interface AccessRequest {
+    id: string
+    user_id?: string
+    full_name: string
+    email?: string
+    phone?: string
+    birth_date?: string
+    role_requested?: string
+    cref?: string
+    status: 'pending' | 'approved' | 'rejected' | string
+    created_at: string
+    [key: string]: unknown
+}
+
 export default function RequestsTab() {
     const { confirm, alert } = useDialog()
-    const [requests, setRequests] = useState<any[]>([])
+    const [requests, setRequests] = useState<AccessRequest[]>([])
     const [loading, setLoading] = useState(true)
-    const [processing, setProcessing] = useState<any>(null) // id being processed
+    const [processing, setProcessing] = useState<string | null>(null) // id being processed
 
     const fetchRequests = async () => {
         setLoading(true)
@@ -16,7 +30,7 @@ export default function RequestsTab() {
             const res = await fetch('/api/admin/access-requests/list?status=pending')
             const json = await res.json()
             if (json.ok) {
-                setRequests(json.data || [])
+                setRequests((json.data || []) as AccessRequest[])
             } else {
                 console.error(json.error)
             }
@@ -31,7 +45,7 @@ export default function RequestsTab() {
         fetchRequests()
     }, [])
 
-    const handleAction = async (req: any, action: string) => {
+    const handleAction = async (req: AccessRequest, action: string) => {
         if (action === 'reject') {
             const ok = await confirm(
                 `Tem certeza que deseja recusar o acesso de ${req.full_name}?`,

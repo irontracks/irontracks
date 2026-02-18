@@ -26,6 +26,7 @@ export async function GET() {
     const alreadySeen = !!data?.user_id
     return NextResponse.json({ ok: true, hasVip: true, alreadySeen, shouldShow: !alreadySeen })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

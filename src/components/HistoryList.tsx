@@ -110,7 +110,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     const [loading, setLoading] = useState(true);
     const supabase = useMemo(() => createClient(), []);
     const safeUserId = user?.id ? String(user.id) : '';
-    const safeUserEmail = String((user as any)?.email || '').trim().toLowerCase();
+    const safeUserEmail = String(user?.email || '').trim().toLowerCase();
     const isReadOnly = !!readOnly;
     const [range, setRange] = useState(() => (readOnly ? 'all' : '30'));
     const [showManual, setShowManual] = useState(false);
@@ -170,8 +170,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             setIsSelectionMode(false);
             setSelectedIds(new Set());
             await alert('Itens excluídos com sucesso');
-        } catch (e: any) {
-            await alert('Erro ao excluir: ' + (e?.message ?? String(e)));
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            await alert('Erro ao excluir: ' + msg);
         }
     };
 
@@ -203,11 +204,11 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         return Array.isArray(history) ? history : [];
     }, [history]);
 
-    const toDateMs = (value: any): number | null => {
+    const toDateMs = (value: unknown): number | null => {
         try {
             if (!value) return null;
-            if (value?.toDate) {
-                const d = value.toDate();
+            if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate?: unknown }).toDate === 'function') {
+                const d = (value as { toDate: () => unknown }).toDate();
                 const t = d instanceof Date ? d.getTime() : new Date(d).getTime();
                 return Number.isFinite(t) ? t : null;
             }
@@ -383,7 +384,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         const data = report && typeof report === 'object' ? report : null;
         if (!data) return '';
         const label = data.type === 'week' ? 'semanal' : data.type === 'month' ? 'mensal' : 'período';
-        const stats = (data.stats && typeof data.stats === 'object' ? data.stats : {}) as any;
+        const stats = (data.stats && typeof data.stats === 'object' ? data.stats : {}) as PeriodStats;
         const count = Number(stats.count) || 0;
         const totalMinutes = Number(stats.totalMinutes) || 0;
         const avgMinutes = Number(stats.avgMinutes) || 0;
@@ -410,12 +411,13 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
 
     const openSession = (session: WorkoutSummary) => {
         const rawSession = session?.rawSession && typeof session.rawSession === 'object' ? session.rawSession : null;
+        const sessionRecord = session && typeof session === 'object' ? (session as Record<string, unknown>) : {};
         const payload = rawSession
             ? {
                 ...rawSession,
                 id: rawSession.id ?? session?.id ?? null,
-                user_id: session?.raw?.user_id ?? rawSession?.user_id ?? (session as any)?.user_id ?? null,
-                student_id: session?.raw?.student_id ?? rawSession?.student_id ?? (session as any)?.student_id ?? null
+                user_id: session?.raw?.user_id ?? rawSession?.user_id ?? sessionRecord.user_id ?? null,
+                student_id: session?.raw?.student_id ?? rawSession?.student_id ?? sessionRecord.student_id ?? null
             }
             : session;
         if (typeof onViewReport === 'function') {
@@ -437,7 +439,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             try {
                 setLoading(true);
                 const baseUserId = user?.id;
-                const role = String((user as any)?.role || '').toLowerCase();
+                const role = String(user?.role || '').toLowerCase();
                 const canUseAdmin = role === 'admin' || role === 'teacher';
                 const tId = String(targetId || '').trim();
                 const tEmail = String(targetEmail || '').trim().toLowerCase();
@@ -456,7 +458,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                         ? `id=${encodeURIComponent(targetId)}`
                         : `email=${encodeURIComponent(targetEmail || '')}`;
                     const json = await adminFetchJson<{ ok: boolean; rows?: WorkoutSummary[]; error?: string }>(
-                        supabase as any,
+                        supabase,
                         `/api/admin/workouts/history?${qs}`,
                     );
                     if (!json?.ok) throw new Error(json?.error || 'Falha ao carregar histórico');
@@ -569,22 +571,26 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             setShowManual(false);
             setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate).toISOString(), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
             await alert('Histórico adicionado');
-        } catch (e: any) {
-            await alert('Erro: ' + (e?.message ?? String(e)));
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            await alert('Erro: ' + msg);
         }
     };
 
     const saveManualNew = async () => {
         try {
             if (!newWorkout.title) throw new Error('Informe o título');
-            const exercises: ManualExercise[] = (newWorkout.exercises || []).map((e: any) => ({
-                name: e.name || '',
-                sets: Number(e.sets) || 0,
-                reps: e.reps || '',
-                restTime: Number(e.restTime) || 0,
-                cadence: e.cadence || '',
-                notes: e.notes || ''
-            }));
+            const exercises: ManualExercise[] = (Array.isArray(newWorkout.exercises) ? newWorkout.exercises : []).map((e) => {
+                const row = isRecord(e) ? e : {};
+                return {
+                    name: String(row.name ?? ''),
+                    sets: Number(row.sets ?? 0) || 0,
+                    reps: String(row.reps ?? ''),
+                    restTime: Number(row.restTime ?? 0) || 0,
+                    cadence: String(row.cadence ?? ''),
+                    notes: String(row.notes ?? ''),
+                };
+            });
             const logs: Record<string, WorkoutLog> = {};
             exercises.forEach((ex, exIdx) => {
                 for (let sIdx = 0; sIdx < (Number(ex.sets) || 0); sIdx++) {
@@ -611,8 +617,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             setShowManual(false);
             setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate).toISOString(), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
             await alert('Histórico adicionado');
-        } catch (e: any) {
-            await alert('Erro: ' + (e?.message ?? String(e)));
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            await alert('Erro: ' + msg);
         }
     };
 
@@ -672,23 +679,27 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         if (selectedTemplate && manualTab === 'existing') buildManualFromTemplate();
     }, [manualTab, selectedTemplate, supabase]);
 
-    const updateManualExercise = (idx: number, field: string, value: any) => {
+    const updateManualExercise = (idx: number, field: string, value: unknown) => {
         setManualExercises(prev => {
             const next = [...prev];
             if (field === 'weight') {
-                const [wIdx, val] = value;
+                const tuple = Array.isArray(value) ? value : [0, ''];
+                const wIdx = Number(tuple[0]) || 0;
+                const val = String(tuple[1] ?? '');
                 const weights = Array.from({ length: Number(next[idx].sets) || 0 }, (_, i) => next[idx].weights?.[i] ?? '');
                 weights[wIdx] = val;
                 next[idx] = { ...next[idx], weights };
             } else if (field === 'rep') {
-                const [rIdx, val] = value;
+                const tuple = Array.isArray(value) ? value : [0, ''];
+                const rIdx = Number(tuple[0]) || 0;
+                const val = String(tuple[1] ?? '');
                 const repsPerSet = Array.from({ length: Number(next[idx].sets) || 0 }, (_, i) => next[idx].repsPerSet?.[i] ?? '');
                 repsPerSet[rIdx] = val;
                 next[idx] = { ...next[idx], repsPerSet };
             } else {
                 next[idx] = { ...next[idx], [field]: value };
                 if (field === 'sets') {
-                    const n = Number(value) || 0;
+                    const n = Number(value as number | string | null | undefined) || 0;
                     const weights = Array.from({ length: n }, (_, i) => next[idx].weights?.[i] ?? '');
                     const repsPerSet = Array.from({ length: n }, (_, i) => next[idx].repsPerSet?.[i] ?? '');
                     next[idx] = { ...next[idx], weights, repsPerSet };
@@ -712,8 +723,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                 .eq('is_template', false);
             if (error) throw error;
             setHistory(prev => prev.filter(h => h.id !== session.id));
-        } catch (error: any) {
-            await alert("Erro ao excluir: " + (error?.message ?? String(error)));
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : String(error);
+            await alert("Erro ao excluir: " + msg);
         }
     };
 
@@ -725,33 +737,58 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         setEditDate(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
         setEditDuration(String(Math.floor((raw?.totalTime || session.totalTime || 0) / 60) || 45));
         setEditNotes(raw?.notes || '');
-        const exs: ManualExercise[] = (raw?.exercises || []).map((ex: any, exIdx: number) => {
-            const count = Number(ex.sets) || 0;
-            const weights = Array.from({ length: count }, (_, sIdx) => String(raw?.logs?.[`${exIdx}-${sIdx}`]?.weight ?? ''));
-            const repsPerSet = Array.from({ length: count }, (_, sIdx) => String(raw?.logs?.[`${exIdx}-${sIdx}`]?.reps ?? ex.reps ?? ''));
-            return { name: ex.name || '', sets: count, reps: ex.reps || '', restTime: Number(ex.restTime) || 0, cadence: ex.cadence || '', notes: ex.notes || '', weights, repsPerSet };
+        const exs: ManualExercise[] = (raw?.exercises || []).map((ex, exIdx: number) => {
+            const exRecord = isRecord(ex) ? ex : {};
+            const count = Number(exRecord.sets ?? 0) || 0;
+            const logs = raw && isRecord(raw.logs) ? (raw.logs as Record<string, unknown>) : {};
+            const weights = Array.from({ length: count }, (_, sIdx) => {
+                const key = `${exIdx}-${sIdx}`;
+                const entry = logs[key];
+                const logRow = entry && isRecord(entry) ? entry : {};
+                return String(logRow.weight ?? '');
+            });
+            const repsPerSet = Array.from({ length: count }, (_, sIdx) => {
+                const key = `${exIdx}-${sIdx}`;
+                const entry = logs[key];
+                const logRow = entry && isRecord(entry) ? entry : {};
+                return String(logRow.reps ?? exRecord.reps ?? '');
+            });
+            return {
+                name: String(exRecord.name ?? ''),
+                sets: count,
+                reps: String(exRecord.reps ?? ''),
+                restTime: Number(exRecord.restTime ?? 0) || 0,
+                cadence: String(exRecord.cadence ?? ''),
+                notes: String(exRecord.notes ?? ''),
+                weights,
+                repsPerSet,
+            };
         });
         setEditExercises(exs);
         setShowEdit(true);
     };
 
-    const updateEditExercise = (idx: number, field: string, value: any) => {
+    const updateEditExercise = (idx: number, field: string, value: unknown) => {
         setEditExercises(prev => {
             const next = [...prev];
             if (field === 'weight') {
-                const [wIdx, val] = value;
+                const tuple = Array.isArray(value) ? value : [0, ''];
+                const wIdx = Number(tuple[0]) || 0;
+                const val = String(tuple[1] ?? '');
                 const weights = Array.from({ length: Number(next[idx].sets) || 0 }, (_, i) => next[idx].weights?.[i] ?? '');
                 weights[wIdx] = val;
                 next[idx] = { ...next[idx], weights };
             } else if (field === 'rep') {
-                const [rIdx, val] = value;
+                const tuple = Array.isArray(value) ? value : [0, ''];
+                const rIdx = Number(tuple[0]) || 0;
+                const val = String(tuple[1] ?? '');
                 const repsPerSet = Array.from({ length: Number(next[idx].sets) || 0 }, (_, i) => next[idx].repsPerSet?.[i] ?? '');
                 repsPerSet[rIdx] = val;
                 next[idx] = { ...next[idx], repsPerSet };
             } else {
                 next[idx] = { ...next[idx], [field]: value };
                 if (field === 'sets') {
-                    const n = Number(value) || 0;
+                    const n = Number(value as number | string | null | undefined) || 0;
                     const weights = Array.from({ length: n }, (_, i) => next[idx].weights?.[i] ?? '');
                     const repsPerSet = Array.from({ length: n }, (_, i) => next[idx].repsPerSet?.[i] ?? '');
                     next[idx] = { ...next[idx], weights, repsPerSet };
@@ -783,8 +820,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             setShowEdit(false);
             setHistory(prev => prev.map(h => h.id === editId ? { ...h, workoutTitle: editTitle, date: new Date(editDate).toISOString(), totalTime: parseInt(editDuration || '0', 10) * 60, rawSession: session } : h));
             await alert('Histórico atualizado');
-        } catch (e: any) {
-            await alert('Erro: ' + (e?.message ?? String(e)));
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            await alert('Erro: ' + msg);
         }
     };
 
@@ -806,11 +844,13 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                     return;
                 }
                 setPeriodAi({ status: 'ready', ai: res.ai || null, error: '' });
-            } catch (err: any) {
-                setPeriodAi({ status: 'error', ai: null, error: String(err?.message || err || 'Falha ao gerar insights') });
+            } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                setPeriodAi({ status: 'error', ai: null, error: msg || 'Falha ao gerar insights' });
             }
-        } catch (e: any) {
-            await alert('Erro ao gerar relatório: ' + (e?.message ?? String(e)));
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
+            await alert('Erro ao gerar relatório: ' + msg);
         }
     };
 
@@ -861,8 +901,8 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                 a.remove();
             } catch { }
             setPeriodPdf({ status: 'ready', url, blob, error: '' });
-        } catch (e: any) {
-            const msg = e?.message ? String(e.message) : String(e);
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             setPeriodPdf((prev) => ({ ...prev, status: 'error', error: msg || 'Falha ao gerar PDF' }));
         } finally {
             setTimeout(() => setPeriodPdf((prev) => (prev?.status === 'loading' ? { ...prev, status: 'idle' } : prev)), 400);
@@ -917,8 +957,8 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                 await alert('Texto do relatório copiado para a área de transferência.');
                 return;
             }
-        } catch (e: any) {
-            const msg = e?.message ? String(e.message) : String(e);
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e);
             const copied = await legacyCopy();
             if (copied) {
                 setShareError('');
@@ -1303,7 +1343,13 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                             )}
                             {manualTab === 'new' && (
                                 <div>
-                                    <ExerciseEditor workout={newWorkout} onSave={setNewWorkout as any} onCancel={() => { }} onChange={setNewWorkout as any} onSaved={() => { }} />
+                                    <ExerciseEditor
+                                        workout={newWorkout}
+                                        onSave={(w) => setNewWorkout(w)}
+                                        onCancel={() => { }}
+                                        onChange={(w) => setNewWorkout(w)}
+                                        onSaved={() => { }}
+                                    />
                                 </div>
                             )}
                         </div>

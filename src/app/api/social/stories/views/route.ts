@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const QuerySchema = z.object({
+  story_id: z.string().uuid('story_id inválido'),
+})
 
 export async function GET(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const url = new URL(req.url)
-    const storyId = String(url.searchParams.get('storyId') || url.searchParams.get('story_id') || '').trim()
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const storyId = q.story_id.trim()
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })
 
     const userId = String(auth.user.id || '').trim()

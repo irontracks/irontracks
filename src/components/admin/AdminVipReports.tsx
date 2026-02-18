@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { 
     Users, MessageSquare, Zap, Crown, Star, TrendingUp, 
@@ -50,7 +51,7 @@ interface VipStatsRow {
 }
 
 interface AdminVipReportsProps {
-    supabase: any; // Mantendo any por enquanto para compatibilidade, idealmente seria SupabaseClient
+    supabase: SupabaseClient;
 }
 
 export default function AdminVipReports({ supabase }: AdminVipReportsProps) {

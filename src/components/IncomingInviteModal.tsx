@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { Users } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
+import type { Workout } from '@/types/app';
 
 interface IncomingInviteModalProps {
-    onStartSession: (workout: any) => void;
+    onStartSession: (workout: Workout) => void;
 }
 
 const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
