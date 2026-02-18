@@ -16,6 +16,29 @@ import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
+import { ActiveWorkoutProvider } from './active-workout/ActiveWorkoutContext';
+import { Header } from './active-workout/Header';
+import { ExerciseList } from './active-workout/ExerciseList';
+import { UnknownRecord } from './active-workout/types';
+import {
+  isObject,
+  isClusterConfig,
+  isRestPauseConfig,
+  buildPlannedBlocks,
+  buildBlocksByCount,
+  toNumber,
+  safeJsonParse,
+  toDateMs,
+  averageNumbers,
+  extractLogWeight,
+  withTimeout,
+  normalizeReportHistory,
+  clampNumber,
+  roundToStep,
+  normalizeExerciseKey,
+  estimate1Rm,
+  formatElapsed,
+} from './active-workout/utils';
 
 type UnknownRecord = Record<string, unknown>;
 
