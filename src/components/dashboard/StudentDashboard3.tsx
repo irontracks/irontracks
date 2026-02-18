@@ -5,13 +5,96 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2, Crown } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
+import { z } from 'zod'
+import { ExerciseSchema, SetSchema, WorkoutSchema } from '@/schemas/database'
 import BadgesGallery from './BadgesGallery'
 import RecentAchievements from './RecentAchievements'
 import WorkoutCalendarModal from './WorkoutCalendarModal'
 import StoriesBar from './StoriesBar'
 import MuscleMapCard from './MuscleMapCard'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
-import { DashboardWorkout, CheckinRow, WorkoutExercise, WorkoutSet } from '@/types/workout'
+
+type UnknownRecord = Record<string, unknown>
+
+const isPlainRecord = (v: unknown): v is UnknownRecord => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const toNumberOrNull = (v: unknown): number | null => {
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+const toIntOrZero = (v: unknown): number => {
+  const n = toNumberOrNull(v)
+  return n == null ? 0 : Math.max(0, Math.floor(n))
+}
+
+const PeriodizationActiveWorkoutSchema = z.object({
+  workout_id: z.string(),
+  exercise_count: z.number().nullable().optional(),
+})
+
+const PeriodizationActiveResponseSchema = z
+  .object({
+    ok: z.boolean().optional(),
+    error: z.unknown().optional(),
+    workouts: z.array(PeriodizationActiveWorkoutSchema).optional(),
+    program: z.object({ id: z.unknown().optional() }).optional(),
+  })
+  .passthrough()
+
+const WorkoutListRowSchema = z
+  .object({
+    id: WorkoutSchema.shape.id,
+    user_id: WorkoutSchema.shape.user_id,
+    created_by: z.string().uuid().nullable().optional(),
+    name: WorkoutSchema.shape.name,
+    notes: WorkoutSchema.shape.notes,
+    archived_at: z.string().nullable().optional(),
+    sort_order: z.number().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+  })
+  .passthrough()
+
+const WorkoutSetRowSchema = z
+  .object({
+    id: SetSchema.shape.id,
+    set_number: SetSchema.shape.set_number,
+    weight: SetSchema.shape.weight,
+    reps: SetSchema.shape.reps,
+    rpe: SetSchema.shape.rpe,
+    completed: SetSchema.shape.completed,
+    is_warmup: SetSchema.shape.is_warmup,
+    advanced_config: SetSchema.shape.advanced_config,
+  })
+  .passthrough()
+
+const WorkoutExerciseRowSchema = z
+  .object({
+    id: ExerciseSchema.shape.id,
+    name: ExerciseSchema.shape.name,
+    notes: ExerciseSchema.shape.notes,
+    video_url: ExerciseSchema.shape.video_url,
+    rest_time: ExerciseSchema.shape.rest_time,
+    cadence: ExerciseSchema.shape.cadence,
+    method: ExerciseSchema.shape.method,
+    order: ExerciseSchema.shape.order,
+    sets: z.array(WorkoutSetRowSchema).optional(),
+  })
+  .passthrough()
+
+const WorkoutFullRowSchema = z
+  .object({
+    id: WorkoutSchema.shape.id,
+    user_id: WorkoutSchema.shape.user_id,
+    created_by: z.string().uuid().nullable().optional(),
+    name: WorkoutSchema.shape.name,
+    notes: WorkoutSchema.shape.notes,
+    archived_at: z.string().nullable().optional(),
+    sort_order: z.number().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+    exercises: z.array(WorkoutExerciseRowSchema).optional(),
+  })
+  .passthrough()
 
 function SortableWorkoutItem({
   item,
@@ -19,7 +102,7 @@ function SortableWorkoutItem({
   onChangeTitle,
   saving,
 }: {
-  item: { id: string; title: string; sortOrder: number }
+  item: { id: string; title: string; sort_order: number }
   index: number
   onChangeTitle: (id: string, val: string) => void
   saving: boolean
@@ -50,6 +133,56 @@ function SortableWorkoutItem({
       />
     </Reorder.Item>
   )
+}
+
+export type DashboardWorkout = {
+  id?: string
+  user_id?: string | null
+  created_by?: string | null
+  name?: string
+  title?: string
+  notes?: string | null
+  exercises?: DashboardExercise[]
+  exercises_count?: number | null
+  archived_at?: string | null
+  sort_order?: number
+  created_at?: string | null
+}
+
+export type DashboardSetDetail = {
+  set_number: number
+  reps: string | null
+  rpe: number | null
+  weight: number | null
+  is_warmup: boolean
+  advanced_config: unknown | null
+}
+
+export type DashboardExercise = {
+  id: string
+  name: string
+  notes: string | null
+  videoUrl: string | null
+  restTime: number | null
+  cadence: string | null
+  method: string | null
+  sets: number
+  reps: string
+  rpe: number
+  setDetails?: DashboardSetDetail[]
+}
+
+type WorkoutCheckinRow = {
+  id?: string
+  kind?: string
+  created_at?: string | null
+  energy?: number | string | null
+  mood?: number | string | null
+  soreness?: number | string | null
+  notes?: string | null
+  answers?: UnknownRecord | null
+  workout_id?: string | null
+  planned_workout_id?: string | null
 }
 
 type MaybePromise<T> = T | Promise<T>
@@ -85,7 +218,7 @@ type Props = {
   onDuplicateWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onEditWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onDeleteWorkout: (id?: string, title?: string) => MaybePromise<void>
-  onBulkEditWorkouts?: (items: { id: string; title: string; sortOrder: number }[]) => MaybePromise<void>
+  onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
   currentUserId?: string
   newRecordsReloadKey?: number
   exportingAll?: boolean
@@ -120,7 +253,7 @@ export default function StudentDashboard(props: Props) {
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [checkinsOpen, setCheckinsOpen] = useState(false)
   const [checkinsLoading, setCheckinsLoading] = useState(false)
-  const [checkinsRows, setCheckinsRows] = useState<CheckinRow[]>([])
+  const [checkinsRows, setCheckinsRows] = useState<WorkoutCheckinRow[]>([])
   const [checkinsFilter, setCheckinsFilter] = useState<'all' | 'pre' | 'post'>('all')
   const [checkinsRange, setCheckinsRange] = useState<'7d' | '30d'>('7d')
   const [creatingWorkout, setCreatingWorkout] = useState(false)
@@ -129,7 +262,7 @@ export default function StudentDashboard(props: Props) {
   const [findingDuplicates, setFindingDuplicates] = useState(false)
   const [applyingTitleRule, setApplyingTitleRule] = useState(false)
   const [editListOpen, setEditListOpen] = useState(false)
-  const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sortOrder: number }[]>([])
+  const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
   const [savingListEdits, setSavingListEdits] = useState(false)
   const [pendingAction, setPendingAction] = useState<
     | {
@@ -146,16 +279,15 @@ export default function StudentDashboard(props: Props) {
   const showBadges = props.settings?.showBadges !== false
   const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
   const isPeriodizedWorkout = (w: DashboardWorkout) => {
-    const rec = w as unknown as Record<string, unknown>
-    const title = String(rec?.title || rec?.name || '').trim()
+    const title = String(w?.title || w?.name || '').trim()
     return title.startsWith('VIP •')
   }
   const workoutsForTab =
     workoutsTab === 'periodized'
       ? (periodizedLoaded ? periodizedWorkouts : workouts.filter(isPeriodizedWorkout))
       : workouts.filter((w) => !isPeriodizedWorkout(w))
-  const archivedCount = workoutsForTab.reduce((acc, w) => (w?.archivedAt ? acc + 1 : acc), 0)
-  const visibleWorkouts = showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archivedAt)
+  const archivedCount = workoutsForTab.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0)
+  const visibleWorkouts = showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archived_at)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -182,16 +314,18 @@ export default function StudentDashboard(props: Props) {
     ;(async () => {
       try {
         const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const json = await res.json().catch(() => null)
+        const jsonUnknown: unknown = await res.json().catch(() => null)
+        const jsonParsed = PeriodizationActiveResponseSchema.safeParse(jsonUnknown)
+        const json = jsonParsed.success ? jsonParsed.data : null
         if (cancelled) return
         if (!json?.ok) {
-          const msg = String(json?.error || 'Falha ao carregar periodização.')
+          const msg = json?.error != null ? String(json.error) : 'Falha ao carregar periodização.'
           setPeriodizedWorkouts([])
           setPeriodizedLoaded(true)
           setPeriodizedError(msg)
           return
         }
-        const rows = (Array.isArray(json?.workouts) ? json.workouts : []) as Array<Record<string, unknown>>
+        const rows = Array.isArray(json?.workouts) ? json.workouts : []
         const ids = rows.map((r) => String(r?.workout_id || '').trim()).filter(Boolean)
         const countById = new Map<string, number>()
         rows.forEach((r) => {
@@ -237,21 +371,24 @@ export default function StudentDashboard(props: Props) {
         const mapped = (Array.isArray(data) ? data : [])
           .filter((w) => isRecord(w))
           .map((w) => {
-            const workout = w as Record<string, unknown>
-            const wid = workout.id != null ? String(workout.id) : ''
+            const parsed = WorkoutListRowSchema.safeParse(w)
+            if (!parsed.success) return null
+            const workout = parsed.data
+            const wid = String(workout.id || '').trim()
             return {
-              id: workout.id != null ? String(workout.id) : undefined,
+              id: workout.id,
               title: String(workout.name ?? ''),
-              notes: typeof workout.notes === 'string' ? workout.notes : null,
-              exercises: [] as WorkoutExercise[],
-              exercisesCount: wid ? (countById.get(wid) ?? null) : null,
-              userId: workout.user_id != null ? String(workout.user_id) : undefined,
-              createdBy: workout.created_by != null ? String(workout.created_by) : undefined,
-              archivedAt: typeof workout.archived_at === 'string' ? workout.archived_at : null,
-              sortOrder: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
-              createdAt: typeof workout.created_at === 'string' ? workout.created_at : null,
-            } as DashboardWorkout
+              notes: workout.notes,
+              exercises: [],
+              exercises_count: wid ? (countById.get(wid) ?? null) : null,
+              user_id: workout.user_id,
+              created_by: workout.created_by ?? null,
+              archived_at: workout.archived_at ?? null,
+              sort_order: workout.sort_order == null ? 0 : toIntOrZero(workout.sort_order),
+              created_at: workout.created_at ?? null,
+            } satisfies DashboardWorkout
           })
+          .filter((w): w is DashboardWorkout => Boolean(w))
 
         const byId = new Map<string, DashboardWorkout>()
         mapped.forEach((w: DashboardWorkout) => {
@@ -335,63 +472,63 @@ export default function StudentDashboard(props: Props) {
 
     if (error || !data?.id) return null
 
-    const workout = data as unknown as Record<string, unknown>
-    const rawExercises = Array.isArray(workout?.exercises) ? (workout.exercises as unknown[]) : []
-    const exs = rawExercises
-      .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
-      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
+    const parsed = WorkoutFullRowSchema.safeParse(data)
+    if (!parsed.success) return null
+
+    const workout = parsed.data
+    const rawExercises = Array.isArray(workout?.exercises) ? workout.exercises : []
+    const exs: DashboardExercise[] = rawExercises
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       .map((e) => {
-        const isCardio = String((e as any).method || '').toLowerCase() === 'cardio'
-        const dbSets = Array.isArray((e as any).sets) ? ((e as any).sets as unknown[]).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object')) : []
-        const sortedSets = dbSets.slice().sort((aSet, bSet) => (Number((aSet as any)?.set_number) || 0) - (Number((bSet as any)?.set_number) || 0))
+        const isCardio = String(e.method || '').toLowerCase() === 'cardio'
+        const dbSets = Array.isArray(e.sets) ? e.sets : []
+        const sortedSets = dbSets.slice().sort((aSet, bSet) => (aSet.set_number ?? 0) - (bSet.set_number ?? 0))
         const setsCount = sortedSets.length || (isCardio ? 1 : 4)
-        const setDetails = sortedSets.map((s, idx) => ({
-          set_number: (s as any)?.set_number ?? idx + 1,
-          reps: (s as any)?.reps ?? null,
-          rpe: (s as any)?.rpe ?? null,
-          weight: (s as any)?.weight ?? null,
-          is_warmup: !!((s as any)?.is_warmup ?? (s as any)?.isWarmup),
-          advanced_config: (s as any)?.advanced_config ?? (s as any)?.advancedConfig ?? null,
+        const setDetails: DashboardSetDetail[] = sortedSets.map((s) => ({
+          set_number: s.set_number,
+          reps: s.reps,
+          rpe: s.rpe,
+          weight: s.weight,
+          is_warmup: !!s.is_warmup,
+          advanced_config: s.advanced_config ?? null,
         }))
-        const nonEmptyReps = setDetails.map((s: any) => s.reps).filter((r: any) => r !== null && r !== undefined && r !== '')
+        const nonEmptyReps = setDetails.map((s) => s.reps).filter((r): r is string => typeof r === 'string' && r.trim() !== '')
         const defaultReps = isCardio ? '20' : '10'
         let repsHeader = defaultReps
         if (nonEmptyReps.length > 0) {
           const uniqueReps = Array.from(new Set(nonEmptyReps))
           repsHeader = uniqueReps.length === 1 ? String(uniqueReps[0] ?? defaultReps) : String(nonEmptyReps[0] ?? defaultReps)
         }
-        const rpeValues = setDetails.map((s: any) => s.rpe).filter((v: any) => v !== null && v !== undefined && !Number.isNaN(Number(v)))
+        const rpeValues = setDetails.map((s) => s.rpe).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
         const defaultRpe = isCardio ? 5 : 8
         const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe
         return {
-            id: String(e.id || ''),
-            name: String(e.name || ''),
-            notes: typeof e.notes === 'string' ? e.notes : undefined,
-            videoUrl: typeof e.video_url === 'string' ? e.video_url : undefined,
-            restTime: Number(e.rest_time) || 0,
-            cadence: typeof e.cadence === 'string' ? e.cadence : undefined,
-            method: typeof e.method === 'string' ? e.method : undefined,
-            sets: setsCount,
-            reps: repsHeader,
-            rpe: rpeHeader,
-            setDetails,
-            order: Number(e.order) || 0,
-          } as WorkoutExercise
+          id: e.id,
+          name: e.name,
+          notes: e.notes,
+          videoUrl: e.video_url,
+          restTime: e.rest_time,
+          cadence: e.cadence,
+          method: e.method,
+          sets: setsCount,
+          reps: repsHeader,
+          rpe: rpeHeader,
+          setDetails,
+        } satisfies DashboardExercise
       })
-      .filter(Boolean)
 
-      return {
-        id: workout.id != null ? String(workout.id) : undefined,
-        title: String(workout.name ?? ''),
-        notes: typeof workout.notes === 'string' ? workout.notes : null,
-        exercises: exs,
-        exercisesCount: exs.length,
-        userId: workout.user_id != null ? String(workout.user_id) : undefined,
-        createdBy: workout.created_by != null ? String(workout.created_by) : undefined,
-        archivedAt: typeof workout.archived_at === 'string' ? workout.archived_at : null,
-        sortOrder: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
-        createdAt: typeof workout.created_at === 'string' ? workout.created_at : null,
-      } as DashboardWorkout
+    return {
+      id: workout.id,
+      title: String(workout.name ?? ''),
+      notes: workout.notes,
+      exercises: exs,
+      user_id: workout.user_id,
+      created_by: workout.created_by ?? null,
+      archived_at: workout.archived_at ?? null,
+      sort_order: workout.sort_order == null ? 0 : toIntOrZero(workout.sort_order),
+      created_at: workout.created_at ?? null,
+    } satisfies DashboardWorkout
   }
 
   useEffect(() => {
@@ -434,7 +571,30 @@ export default function StudentDashboard(props: Props) {
           .limit(400)
         if (error) throw error
         if (cancelled) return
-        setCheckinsRows(Array.isArray(data) ? data : [])
+        const rows: WorkoutCheckinRow[] = (Array.isArray(data) ? data : [])
+          .filter((row) => isPlainRecord(row))
+          .map((row) => {
+            const toNumberOrStringOrNull = (v: unknown): number | string | null => {
+              if (v == null) return null
+              if (typeof v === 'number') return v
+              const s = String(v)
+              return s ? s : null
+            }
+            const answers = isPlainRecord(row.answers) ? row.answers : null
+            return {
+              id: row.id != null ? String(row.id) : undefined,
+              kind: row.kind != null ? String(row.kind) : undefined,
+              created_at: row.created_at != null ? String(row.created_at) : null,
+              energy: toNumberOrStringOrNull(row.energy),
+              mood: toNumberOrStringOrNull(row.mood),
+              soreness: toNumberOrStringOrNull(row.soreness),
+              notes: row.notes != null ? String(row.notes) : null,
+              answers,
+              workout_id: row.workout_id != null ? String(row.workout_id) : null,
+              planned_workout_id: row.planned_workout_id != null ? String(row.planned_workout_id) : null,
+            }
+          })
+        setCheckinsRows(rows)
       } catch {
         if (cancelled) return
         setCheckinsRows([])
@@ -586,11 +746,6 @@ export default function StudentDashboard(props: Props) {
                   {(() => {
                     const rows = Array.isArray(checkinsRows) ? checkinsRows : []
                     const filtered = checkinsFilter === 'all' ? rows : rows.filter((r) => String(r?.kind || '').trim() === checkinsFilter)
-
-                    const toNumberOrNull = (v: any) => {
-                      const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
-                      return Number.isFinite(n) ? n : null
-                    }
                     const avg = (vals: Array<number | null>) => {
                       const list = vals.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
                       if (!list.length) return null
@@ -602,7 +757,7 @@ export default function StudentDashboard(props: Props) {
                     const preAvgSoreness = avg(preRows.map((r) => toNumberOrNull(r?.soreness)))
                     const preAvgTime = avg(
                       preRows.map((r) => {
-                        const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {}
+                        const answers: UnknownRecord = isPlainRecord(r?.answers) ? r.answers : {}
                         return toNumberOrNull(answers?.time_minutes ?? answers?.timeMinutes)
                       }),
                     )
@@ -610,7 +765,7 @@ export default function StudentDashboard(props: Props) {
                     const postAvgSatisfaction = avg(postRows.map((r) => toNumberOrNull(r?.mood)))
                     const postAvgRpe = avg(
                       postRows.map((r) => {
-                        const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {}
+                        const answers: UnknownRecord = isPlainRecord(r?.answers) ? r.answers : {}
                         return toNumberOrNull(answers?.rpe)
                       }),
                     )
@@ -719,7 +874,7 @@ export default function StudentDashboard(props: Props) {
                               const energy = r?.energy != null ? String(r.energy) : '—'
                               const soreness = r?.soreness != null ? String(r.soreness) : '—'
                               const mood = r?.mood != null ? String(r.mood) : '—'
-                              const answers = r?.answers && typeof r.answers === 'object' ? r.answers : {}
+                              const answers: UnknownRecord = isPlainRecord(r?.answers) ? r.answers : {}
                               const rpe = answers?.rpe != null ? String(answers.rpe) : '—'
                               const timeMinutes = answers?.time_minutes != null ? String(answers.time_minutes) : answers?.timeMinutes != null ? String(answers.timeMinutes) : '—'
                               const notes = r?.notes ? String(r.notes) : ''
@@ -922,9 +1077,9 @@ export default function StudentDashboard(props: Props) {
                       .map((w, idx) => {
                         const id = String(w?.id || '').trim()
                         if (!id) return null
-                        return { id, title: String(w?.title || 'Treino'), sortOrder: idx }
+                        return { id, title: String(w?.title || 'Treino'), sort_order: idx }
                       })
-                      .filter(Boolean) as { id: string; title: string; sortOrder: number }[]
+                      .filter(Boolean) as { id: string; title: string; sort_order: number }[]
                     setEditListDraft(items)
                     setEditListOpen(true)
                     setToolsOpen(false)
@@ -1154,9 +1309,9 @@ export default function StudentDashboard(props: Props) {
                 <div className="relative z-10">
                   <h3 className="font-bold text-white text-lg uppercase mb-1 pr-32 leading-tight">{String(w?.title || 'Treino')}</h3>
                   <p className="text-xs text-neutral-400 font-mono mb-4">
-                    {(Number.isFinite(Number(w.exercisesCount)) ? Math.max(0, Math.floor(Number(w.exercisesCount))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} EXERCÍCIOS
+                    {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} EXERCÍCIOS
                   </p>
-                  {w?.archivedAt ? (
+                  {w?.archived_at ? (
                     <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
                       ARQUIVADO
                     </div>
@@ -1167,7 +1322,7 @@ export default function StudentDashboard(props: Props) {
                       onClick={async (e) => {
                         e.stopPropagation()
                         const key = getWorkoutKey(w, idx)
-                        if (w?.archivedAt) {
+                        if (w?.archived_at) {
                           if (typeof props.onRestoreWorkout !== 'function') return
                           await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
                           return
@@ -1192,10 +1347,10 @@ export default function StudentDashboard(props: Props) {
                         })
                       }}
                       data-tour="workout-start"
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archivedAt) && typeof props.onRestoreWorkout !== 'function')}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
                       className="relative z-30 flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg flex items-center justify-center gap-2 text-white font-bold text-sm transition-colors border border-white/10 active:scale-95 touch-manipulation disabled:opacity-60"
                     >
-                      {w?.archivedAt ? (
+                      {w?.archived_at ? (
                         isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
                           <>
                             <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
@@ -1252,7 +1407,7 @@ export default function StudentDashboard(props: Props) {
                   >
                     {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
                   </button>
-                  {w?.userId && props.currentUserId && w.userId === props.currentUserId ? (
+                  {w?.user_id && props.currentUserId && w.user_id === props.currentUserId ? (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation()
