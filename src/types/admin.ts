@@ -48,6 +48,7 @@ export interface ErrorReport {
   userEmail?: string; // Legacy support
   message: string;
   stack?: string;
+  stack_trace?: string;
   pathname?: string;
   created_at: string;
   status: 'open' | 'resolved' | 'ignored' | string;
@@ -74,6 +75,7 @@ export interface ExecutionVideo {
 export interface AdminWorkoutTemplate {
   id: string;
   title: string;
+  name?: string; // Some queries return name
   description?: string;
   exercises: Exercise[];
   created_at: string;
