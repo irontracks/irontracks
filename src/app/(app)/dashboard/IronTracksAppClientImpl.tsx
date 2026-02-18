@@ -179,11 +179,11 @@ const mapWorkoutRow = (w: unknown) => {
         notes: workout.notes,
         exercises: exs,
         is_template: !!workout.is_template,
-        user_id: workout.user_id != null ? String(workout.user_id) : undefined,
-        created_by: workout.created_by != null ? String(workout.created_by) : undefined,
-        archived_at: workout.archived_at ?? null,
-        sort_order: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
-        created_at: workout.created_at ?? null,
+        userId: workout.user_id != null ? String(workout.user_id) : undefined,
+        createdBy: workout.created_by != null ? String(workout.created_by) : undefined,
+        archivedAt: workout.archived_at ?? null,
+        sortOrder: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
+        createdAt: workout.created_at ?? null,
     };
 };
 
@@ -1822,8 +1822,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     .map((row) => mapWorkoutRow(row))
                     .filter(Boolean);
                 const mapped = mappedRaw.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-                    const ao = Number.isFinite(Number(a?.sort_order)) ? Number(a.sort_order) : 0
-                    const bo = Number.isFinite(Number(b?.sort_order)) ? Number(b.sort_order) : 0
+                    const ao = Number.isFinite(Number(a?.sortOrder)) ? Number(a.sortOrder) : 0
+                    const bo = Number.isFinite(Number(b?.sortOrder)) ? Number(b.sortOrder) : 0
                     if (ao !== bo) return ao - bo
                     return String(a.title || '').localeCompare(String(b.title || ''))
                 });
@@ -1838,7 +1838,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         const studentMapped = (studentData || []).map(mapWorkoutRow)
                         const byStudent = new Map()
                         for (const w of studentMapped) {
-                            const sid = w.user_id
+                            const sid = w.userId
                             if (!sid) continue
                             const list = byStudent.get(sid) || []
                             list.push(w)
@@ -1862,10 +1862,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 } else {
                     setWorkouts(mapped)
                     try {
-                        const shared = mapped.filter((w: Record<string, unknown>) => (w.created_by && String(w.created_by) !== String(currentUser.id)))
+                        const shared = mapped.filter((w: Record<string, unknown>) => (w.createdBy && String(w.createdBy) !== String(currentUser.id)))
                         const byCoach = new Map<string, Array<Record<string, unknown>>>()
                         for (const w of shared) {
-                            const cid = String(w.created_by || '').trim()
+                            const cid = String(w.createdBy || '').trim()
                             if (!cid) continue
                             const list = byCoach.get(cid) || []
                             list.push(w)

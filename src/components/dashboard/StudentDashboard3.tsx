@@ -19,7 +19,7 @@ function SortableWorkoutItem({
   onChangeTitle,
   saving,
 }: {
-  item: { id: string; title: string; sort_order: number }
+  item: { id: string; title: string; sortOrder: number }
   index: number
   onChangeTitle: (id: string, val: string) => void
   saving: boolean
@@ -85,7 +85,7 @@ type Props = {
   onDuplicateWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onEditWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onDeleteWorkout: (id?: string, title?: string) => MaybePromise<void>
-  onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
+  onBulkEditWorkouts?: (items: { id: string; title: string; sortOrder: number }[]) => MaybePromise<void>
   currentUserId?: string
   newRecordsReloadKey?: number
   exportingAll?: boolean
@@ -129,7 +129,7 @@ export default function StudentDashboard(props: Props) {
   const [findingDuplicates, setFindingDuplicates] = useState(false)
   const [applyingTitleRule, setApplyingTitleRule] = useState(false)
   const [editListOpen, setEditListOpen] = useState(false)
-  const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
+  const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sortOrder: number }[]>([])
   const [savingListEdits, setSavingListEdits] = useState(false)
   const [pendingAction, setPendingAction] = useState<
     | {
@@ -154,8 +154,8 @@ export default function StudentDashboard(props: Props) {
     workoutsTab === 'periodized'
       ? (periodizedLoaded ? periodizedWorkouts : workouts.filter(isPeriodizedWorkout))
       : workouts.filter((w) => !isPeriodizedWorkout(w))
-  const archivedCount = workoutsForTab.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0)
-  const visibleWorkouts = showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archived_at)
+  const archivedCount = workoutsForTab.reduce((acc, w) => (w?.archivedAt ? acc + 1 : acc), 0)
+  const visibleWorkouts = showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archivedAt)
 
   useEffect(() => {
     isMountedRef.current = true
@@ -244,12 +244,12 @@ export default function StudentDashboard(props: Props) {
               title: String(workout.name ?? ''),
               notes: typeof workout.notes === 'string' ? workout.notes : null,
               exercises: [] as WorkoutExercise[],
-              exercises_count: wid ? (countById.get(wid) ?? null) : null,
-              user_id: workout.user_id != null ? String(workout.user_id) : undefined,
-              created_by: workout.created_by != null ? String(workout.created_by) : undefined,
-              archived_at: typeof workout.archived_at === 'string' ? workout.archived_at : null,
-              sort_order: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
-              created_at: typeof workout.created_at === 'string' ? workout.created_at : null,
+              exercisesCount: wid ? (countById.get(wid) ?? null) : null,
+              userId: workout.user_id != null ? String(workout.user_id) : undefined,
+              createdBy: workout.created_by != null ? String(workout.created_by) : undefined,
+              archivedAt: typeof workout.archived_at === 'string' ? workout.archived_at : null,
+              sortOrder: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
+              createdAt: typeof workout.created_at === 'string' ? workout.created_at : null,
             } as DashboardWorkout
           })
 
@@ -380,17 +380,18 @@ export default function StudentDashboard(props: Props) {
       })
       .filter(Boolean)
 
-    return {
-      id: workout.id != null ? String(workout.id) : undefined,
-      title: String(workout.name ?? ''),
-      notes: workout.notes as any,
-      exercises: exs as any,
-      user_id: workout.user_id != null ? String(workout.user_id) : undefined,
-      created_by: workout.created_by != null ? String(workout.created_by) : undefined,
-      archived_at: (workout as any).archived_at ?? null,
-      sort_order: typeof (workout as any).sort_order === 'number' ? ((workout as any).sort_order as number) : ((workout as any).sort_order == null ? 0 : Number((workout as any).sort_order) || 0),
-      created_at: (workout as any).created_at ?? null,
-    } as DashboardWorkout
+      return {
+        id: workout.id != null ? String(workout.id) : undefined,
+        title: String(workout.name ?? ''),
+        notes: typeof workout.notes === 'string' ? workout.notes : null,
+        exercises: exs,
+        exercisesCount: exs.length,
+        userId: workout.user_id != null ? String(workout.user_id) : undefined,
+        createdBy: workout.created_by != null ? String(workout.created_by) : undefined,
+        archivedAt: typeof workout.archived_at === 'string' ? workout.archived_at : null,
+        sortOrder: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
+        createdAt: typeof workout.created_at === 'string' ? workout.created_at : null,
+      } as DashboardWorkout
   }
 
   useEffect(() => {
@@ -921,9 +922,9 @@ export default function StudentDashboard(props: Props) {
                       .map((w, idx) => {
                         const id = String(w?.id || '').trim()
                         if (!id) return null
-                        return { id, title: String(w?.title || 'Treino'), sort_order: idx }
+                        return { id, title: String(w?.title || 'Treino'), sortOrder: idx }
                       })
-                      .filter(Boolean) as { id: string; title: string; sort_order: number }[]
+                      .filter(Boolean) as { id: string; title: string; sortOrder: number }[]
                     setEditListDraft(items)
                     setEditListOpen(true)
                     setToolsOpen(false)
@@ -1153,9 +1154,9 @@ export default function StudentDashboard(props: Props) {
                 <div className="relative z-10">
                   <h3 className="font-bold text-white text-lg uppercase mb-1 pr-32 leading-tight">{String(w?.title || 'Treino')}</h3>
                   <p className="text-xs text-neutral-400 font-mono mb-4">
-                    {(Number.isFinite(Number((w as any)?.exercises_count)) ? Math.max(0, Math.floor(Number((w as any).exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} EXERCÍCIOS
+                    {(Number.isFinite(Number(w.exercisesCount)) ? Math.max(0, Math.floor(Number(w.exercisesCount))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} EXERCÍCIOS
                   </p>
-                  {w?.archived_at ? (
+                  {w?.archivedAt ? (
                     <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
                       ARQUIVADO
                     </div>
@@ -1166,7 +1167,7 @@ export default function StudentDashboard(props: Props) {
                       onClick={async (e) => {
                         e.stopPropagation()
                         const key = getWorkoutKey(w, idx)
-                        if (w?.archived_at) {
+                        if (w?.archivedAt) {
                           if (typeof props.onRestoreWorkout !== 'function') return
                           await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
                           return
@@ -1191,10 +1192,10 @@ export default function StudentDashboard(props: Props) {
                         })
                       }}
                       data-tour="workout-start"
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archivedAt) && typeof props.onRestoreWorkout !== 'function')}
                       className="relative z-30 flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg flex items-center justify-center gap-2 text-white font-bold text-sm transition-colors border border-white/10 active:scale-95 touch-manipulation disabled:opacity-60"
                     >
-                      {w?.archived_at ? (
+                      {w?.archivedAt ? (
                         isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
                           <>
                             <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
@@ -1251,7 +1252,7 @@ export default function StudentDashboard(props: Props) {
                   >
                     {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
                   </button>
-                  {w?.user_id && props.currentUserId && w.user_id === props.currentUserId ? (
+                  {w?.userId && props.currentUserId && w.userId === props.currentUserId ? (
                     <button
                       onClick={async (e) => {
                         e.stopPropagation()

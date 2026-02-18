@@ -15,15 +15,15 @@ export interface PeriodStats {
 
 export interface DashboardWorkout {
     id?: string
-    user_id?: string | null
-    created_by?: string | null
+    userId?: string | null
+    createdBy?: string | null
     title?: string
     notes?: string | null
     exercises?: WorkoutExercise[]
-    exercises_count?: number | null
-    archived_at?: string | null
-    sort_order?: number
-    created_at?: string | null
+    exercisesCount?: number | null
+    archivedAt?: string | null
+    sortOrder?: number
+    createdAt?: string | null
 }
 
 export interface WorkoutExercise {
@@ -43,12 +43,12 @@ export interface WorkoutExercise {
 }
 
 export interface WorkoutSet {
-    set_number: number
+    setNumber: number
     reps?: string | null
     rpe?: number | null
     weight?: number | null
-    is_warmup: boolean
-    advanced_config?: unknown
+    isWarmup: boolean
+    advancedConfig?: unknown
     completed?: boolean
 }
 
