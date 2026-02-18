@@ -10,6 +10,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
+import { PeriodStats } from '@/types/workout';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -72,15 +73,6 @@ interface ManualExercise {
     weights?: string[];
     repsPerSet?: string[];
     rest_time?: number;
-    [key: string]: unknown;
-}
-
-interface PeriodStats {
-    count: number;
-    totalMinutes: number;
-    avgMinutes: number;
-    totalVolumeKg: number;
-    avgVolumeKg: number;
     [key: string]: unknown;
 }
 

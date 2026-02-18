@@ -11,6 +11,7 @@ import WorkoutCalendarModal from './WorkoutCalendarModal'
 import StoriesBar from './StoriesBar'
 import MuscleMapCard from './MuscleMapCard'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
+import { DashboardWorkout, CheckinRow, WorkoutExercise, WorkoutSet } from '@/types/workout'
 
 function SortableWorkoutItem({
   item,
@@ -49,19 +50,6 @@ function SortableWorkoutItem({
       />
     </Reorder.Item>
   )
-}
-
-export type DashboardWorkout = {
-  id?: string
-  user_id?: string | null
-  created_by?: string | null
-  title?: string
-  notes?: string | null
-  exercises?: any[]
-  exercises_count?: number | null
-  archived_at?: string | null
-  sort_order?: number
-  created_at?: string | null
 }
 
 type MaybePromise<T> = T | Promise<T>
@@ -132,7 +120,7 @@ export default function StudentDashboard(props: Props) {
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [checkinsOpen, setCheckinsOpen] = useState(false)
   const [checkinsLoading, setCheckinsLoading] = useState(false)
-  const [checkinsRows, setCheckinsRows] = useState<any[]>([])
+  const [checkinsRows, setCheckinsRows] = useState<CheckinRow[]>([])
   const [checkinsFilter, setCheckinsFilter] = useState<'all' | 'pre' | 'post'>('all')
   const [checkinsRange, setCheckinsRange] = useState<'7d' | '30d'>('7d')
   const [creatingWorkout, setCreatingWorkout] = useState(false)
@@ -158,7 +146,8 @@ export default function StudentDashboard(props: Props) {
   const showBadges = props.settings?.showBadges !== false
   const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
   const isPeriodizedWorkout = (w: DashboardWorkout) => {
-    const title = String((w as any)?.title || (w as any)?.name || '').trim()
+    const rec = w as unknown as Record<string, unknown>
+    const title = String(rec?.title || rec?.name || '').trim()
     return title.startsWith('VIP •')
   }
   const workoutsForTab =
@@ -193,7 +182,7 @@ export default function StudentDashboard(props: Props) {
     ;(async () => {
       try {
         const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const json = await res.json().catch((): any => null)
+        const json = await res.json().catch(() => null)
         if (cancelled) return
         if (!json?.ok) {
           const msg = String(json?.error || 'Falha ao carregar periodização.')
@@ -202,10 +191,10 @@ export default function StudentDashboard(props: Props) {
           setPeriodizedError(msg)
           return
         }
-        const rows = Array.isArray(json?.workouts) ? json.workouts : []
-        const ids = rows.map((r: any) => String(r?.workout_id || '').trim()).filter(Boolean)
+        const rows = (Array.isArray(json?.workouts) ? json.workouts : []) as Array<Record<string, unknown>>
+        const ids = rows.map((r) => String(r?.workout_id || '').trim()).filter(Boolean)
         const countById = new Map<string, number>()
-        rows.forEach((r: any) => {
+        rows.forEach((r) => {
           const id = String(r?.workout_id || '').trim()
           const n = Number(r?.exercise_count)
           if (!id) return
@@ -240,27 +229,27 @@ export default function StudentDashboard(props: Props) {
         if (error) {
           setPeriodizedWorkouts([])
           setPeriodizedLoaded(true)
-          setPeriodizedError(String((error as any)?.message || 'Falha ao carregar treinos periodizados.'))
+          setPeriodizedError(String(error?.message || 'Falha ao carregar treinos periodizados.'))
           return
         }
 
         const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
         const mapped = (Array.isArray(data) ? data : [])
-          .filter((w: any) => isRecord(w))
-          .map((w: any) => {
+          .filter((w) => isRecord(w))
+          .map((w) => {
             const workout = w as Record<string, unknown>
             const wid = workout.id != null ? String(workout.id) : ''
             return {
               id: workout.id != null ? String(workout.id) : undefined,
               title: String(workout.name ?? ''),
-              notes: workout.notes as any,
-              exercises: [] as any,
+              notes: typeof workout.notes === 'string' ? workout.notes : null,
+              exercises: [] as WorkoutExercise[],
               exercises_count: wid ? (countById.get(wid) ?? null) : null,
               user_id: workout.user_id != null ? String(workout.user_id) : undefined,
               created_by: workout.created_by != null ? String(workout.created_by) : undefined,
-              archived_at: (workout as any).archived_at ?? null,
-              sort_order: typeof (workout as any).sort_order === 'number' ? ((workout as any).sort_order as number) : ((workout as any).sort_order == null ? 0 : Number((workout as any).sort_order) || 0),
-              created_at: (workout as any).created_at ?? null,
+              archived_at: typeof workout.archived_at === 'string' ? workout.archived_at : null,
+              sort_order: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
+              created_at: typeof workout.created_at === 'string' ? workout.created_at : null,
             } as DashboardWorkout
           })
 
@@ -308,9 +297,9 @@ export default function StudentDashboard(props: Props) {
   }
 
   const isPeriodizedWorkoutFullyLoaded = (w: DashboardWorkout) => {
-    const exs = Array.isArray(w?.exercises) ? (w.exercises as any[]) : []
+    const exs = Array.isArray(w?.exercises) ? w.exercises : []
     if (exs.length === 0) return false
-    return exs.some((e) => Array.isArray((e as any)?.setDetails))
+    return exs.some((e) => Array.isArray(e?.setDetails))
   }
 
   const loadWorkoutFullById = async (workoutId: string): Promise<DashboardWorkout | null> => {
@@ -346,11 +335,11 @@ export default function StudentDashboard(props: Props) {
 
     if (error || !data?.id) return null
 
-    const workout: Record<string, unknown> = data as any
+    const workout = data as unknown as Record<string, unknown>
     const rawExercises = Array.isArray(workout?.exercises) ? (workout.exercises as unknown[]) : []
     const exs = rawExercises
       .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
-      .sort((a, b) => (Number((a as any).order) || 0) - (Number((b as any).order) || 0))
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0))
       .map((e) => {
         const isCardio = String((e as any).method || '').toLowerCase() === 'cardio'
         const dbSets = Array.isArray((e as any).sets) ? ((e as any).sets as unknown[]).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object')) : []
@@ -375,18 +364,19 @@ export default function StudentDashboard(props: Props) {
         const defaultRpe = isCardio ? 5 : 8
         const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe
         return {
-          id: (e as any).id,
-          name: (e as any).name,
-          notes: (e as any).notes,
-          videoUrl: (e as any).video_url,
-          restTime: (e as any).rest_time,
-          cadence: (e as any).cadence,
-          method: (e as any).method,
-          sets: setsCount,
-          reps: repsHeader,
-          rpe: rpeHeader,
-          setDetails,
-        }
+            id: String(e.id || ''),
+            name: String(e.name || ''),
+            notes: typeof e.notes === 'string' ? e.notes : undefined,
+            videoUrl: typeof e.video_url === 'string' ? e.video_url : undefined,
+            restTime: Number(e.rest_time) || 0,
+            cadence: typeof e.cadence === 'string' ? e.cadence : undefined,
+            method: typeof e.method === 'string' ? e.method : undefined,
+            sets: setsCount,
+            reps: repsHeader,
+            rpe: rpeHeader,
+            setDetails,
+            order: Number(e.order) || 0,
+          } as WorkoutExercise
       })
       .filter(Boolean)
 
