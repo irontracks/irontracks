@@ -13,6 +13,22 @@ type StoryRow = {
   caption: string | null
 }
 
+type StoryGroup = {
+  authorId: string
+  displayName: string | null
+  photoUrl: string | null
+  role: string | null
+  stories: Array<Record<string, unknown>>
+}
+
+const mediaKindFromPath = (path: string): 'image' | 'video' => {
+  const p = String(path || '').toLowerCase()
+  if (p.endsWith('.mp4') || p.endsWith('.mov') || p.endsWith('.webm')) return 'video'
+  return 'image'
+}
+
+const asRecord = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {})
+
 export async function GET(req: Request) {
   try {
     const auth = await requireUser()
@@ -35,7 +51,9 @@ export async function GET(req: Request) {
 
     if (fErr) return NextResponse.json({ ok: false, error: fErr.message }, { status: 400 })
 
-    const followingIds = (Array.isArray(follows) ? follows : []).map((r: any) => String(r?.following_id || '').trim()).filter(Boolean)
+    const followingIds = (Array.isArray(follows) ? follows : [])
+      .map((r: unknown) => String(asRecord(r)?.following_id || '').trim())
+      .filter(Boolean)
     const authorIds = Array.from(new Set([userId, ...followingIds]))
     if (!authorIds.length) return NextResponse.json({ ok: true, data: [] })
 
@@ -49,14 +67,26 @@ export async function GET(req: Request) {
       .limit(limit)
 
     if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 })
-    const stories = (Array.isArray(storiesRaw) ? (storiesRaw as any[]) : []) as StoryRow[]
+    const stories: StoryRow[] = (Array.isArray(storiesRaw) ? storiesRaw : [])
+      .map((row: unknown) => {
+        const r = asRecord(row)
+        return {
+          id: String(r.id || '').trim(),
+          author_id: String(r.author_id || '').trim(),
+          media_path: String(r.media_path || ''),
+          created_at: String(r.created_at || ''),
+          expires_at: String(r.expires_at || ''),
+          caption: r.caption == null ? null : String(r.caption),
+        }
+      })
+      .filter((s) => Boolean(s.id && s.author_id))
     const storyIds = stories.map((s) => s.id).filter(Boolean)
 
     const viewedSet = new Set<string>()
     if (storyIds.length) {
       const { data: viewsRaw } = await admin.from('social_story_views').select('story_id').eq('viewer_id', userId).in('story_id', storyIds)
-      for (const r of Array.isArray(viewsRaw) ? (viewsRaw as any[]) : []) {
-        const sid = String((r as any)?.story_id || '').trim()
+      for (const r of Array.isArray(viewsRaw) ? viewsRaw : []) {
+        const sid = String(asRecord(r)?.story_id || '').trim()
         if (sid) viewedSet.add(sid)
       }
     }
@@ -66,9 +96,10 @@ export async function GET(req: Request) {
     if (storyIds.length) {
       const { data: likesRaw } = await admin.from('social_story_likes').select('story_id, user_id').in('story_id', storyIds)
       const likes = Array.isArray(likesRaw) ? likesRaw : []
-      for (const r of likes as any[]) {
-        const sid = String(r?.story_id || '').trim()
-        const uid = String(r?.user_id || '').trim()
+      for (const r of likes as unknown[]) {
+        const row = asRecord(r)
+        const sid = String(row?.story_id || '').trim()
+        const uid = String(row?.user_id || '').trim()
         if (!sid) continue
         likeCountByStory.set(sid, (likeCountByStory.get(sid) || 0) + 1)
         if (uid && uid === userId) likedSet.add(sid)
@@ -79,8 +110,8 @@ export async function GET(req: Request) {
     if (storyIds.length) {
       const { data: commentsRaw } = await admin.from('social_story_comments').select('story_id').in('story_id', storyIds)
       const comments = Array.isArray(commentsRaw) ? commentsRaw : []
-      for (const r of comments as any[]) {
-        const sid = String(r?.story_id || '').trim()
+      for (const r of comments as unknown[]) {
+        const sid = String(asRecord(r)?.story_id || '').trim()
         if (!sid) continue
         commentCountByStory.set(sid, (commentCountByStory.get(sid) || 0) + 1)
       }
@@ -91,34 +122,22 @@ export async function GET(req: Request) {
       .select('id, display_name, photo_url, role')
       .in('id', authorIds)
     const profilesArr = Array.isArray(profilesRaw) ? profilesRaw : []
-    const profileById = new Map<string, any>()
-    for (const p of profilesArr as any[]) {
-      const id = String(p?.id || '').trim()
+    const profileById = new Map<string, Record<string, unknown>>()
+    for (const p of profilesArr as unknown[]) {
+      const row = asRecord(p)
+      const id = String(row?.id || '').trim()
       if (!id) continue
-      profileById.set(id, p)
+      profileById.set(id, row)
     }
 
-    const bucket = 'social-stories'
-    const signedUrlByPath = new Map<string, string>()
-    const sign = async (path: string) => {
-      const p = String(path || '').trim()
-      if (!p) return null
-      const cached = signedUrlByPath.get(p)
-      if (cached) return cached
-      const { data, error } = await admin.storage.from(bucket).createSignedUrl(p, signedSeconds)
-      if (error || !data?.signedUrl) return null
-      signedUrlByPath.set(p, data.signedUrl)
-      return data.signedUrl
-    }
-
-    const byAuthor = new Map<string, any>()
+    const byAuthor = new Map<string, StoryGroup>()
     for (const authorId of authorIds) {
       const p = profileById.get(authorId) || null
       byAuthor.set(authorId, {
         authorId,
-        displayName: p?.display_name ?? null,
-        photoUrl: p?.photo_url ?? null,
-        role: p?.role ?? null,
+        displayName: p?.display_name != null ? String(p.display_name) : null,
+        photoUrl: p?.photo_url != null ? String(p.photo_url) : null,
+        role: p?.role != null ? String(p.role) : null,
         stories: [],
       })
     }
@@ -126,13 +145,15 @@ export async function GET(req: Request) {
     for (const s of stories) {
       const authorId = String(s.author_id || '').trim()
       if (!authorId || !byAuthor.has(authorId)) continue
-      const urlSigned = await sign(s.media_path)
-      byAuthor.get(authorId).stories.push({
+      const group = byAuthor.get(authorId)
+      if (!group) continue
+      group.stories.push({
         id: s.id,
         createdAt: s.created_at,
         expiresAt: s.expires_at,
         caption: s.caption ?? null,
-        mediaUrl: urlSigned,
+        mediaUrl: `/api/social/stories/media?storyId=${encodeURIComponent(String(s.id))}&signedSeconds=${encodeURIComponent(String(signedSeconds))}`,
+        mediaKind: mediaKindFromPath(s.media_path),
         viewed: viewedSet.has(s.id),
         likeCount: likeCountByStory.get(s.id) || 0,
         hasLiked: likedSet.has(s.id),
@@ -146,7 +167,7 @@ export async function GET(req: Request) {
         return {
           ...g,
           hasStories: storiesArr.length > 0,
-          hasUnseen: storiesArr.some((st: any) => !st.viewed),
+          hasUnseen: storiesArr.some((st: Record<string, unknown>) => st.viewed !== true),
           latestAt: storiesArr.length ? String(storiesArr[0]?.createdAt || '') : '',
         }
       })
@@ -160,7 +181,8 @@ export async function GET(req: Request) {
       })
 
     return NextResponse.json({ ok: true, data: groups })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
 }

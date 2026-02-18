@@ -114,9 +114,9 @@ export default function WorkoutCalendarModal(props: Props) {
         if (cancelled) return
         const map: Record<string, { pre: boolean; post: boolean }> = {}
         for (const r of Array.isArray(chkData) ? chkData : []) {
-          const wid = String((r as any)?.workout_id || '').trim()
+          const wid = String((r as Record<string, unknown>)?.workout_id || '').trim()
           if (!wid) continue
-          const kind = String((r as any)?.kind || '').trim()
+          const kind = String((r as Record<string, unknown>)?.kind || '').trim()
           if (!map[wid]) map[wid] = { pre: false, post: false }
           if (kind === 'pre') map[wid].pre = true
           if (kind === 'post') map[wid].post = true

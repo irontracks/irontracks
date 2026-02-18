@@ -6,13 +6,21 @@ import { AlertCircle, RefreshCw, LogIn } from 'lucide-react'
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     try {
-      const key = 'irontracks.dashboard.error.autoreload.v1'
+      const msg = String(error?.message || '')
+      const lower = msg.toLowerCase()
+      const shouldAutoReload =
+        lower.includes('chunkloaderror') ||
+        lower.includes('loading chunk') ||
+        lower.includes('failed to fetch dynamically imported module')
+      if (!shouldAutoReload) return
+
+      const key = 'irontracks.dashboard.error.autoreload.v2'
       const seen = window.sessionStorage.getItem(key) || ''
       if (seen === '1') return
       window.sessionStorage.setItem(key, '1')
       window.location.reload()
     } catch {}
-  }, [])
+  }, [error?.message])
 
   return (
     <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-6 text-center">
@@ -60,4 +68,3 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
     </div>
   )
 }
-

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,8 +11,11 @@ const clamp = (n: number, min: number, max: number) => {
 
 export async function GET(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin'])
+      if (!auth.ok) return auth.response
+    }
 
     const url = new URL(req.url)
     const teacher_user_id = String(url.searchParams.get('teacher_user_id') || '').trim()
@@ -33,9 +36,9 @@ export async function GET(req: Request) {
 
     const studentNameById = new Map<string, string>()
     for (const s of students || []) {
-      const uid = String((s as any)?.user_id || '').trim()
+      const uid = String((s as Record<string, unknown>)?.user_id || '').trim()
       if (!uid) continue
-      const nm = String((s as any)?.name || '').trim()
+      const nm = String((s as Record<string, unknown>)?.name || '').trim()
       if (nm) studentNameById.set(uid, nm)
     }
 
@@ -61,8 +64,7 @@ export async function GET(req: Request) {
     const next_cursor = last?.created_at ? String(last.created_at) : null
 
     return NextResponse.json({ ok: true, rows: enriched, next_cursor }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

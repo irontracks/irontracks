@@ -1,9 +1,21 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    priceCents: z.coerce.number(),
+    interval: z.enum(['month', 'year']).optional(),
+    status: z.enum(['active', 'inactive']).optional(),
+  })
+  .passthrough()
 
 const getRole = async (admin: ReturnType<typeof createAdminClient>, userId: string) => {
   const { data } = await admin.from('profiles').select('role, email').eq('id', userId).maybeSingle()
@@ -31,7 +43,7 @@ export async function GET(req: Request) {
     const { data, error } = await q
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, plans: data || [] })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
@@ -43,7 +55,9 @@ export async function POST(req: Request) {
     const supabase = auth.supabase
     const user = auth.user
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
     const name = (body?.name || '').trim()
     const description = (body?.description || '').trim()
     const priceCents = Number(body?.priceCents)
@@ -77,7 +91,7 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, plan: data })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

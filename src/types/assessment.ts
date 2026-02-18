@@ -224,12 +224,12 @@ export interface AssessmentListResponse {
 }
 
 // Funções utilitárias de tipo
-export const isValidGender = (value: any): value is 'M' | 'F' => {
+export const isValidGender = (value: unknown): value is 'M' | 'F' => {
   return value === 'M' || value === 'F';
 };
 
-export const isValidPhotoType = (value: any): value is 'front' | 'side' | 'back' => {
-  return ['front', 'side', 'back'].includes(value);
+export const isValidPhotoType = (value: unknown): value is 'front' | 'side' | 'back' => {
+  return ['front', 'side', 'back'].includes(value as string);
 };
 
 export const parseNumberInput = (value: string): number | null => {

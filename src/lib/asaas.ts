@@ -30,7 +30,7 @@ export async function asaasRequest<T>(options: AsaasRequestOptions): Promise<T> 
   })
 
   const text = await res.text()
-  let json: any = null
+  let json: unknown = null
   try {
     json = text ? JSON.parse(text) : null
   } catch {

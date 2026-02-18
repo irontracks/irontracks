@@ -48,7 +48,7 @@ export default function PrivacyPolicy() {
         <ul className="list-disc pl-6 space-y-2">
           <li>Acessar seus dados pessoais a qualquer momento através do aplicativo.</li>
           <li>Solicitar a correção de dados incorretos.</li>
-          <li>Solicitar a exclusão completa da sua conta e de todos os dados associados. Para isso, utilize a opção "Excluir Conta" nas configurações do aplicativo ou entre em contato conosco.</li>
+          <li>Solicitar a exclusão completa da sua conta e de todos os dados associados. Para isso, utilize a opção &quot;Excluir Conta&quot; nas configurações do aplicativo ou entre em contato conosco.</li>
         </ul>
       </section>
 

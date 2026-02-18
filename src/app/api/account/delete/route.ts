@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z
+  .object({
+    confirm: z.string().min(1),
+  })
+  .passthrough()
 
 const isMissingTable = (error: any) => {
   const status = Number(error?.status)
@@ -19,7 +27,9 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const confirm = String(body?.confirm || '').trim().toUpperCase()
     if (confirm !== 'EXCLUIR') return NextResponse.json({ ok: false, error: 'invalid_confirm' }, { status: 400 })
 
@@ -30,7 +40,7 @@ export async function POST(req: Request) {
       try {
         const { error } = await query
         if (error && !isMissingTable(error)) throw error
-      } catch (e: any) {
+      } catch (e) {
         if (isMissingTable(e)) return
         throw e
       }
@@ -45,7 +55,7 @@ export async function POST(req: Request) {
         }
         const rows = Array.isArray(data) ? data : []
         return rows.map((r: any) => r?.[key]).filter(Boolean)
-      } catch (e: any) {
+      } catch (e) {
         if (isMissingTable(e)) return []
         throw e
       }
@@ -101,8 +111,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

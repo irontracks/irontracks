@@ -1,7 +1,8 @@
 import { logInfo, logError } from '@/lib/logger'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-export async function runChatDiagnostics(supabase: any, userId: string) {
-  const report: any = { ok: true, steps: [] }
+export async function runChatDiagnostics(supabase: SupabaseClient, userId: string) {
+  const report: { ok: boolean; steps: Record<string, unknown>[]; error?: string } = { ok: true, steps: [] }
   try {
     const { data: me, error: meErr } = await supabase
       .from('profiles')
@@ -35,7 +36,7 @@ export async function runChatDiagnostics(supabase: any, userId: string) {
     logInfo('chatDiagnostics', 'Finished', report)
   } catch (e) {
     report.ok = false
-    report.error = (e as any)?.message ?? String(e)
+    report.error = String((e as Record<string, unknown>)?.message ?? String(e))
     logError('chatDiagnostics', e)
   }
   return report

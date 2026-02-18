@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
@@ -6,13 +8,21 @@ import { mercadopagoRequest } from '@/lib/mercadopago'
 
 export const dynamic = 'force-dynamic'
 
+const ZodBodySchema = z
+  .object({
+    planId: z.string().optional(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const planId = String(body?.planId || '').trim()
 
     const admin = createAdminClient()
@@ -68,8 +78,7 @@ export async function POST(req: Request) {
       .eq('id', sub.id)
 
     return NextResponse.json({ ok: true, cancelled: true, id: sub.id })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

@@ -9,6 +9,7 @@ export type MercadoPagoRequestOptions = {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE'
   path: string
   body?: unknown
+  idempotencyKey?: string
 }
 
 export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions): Promise<T> {
@@ -20,19 +21,38 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
   }
 
   const url = `${baseUrl}${options.path.startsWith('/') ? '' : '/'}${options.path}`
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'User-Agent': userAgent,
+    Authorization: `Bearer ${accessToken}`,
+  }
+  if (options.method === 'POST') {
+    let idempotencyKey = String(options.idempotencyKey || '').trim()
+    if (!idempotencyKey) {
+      try {
+        const maybe = (globalThis as any)?.crypto?.randomUUID
+        if (typeof maybe === 'function') idempotencyKey = String(maybe()).trim()
+      } catch {}
+    }
+    if (!idempotencyKey) {
+      try {
+        const mod: any = await import('crypto')
+        const maybe = mod?.randomUUID
+        if (typeof maybe === 'function') idempotencyKey = String(maybe()).trim()
+      } catch {}
+    }
+    if (!idempotencyKey) idempotencyKey = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+    headers['X-Idempotency-Key'] = idempotencyKey
+  }
   const res = await fetch(url, {
     method: options.method,
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': userAgent,
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     cache: 'no-store',
   })
 
   const text = await res.text()
-  let json: any = null
+  let json: unknown = null
   try {
     json = text ? JSON.parse(text) : null
   } catch {
@@ -47,4 +67,3 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
 
   return (json as T)
 }
-

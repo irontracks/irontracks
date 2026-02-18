@@ -22,7 +22,12 @@ export function parseInput(text: string): MealLog {
   const rawText = typeof text === 'string' ? text : ''
   if (!rawText.trim()) throw new Error('nutrition_parser_empty_input')
 
-  const lines = rawText.split('\n')
+  const lines = rawText
+    .split('\n')
+    .flatMap((l) => String(l || '').split(/\s*\+\s*/g))
+    .flatMap((l) => String(l || '').split(/\s*;\s*/g))
+    .map((l) => String(l || '').trim())
+    .filter(Boolean)
   let mealName = 'Refeição'
   const totals: MacroTotals = { p: 0, c: 0, f: 0, kcal: 0 }
   const unknownLines: string[] = []
@@ -32,7 +37,7 @@ export function parseInput(text: string): MealLog {
     const rawLine = (line || '').trim()
     if (!rawLine) continue
 
-    if (index === 0 && !/\d/.test(rawLine)) {
+    if (index === 0 && lines.length > 1 && !/\d/.test(rawLine)) {
       mealName = rawLine
       continue
     }
@@ -46,16 +51,17 @@ export function parseInput(text: string): MealLog {
     let wasApprox = false
 
     const approxRegex =
-      /(\d+)\s*(colheres?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|ovos?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalhoes?|espetinhos?)/i
-    const gramRegex = /(\d+)\s*(g|ml)\b/i
-    const countRegex = /^(\d+)\s+(.+)$/i
+      /(\d+(?:[.,]\d+)?)\s*(colheres?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|ovos?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalhoes?|espetinhos?|un|unid)\b/i
+    const gramRegex = /(\d+(?:[.,]\d+)?)\s*(g|gr|ml)\b/i
+    const countRegex = /^(\d+(?:[.,]\d+)?)\s+(.+)$/i
 
     const approxMatch = normalizedLine.match(approxRegex)
     const gramMatch = normalizedLine.match(gramRegex)
     const countMatch = normalizedLine.match(countRegex)
+    const parseQtd = (raw: string) => Number.parseFloat(String(raw || '0').replace(',', '.'))
 
     if (approxMatch) {
-      qtd = Number.parseInt(approxMatch[1] || '0', 10)
+      qtd = parseQtd(approxMatch[1] || '0')
       const unitRaw = (approxMatch[2] || '').toLowerCase()
 
       if (unitRaw.startsWith('colher')) unitUsed = 'colher'
@@ -79,11 +85,11 @@ export function parseInput(text: string): MealLog {
       foodName = normalizedLine.replace(approxMatch[0] || '', '').replace(' de ', ' ').trim().toLowerCase()
       wasApprox = true
     } else if (gramMatch) {
-      qtd = Number.parseInt(gramMatch[1] || '0', 10)
-      unitUsed = 'g'
+      qtd = parseQtd(gramMatch[1] || '0')
+      unitUsed = String(gramMatch[2] || '').toLowerCase() === 'ml' ? 'ml' : 'g'
       foodName = normalizedLine.replace(gramMatch[0] || '', '').replace(' de ', ' ').trim().toLowerCase()
     } else if (countMatch) {
-      qtd = Number.parseInt(countMatch[1] || '0', 10)
+      qtd = parseQtd(countMatch[1] || '0')
       unitUsed = 'unidade'
       foodName = (countMatch[2] || '').replace(' de ', ' ').trim().toLowerCase()
       wasApprox = true
@@ -118,6 +124,8 @@ export function parseInput(text: string): MealLog {
 
     let grams = 0
     if (unitUsed === 'g') {
+      grams = qtd
+    } else if (unitUsed === 'ml') {
       grams = qtd
     } else if (wasApprox) {
       const approx = matchedItem?.approx
@@ -155,4 +163,3 @@ export function parseInput(text: string): MealLog {
     fat: Math.max(0, Math.round(totals.f)),
   }
 }
-

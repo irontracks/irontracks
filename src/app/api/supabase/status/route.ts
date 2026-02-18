@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       })
     }
     return NextResponse.json({ ok: true, hasUrl, hasAnon })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json(
       { ok: false, hasUrl, hasAnon, error: e?.message ?? String(e) },
       { status: 500 }

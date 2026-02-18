@@ -1,0 +1,165 @@
+ M .gitignore
+ D "_archive/duplicates/src/actions/workout-actions 2.js"
+ D "_archive/duplicates/src/app/(app)/community/CommunityClient 2.tsx"
+ D "_archive/duplicates/src/app/(app)/community/page 2.tsx"
+ D "_archive/duplicates/src/app/(app)/dashboard/DashboardClientEntry 2.tsx"
+ D "_archive/duplicates/src/app/(app)/dashboard/IronTracksAppClient 2.js"
+ D "_archive/duplicates/src/app/(app)/dashboard/IronTracksAppClient 4.js"
+ D "_archive/duplicates/src/app/(app)/dashboard/IronTracksAppClient 5.js"
+ D "_archive/duplicates/src/app/(app)/dashboard/IronTracksAppClient 6.js"
+ D "_archive/duplicates/src/app/(app)/dashboard/IronTracksAppClient 7.js"
+ D "_archive/duplicates/src/app/(app)/dashboard/IronTracksAppClient 8.js"
+ D "_archive/duplicates/src/app/(app)/dashboard/error 2.tsx"
+ D "_archive/duplicates/src/app/(app)/dashboard/page 2.tsx"
+ D "_archive/duplicates/src/app/(app)/dashboard/page 3.tsx"
+ D "_archive/duplicates/src/app/(app)/dashboard/schedule/ScheduleClient 2.tsx"
+ D "_archive/duplicates/src/app/(public)/page 2.tsx"
+ D "_archive/duplicates/src/app/api/access-request/create/route 2.ts"
+ D "_archive/duplicates/src/app/api/admin/access-requests/action/route 2.ts"
+ D "_archive/duplicates/src/app/api/ai/coach-chat/route 2.ts"
+ D "_archive/duplicates/src/app/api/ai/workout-wizard/route 2.ts"
+ D "_archive/duplicates/src/app/api/assessment-scanner/route 2.ts"
+ D "_archive/duplicates/src/app/api/assessment-scanner/route 3.ts"
+ D "_archive/duplicates/src/app/api/diagnostics/iron-rank/route 2.ts"
+ D "_archive/duplicates/src/app/api/exercises/canonicalize/route 2.ts"
+ D "_archive/duplicates/src/app/api/marketplace/webhooks/asaas/route 2.ts"
+ D "_archive/duplicates/src/app/api/social/stories/create/route 2.ts"
+ D "_archive/duplicates/src/app/api/social/stories/delete/route 2.ts"
+ D "_archive/duplicates/src/app/api/social/stories/delete/route 3.ts"
+ D "_archive/duplicates/src/app/api/social/stories/list/route 2.ts"
+ D "_archive/duplicates/src/app/api/social/stories/media/route 2.ts"
+ D "_archive/duplicates/src/app/api/supabase/status/route 2.ts"
+ D "_archive/duplicates/src/app/api/workouts/finish/route 2.ts"
+ D "_archive/duplicates/src/app/api/workouts/finish/route 3.ts"
+ D "_archive/duplicates/src/app/api/workouts/list/route 2.ts"
+ D "_archive/duplicates/src/app/api/workouts/list/route 3.ts"
+ D "_archive/duplicates/src/app/auth/callback/route 2.js"
+ D "_archive/duplicates/src/app/auth/error/page 2.tsx"
+ D "_archive/duplicates/src/app/auth/login/route 2.ts"
+ D "_archive/duplicates/src/app/auth/logout/route 2.ts"
+ D "_archive/duplicates/src/app/favicon.ico/route 2.ts"
+ D "_archive/duplicates/src/app/favicon.ico/route 3.ts"
+ D "_archive/duplicates/src/app/marketplace/MarketplaceClient 2.tsx"
+ D "_archive/duplicates/src/app/wait-approval/page 2.tsx"
+ D "_archive/duplicates/src/components/ActiveWorkout 2.js"
+ D "_archive/duplicates/src/components/AdminPanelV2 2.js"
+ D "_archive/duplicates/src/components/ExerciseEditor 2.js"
+ D "_archive/duplicates/src/components/HistoryList 2.js"
+ D "_archive/duplicates/src/components/LoginScreen 2.js"
+ D "_archive/duplicates/src/components/ServiceWorkerRegister 2.js"
+ D "_archive/duplicates/src/components/StoryComposer 2.tsx"
+ D "_archive/duplicates/src/components/admin/RequestsTab 2.js"
+ D "_archive/duplicates/src/components/assessment/AssessmentButton 2.tsx"
+ D "_archive/duplicates/src/components/dashboard/StoriesBar 2.tsx"
+ D "_archive/duplicates/src/components/dashboard/StoriesBar 3.tsx"
+ D "_archive/duplicates/src/components/dashboard/StudentDashboard 2.tsx"
+ D "_archive/duplicates/src/components/dashboard/StudentDashboard 3.tsx"
+ D "_archive/duplicates/src/components/muscle-map/BodyMapSvg 2.tsx"
+ D "_archive/duplicates/src/components/muscle-map/BodyMapSvg 3.tsx"
+ D "_archive/duplicates/src/components/onboarding/GuidedTour 2.js"
+ D "_archive/duplicates/src/components/onboarding/GuidedTour 3.js"
+ D "_archive/duplicates/src/components/stories/StoryCreatorModal 2.tsx"
+ D "_archive/duplicates/src/components/stories/StoryViewer 2.tsx"
+ D "_archive/duplicates/src/components/stories/VideoTrimmer 2.tsx"
+ D "_archive/duplicates/src/components/stories/VideoTrimmer 3.tsx"
+ D "_archive/duplicates/src/hooks/useAssessment 2.ts"
+ D "_archive/duplicates/src/hooks/useAssessment 3.ts"
+ D "_archive/duplicates/src/lib/offline/_probe 3.txt"
+ D "_archive/duplicates/src/lib/offline/idb 2.js"
+ D "_archive/duplicates/src/lib/offline/idb 3.js"
+ D "_archive/duplicates/src/lib/offline/offlineSync 3.js"
+ D "_archive/duplicates/src/lib/social/notifyFollowers 2.js"
+ D "_archive/duplicates/src/lib/social/notifyFollowers 3.js"
+ D "_archive/duplicates/src/lib/social/storyValidation 2.ts"
+ D "_archive/duplicates/src/lib/video/VideoCompositor 2.ts"
+ D "_archive/duplicates/src/lib/video/VideoCompositor 3.ts"
+ D "_archive/duplicates/src/utils/__tests__/mediaUtils.test 2.ts"
+ D "_archive/duplicates/src/utils/calories/kcalClient 3.js"
+ D "_archive/duplicates/src/utils/report/buildHtml 2.js"
+ D "_archive/duplicates/src/utils/report/buildPeriodReportHtml 2.js"
+ D "_archive/duplicates/src/utils/report/templates 2.js"
+ D "_archive/duplicates/src/utils/supabase/client 2.ts"
+ D "_archive/duplicates/src/utils/supabase/client 3.ts"
+ D "_archive/duplicates/src/utils/supabase/cookieOptions 2.ts"
+ D "_archive/duplicates/src/utils/supabase/cookieOptions 3.ts"
+ D "_archive/duplicates/src/utils/supabase/middleware 2.ts"
+ D "_archive/duplicates/src/utils/supabase/middleware 3.ts"
+ D "_archive/duplicates/src/utils/supabase/server 2.ts"
+ D "_archive/duplicates/src/utils/training/notesMethodParser 2.js"
+ D "_archive/duplicates/src/utils/training/notesMethodParser 3.js"
+ D claude.zip
+ D claude/_debug/login_loop_debug_report.json
+ D claude/middleware.ts
+ D claude/schema_full_restore.sql
+ D claude/src/app/(app)/layout.tsx
+ D "claude/src/app/auth/login/route 2.ts"
+ D claude/src/app/auth/login/route.ts
+ D claude/src/components/dashboard/StudentDashboard.tsx
+ D claude/src/content/vipPlaybooks.ts
+ D claude/src/types/assessment.ts
+ D claude/src/types/supabase.ts
+ D claude/src/utils/featureFlags.js
+ D claude/src/utils/vip/limits.ts
+ D claudeanalise
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/100 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/102 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/1024 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/108 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/114 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/120 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/128 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/144 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/152 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/16 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/167 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/180 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/196 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/20 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/216 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/234 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/256 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/258 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/29 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/40 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/48 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/50 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/512 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/55 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/57 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/58 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/60 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/64 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/66 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/72 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/76 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/80 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/87 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/88 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/92 2.png"
+ D "ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x 2.png"
+ D "ios/App/App/Info 2.plist"
+ D "ios/App/App/config 2.xml"
+ D "ios/debug 2.xcconfig"
+ M package.json
+ D "scripts/test-story-validation 2.js"
+ D "scripts/test-trimming 2.js"
+ D "scripts/validate-media-logic 2.js"
+ M scripts/vip-entitlement.test.cjs
+ D "scripts/workoutWizardAiValidation.test 2.cjs"
+ M src/app/api/marketplace/webhooks/asaas/route.ts
+ M src/app/auth/login/route.ts
+RM src/components/ActiveWorkout.js -> src/components/ActiveWorkout.tsx
+RM src/components/AdminPanelV2.js -> src/components/AdminPanelV2.tsx
+ D "src/hooks/useAssessment 4.ts"
+ M src/utils/vip/limits.ts
+ M tsconfig.json
+?? scripts/ai-routes-smoke.test.cjs
+?? scripts/auth-login-origin-smoke.test.cjs
+?? snapshots/
+?? src/app/api/ai/coach-chat/
+?? src/app/api/ai/vip-coach/
+?? src/app/api/ai/workout-wizard/
+?? src/components/ActiveWorkout.js
+?? src/components/AdminPanelV2.js
+?? src/hooks/useStableSupabaseClient.ts
+?? supabase/migrations/20260213200500_user_entitlements.sql

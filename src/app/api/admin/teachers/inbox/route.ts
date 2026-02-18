@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, jsonError } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer, jsonError } from '@/utils/auth/route'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,9 +27,18 @@ const toNumeric = (v: unknown) => {
   return Number.isFinite(n) ? n : 0
 }
 
-const normalizeCoachInboxSettings = (raw: any) => {
-  const s = raw && typeof raw === 'object' ? raw : {}
-  const toInt = (v: any, min: number, max: number, fallback: number) => {
+interface CoachInboxConfig {
+  churnDays: number
+  volumeDropPct: number
+  loadSpikePct: number
+  minPrev7Volume: number
+  minCurrent7VolumeSpike: number
+  [key: string]: unknown
+}
+
+const normalizeCoachInboxSettings = (raw: unknown): CoachInboxConfig => {
+  const s = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const toInt = (v: unknown, min: number, max: number, fallback: number): number => {
     const n = Number(v)
     if (!Number.isFinite(n)) return fallback
     const x = Math.floor(n)
@@ -54,8 +63,11 @@ const messageTemplate = (kind: string, studentName: string) => {
 }
 
 export async function GET(req: Request) {
-  const auth = await requireRole(['admin'])
-  if (!auth.ok) return auth.response
+  let auth = await requireRole(['admin'])
+  if (!auth.ok) {
+    auth = await requireRoleWithBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
+  }
 
   try {
     const url = new URL(req.url)
@@ -76,7 +88,10 @@ export async function GET(req: Request) {
         .eq('user_id', teacher_user_id)
         .maybeSingle()
       const prefs = prefRow?.preferences && typeof prefRow.preferences === 'object' ? prefRow.preferences : null
-      if (prefs) cfg = normalizeCoachInboxSettings((prefs as any)?.coachInbox)
+      if (prefs) {
+        const prefsObj = prefs as Record<string, unknown>
+        cfg = normalizeCoachInboxSettings(prefsObj?.coachInbox)
+      }
     } catch {}
 
     const { data: students, error: stErr } = await admin
@@ -87,14 +102,14 @@ export async function GET(req: Request) {
     if (stErr) return jsonError(400, stErr.message)
 
     const list = Array.isArray(students) ? students : []
-    const studentUserIds = list.map((s: any) => String(s?.user_id || '').trim()).filter(Boolean)
+    const studentUserIds = list.map((s) => String((s as Record<string, unknown>)?.user_id ?? '').trim()).filter(Boolean)
     if (studentUserIds.length === 0) return NextResponse.json({ ok: true, items: [] }, { headers: { 'cache-control': 'no-store, max-age=0' } })
 
     const studentNameById = new Map<string, string>()
     for (const s of list) {
-      const uid = String((s as any)?.user_id || '').trim()
+      const uid = String((s as Record<string, unknown>)?.user_id ?? '').trim()
       if (!uid) continue
-      const nm = String((s as any)?.name || '').trim()
+      const nm = String((s as Record<string, unknown>)?.name ?? '').trim()
       if (nm) studentNameById.set(uid, nm)
     }
 
@@ -109,10 +124,10 @@ export async function GET(req: Request) {
 
     const lastWorkoutByUser = new Map<string, number>()
     for (const w of Array.isArray(lastWorkouts) ? lastWorkouts : []) {
-      const uid = String((w as any)?.user_id || '').trim()
+      const uid = String((w as Record<string, unknown>)?.user_id ?? '').trim()
       if (!uid) continue
       if (lastWorkoutByUser.has(uid)) continue
-      const t = Date.parse(String((w as any)?.date || ''))
+      const t = Date.parse(String((w as Record<string, unknown>)?.date ?? ''))
       if (Number.isFinite(t)) lastWorkoutByUser.set(uid, t)
     }
 
@@ -128,20 +143,23 @@ export async function GET(req: Request) {
     if (w14Err) return jsonError(400, w14Err.message)
 
     for (const w of Array.isArray(workouts14) ? workouts14 : []) {
-      const uid = String((w as any)?.user_id || '').trim()
+      const uid = String((w as Record<string, unknown>)?.user_id ?? '').trim()
       if (!uid) continue
-      const dateMs = Date.parse(String((w as any)?.date || ''))
+      const dateMs = Date.parse(String((w as Record<string, unknown>)?.date ?? ''))
       if (!Number.isFinite(dateMs)) continue
       const inLast7 = dateMs >= since7.getTime()
-      const exs = Array.isArray((w as any)?.exercises) ? (w as any).exercises : []
+      const wObj = w as Record<string, unknown>
+      const exs = Array.isArray(wObj?.exercises) ? (wObj.exercises as unknown[]) : []
       let vol = 0
       for (const ex of exs) {
-        const sets = Array.isArray(ex?.sets) ? ex.sets : []
+        const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+        const sets = Array.isArray(exObj?.sets) ? (exObj.sets as unknown[]) : []
         for (const s of sets) {
           if (!s || typeof s !== 'object') continue
-          if (s.completed !== true) continue
-          const weight = toNumeric((s as any).weight)
-          const reps = toNumeric((s as any).reps)
+          const sObj = s as Record<string, unknown>
+          if (sObj.completed !== true) continue
+          const weight = toNumeric(sObj.weight)
+          const reps = toNumeric(sObj.reps)
           if (weight <= 0 || reps <= 0) continue
           vol += weight * reps
         }
@@ -166,9 +184,9 @@ export async function GET(req: Request) {
         .limit(20000)
       if (cErr) throw cErr
       for (const r of Array.isArray(checkins7) ? checkins7 : []) {
-        const uid = String((r as any)?.user_id || '').trim()
+        const uid = String((r as Record<string, unknown>)?.user_id ?? '').trim()
         if (!uid) continue
-        const kind = String((r as any)?.kind || '').trim()
+        const kind = String((r as Record<string, unknown>)?.kind ?? '').trim()
         const prev = checkinsAggByUser.get(uid) || {
           preEnergySum: 0,
           preEnergyCount: 0,
@@ -182,11 +200,11 @@ export async function GET(req: Request) {
           highSorenessCount: 0,
         }
 
-        const soreness = toNumeric((r as any)?.soreness)
+        const soreness = toNumeric((r as Record<string, unknown>)?.soreness)
         if (Number.isFinite(soreness) && soreness >= 7) prev.highSorenessCount += 1
 
         if (kind === 'pre') {
-          const energy = toNumeric((r as any)?.energy)
+          const energy = toNumeric((r as Record<string, unknown>)?.energy)
           if (Number.isFinite(energy) && energy > 0) {
             prev.preEnergySum += energy
             prev.preEnergyCount += 1
@@ -199,13 +217,13 @@ export async function GET(req: Request) {
         }
 
         if (kind === 'post') {
-          const satisfaction = toNumeric((r as any)?.mood)
+          const satisfaction = toNumeric((r as Record<string, unknown>)?.mood)
           if (Number.isFinite(satisfaction) && satisfaction > 0) {
             prev.postSatisfactionSum += satisfaction
             prev.postSatisfactionCount += 1
           }
-          const answers = (r as any)?.answers && typeof (r as any).answers === 'object' ? (r as any).answers : {}
-          const rpe = toNumeric((answers as any)?.rpe)
+          const answers = (r as Record<string, unknown>)?.answers && typeof (r as Record<string, unknown>).answers === 'object' ? (r as Record<string, unknown>).answers : {}
+          const rpe = toNumeric((answers as Record<string, unknown>)?.rpe)
           if (Number.isFinite(rpe) && rpe > 0) {
             prev.postRpeSum += rpe
             prev.postRpeCount += 1
@@ -226,15 +244,25 @@ export async function GET(req: Request) {
 
     const stateByKey = new Map<string, { status: string; snoozeUntil: number }>()
     for (const s of Array.isArray(states) ? states : []) {
-      const uid = String((s as any)?.student_user_id || '').trim()
-      const kind = String((s as any)?.kind || '').trim()
+      const uid = String((s as Record<string, unknown>)?.student_user_id ?? '').trim()
+      const kind = String((s as Record<string, unknown>)?.kind ?? '').trim()
       if (!uid || !kind) continue
-      const status = String((s as any)?.status || 'open').trim().toLowerCase()
-      const snoozeUntil = Date.parse(String((s as any)?.snooze_until || ''))
+      const status = String((s as Record<string, unknown>)?.status ?? 'open').trim().toLowerCase()
+      const snoozeUntil = Date.parse(String((s as Record<string, unknown>)?.snooze_until ?? ''))
       stateByKey.set(`${uid}:${kind}`, { status, snoozeUntil: Number.isFinite(snoozeUntil) ? snoozeUntil : 0 })
     }
 
-    const items: any[] = []
+    const items: Array<{
+      id: string
+      student_user_id: string
+      student_name: string
+      kind: string
+      title: string
+      reason: string
+      score: number
+      suggested_message: string
+      last_workout_at: string | null
+    }> = []
     for (const uid of studentUserIds) {
       const name = studentNameById.get(uid) || ''
       const lastAt = lastWorkoutByUser.get(uid) || 0
@@ -311,8 +339,8 @@ export async function GET(req: Request) {
 
     items.sort((a, b) => (b.score || 0) - (a.score || 0))
     return NextResponse.json({ ok: true, items: items.slice(0, limit) }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
-    return jsonError(500, e?.message ?? String(e))
+  } catch (e) {
+    const msg = (e as Record<string, unknown>)?.message
+    return jsonError(500, typeof msg === 'string' ? msg : String(e))
   }
 }
-

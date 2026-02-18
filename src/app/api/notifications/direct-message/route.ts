@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    receiverId: z.string().min(1),
+    senderName: z.string().min(1),
+    preview: z.string().min(1),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +22,9 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
     const receiverId = (body?.receiverId || '').trim() as string
     const senderName = (body?.senderName || '').trim() as string
     const preview = (body?.preview || '').trim() as string
@@ -52,7 +64,7 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

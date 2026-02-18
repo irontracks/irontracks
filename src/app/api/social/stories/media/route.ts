@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+const PostBodySchema = z
+  .object({
+    storyId: z.string().optional(),
+    story_id: z.string().optional(),
+    signedSeconds: z.coerce.number().optional(),
+  })
+  .passthrough()
 
 const guessContentTypeFromPath = (path: string) => {
   const p = String(path || '').toLowerCase()
@@ -40,7 +50,7 @@ export async function GET(req: Request) {
     if (story?.is_deleted) return new Response('not_found', { status: 404 })
     if (story?.expires_at && new Date(String(story.expires_at)).getTime() <= Date.now()) return new Response('not_found', { status: 404 })
 
-    const authorId = String((story as any)?.author_id || '').trim()
+    const authorId = String((story as Record<string, unknown>)?.author_id || '').trim()
     if (!authorId) return new Response('not_found', { status: 404 })
     if (authorId !== userId) {
       const { data: follow, error: fErr } = await admin
@@ -57,43 +67,12 @@ export async function GET(req: Request) {
     const { data: signed, error: sErr } = await admin.storage.from(bucket).createSignedUrl(String(story.media_path), signedSeconds)
     if (sErr || !signed?.signedUrl) return new Response(sErr?.message || 'failed_to_sign', { status: 400 })
 
-    const range = req.headers.get('range') || req.headers.get('Range')
-    const upstream = await fetch(String(signed.signedUrl), {
-      headers: range ? { Range: range } : undefined,
-      redirect: 'follow',
-    })
-
-    if (!upstream.ok && upstream.status !== 206) {
-      const txt = await upstream.text().catch(() => '')
-      return new Response(txt || 'upstream_failed', { status: upstream.status || 502 })
-    }
-
     const headers = new Headers()
-
-    const contentType =
-      upstream.headers.get('content-type') ||
-      guessContentTypeFromPath(String(story.media_path)) ||
-      'application/octet-stream'
-    headers.set('Content-Type', contentType)
-
-    for (const h of ['content-length', 'content-range', 'accept-ranges', 'etag', 'last-modified'] as const) {
-      const v = upstream.headers.get(h)
-      if (v) headers.set(h, v)
-    }
-
-    if (!headers.get('accept-ranges')) headers.set('Accept-Ranges', 'bytes')
-
-    headers.set('Content-Disposition', 'inline')
-
-    headers.set('Cache-Control', 'private, max-age=60')
-
-    headers.set('Vary', 'Range')
-
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers,
-    })
-  } catch (e: any) {
+    headers.set('Location', String(signed.signedUrl))
+    headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
+    headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
+    return new Response(null, { status: 307, headers })
+  } catch (e) {
     return new Response(e?.message ?? 'internal_error', { status: 500 })
   }
 }
@@ -103,7 +82,9 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, PostBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const storyId = String(body?.storyId || body?.story_id || '').trim()
     const signedSeconds = Math.min(3600, Math.max(60, Number(body?.signedSeconds || 600) || 600))
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })
@@ -122,7 +103,7 @@ export async function POST(req: Request) {
     if (sErr || !data?.signedUrl) return NextResponse.json({ ok: false, error: sErr?.message || 'failed' }, { status: 400 })
 
     return NextResponse.json({ ok: true, url: data.signedUrl })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

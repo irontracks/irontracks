@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, Sparkles } from 'lucide-react'
+import { useVipCredits } from '@/hooks/useVipCredits'
 
 export type WorkoutWizardGoal = 'hypertrophy' | 'strength' | 'conditioning' | 'maintenance'
 export type WorkoutWizardSplit = 'full_body' | 'upper_lower' | 'ppl'
@@ -71,6 +72,7 @@ const titleFocus = (f: WorkoutWizardFocus) =>
 const titleEquipment = (e: WorkoutWizardEquipment) => (e === 'gym' ? 'Academia' : e === 'home' ? 'Casa' : 'Mínimo (halteres/elástico)')
 
 export default function WorkoutWizardModal(props: Props) {
+  const { credits, loading: creditsLoading, error: creditsError } = useVipCredits() as { credits: any; loading: boolean; error: string | null }
   const isOpen = !!props.isOpen
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<GenerateMode>('single')
@@ -143,7 +145,7 @@ export default function WorkoutWizardModal(props: Props) {
     setDraftIdx(0)
     try {
       const res = await Promise.resolve(props.onGenerate(answers, { mode }))
-      const many = res && typeof res === 'object' && Array.isArray((res as any)?.drafts) ? ((res as any).drafts as WorkoutDraft[]) : null
+      const many = res && typeof res === 'object' && Array.isArray((res as Record<string, unknown>)?.drafts) ? ((res as Record<string, unknown>).drafts as WorkoutDraft[]) : null
       if (many && many.length) {
         const safe = many
           .map((d) => ({
@@ -168,7 +170,7 @@ export default function WorkoutWizardModal(props: Props) {
         }
         setDraft({ title, exercises })
       }
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message ? String(e.message) : 'Falha ao gerar treino.')
       setDraft(null)
       setDrafts(null)
@@ -186,7 +188,7 @@ export default function WorkoutWizardModal(props: Props) {
     setError('')
     try {
       await Promise.resolve(props.onSaveDrafts(list))
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message ? String(e.message) : 'Falha ao salvar treinos.')
     } finally {
       setSavingAll(false)
@@ -200,7 +202,14 @@ export default function WorkoutWizardModal(props: Props) {
       <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Criar Treino</div>
+            <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
+              Criar Treino
+              {credits?.wizard && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono text-white ${credits.wizard.used >= credits.wizard.limit ? 'bg-red-500/40' : 'bg-neutral-800'}`}>
+                  {credits.wizard.used}/{credits.wizard.limit > 1000 ? '∞' : credits.wizard.limit}
+                </span>
+              )}
+            </div>
             <div className="text-white font-black text-lg truncate">Wizard Automático</div>
             <div className="text-xs text-neutral-400">Responda rápido e gere um treino pronto para editar.</div>
           </div>
@@ -432,6 +441,28 @@ export default function WorkoutWizardModal(props: Props) {
               <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                 <div className="text-sm font-black text-white">Preview</div>
                 <div className="text-xs text-neutral-400 mt-1">Gere e depois abra no editor para ajustar.</div>
+                
+                {creditsLoading && (
+                  <div className="mt-3 flex items-center justify-center bg-neutral-900/60 p-2 rounded-lg border border-neutral-800">
+                    <div className="text-xs text-neutral-500 animate-pulse">Carregando créditos...</div>
+                  </div>
+                )}
+
+                {creditsError && (
+                  <div className="mt-3 flex items-center justify-center bg-red-900/20 p-2 rounded-lg border border-red-900/50">
+                    <div className="text-xs text-red-400">Erro: {creditsError}</div>
+                  </div>
+                )}
+
+                {credits?.wizard && (
+                  <div className="mt-3 flex items-center justify-between bg-neutral-900/60 p-2 rounded-lg border border-neutral-800">
+                    <div className="text-xs text-neutral-400 font-bold">Seus créditos semanais</div>
+                    <div className={`text-xs font-mono font-bold ${credits.wizard.used >= credits.wizard.limit ? 'text-red-400' : 'text-green-400'}`}>
+                      {credits.wizard.used} / {credits.wizard.limit > 1000 ? '∞' : credits.wizard.limit}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-3 flex flex-col sm:flex-row gap-2">
                   <button
                     type="button"
@@ -496,11 +527,12 @@ export default function WorkoutWizardModal(props: Props) {
                     {(() => {
                       const d = drafts[Math.max(0, Math.min(drafts.length - 1, draftIdx))]
                       if (!d) return null
+                      const safeExercises = Array.isArray(d?.exercises) ? d.exercises : []
                       return (
                         <div className="mt-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
                           <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{d.title}</div>
                           <div className="mt-2 space-y-2">
-                            {d.exercises.slice(0, 10).map((ex, idx) => (
+                            {safeExercises.slice(0, 10).map((ex, idx) => (
                               <div key={String(ex?.name || idx)} className="flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="text-sm font-bold text-white truncate">{String(ex?.name || 'Exercício')}</div>
@@ -510,7 +542,7 @@ export default function WorkoutWizardModal(props: Props) {
                                 </div>
                               </div>
                             ))}
-                            {d.exercises.length > 10 ? <div className="text-xs text-neutral-500">+ mais {d.exercises.length - 10}</div> : null}
+                            {safeExercises.length > 10 ? <div className="text-xs text-neutral-500">+ mais {safeExercises.length - 10}</div> : null}
                           </div>
                         </div>
                       )
@@ -520,7 +552,7 @@ export default function WorkoutWizardModal(props: Props) {
                   <div className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{draft.title}</div>
                     <div className="mt-2 space-y-2">
-                      {draft.exercises.slice(0, 10).map((ex, idx) => (
+                      {(Array.isArray(draft?.exercises) ? draft.exercises : []).slice(0, 10).map((ex, idx) => (
                         <div key={String(ex?.name || idx)} className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-sm font-bold text-white truncate">{String(ex?.name || 'Exercício')}</div>
@@ -530,7 +562,9 @@ export default function WorkoutWizardModal(props: Props) {
                           </div>
                         </div>
                       ))}
-                      {draft.exercises.length > 10 ? <div className="text-xs text-neutral-500">+ mais {draft.exercises.length - 10}</div> : null}
+                      {(Array.isArray(draft?.exercises) ? draft.exercises : []).length > 10 ? (
+                        <div className="text-xs text-neutral-500">+ mais {(Array.isArray(draft?.exercises) ? draft.exercises : []).length - 10}</div>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}

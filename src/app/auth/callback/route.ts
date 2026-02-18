@@ -1,32 +1,63 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { z } from 'zod'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? ''
-  const type = String(searchParams.get('type') || '').trim().toLowerCase()
-  const errorParam = searchParams.get('error')
-  const errorDescription = searchParams.get('error_description')
-  const nextCookieName = 'it.auth.next'
-
-  const originFromUrl = new URL(request.url).origin
-  const forwardedHost = request.headers.get('x-forwarded-host')
-  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+const resolvePublicOrigin = (request: Request) => {
   const isLocalEnv = process.env.NODE_ENV === 'development'
-  const baseOrigin = forwardedHost && !isLocalEnv ? `${forwardedProto}://${forwardedHost}` : originFromUrl
-  let safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
-  if (!isLocalEnv) {
+  const envOriginRaw = String(
+    process.env.IRONTRACKS_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || '',
+  ).trim()
+  if (envOriginRaw) {
     try {
-      const u = new URL(safeOrigin)
-      u.protocol = 'https:'
-      safeOrigin = u.origin
+      return new URL(envOriginRaw).origin
     } catch {}
   }
+
+  const host = String(request.headers.get('x-forwarded-host') || request.headers.get('host') || '').trim()
+  const proto = String(request.headers.get('x-forwarded-proto') || (isLocalEnv ? 'http' : 'https')).trim()
+  if (host) {
+    const base = `${proto}://${host}`
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+  }
+
+  try {
+    const base = new URL(request.url).origin
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+  } catch {
+    return isLocalEnv ? 'http://localhost:3000' : 'https://localhost'
+  }
+}
+
+const QuerySchema = z
+  .object({
+    code: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string()).optional(),
+    next: z.preprocess((v) => (typeof v === 'string' ? v : ''), z.string()).optional(),
+    type: z.preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.string()).optional(),
+    error: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string()).optional(),
+    error_description: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string()).optional(),
+  })
+  .passthrough()
+
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const spObj: Record<string, string> = {}
+  url.searchParams.forEach((value, key) => {
+    spObj[key] = value
+  })
+  const q = QuerySchema.parse(spObj)
+
+  const code = q.code || ''
+  const next = q.next ?? ''
+  const type = q.type || ''
+  const errorParam = q.error
+  const errorDescription = q.error_description
+  const nextCookieName = 'it.auth.next'
+  const safeOrigin = resolvePublicOrigin(request)
 
   const rawError = String(errorDescription || errorParam || '').trim()
   if (rawError && !code) {
@@ -41,14 +72,23 @@ export async function GET(request: Request) {
 
   let nextFromCookie = ''
   try {
-    nextFromCookie = String((request as any).cookies?.get?.(nextCookieName)?.value || '')
+    const cookieStore = await cookies()
+    nextFromCookie = String(cookieStore.get(nextCookieName)?.value || '')
   } catch {}
   const rawNext = String(next || '')
   const fallbackNext = nextFromCookie || '/dashboard'
   const safeNext = rawNext.startsWith('/') ? rawNext : fallbackNext.startsWith('/') ? fallbackNext : '/dashboard'
   const redirectUrl = new URL(safeNext, safeOrigin)
 
-  let response = NextResponse.redirect(redirectUrl)
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta http-equiv="cache-control" content="no-store"/><title>Entrando…</title></head><body style="margin:0;background:#0a0a0a;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px"><div style="max-width:420px;width:100%"><div style="font-weight:900;font-size:18px;margin-bottom:8px">Entrando…</div><div style="opacity:.8;font-size:13px;line-height:1.4;margin-bottom:16px">Finalizando autenticação e abrindo o app.</div><a href="${safeNext}" style="display:block;text-decoration:none;background:#facc15;color:#000;font-weight:900;padding:12px 14px;border-radius:12px;text-align:center">Continuar</a></div><script>try{window.location.replace(${JSON.stringify(safeNext)})}catch(e){try{window.location.href=${JSON.stringify(safeNext)}}catch(_){}}</script></body></html>`
+
+  let response = new NextResponse(html, {
+    status: 200,
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store, max-age=0',
+    },
+  })
   try {
     response.cookies.set(nextCookieName, '', { path: '/', maxAge: 0 })
   } catch {}
@@ -65,15 +105,23 @@ export async function GET(request: Request) {
     return NextResponse.redirect(u)
   }
 
+  const cookieStore = await cookies()
+
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
-        return (request as any).cookies?.getAll?.() || []
+        return cookieStore.getAll()
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, { ...(options || {}) })
+          try {
+            response.cookies.set(name, value, { ...(options || {}) })
+          } catch {
+            try {
+              response.cookies.set(name, value)
+            } catch {}
+          }
         })
       },
     },
@@ -83,15 +131,15 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) {
       const msg = String(error.message || '').toLowerCase()
-      if (msg.includes('code challenge') || msg.includes('code verifier')) {
-        const u = new URL('/auth/recovery', safeOrigin)
-        u.searchParams.set('code', code)
-        u.searchParams.set('next', safeNext)
-        return NextResponse.redirect(u)
+      if (
+        msg.includes('code challenge') ||
+        msg.includes('code verifier') ||
+        msg.includes('pkce') ||
+        msg.includes('flow_state_not_found')
+      ) {
+        return NextResponse.redirect(new URL('/auth/error?error=pkce_failed', safeOrigin))
       }
-      return NextResponse.redirect(
-        new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin),
-      )
+      return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin))
     }
     try {
       await supabase.auth.getUser()

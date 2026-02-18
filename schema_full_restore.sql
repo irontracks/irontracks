@@ -1,3 +1,7 @@
+-- IMPORTANT:
+-- This file is legacy/incomplete and is NOT the source of truth for the current database.
+-- Source of truth: /supabase/migrations (apply migrations to build the real schema).
+--
 -- 1. PERFIL PÚBLICO (Essencial para Busca de Amigos e Admin)
 CREATE TABLE IF NOT EXISTS profiles (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,

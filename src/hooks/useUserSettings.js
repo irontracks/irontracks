@@ -46,7 +46,6 @@ export const DEFAULT_SETTINGS = {
   featuresKillSwitch: false,
   featureTeamworkV2: false,
   featureStoriesV2: false,
-  featureWeeklyReportCTA: false,
   featureOfflineSyncV2: false,
 }
 

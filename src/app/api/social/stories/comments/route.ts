@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const PostBodySchema = z
+  .object({
+    storyId: z.string().optional(),
+    story_id: z.string().optional(),
+    body: z.string().optional(),
+    text: z.string().optional(),
+  })
+  .passthrough()
 
 export async function GET(req: Request) {
   try {
@@ -52,7 +63,7 @@ export async function GET(req: Request) {
         }
       }),
     })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
@@ -62,7 +73,9 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, PostBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const storyId = String(body?.storyId || body?.story_id || '').trim()
     const text = String(body?.body || body?.text || '').trim()
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })
@@ -77,8 +90,7 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, data })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

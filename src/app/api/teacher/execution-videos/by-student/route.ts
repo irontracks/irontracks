@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     if (error) return jsonError(400, error.message)
 
     return NextResponse.json({ ok: true, items: Array.isArray(data) ? data : [] }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

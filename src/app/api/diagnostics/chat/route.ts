@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { runChatDiagnostics } from '@/lib/chatDiagnostics'
+
+const ZodBodySchema = z
+  .object({
+    channelId: z.string().min(1),
+    content: z.string().optional(),
+  })
+  .passthrough()
 
 export async function GET() {
   try {
@@ -10,7 +19,7 @@ export async function GET() {
 
     const report = await runChatDiagnostics(supabase, user.id)
     return NextResponse.json(report)
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
@@ -21,7 +30,9 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await request.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(request, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
     const { channelId, content } = body
     if (!channelId) return NextResponse.json({ ok: false, error: 'channelId required' }, { status: 400 })
     const text = content || `diagnostic ping ${new Date().toISOString()}`
@@ -33,8 +44,7 @@ export async function POST(request: Request) {
       .single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, inserted })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

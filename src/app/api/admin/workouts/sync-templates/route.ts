@@ -1,17 +1,36 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
+import { hasValidInternalSecret, requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 
 export const dynamic = 'force-dynamic'
 
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const ZodBodySchema = z
+  .object({
+    id: z.string().optional(),
+    email: z.string().optional(),
+    names: z.array(z.string()).optional(),
+    mode: z.string().optional(),
+    template_ids: z.array(z.string()).optional(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      if (!auth.ok) return auth.response
+    }
 
     const admin = createAdminClient()
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const id = body?.id as string | undefined
     const email = body?.email as string | undefined
 
@@ -78,18 +97,20 @@ export async function POST(req: Request) {
         .replace(/\s+/g, ' ')
         .trim()
 
-    const namesArr: string[] = Array.isArray((body as any)?.names)
-      ? (body as any).names.map((x: any) => String(x).toLowerCase().trim()).filter(Boolean)
+    const rawNames = (body as Record<string, unknown>)?.names
+    const namesArr: string[] = Array.isArray(rawNames)
+      ? rawNames.map((x: unknown) => String(x).toLowerCase().trim()).filter(Boolean)
       : []
 
     const letters = namesArr.map((x) => x[0]).filter(Boolean)
 
-    const modeRaw = String((body as any)?.mode || '').toLowerCase().trim()
+    const modeRaw = String((body as Record<string, unknown>)?.mode || '').toLowerCase().trim()
     const syncMode: 'all' | 'letters' = modeRaw === 'all' ? 'all' : 'letters'
 
-    const templateIds: string[] = Array.isArray((body as any)?.template_ids)
-      ? (body as any).template_ids
-          .map((x: any) => String(x || '').trim())
+    const rawTemplateIds = (body as Record<string, unknown>)?.template_ids
+    const templateIds: string[] = Array.isArray(rawTemplateIds)
+      ? rawTemplateIds
+          .map((x: unknown) => String(x || '').trim())
           .filter((x: string) => /^[0-9a-fA-F-]{36}$/.test(x))
       : []
 
@@ -119,11 +140,11 @@ export async function POST(req: Request) {
       )
     }
 
-    const exercisesLen = (row: any) => (Array.isArray(row?.exercises) ? row.exercises.length : 0)
+    const exercisesLen = (row: Record<string, unknown>): number => (Array.isArray(row?.exercises) ? row.exercises.length : 0)
 
-    const pickBestByLetter = (rows: any[], letterRaw: string) => {
+    const pickBestByLetter = (rows: Array<Record<string, unknown>>, letterRaw: string) => {
       const letter = String(letterRaw || '').toLowerCase()
-      const candidates = (rows || []).filter((r) => matchesGroupForLetter(r?.name || '', letter))
+      const candidates = (rows || []).filter((r) => matchesGroupForLetter(String(r?.name ?? ''), letter))
       candidates.sort((a, b) => exercisesLen(b) - exercisesLen(a))
       return candidates[0] || null
     }
@@ -167,7 +188,7 @@ export async function POST(req: Request) {
         )
       `
 
-    let providedTemplatesRaw: any[] = []
+    let providedTemplatesRaw: Array<Record<string, unknown>> = []
     if (templateIds.length > 0) {
       const { data: raw, error: pErr } = await admin.from('workouts').select(selectTpl).in('id', templateIds)
       if (pErr) {
@@ -176,7 +197,7 @@ export async function POST(req: Request) {
           { status: 400 },
         )
       }
-      providedTemplatesRaw = raw || []
+      providedTemplatesRaw = Array.isArray(raw) ? raw.filter(isRecord) : []
     }
 
     const { data: ownerTemplatesRaw, error: ownerErr } = await admin
@@ -188,22 +209,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: ownerErr.message, debug: { sourceUserId } }, { status: 400 })
     }
 
-    const isOwnedSyncable = (t: any) => {
-      if (!t || typeof t !== 'object') return false
-      const uid = String(t?.user_id || '')
+    const isOwnedSyncable = (t: Record<string, unknown>): boolean => {
+      const uid = String(t?.user_id ?? '')
       const owned = uid === String(sourceUserId)
       if (!owned) return false
       return t?.is_template === true
     }
 
     const providedOwned = (providedTemplatesRaw || []).filter(isOwnedSyncable)
-    const ownerOwned = (ownerTemplatesRaw || []).filter(isOwnedSyncable)
+    const ownerOwned = (Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw.filter(isRecord) : []).filter(isOwnedSyncable)
 
-    const providedMatched = syncMode === 'all' ? providedOwned : providedOwned.filter((t: any) => matchesGroup(t?.name || ''))
-    const ownerMatched = syncMode === 'all' ? ownerOwned : ownerOwned.filter((t: any) => matchesGroup(t?.name || ''))
+    const providedMatched = syncMode === 'all' ? providedOwned : providedOwned.filter((t) => matchesGroup(String(t?.name ?? '')))
+    const ownerMatched = syncMode === 'all' ? ownerOwned : ownerOwned.filter((t) => matchesGroup(String(t?.name ?? '')))
 
     let sourceMode: 'provided' | 'owner' | 'global' = providedMatched.length > 0 ? 'provided' : 'owner'
-    let sourceRows: any[] = providedMatched.length > 0 ? providedMatched : ownerMatched
+    let sourceRows: Array<Record<string, unknown>> = providedMatched.length > 0 ? providedMatched : ownerMatched
     if (sourceRows.length === 0) {
       return NextResponse.json(
         {
@@ -216,13 +236,17 @@ export async function POST(req: Request) {
             sourceUserId,
             authUserId: auth.user.id,
             source_mode: sourceMode,
-            owner_raw_count: (ownerTemplatesRaw || []).length,
+            owner_raw_count: Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw.length : 0,
             owner_owned_count: ownerOwned.length,
             owner_matched_count: ownerMatched.length,
             provided_raw_count: (providedTemplatesRaw || []).length,
             provided_owned_count: providedOwned.length,
             provided_matched_count: providedMatched.length,
-            owner_sample_names: (ownerTemplatesRaw || []).map((t: any) => t?.name || '').filter(Boolean).slice(0, 5),
+            owner_sample_names: (Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw : [])
+              .filter(isRecord)
+              .map((t) => String(t?.name ?? ''))
+              .filter(Boolean)
+              .slice(0, 5),
             letters,
             syncMode,
           },
@@ -240,38 +264,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: existingErr.message, debug: { targetUserId } }, { status: 400 })
     }
 
-    const syncedExisting = (existing || []).filter((w: any) => (w?.created_by || '') === auth.user.id)
-    const syncedExistingMatched = (syncedExisting || []).filter((w: any) => matchesGroup(w?.name || ''))
+    const syncedExisting = (Array.isArray(existing) ? existing : []).filter((w) => String((w as Record<string, unknown>)?.created_by ?? '') === auth.user.id)
+    const syncedExistingMatched = syncedExisting.filter((w) => matchesGroup(String((w as Record<string, unknown>)?.name ?? '')))
 
-    const byName = new Map<string, any[]>()
+    const byName = new Map<string, Array<Record<string, unknown>>>()
     for (const w of syncedExistingMatched) {
-      const k = normalizeName(w?.name || '')
+      const wObj: Record<string, unknown> = isRecord(w) ? w : {}
+      const k = normalizeName(String(wObj?.name ?? ''))
       if (!k) continue
       const list = byName.get(k) || []
-      list.push(w)
+      list.push(wObj)
       byName.set(k, list)
     }
 
-    const allowDeleteDedup = Boolean(hasValidInternalSecret(req) && auth.role === 'admin' && (body as any)?.allow_delete_dedup === true)
+    const allowDeleteDedup = Boolean(hasValidInternalSecret(req) && auth.role === 'admin' && (body as Record<string, unknown>)?.allow_delete_dedup === true)
     let dedup_deleted = 0
     const keptSynced = new Map<string, { id: string; name: string }>()
     for (const entry of Array.from(byName.entries())) {
       const [k, list] = entry
-      const sorted = (list || []).slice().sort((a: any, b: any) => {
-        const da = a?.created_at ? new Date(a.created_at).getTime() : 0
-        const db = b?.created_at ? new Date(b.created_at).getTime() : 0
+      const sorted = (list || []).slice().sort((a, b) => {
+        const da = a?.created_at ? new Date(String(a.created_at)).getTime() : 0
+        const db = b?.created_at ? new Date(String(b.created_at)).getTime() : 0
         return db - da
       })
       const keep = sorted[0]
-      if (keep?.id) keptSynced.set(k, { id: keep.id, name: keep.name })
+      if (keep?.id) keptSynced.set(k, { id: String(keep.id), name: String(keep.name ?? '') })
       const toDelete = sorted.slice(1)
       if (!allowDeleteDedup) continue
       for (const d of toDelete) {
-        const wid = d?.id
+        const wid = String(d?.id ?? '').trim()
         if (!wid) continue
         try {
           const { data: exs } = await admin.from('exercises').select('id').eq('workout_id', wid)
-          const exIds = (exs || []).map((x: any) => x?.id).filter(Boolean)
+          const exIds = (Array.isArray(exs) ? exs : []).map((x) => String((x as Record<string, unknown>)?.id ?? '')).filter(Boolean)
           if (exIds.length > 0) {
             await admin.from('sets').delete().in('exercise_id', exIds)
           }
@@ -284,20 +309,20 @@ export async function POST(req: Request) {
       }
     }
 
-    const picked: any[] = []
+    const picked: Array<Record<string, unknown>> = []
     for (const l of letters) {
       const best = pickBestByLetter(sourceRows, l)
       if (best) picked.push(best)
     }
 
-    const teacherTemplates = picked.reduce((map: Record<string, any>, t: any) => {
-      const key = normalizeName(t.name || '')
+    const teacherTemplates = picked.reduce((map: Record<string, Record<string, unknown>>, t: Record<string, unknown>) => {
+      const key = normalizeName(String(t.name ?? ''))
       const current = map[key]
       const len = exercisesLen(t)
       if (!current || len > exercisesLen(current)) map[key] = t
       return map
-    }, {})
-    const teacherTemplatesList: any[] = Object.values(teacherTemplates)
+    }, {} as Record<string, Record<string, unknown>>)
+    const teacherTemplatesList = Object.values(teacherTemplates) as Array<Record<string, unknown>>
 
     const existingMap = new Map<string, { id: string; name: string }>()
     for (const entry of Array.from(keptSynced.entries())) {
@@ -333,43 +358,44 @@ export async function POST(req: Request) {
       }
 
       for (const t of teacherTemplatesList) {
-        const tName = normalizeName(t.name || '')
+        const tName = normalizeName(String(t.name ?? ''))
         if (!tName) continue
         const targetWorkout = existingMap.get(tName)
-        const exs = Array.isArray(t?.exercises) ? t.exercises.filter((x: any) => x && typeof x === 'object') : []
+        const exs: Array<Record<string, unknown>> = Array.isArray(t?.exercises) ? (t.exercises as unknown[]).filter(isRecord) : []
 
         try {
           if (targetWorkout) {
-            const wUpdate: any = { name: t.name || '', notes: t.notes, is_template: true }
-            if (canWriteSourceId) wUpdate.source_workout_id = t?.id || null
+            const wUpdate: Record<string, unknown> = { name: String(t.name ?? ''), notes: t.notes, is_template: true }
+            if (canWriteSourceId) wUpdate.source_workout_id = t?.id ?? null
             await admin.from('workouts').update(wUpdate).eq('id', targetWorkout.id)
 
             const { data: oldExs } = await admin.from('exercises').select('id').eq('workout_id', targetWorkout.id)
-            const oldExIds = (oldExs || []).map((x: any) => x?.id).filter(Boolean)
+            const oldExIds = (Array.isArray(oldExs) ? oldExs : []).map((x) => String((x as Record<string, unknown>)?.id ?? '')).filter(Boolean)
             if (oldExIds.length > 0) {
               await admin.from('sets').delete().in('exercise_id', oldExIds)
             }
             await admin.from('exercises').delete().eq('workout_id', targetWorkout.id)
 
             for (const e of exs) {
+              const eObj = isRecord(e) ? e : {}
               const { data: newEx } = await admin
                 .from('exercises')
                 .insert({
                   workout_id: targetWorkout.id,
-                  name: e.name || '',
-                  notes: e.notes || '',
-                  rest_time: e.rest_time ?? 60,
-                  video_url: e.video_url || '',
-                  method: e.method || 'Normal',
-                  cadence: e.cadence || '2020',
-                  order: e.order ?? 0,
+                  name: String(eObj.name ?? ''),
+                  notes: String(eObj.notes ?? ''),
+                  rest_time: eObj.rest_time ?? 60,
+                  video_url: String(eObj.video_url ?? ''),
+                  method: String(eObj.method ?? 'Normal'),
+                  cadence: String(eObj.cadence ?? '2020'),
+                  order: eObj.order ?? 0,
                 })
                 .select()
                 .single()
 
-              const sets = Array.isArray(e?.sets) ? e.sets : []
+              const sets: Array<Record<string, unknown>> = Array.isArray(eObj?.sets) ? (eObj.sets as unknown[]).filter(isRecord) : []
               if (newEx?.id && sets.length > 0) {
-                const newSets = sets.map((s: any) => ({
+                const newSets = sets.map((s: Record<string, unknown>) => ({
                   exercise_id: newEx.id,
                   weight: s.weight ?? null,
                   reps: s.reps ?? null,
@@ -386,7 +412,7 @@ export async function POST(req: Request) {
               .from('workouts')
               .insert({
                 user_id: targetUserId || null,
-                name: t.name,
+                name: String(t.name ?? ''),
                 notes: t.notes,
                 created_by: sourceUserId,
                 is_template: true,
@@ -401,24 +427,25 @@ export async function POST(req: Request) {
             created++
 
             for (const e of exs) {
+              const eObj = isRecord(e) ? e : {}
               const { data: newEx } = await admin
                 .from('exercises')
                 .insert({
                   workout_id: nw.id,
-                  name: e.name || '',
-                  notes: e.notes || '',
-                  rest_time: e.rest_time ?? 60,
-                  video_url: e.video_url || '',
-                  method: e.method || 'Normal',
-                  cadence: e.cadence || '2020',
-                  order: e.order ?? 0,
+                  name: String(eObj.name ?? ''),
+                  notes: String(eObj.notes ?? ''),
+                  rest_time: eObj.rest_time ?? 60,
+                  video_url: String(eObj.video_url ?? ''),
+                  method: String(eObj.method ?? 'Normal'),
+                  cadence: String(eObj.cadence ?? '2020'),
+                  order: eObj.order ?? 0,
                 })
                 .select()
                 .single()
 
-              const sets = Array.isArray(e?.sets) ? e.sets : []
+              const sets: Array<Record<string, unknown>> = Array.isArray(eObj?.sets) ? (eObj.sets as unknown[]).filter(isRecord) : []
               if (newEx?.id && sets.length > 0) {
-                const newSets = sets.map((s: any) => ({
+                const newSets = sets.map((s: Record<string, unknown>) => ({
                   exercise_id: newEx.id,
                   weight: s.weight ?? null,
                   reps: s.reps ?? null,
@@ -452,19 +479,27 @@ export async function POST(req: Request) {
       provided_ids_count: templateIds.length,
       provided_raw_count: (providedTemplatesRaw || []).length,
       provided_matched_count: providedMatched.length,
-      owner_raw_count: (ownerTemplatesRaw || []).length,
+      owner_raw_count: Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw.length : 0,
       owner_matched_count: ownerMatched.length,
       source_count: sourceRows.length,
       picked_count: syncMode === 'all' ? sourceRows.length : teacherTemplatesList.length,
       failed_count: failed,
       dedup_deleted_count: dedup_deleted,
-      owner_sample_names: (ownerTemplatesRaw || []).map((t: any) => t?.name || '').filter(Boolean).slice(0, 10),
-      source_sample_names: (sourceRows || []).map((t: any) => t?.name || '').filter(Boolean).slice(0, 10),
-      picked_names: (syncMode === 'all' ? sourceRows : teacherTemplatesList).map((t: any) => t?.name || '').filter(Boolean),
+      owner_sample_names: (Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw : [])
+        .filter(isRecord)
+        .map((t) => String(t?.name ?? ''))
+        .filter(Boolean)
+        .slice(0, 10),
+      source_sample_names: (sourceRows || [])
+        .map((t) => String(t?.name ?? ''))
+        .filter(Boolean)
+        .slice(0, 10),
+      picked_names: (syncMode === 'all' ? sourceRows : teacherTemplatesList).map((t) => String(t?.name ?? '')).filter(Boolean),
     }
 
     return NextResponse.json({ ok: true, created_count: created, updated_count: updated, rows: rows || [], debug })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
 }

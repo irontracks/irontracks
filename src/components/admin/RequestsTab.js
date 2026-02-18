@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useState } from 'react'
-import { Check, X, Loader2, Calendar, Mail, Phone, User, Clock } from 'lucide-react'
+import { Check, X, Loader2, Calendar, Mail, Phone, User, Clock, GraduationCap } from 'lucide-react'
 import { useDialog } from '@/contexts/DialogContext'
 
 export default function RequestsTab() {
@@ -41,9 +41,9 @@ export default function RequestsTab() {
             if (!ok) return
         } else {
             const ok = await confirm(
-                `Aceitar solicitação de ${req.full_name}?\nIsso criará uma conta e enviará as credenciais.`,
+                `Aceitar solicitação de ${req.full_name}?\nIsso vai liberar o acesso e enviar um e-mail de aprovação.`,
                 'Aceitar Acesso',
-                { confirmText: 'Criar Conta', cancelText: 'Cancelar' }
+                { confirmText: 'Aprovar', cancelText: 'Cancelar' }
             )
             if (!ok) return
         }
@@ -105,11 +105,23 @@ export default function RequestsTab() {
                     <div key={req.id} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 flex flex-col gap-4 shadow-sm hover:border-yellow-500/30 transition-colors">
                         <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-yellow-500 font-black text-lg border border-neutral-700">
+                                <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center text-yellow-500 font-black text-lg border border-neutral-700 relative">
                                     {req.full_name.charAt(0).toUpperCase()}
+                                    {req.role_requested === 'teacher' && (
+                                        <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-black p-0.5 rounded-full border border-black">
+                                            <GraduationCap size={10} strokeWidth={3} />
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
-                                    <h4 className="font-bold text-white text-sm line-clamp-1">{req.full_name}</h4>
+                                    <h4 className="font-bold text-white text-sm line-clamp-1 flex items-center gap-2">
+                                        {req.full_name}
+                                        {req.role_requested === 'teacher' && (
+                                            <span className="text-[9px] bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 px-1.5 py-0.5 rounded uppercase tracking-wider font-black">
+                                                Professor
+                                            </span>
+                                        )}
+                                    </h4>
                                     <div className="flex items-center gap-1 text-[10px] text-neutral-500">
                                         <Clock size={10} />
                                         <span>{new Date(req.created_at).toLocaleDateString()} às {new Date(req.created_at).toLocaleTimeString().slice(0,5)}</span>
@@ -119,17 +131,23 @@ export default function RequestsTab() {
                         </div>
 
                         <div className="space-y-2">
+                            {req.role_requested === 'teacher' && req.cref && (
+                                <div className="flex items-center gap-2 text-xs text-yellow-200 bg-yellow-900/20 p-2 rounded-lg border border-yellow-500/20">
+                                    <GraduationCap size={14} className="text-yellow-500" />
+                                    <span className="font-mono font-bold">CREF: {req.cref}</span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
                                 <Mail size={14} className="text-neutral-500" />
                                 <span className="truncate select-all">{req.email}</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
                                 <Phone size={14} className="text-neutral-500" />
-                                <span className="select-all">{req.phone}</span>
+                                <span className="select-all">{req.phone || '-'}</span>
                             </div>
                             <div className="flex items-center gap-2 text-xs text-neutral-300 bg-black/30 p-2 rounded-lg border border-white/5">
                                 <Calendar size={14} className="text-neutral-500" />
-                                <span>{new Date(req.birth_date).toLocaleDateString()}</span>
+                                <span>{req.birth_date ? new Date(req.birth_date).toLocaleDateString() : '-'}</span>
                             </div>
                         </div>
 

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -8,6 +10,12 @@ import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    names: z.array(z.string().min(1)).min(1).max(60),
+  })
+  .passthrough()
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -32,42 +40,56 @@ const extractJsonFromModelText = (text: string) => {
   return safeJsonParse(cleaned.slice(start, end + 1))
 }
 
-const toStr = (v: any) => String(v || '').trim()
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
-const toBool = (v: any) => Boolean(v)
+const toStr = (v: unknown) => String(v || '').trim()
 
-const normalizeResult = (obj: any) => {
-  const base = obj && typeof obj === 'object' ? obj : {}
-  const itemsRaw = Array.isArray(base.items) ? base.items : []
-  const muscleIds = new Set(MUSCLE_GROUPS.map((m) => m.id))
+const toBool = (v: unknown) => Boolean(v)
+
+const normalizeResult = (obj: unknown): { items: Array<Record<string, unknown>> } => {
+  const base = obj && typeof obj === 'object' ? (obj as Record<string, unknown>) : {}
+  const itemsRaw = Array.isArray(base.items) ? (base.items as unknown[]) : []
+  const muscleIds = new Set<string>(MUSCLE_GROUPS.map((m) => m.id))
 
   const normalized = itemsRaw
-    .map((it: any) => {
-      const name = toStr(it?.name)
+    .map((it: unknown) => {
+      const item = it && typeof it === 'object' ? (it as Record<string, unknown>) : {}
+      const name = toStr(item?.name)
       const canonical =
-        toStr(it?.canonical_name || it?.canonicalName || it?.canonical) || (name ? resolveCanonicalExerciseName(name)?.canonical : '')
+        toStr(item?.canonical_name || item?.canonicalName || item?.canonical) || (name ? resolveCanonicalExerciseName(name)?.canonical : '')
       const key = normalizeExerciseName(canonical || name)
       if (!key) return null
 
-      const contribRaw = Array.isArray(it?.contributions) ? it.contributions : Array.isArray(it?.muscles) ? it.muscles : []
+      const contribRaw = Array.isArray(item?.contributions)
+        ? (item.contributions as unknown[])
+        : Array.isArray(item?.muscles)
+          ? (item.muscles as unknown[])
+          : []
       const contributions = contribRaw
-        .map((c: any) => {
-          const muscleId = toStr(c?.muscleId || c?.id)
-          if (!muscleId || !muscleIds.has(muscleId as any)) return null
-          const weight = Number(c?.weight)
+        .map((c: unknown) => {
+          const cc = c && typeof c === 'object' ? (c as Record<string, unknown>) : {}
+          const muscleId = toStr(cc?.muscleId || cc?.id)
+          if (!muscleId || typeof muscleId !== 'string' || !muscleIds.has(muscleId)) return null
+          const weight = Number(cc?.weight)
           if (!Number.isFinite(weight) || weight <= 0) return null
-          const role = toStr(c?.role || c?.type || 'primary') || 'primary'
+          const role = toStr(cc?.role || cc?.type || 'primary') || 'primary'
           return { muscleId, weight, role }
         })
         .filter(Boolean)
 
-      const weightSum = contributions.reduce((acc: number, c: any) => acc + (Number(c?.weight) || 0), 0)
+      const weightSum = contributions.reduce(
+        (acc: number, c: unknown) => acc + (Number((c as Record<string, unknown>)?.weight) || 0),
+        0,
+      )
       const normalizedContrib =
         weightSum > 0
-          ? contributions.map((c: any) => ({ ...c, weight: (Number(c.weight) || 0) / weightSum }))
+          ? contributions.map((c: unknown) => {
+              const cc = c as Record<string, unknown>
+              return { ...cc, weight: (Number(cc.weight) || 0) / weightSum }
+            })
           : []
 
-      const confidenceRaw = Number(it?.confidence)
+      const confidenceRaw = Number(item?.confidence)
       const confidence = Number.isFinite(confidenceRaw) ? Math.max(0, Math.min(1, confidenceRaw)) : 0.6
 
       return {
@@ -75,16 +97,16 @@ const normalizeResult = (obj: any) => {
         canonical_name: canonical || name,
         mapping: {
           contributions: normalizedContrib,
-          unilateral: toBool(it?.unilateral),
+          unilateral: toBool(item?.unilateral),
           confidence,
-          notes: toStr(it?.notes).slice(0, 240),
+          notes: toStr(item?.notes).slice(0, 240),
         },
         confidence,
       }
     })
     .filter(Boolean)
 
-  return { items: normalized }
+  return { items: (normalized.filter(isRecord) as Array<Record<string, unknown>>) }
 }
 
 export async function POST(req: Request) {
@@ -92,9 +114,11 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data as Record<string, unknown>
     const names: string[] = Array.isArray(body?.names)
-      ? body.names.map((v: any) => String(v || '').trim()).filter((v: string) => Boolean(v))
+      ? (body.names as unknown[]).map((v: unknown) => String(v || '').trim()).filter((v: string) => Boolean(v))
       : []
     if (!names.length) return NextResponse.json({ ok: false, error: 'names required' }, { status: 400 })
 
@@ -107,7 +131,7 @@ export async function POST(req: Request) {
         const canonical = resolveCanonicalExerciseName(name)?.canonical || name
         return buildHeuristicExerciseMap(canonical)
       })
-      .filter(Boolean) as any[]
+      .filter(isRecord) as Array<Record<string, unknown>>
 
     if (heuristicItems.length) {
       const rows = heuristicItems.map((it) => ({
@@ -129,7 +153,7 @@ export async function POST(req: Request) {
     const remaining = unique.filter((name) => {
       const canonical = resolveCanonicalExerciseName(name)?.canonical || name
       const k = normalizeExerciseName(canonical || name)
-      return !heuristicItems.some((it) => String((it as any)?.exercise_key || '') === k)
+      return !heuristicItems.some((it) => String((it as Record<string, unknown>)?.exercise_key || '') === k)
     })
     if (!remaining.length) return NextResponse.json({ ok: true, items: heuristicItems })
     const muscleList = MUSCLE_GROUPS.map((m) => `${m.id}: ${m.label}`).join(', ')
@@ -173,28 +197,32 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent([{ text: prompt }] as any)
+    const result = await model.generateContent(prompt)
     const text = (await result?.response?.text()) || ''
     const parsed = extractJsonFromModelText(text)
     if (!parsed) return NextResponse.json({ ok: false, error: 'invalid_ai_response' }, { status: 400 })
 
     const normalized = normalizeResult(parsed)
 
-    const upsertRows = normalized.items.map((it: any) => ({
+    const upsertRows = normalized.items.map((it: unknown) => {
+      const row = it && typeof it === 'object' ? (it as Record<string, unknown>) : {}
+      return ({
       user_id: userId,
-      exercise_key: it.exercise_key,
-      canonical_name: it.canonical_name,
-      mapping: it.mapping,
-      confidence: it.confidence,
+      exercise_key: row.exercise_key,
+      canonical_name: row.canonical_name,
+      mapping: row.mapping,
+      confidence: row.confidence,
       source: 'ai',
-    }))
+      })
+    })
 
     if (upsertRows.length) {
       await admin.from('exercise_muscle_maps').upsert(upsertRows, { onConflict: 'user_id,exercise_key' })
     }
 
     return NextResponse.json({ ok: true, items: [...heuristicItems, ...upsertRows] })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
 }

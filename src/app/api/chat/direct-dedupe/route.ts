@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     const row = Array.isArray(data) && data.length ? data[0] : { pairs_affected: 0, channels_deduped: 0, messages_moved: 0 }
     return NextResponse.json({ ok: true, report: row })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

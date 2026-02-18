@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server'
 
-import { requireRole } from '@/utils/auth/route'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    limit: z.coerce.number().optional(),
+  })
+  .passthrough()
 
 const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -55,17 +63,22 @@ async function resolveWithGemini(items: Array<{ normalized: string; alias: strin
   const result = await model.generateContent(prompt)
   const text = (await result?.response?.text()) || ''
   const parsed = extractJson(text)
-  const out = parsed && typeof parsed === 'object' ? (parsed as any).items : null
+  const out = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>).items : null
   return Array.isArray(out) ? out : []
 }
 
 export async function POST(req: Request) {
-  const auth = await requireRole(['admin'])
-  if (!auth.ok) return auth.response
+  let auth = await requireRole(['admin'])
+  if (!auth.ok) {
+    auth = await requireRoleWithBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
+  }
 
   try {
-    const body = await req.json().catch(() => ({}))
-    const limitRaw = Number((body as any)?.limit)
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
+    const limitRaw = Number((body as Record<string, unknown>)?.limit)
     const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(60, Math.floor(limitRaw))) : 30
 
     const admin = createAdminClient()
@@ -127,10 +140,10 @@ export async function POST(req: Request) {
     let failed = 0
 
     for (const r of rows) {
-      const jobId = String((r as any)?.id || '').trim()
-      const userId = String((r as any)?.user_id || '').trim()
-      const alias = String((r as any)?.alias || '').trim() || String((r as any)?.normalized_alias || '').trim()
-      const normalized = String((r as any)?.normalized_alias || '').trim()
+      const jobId = String((r as Record<string, unknown>)?.id || '').trim()
+      const userId = String((r as Record<string, unknown>)?.user_id || '').trim()
+      const alias = String((r as Record<string, unknown>)?.alias || '').trim() || String((r as Record<string, unknown>)?.normalized_alias || '').trim()
+      const normalized = String((r as Record<string, unknown>)?.normalized_alias || '').trim()
       if (!jobId || !userId || !normalized) continue
 
       processed += 1
@@ -142,7 +155,7 @@ export async function POST(req: Request) {
           .from('exercise_alias_jobs')
           .update({
             status: 'failed',
-            attempts: (Number((r as any)?.attempts) || 0) + 1,
+            attempts: (Number((r as Record<string, unknown>)?.attempts) || 0) + 1,
             last_error: 'no_result',
             processed_at: new Date().toISOString(),
           })
@@ -158,7 +171,7 @@ export async function POST(req: Request) {
           .from('exercise_alias_jobs')
           .update({
             status: 'failed',
-            attempts: (Number((r as any)?.attempts) || 0) + 1,
+            attempts: (Number((r as Record<string, unknown>)?.attempts) || 0) + 1,
             last_error: 'invalid_canonical',
             processed_at: new Date().toISOString(),
           })
@@ -181,7 +194,7 @@ export async function POST(req: Request) {
           .from('exercise_alias_jobs')
           .update({
             status: 'failed',
-            attempts: (Number((r as any)?.attempts) || 0) + 1,
+            attempts: (Number((r as Record<string, unknown>)?.attempts) || 0) + 1,
             last_error: String(canonErr?.message || 'canonical_upsert_failed'),
             processed_at: new Date().toISOString(),
           })
@@ -189,7 +202,7 @@ export async function POST(req: Request) {
         continue
       }
 
-      const canonicalId = String((canonRow as any).id)
+      const canonicalId = String((canonRow as Record<string, unknown>).id)
 
       const needsReview = !(Number.isFinite(res.confidence) && res.confidence >= 0.78)
       const { error: aliasErr } = await admin
@@ -213,7 +226,7 @@ export async function POST(req: Request) {
           .from('exercise_alias_jobs')
           .update({
             status: 'failed',
-            attempts: (Number((r as any)?.attempts) || 0) + 1,
+            attempts: (Number((r as Record<string, unknown>)?.attempts) || 0) + 1,
             last_error: String(aliasErr?.message || 'alias_upsert_failed'),
             processed_at: new Date().toISOString(),
           })
@@ -227,7 +240,7 @@ export async function POST(req: Request) {
         .from('exercise_alias_jobs')
         .update({
           status: 'done',
-          attempts: (Number((r as any)?.attempts) || 0) + 1,
+          attempts: (Number((r as Record<string, unknown>)?.attempts) || 0) + 1,
           last_error: null,
           resolved_canonical_name: canonicalName,
           resolved_canonical_id: canonicalId,
@@ -243,7 +256,7 @@ export async function POST(req: Request) {
           .eq('user_id', userId)
           .eq('id', canonicalId)
           .maybeSingle()
-        const nextCount = (Number((canonExisting as any)?.usage_count) || 0) + 1
+        const nextCount = (Number((canonExisting as Record<string, unknown>)?.usage_count) || 0) + 1
         await admin.from('exercise_canonical').update({ usage_count: nextCount }).eq('user_id', userId).eq('id', canonicalId)
       } catch {}
 
@@ -251,8 +264,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, processed, created, updated, failed })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
-

@@ -1,19 +1,32 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors } from 'lucide-react'
+import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors, Loader2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-// @ts-ignore - Ignoring type check for js file
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
+import { VideoCompositor } from '@/lib/video/VideoCompositor'
+
+// --- Types ---
+
 
 // --- Types ---
 
 interface StoryComposerProps {
   open: boolean
-  session: any // We'll refine this if possible, but keeping flexible for now to avoid breaking existing calls
+  session: SessionLite
   onClose: () => void
+}
+
+interface SessionLite {
+  id?: string
+  name?: string
+  date?: string
+  exercises?: unknown[]
+  logs?: Record<string, unknown>
+  elapsedSeconds?: number
+  [key: string]: unknown
 }
 
 interface Metrics {
@@ -66,9 +79,34 @@ const DEFAULT_LIVE_POSITIONS: LivePositions = {
 
 // --- Helpers ---
 
-const safeString = (v: any): string => {
+const safeString = (v: unknown): string => {
   try {
     return String(v ?? '').trim()
+  } catch {
+    return ''
+  }
+}
+
+const isIOSUserAgent = (ua: string): boolean => {
+  const s = String(ua || '')
+  if (/(iPad|iPhone|iPod)/i.test(s)) return true
+  try {
+    const nav = typeof navigator !== 'undefined' ? navigator : null
+    if (nav && nav.platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1) return true
+  } catch {
+  }
+  return false
+}
+
+const pickFirstSupportedMime = (candidates: string[]): string => {
+  try {
+    return (Array.isArray(candidates) ? candidates : []).find((t) => {
+      try {
+        return !!(t && typeof MediaRecorder !== 'undefined' && typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(t))
+      } catch {
+        return false
+      }
+    }) || ''
   } catch {
     return ''
   }
@@ -102,10 +140,12 @@ const guessMediaKind = (mime: string, ext: string): 'video' | 'image' | 'unknown
   return 'unknown'
 }
 
-const formatDatePt = (v: any): string => {
+const formatDatePt = (v: unknown): string => {
   try {
     if (!v) return ''
-    const d = v?.toDate ? v.toDate() : v instanceof Date ? v : new Date(v)
+    const vObj = v && typeof v === 'object' ? (v as Record<string, unknown>) : null
+    const raw = vObj?.toDate && typeof vObj.toDate === 'function' ? (vObj.toDate as () => unknown)() : v
+    const d = raw instanceof Date ? raw : new Date(raw as string | number | Date)
     if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   } catch {
@@ -113,7 +153,7 @@ const formatDatePt = (v: any): string => {
   }
 }
 
-const formatDuration = (totalSeconds: any): string => {
+const formatDuration = (totalSeconds: unknown): string => {
   const sec = Number(totalSeconds) || 0
   if (sec <= 0) return '0min'
   const h = Math.floor(sec / 3600)
@@ -122,13 +162,13 @@ const formatDuration = (totalSeconds: any): string => {
   return `${m}min`
 }
 
-const calculateTotalVolume = (logs: any): number => {
+const calculateTotalVolume = (logs: Record<string, unknown>): number => {
   try {
-    if (!logs || typeof logs !== 'object') return 0
     let total = 0
-    Object.values(logs).forEach((log: any) => {
-      const w = Number(String(log?.weight ?? '').replace(',', '.'))
-      const r = Number(String(log?.reps ?? '').replace(',', '.'))
+    Object.values(logs).forEach((log: unknown) => {
+      const l = log && typeof log === 'object' ? (log as Record<string, unknown>) : {}
+      const w = Number(String(l?.weight ?? '').replace(',', '.'))
+      const r = Number(String(l?.reps ?? '').replace(',', '.'))
       if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) {
         total += w * r
       }
@@ -139,7 +179,7 @@ const calculateTotalVolume = (logs: any): number => {
   }
 }
 
-const computeKcal = ({ session, volume }: { session: any; volume: number }): number => {
+const computeKcal = ({ session, volume }: { session: SessionLite; volume: number }): number => {
   try {
     const existing = Number(session?.calories) || Number(session?.kcal)
     if (Number.isFinite(existing) && existing > 0) return Math.round(existing)
@@ -170,7 +210,7 @@ const fitCover = ({ canvasW, canvasH, imageW, imageH }: { canvasW: number; canva
   return { scale: coverScale, dw, dh }
 }
 
-const clamp01 = (n: any) => Math.max(0, Math.min(1, Number(n) || 0))
+const clamp01 = (n: unknown): number => Math.max(0, Math.min(1, Number(n) || 0))
 
 const clampPctWithSize = ({ pos, size }: { pos: LivePosition; size: { w: number; h: number } }) => {
   const px = clamp01(pos?.x)
@@ -280,6 +320,7 @@ const drawStory = ({
   layout,
   livePositions,
   transparentBg = false,
+  skipClear = false,
 }: {
   ctx: CanvasRenderingContext2D
   canvasW: number
@@ -289,8 +330,9 @@ const drawStory = ({
   layout: string
   livePositions: LivePositions
   transparentBg?: boolean
+  skipClear?: boolean
 }) => {
-  ctx.clearRect(0, 0, canvasW, canvasH)
+  if (!skipClear) ctx.clearRect(0, 0, canvasW, canvasH)
   
   // Background
   if (!transparentBg) {
@@ -546,6 +588,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const [backgroundUrl, setBackgroundUrl] = useState('')
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null)
   const [busy, setBusy] = useState(false)
+  const [busyAction, setBusyAction] = useState<'post' | 'share' | null>(null)
+  const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [showSafeGuide, setShowSafeGuide] = useState(true)
@@ -560,7 +604,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   // Trimming State
   const [showTrimmer, setShowTrimmer] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
-  const [trimRange, setTrimRange] = useState<[number, number]>([0, 15])
+  const [trimRange, setTrimRange] = useState<[number, number]>([0, 60])
   const [previewTime, setPreviewTime] = useState(0)
 
   useEffect(() => {
@@ -571,11 +615,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const metrics: Metrics = useMemo(() => {
     const title = safeString(session?.workoutTitle || session?.name || 'Treino')
     const date = formatDatePt(session?.date || session?.completed_at || session?.completedAt || session?.created_at)
-    const logs = session?.logs && typeof session.logs === 'object' ? session.logs : {}
+    const logs = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {}
     const volume = calculateTotalVolume(logs)
     const totalTime = Number(session?.totalTime) || 0
     const kcal = Number.isFinite(Number(kcalEstimate)) && Number(kcalEstimate) > 0 ? Number(kcalEstimate) : computeKcal({ session, volume })
-    const teamCountRaw = session?.team?.participantsCount ?? session?.teamParticipantsCount ?? session?.teamSessionParticipantsCount
+    const teamObj = session?.team && typeof session.team === 'object' ? (session.team as Record<string, unknown>) : null
+    const teamCountRaw = teamObj?.participantsCount ?? session?.teamParticipantsCount ?? session?.teamSessionParticipantsCount
     const teamCount = Number(teamCountRaw)
     return {
       title,
@@ -619,9 +664,16 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     }
   }, [metrics])
 
+  // Compositor Ref
+  const compositorRef = useRef<VideoCompositor | null>(null)
+
   // Reset state on open/close
   useEffect(() => {
     if (!open) {
+      if (compositorRef.current) {
+        compositorRef.current.cancel()
+        compositorRef.current = null
+      }
       try {
         const url = String(backgroundUrlRef.current || '')
         if (url) URL.revokeObjectURL(url)
@@ -633,6 +685,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       setError('')
       setInfo('')
       setBusy(false)
+      setBusyAction(null)
       setShowSafeGuide(true)
       setLivePositions(DEFAULT_LIVE_POSITIONS)
       setDraggingKey(null)
@@ -645,6 +698,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     setError('')
     setInfo('')
     setBusy(false)
+    setBusyAction(null)
     setShowSafeGuide(true)
     setLivePositions(DEFAULT_LIVE_POSITIONS)
     setDraggingKey(null)
@@ -655,7 +709,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     setBackgroundImage(null)
     setShowTrimmer(false)
     setVideoDuration(0)
-    setTrimRange([0, 15])
+    setTrimRange([0, 60])
     try {
       if (inputRef?.current) inputRef.current.value = ''
     } catch {}
@@ -753,7 +807,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         v.onloadedmetadata = () => {
              const dur = v.duration || 0
              setVideoDuration(dur)
-             setTrimRange([0, Math.min(dur, 15)])
+             setTrimRange([0, Math.min(dur, 60)])
         }
         v.src = url
         return
@@ -784,33 +838,29 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     return liveSizes?.card ?? { w: 0.26, h: 0.08 }
   }
 
-  const onPiecePointerDown = (key: string, e: React.PointerEvent) => {
+  const onPiecePointerDown = (key: string, e: React.PointerEvent<HTMLElement>) => {
     try {
       if (layout !== 'live') return
       if (!key) return
       if (!e?.currentTarget) return
-      // @ts-ignore
       if (typeof e?.pointerId !== 'number') return
       e.preventDefault?.()
       e.stopPropagation?.()
       const startPos = livePositions?.[key] ?? DEFAULT_LIVE_POSITIONS?.[key] ?? { x: 0.1, y: 0.1 }
-      // @ts-ignore
       dragRef.current = { key, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startPos }
       setDraggingKey(key)
-      // @ts-ignore
       e.currentTarget?.setPointerCapture?.(e.pointerId)
     } catch {
     }
   }
 
-  const onPiecePointerMove = (key: string, e: React.PointerEvent) => {
+  const onPiecePointerMove = (key: string, e: React.PointerEvent<HTMLElement>) => {
     try {
       if (layout !== 'live') return
       const activeKey = dragRef.current?.key
       const activePointerId = dragRef.current?.pointerId
       if (!activeKey || activeKey !== key) return
       if (typeof activePointerId !== 'number') return
-      // @ts-ignore
       if (e?.pointerId !== activePointerId) return
       const preview = previewRef.current
       const rect = preview?.getBoundingClientRect?.()
@@ -828,17 +878,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     }
   }
 
-  const onPiecePointerUp = (key: string, e: React.PointerEvent) => {
+  const onPiecePointerUp = (key: string, e: React.PointerEvent<HTMLElement>) => {
     try {
       const activeKey = dragRef.current?.key
       const activePointerId = dragRef.current?.pointerId
       if (!activeKey || activeKey !== key) return
       if (typeof activePointerId !== 'number') return
-      // @ts-ignore
       if (e?.pointerId !== activePointerId) return
       e.preventDefault?.()
       e.stopPropagation?.()
-      // @ts-ignore
       e.currentTarget?.releasePointerCapture?.(activePointerId)
       dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
       setDraggingKey(null)
@@ -889,6 +937,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         transparentBg: mediaKind === 'video' 
       })
     }
+    if (isExporting) {
+        draw()
+        return
+    }
     // Only animate if LIVE and dragging, otherwise draw once to save battery
     if (layout === 'live' && draggingKey) {
         raf = requestAnimationFrame(draw)
@@ -896,106 +948,56 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         draw()
     }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting])
 
   const renderVideo = async (): Promise<{ blob: Blob; filename: string; mime: string }> => {
     if (!videoRef.current) throw new Error('Vídeo não disponível')
-    const video = videoRef.current
-    const duration = video.duration
-    if (!duration || !Number.isFinite(duration)) throw new Error('Duração inválida')
-
-    const canvas = document.createElement('canvas')
-    canvas.width = CANVAS_W
-    canvas.height = CANVAS_H
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Erro no Canvas')
-
-    const stream = canvas.captureStream(30)
     
-    // Tenta capturar áudio (se disponível e não mudo)
-    // @ts-ignore
-    const vidStream = video.captureStream ? video.captureStream() : video.mozCaptureStream ? video.mozCaptureStream() : null
-    if (vidStream) {
-      const audioTrack = vidStream.getAudioTracks()[0]
-      if (audioTrack) stream.addTrack(audioTrack)
+    // Initialize compositor
+    compositorRef.current = new VideoCompositor()
+    setIsExporting(true)
+    
+    try {
+        const result = await compositorRef.current.render({
+            videoElement: videoRef.current,
+            trimRange,
+            outputWidth: CANVAS_W,
+            outputHeight: CANVAS_H,
+            fps: 30,
+            onDrawFrame: (ctx, video) => {
+                const vw = video.videoWidth
+                const vh = video.videoHeight
+                if (!vw || !vh) return
+
+                const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
+                const dw = vw * scale
+                const dh = vh * scale
+                const cx = (CANVAS_W - dw) / 2
+                const cy = (CANVAS_H - dh) / 2
+                
+                ctx.drawImage(video, cx, cy, dw, dh)
+                
+                drawStory({ 
+                    ctx, 
+                    canvasW: CANVAS_W, 
+                    canvasH: CANVAS_H, 
+                    backgroundImage: null, 
+                    metrics, 
+                    layout, 
+                    livePositions, 
+                    transparentBg: true, 
+                    skipClear: true 
+                })
+            }
+        })
+        return result
+    } catch (e) {
+        console.error('Render failed', e)
+        throw e
+    } finally {
+        compositorRef.current = null
+        setIsExporting(false)
     }
-
-    const chunks: Blob[] = []
-    let mime = 'video/mp4'
-    // Safari e Chrome modernos suportam mp4
-    if (!MediaRecorder.isTypeSupported(mime)) {
-      mime = 'video/webm;codecs=vp9'
-      if (!MediaRecorder.isTypeSupported(mime)) mime = 'video/webm'
-    }
-
-    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000 }) // 5 Mbps
-
-    return new Promise((resolve, reject) => {
-      let rafId = 0
-      
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) chunks.push(e.data)
-      }
-
-      recorder.onstop = () => {
-        cancelAnimationFrame(rafId)
-        video.loop = true
-        video.muted = true
-        video.play().catch(() => {})
-        
-        const blob = new Blob(chunks, { type: mime })
-        const ext = mime.includes('mp4') ? 'mp4' : 'webm'
-        resolve({ blob, filename: `irontracks-story-${Date.now()}.${ext}`, mime })
-      }
-
-      recorder.onerror = (e) => {
-        cancelAnimationFrame(rafId)
-        reject(e)
-      }
-
-      // Configuração inicial do vídeo para gravação
-      video.pause()
-      video.currentTime = trimRange[0] // Start from trim start
-      video.loop = false
-      
-      recorder.start()
-      video.play().then(() => {
-        const draw = () => {
-          // Stop if reached end of trim or video ended
-          if (video.paused || video.ended || video.currentTime >= trimRange[1]) {
-            if (recorder.state === 'recording') recorder.stop()
-            return
-          }
-          
-          const vw = video.videoWidth
-          const vh = video.videoHeight
-          const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
-          const dw = vw * scale
-          const dh = vh * scale
-          const cx = (CANVAS_W - dw) / 2
-          const cy = (CANVAS_H - dh) / 2
-          ctx.drawImage(video, cx, cy, dw, dh)
-
-          drawStory({ 
-            ctx, 
-            canvasW: CANVAS_W, 
-            canvasH: CANVAS_H, 
-            backgroundImage: null, 
-            metrics, 
-            layout, 
-            livePositions, 
-            transparentBg: true 
-          })
-
-          rafId = requestAnimationFrame(draw)
-        }
-        draw()
-      }).catch((err) => {
-         cancelAnimationFrame(rafId)
-         if (recorder.state === 'recording') recorder.stop()
-         reject(err)
-      })
-    })
   }
 
   const createImageBlob = async ({ type = 'jpg', quality = 0.95 }): Promise<{ blob: Blob; filename: string; mime: string }> => {
@@ -1052,23 +1054,49 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
   const shareImage = async () => {
     setBusy(true)
+    setBusyAction('share')
     setError('')
     setInfo('')
     try {
       const result = await createImageBlob({ type: 'jpg' })
       const file = new File([result.blob], result.filename, { type: result.mime })
-      const canShareFile = !!(typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] }))
-      if (canShareFile) await navigator.share({ files: [file], title: 'Story IronTracks' })
-      else downloadBlob(result.blob, result.filename)
-    } catch {
-      setError('Não foi possível compartilhar.')
+      
+      let shared = false
+      if (typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Story IronTracks' })
+          shared = true
+        } catch (shareErr) {
+          const name = String(shareErr?.name || '').trim()
+          // If user cancelled, stop here
+          if (name === 'AbortError') {
+             setBusy(false)
+             setBusyAction(null)
+             return
+          }
+          // If not allowed or other error, fall through to download
+          console.warn('Share API failed, falling back to download:', shareErr)
+        }
+      }
+
+      if (!shared) {
+        downloadBlob(result.blob, result.filename)
+        setInfo('Baixado com sucesso!')
+      }
+    } catch (e) {
+      const name = String(e?.name || '').trim()
+      if (name === 'AbortError') return
+      const msg = String(e?.message || '').trim()
+      setError(msg || 'Não foi possível compartilhar.')
     } finally {
       setBusy(false)
+      setBusyAction(null)
     }
   }
 
   const postToIronTracks = async () => {
     setBusy(true)
+    setBusyAction('post')
     setError('')
     setInfo('')
     try {
@@ -1078,16 +1106,20 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       if (!uid) throw new Error('unauthorized')
 
       let path = ''
-      let meta: any = {}
+      let meta: Record<string, unknown> = {}
       
       if (mediaKind === 'video') {
         if (!selectedFile) throw new Error('Selecione um vídeo primeiro.')
-        const maxBytes = 100 * 1024 * 1024 // 100MB Limit
-        if (Number(selectedFile.size) > maxBytes) throw new Error('Vídeo muito grande (máx 100MB).')
+        const maxBytes = 200 * 1024 * 1024
+        if (Number(selectedFile.size) > maxBytes) throw new Error('Vídeo muito grande (máx 200MB).')
         
         // Renderiza vídeo com layout
         const { blob, mime } = await createImageBlob({})
-        if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 100MB).')
+        if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 200MB).')
+        if (String(mime || '').toLowerCase().includes('webm')) {
+          const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
+          if (isIOSUserAgent(ua)) throw new Error('No iPhone, o vídeo com layout precisa ser MP4. Atualize o iOS/Safari ou poste via desktop.')
+        }
 
         const ext = mime.includes('mp4') ? '.mp4' : '.webm'
         const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
@@ -1097,7 +1129,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ path }),
         })
-        const signJson = await signResp.json().catch(() => null)
+        const signJson = await signResp.json().catch((): any => null)
         if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
         const { error: upErr } = await supabase.storage
           .from('social-stories')
@@ -1123,7 +1155,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ path }),
           })
-          const signJson = await signResp.json().catch(() => null)
+          const signJson = await signResp.json().catch((): any => null)
           if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
           const { error: upErr } = await supabase.storage
             .from('social-stories')
@@ -1145,7 +1177,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ mediaPath: path, caption: String(metrics?.title || ''), meta }),
       })
-      const createJson = await createResp.json().catch(() => null)
+      const createJson = await createResp.json().catch((): any => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
       
       setInfo('Publicado no IronTracks!')
@@ -1157,11 +1189,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         window.setTimeout(() => onClose?.(), 1000)
       } catch {}
 
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      setError(err?.message || 'Falha ao publicar story.')
+      const msg = String(err?.message || '').trim()
+      setError(msg || 'Falha ao publicar story.')
     } finally {
       setBusy(false)
+      setBusyAction(null)
     }
   }
 
@@ -1460,7 +1494,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         disabled={busy}
                         className="h-14 w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
                     >
-                        {busy ? 'PROCESSANDO...' : 'POSTAR NO IRONTRACKS'}
+                        {busyAction === 'post' ? (
+                            <>
+                                <Loader2 className="animate-spin" size={18} />
+                                PROCESSANDO...
+                            </>
+                        ) : 'POSTAR NO IRONTRACKS'}
                     </button>
                     
                     <button
@@ -1468,8 +1507,17 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         disabled={busy}
                         className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
                     >
-                        <Share2 size={14} />
-                        BAIXAR / COMPARTILHAR
+                        {busyAction === 'share' ? (
+                            <>
+                                <Loader2 className="animate-spin" size={14} />
+                                PROCESSANDO...
+                            </>
+                        ) : (
+                            <>
+                                <Share2 size={14} />
+                                BAIXAR / COMPARTILHAR
+                            </>
+                        )}
                     </button>
                 </div>
 

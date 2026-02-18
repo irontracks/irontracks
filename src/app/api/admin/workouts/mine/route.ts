@@ -1,26 +1,37 @@
 import { NextResponse } from 'next/server'
+import { requireRoleWithBearer } from '@/utils/auth/route'
 import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    let resolvedUser = user
+    let resolvedSupabase = supabase
+
+    if (!resolvedUser) {
+      const auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      if (!auth.ok) return auth.response
+      resolvedUser = auth.user
+      resolvedSupabase = auth.supabase
+    }
+
+    if (!resolvedUser) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await resolvedSupabase
       .from('workouts')
       .select('*, exercises(*, sets(*))')
       .eq('is_template', true)
-      .eq('user_id', user.id)
+      .eq('user_id', resolvedUser.id)
       .order('name')
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, rows: data || [] })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

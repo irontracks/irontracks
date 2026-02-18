@@ -1,15 +1,31 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
+const ZodBodySchema = z
+  .object({
+    student_id: z.string().optional(),
+    teacher_user_id: z.string().nullable().optional(),
+    teacher_email: z.string().optional(),
+    email: z.string().optional(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      if (!auth.ok) return auth.response
+    }
 
-    const body = await req.json()
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const student_id = body?.student_id as string | undefined
     let teacher_user_id = body?.teacher_user_id as string | null
     const teacher_email = (body?.teacher_email || '') as string
@@ -70,7 +86,7 @@ export async function POST(req: Request) {
     const { error } = await admin.from('students').update({ teacher_id: teacher_user_id }).eq('id', srow.id)
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, student_id: srow.id, teacher_user_id })
-  } catch (e: any) {
+  } catch (e) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

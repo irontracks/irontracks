@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const rawQ = url.searchParams.get('q') || ''
     const q = rawQ.trim()
 
-    let items: any[] = []
+    let items: unknown[] = []
 
     let studentsQuery = supabase
       .from('students')
@@ -102,7 +102,7 @@ export async function GET(req: Request) {
     items = [...items, ...profileItems]
 
     return NextResponse.json({ ok: true, items })
-  } catch (e: any) {
+  } catch (e) {
     const message = e?.message ?? String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

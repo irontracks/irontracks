@@ -1,16 +1,26 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications } from '@/lib/social/notifyFollowers'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z
+  .object({
+    following_id: z.string().min(1),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const followingId = String(body?.following_id || '').trim()
     const followerId = String(auth.user.id || '').trim()
     if (!followingId) return NextResponse.json({ ok: false, error: 'missing following_id' }, { status: 400 })
@@ -27,7 +37,7 @@ export async function POST(req: Request) {
       if (prefs && prefs.allowSocialFollows === false) {
         return NextResponse.json({ ok: false, error: 'user_not_accepting_follows' }, { status: 403 })
       }
-    } catch {}
+    } catch { }
 
     const { error } = await auth.supabase
       .from('social_follows')
@@ -62,7 +72,7 @@ export async function POST(req: Request) {
                 .eq('user_id', followingId)
                 .eq('type', 'follow_request')
                 .eq('sender_id', followerId)
-            } catch {}
+            } catch { }
 
             const inserted = await insertNotifications([
               {
@@ -107,7 +117,7 @@ export async function POST(req: Request) {
           .eq('user_id', followingId)
           .eq('type', 'follow_request')
           .eq('sender_id', followerId)
-      } catch {}
+      } catch { }
 
       const inserted = await insertNotifications([
         {
@@ -126,7 +136,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, notified })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

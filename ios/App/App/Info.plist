@@ -24,6 +24,14 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Usamos a câmera para gravar vídeos de execução dos exercícios e enviar ao seu treinador.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Usamos o microfone para gravar áudio junto com seus vídeos de execução.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Usamos sua biblioteca de fotos para selecionar vídeos e enviá-los ao seu treinador.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Usamos sua biblioteca de fotos para salvar vídeos gravados quando necessário.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

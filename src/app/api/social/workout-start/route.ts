@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import {
@@ -7,15 +8,26 @@ import {
   listFollowerIdsOf,
   shouldThrottleBySenderType,
 } from '@/lib/social/notifyFollowers'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z
+  .object({
+    workout_id: z.string().optional(),
+    workout_title: z.string().optional(),
+    title: z.string().optional(),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const workoutId = String(body?.workout_id || '').trim() || null
     const workoutTitle = String(body?.workout_title || body?.title || '').trim() || 'Treino'
 
@@ -48,8 +60,7 @@ export async function POST(req: Request) {
     const res = await insertNotifications(rows)
     if (!res.ok) return NextResponse.json({ ok: false, error: res.error || 'failed' }, { status: 400 })
     return NextResponse.json({ ok: true, sent: res.inserted })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }
-
