@@ -3645,7 +3645,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                     {/* Admin Panel Modal controlled by State */}
                     {showAdminPanel && (
-                        <AdminPanelV2 user={user as any} onClose={closeAdminPanel} />
+                        <div className="fixed inset-0 z-[1200] bg-neutral-950 overflow-hidden">
+                            <AdminPanelV2 user={user as any} onClose={closeAdminPanel} />
+                        </div>
                     )}
 
                     {whatsNewOpen && (
