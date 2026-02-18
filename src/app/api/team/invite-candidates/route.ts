@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const rawQ = url.searchParams.get('q') || ''
     const q = rawQ.trim()
 
-    let items: any[] = []
+    let items: unknown[] = []
 
     let studentsQuery = supabase
       .from('students')

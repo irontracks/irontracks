@@ -1,9 +1,17 @@
 import { useState, useEffect } from 'react';
 
+interface VipCredits {
+    chat?: { used: number; limit: number }
+    wizard?: { used: number; limit: number }
+    insights?: { used: number; limit: number }
+    plan?: string
+    [key: string]: unknown
+}
+
 export function useVipCredits() {
-    const [credits, setCredits] = useState<any>(null);
+    const [credits, setCredits] = useState<VipCredits | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<any>(null);
+    const [error, setError] = useState<string | null>(null);
 
     const fetchCredits = async () => {
         try {
@@ -17,7 +25,7 @@ export function useVipCredits() {
             }
         } catch (error) {
             console.error('Failed to fetch VIP credits', error);
-            setError(error.message);
+            setError((error as Error).message);
         } finally {
             setLoading(false);
         }

@@ -11,16 +11,90 @@ import { HELP_TERMS } from '@/utils/help/terms';
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
 
-const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
-	const { confirm, alert, closeDialog, showLoading } = useDialog();
+interface AdvancedConfig {
+    initial_reps?: number | null;
+    mini_sets?: number | null;
+    rest_time_sec?: number | null;
+    weight?: number | null;
+    reps?: string | number | null;
+    type?: string;
+    workSec?: number;
+    restSec?: number;
+    rounds?: number;
+    hitIntensity?: string;
+    incline?: string | number;
+    speed?: string | number;
+    resistance?: string | number;
+    heart_rate?: string | number;
+    cluster_size?: number | null;
+    intra_rest_sec?: number | null;
+    total_reps?: number | null;
+    isHIT?: boolean;
+    [key: string]: unknown;
+}
+
+interface SetDetail {
+    set_number: number;
+    reps: string | number | null;
+    rpe: number | null;
+    weight: number | null;
+    is_warmup: boolean;
+    isWarmup?: boolean;
+    advanced_config: AdvancedConfig | AdvancedConfig[] | null;
+    advancedConfig?: AdvancedConfig | AdvancedConfig[] | null;
+    it_auto?: {
+        source: string;
+        kind: string;
+        label: string;
+        hash: string;
+    } | null;
+}
+
+interface Exercise {
+    name: string;
+    sets: number | string;
+    reps: string | number | null;
+    rpe: number | string | null;
+    method?: string | null;
+    restTime?: number | string | null;
+    rest_time?: number | string | null;
+    videoUrl?: string | null;
+    video_url?: string | null;
+    notes?: string | null;
+    cadence?: string | null;
+    type?: string;
+    setDetails?: SetDetail[];
+    set_details?: SetDetail[];
+    order?: number;
+}
+
+interface Workout {
+    id?: string;
+    title?: string;
+    notes?: string;
+    exercises?: Exercise[];
+    created_by?: string;
+    user_id?: string;
+}
+
+interface ExerciseEditorProps {
+    workout: Workout;
+    onSave?: (workout: Workout) => Promise<any>;
+    onCancel?: () => void;
+    onChange?: (workout: Workout) => void;
+    onSaved?: () => void;
+}
+
+const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCancel, onChange, onSaved }) => {
+    const { confirm, alert, closeDialog, showLoading } = useDialog();
     const [saving, setSaving] = React.useState(false);
     const [scannerLoading, setScannerLoading] = React.useState(false);
     const [scannerError, setScannerError] = React.useState('');
 
-    const fileInputRef = React.useRef<any>(null);
-    const scannerFileInputRef = React.useRef<any>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const scannerFileInputRef = React.useRef<HTMLInputElement>(null);
 
-    const normalizeMethod = React.useCallback((method) => {
+    const normalizeMethod = React.useCallback((method: unknown) => {
         const raw = String(method || '').trim();
         const lower = raw.toLowerCase();
         if (!raw) return 'Normal';
@@ -33,7 +107,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         return raw;
     }, []);
 
-    const buildDefaultSetDetail = React.useCallback((exercise, setNumber) => {
+    const buildDefaultSetDetail = React.useCallback((exercise: Exercise, setNumber: number): SetDetail => {
         const reps = (exercise?.reps ?? '')
         const rpeNum = Number(exercise?.rpe)
         return {
@@ -46,9 +120,9 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         };
     }, []);
 
-    const ensureSetDetails = React.useCallback((exercise, desiredCount) => {
+    const ensureSetDetails = React.useCallback((exercise: Exercise, desiredCount: number) => {
         const existing = Array.isArray(exercise?.setDetails) ? exercise.setDetails : [];
-        const next: any[] = [];
+        const next: SetDetail[] = [];
         for (let i = 0; i < desiredCount; i++) {
             const setNumber = i + 1;
             const current = existing[i];
@@ -61,12 +135,12 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         return next;
     }, [buildDefaultSetDetail]);
 
-	React.useEffect(() => {
-		if (!Array.isArray(workout?.exercises)) return;
-		const validExercises = workout.exercises.filter(e => e && typeof e === 'object');
-		if (validExercises.length !== workout.exercises.length) {
-			onChange?.({ ...workout, exercises: validExercises });
-		}
+    React.useEffect(() => {
+        if (!Array.isArray(workout?.exercises)) return;
+        const validExercises = workout.exercises.filter(e => e && typeof e === 'object');
+        if (validExercises.length !== workout.exercises.length) {
+            onChange?.({ ...workout, exercises: validExercises });
+        }
     }, [workout, onChange]);
     React.useEffect(() => {
         if (!Array.isArray(workout?.exercises)) return;
@@ -75,7 +149,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             if (!ex || typeof ex !== 'object') return ex;
 
             const existingDetailsRaw = Array.isArray(ex?.setDetails) ? ex.setDetails : [];
-            const setsFromField = Math.max(0, parseInt(ex?.sets) || 0);
+            const setsFromField = Math.max(0, parseInt(String(ex?.sets)) || 0);
             const setsFromDetails = Array.isArray(existingDetailsRaw) ? existingDetailsRaw.length : 0;
             const desiredCount = Math.max(setsFromField, setsFromDetails);
             if (!desiredCount) return ex;
@@ -115,16 +189,16 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             const repsNum = Number.parseInt(String(next?.reps ?? ''), 10);
             const fallbackTemplate = {
                 initial_reps: Number.isFinite(repsNum) ? repsNum : null,
-                mini_sets: null,
+                mini_sets: null as number | null,
                 rest_time_sec: REST_PAUSE_DEFAULT_PAUSE_SEC,
             };
 
-            const rp = template || fallbackTemplate;
+            const rp = (template || fallbackTemplate) as AdvancedConfig;
 
             const propagated = nextDetails.map((s) => {
                 const cfg = s?.advanced_config ?? s?.advancedConfig ?? null;
                 const baseCfg = cfg && typeof cfg === 'object' && !Array.isArray(cfg) ? cfg : {};
-                const nextCfg = {
+                const nextCfg: AdvancedConfig = {
                     ...baseCfg,
                     initial_reps: baseCfg?.initial_reps ?? rp.initial_reps,
                     mini_sets: baseCfg?.mini_sets ?? rp.mini_sets,
@@ -145,10 +219,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         if (!changed) return;
         onChange?.({ ...workout, exercises: nextExercises });
     }, [ensureSetDetails, normalizeMethod, workout, onChange]);
-	if (!workout) return null;
+    if (!workout) return null;
 
 
-    const detectRestPauseConfig = (name, reps, notes) => {
+    const detectRestPauseConfig = (name: unknown, reps: unknown, notes: unknown) => {
         const text = `${String(name || '')} ${String(reps || '')} ${String(notes || '')}`.toLowerCase();
         const hasRestPause = text.includes('rest-pause') || text.includes('rest pause') || text.includes('restpause');
         if (!hasRestPause) return null;
@@ -219,8 +293,8 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         };
     };
 
-    const extractRepsTargets = (primaryReps, notes) => {
-        const normalize = (value) => {
+    const extractRepsTargets = (primaryReps: unknown, notes: unknown) => {
+        const normalize = (value: unknown) => {
             const raw = String(value || '').trim();
             if (!raw) return '';
             const rangePattern = /(\d+)\s*(?:a|-|to)\s*(\d+)/i;
@@ -235,7 +309,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             return raw;
         };
 
-        const targets: any[] = [];
+        const targets: string[] = [];
         const normalizedPrimary = normalize(primaryReps);
         if (normalizedPrimary) targets.push(normalizedPrimary);
 
@@ -257,10 +331,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         return targets;
     };
 
-    const updateSetDetail = (exerciseIndex, setIndex, patch) => {
+    const updateSetDetail = (exerciseIndex: number, setIndex: number, patch: Partial<SetDetail>) => {
         const newExercises = [...(workout.exercises || [])];
-        const ex = newExercises[exerciseIndex] || {};
-        const setsCount = Math.max(0, parseInt(ex?.sets) || 0);
+        const ex = newExercises[exerciseIndex] || ({} as Exercise);
+        const setsCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
         const setDetails = ensureSetDetails(ex, setsCount);
         const current = setDetails[setIndex] || buildDefaultSetDetail(ex, setIndex + 1);
         const next = { ...current, ...patch };
@@ -281,56 +355,56 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         onChange?.({ ...workout, exercises: newExercises });
     };
 
-	const updateExercise = (index, field, value) => {
-		const newExercises = [...(workout.exercises || [])];
-		if (field === 'duplicate') {
-			newExercises.splice(index + 1, 0, { ...newExercises[index] });
-			} else {
-				const ex = newExercises[index] || {};
-				if (field === 'sets') {
-					const nextCount = Math.max(0, parseInt(value) || 0);
-					const nextDetails = ensureSetDetails(ex, nextCount);
-					newExercises[index] = { ...ex, sets: value, setDetails: nextDetails };
-				} else if (field === 'method') {
-				const prevMethod = normalizeMethod(ex?.method);
-				const nextMethod = normalizeMethod(value);
-				const currentCount = Math.max(0, parseInt(ex?.sets) || 0);
-				const nextIsSpecial =
-					nextMethod === 'Drop-set' ||
-					nextMethod === 'Rest-Pause' ||
-					nextMethod === 'Cluster';
-				const prevIsSpecial =
-					prevMethod === 'Drop-set' ||
-					prevMethod === 'Rest-Pause' ||
-					prevMethod === 'Cluster';
-				const setsCount = nextIsSpecial ? Math.max(1, currentCount || 1) : (currentCount || 4);
-				const switchingBetweenSpecial = prevIsSpecial && nextIsSpecial && prevMethod !== nextMethod;
-				const shouldResetConfig =
-					nextMethod === 'Normal' ||
-					nextMethod === 'Bi-Set' ||
-					nextMethod === 'Cardio' ||
-					switchingBetweenSpecial;
-				const baseDetails = ensureSetDetails({ ...ex, method: nextMethod }, setsCount);
-				const nextDetails = shouldResetConfig
-					? baseDetails.map((s) => ({
-							...s,
-							advanced_config: null
-					  }))
-					: baseDetails;
-				const currentRestTime = ex?.restTime ?? ex?.rest_time ?? null;
-				const currentRestTimeNum = currentRestTime === '' ? NaN : Number(currentRestTime);
-				const shouldSuggestRestZero = nextMethod === 'Bi-Set' && (!Number.isFinite(currentRestTimeNum) || currentRestTimeNum === 60);
-				newExercises[index] = {
-					...ex,
-					method: nextMethod,
-					restTime: shouldSuggestRestZero ? 0 : (ex?.restTime ?? ex?.rest_time ?? null),
-					sets: setsCount,
-					setDetails: nextDetails
-				};
-			} else if (field === 'reps' || field === 'rpe') {
+    const updateExercise = (index: number, field: keyof Exercise | 'duplicate', value: any) => {
+        const newExercises = [...(workout.exercises || [])];
+        if (field === 'duplicate') {
+            newExercises.splice(index + 1, 0, { ...newExercises[index] });
+        } else {
+            const ex = newExercises[index] || ({} as Exercise);
+            if (field === 'sets') {
+                const nextCount = Math.max(0, parseInt(value) || 0);
+                const nextDetails = ensureSetDetails(ex, nextCount);
+                newExercises[index] = { ...ex, sets: value, setDetails: nextDetails };
+            } else if (field === 'method') {
+                const prevMethod = normalizeMethod(ex?.method);
+                const nextMethod = normalizeMethod(value);
+                const currentCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
+                const nextIsSpecial =
+                    nextMethod === 'Drop-set' ||
+                    nextMethod === 'Rest-Pause' ||
+                    nextMethod === 'Cluster';
+                const prevIsSpecial =
+                    prevMethod === 'Drop-set' ||
+                    prevMethod === 'Rest-Pause' ||
+                    prevMethod === 'Cluster';
+                const setsCount = nextIsSpecial ? Math.max(1, currentCount || 1) : (currentCount || 4);
+                const switchingBetweenSpecial = prevIsSpecial && nextIsSpecial && prevMethod !== nextMethod;
+                const shouldResetConfig =
+                    nextMethod === 'Normal' ||
+                    nextMethod === 'Bi-Set' ||
+                    nextMethod === 'Cardio' ||
+                    switchingBetweenSpecial;
+                const baseDetails = ensureSetDetails({ ...ex, method: nextMethod }, setsCount);
+                const nextDetails = shouldResetConfig
+                    ? baseDetails.map((s) => ({
+                        ...s,
+                        advanced_config: null as AdvancedConfig | null
+                    }))
+                    : baseDetails;
+                const currentRestTime = ex?.restTime ?? ex?.rest_time ?? null;
+                const currentRestTimeNum = currentRestTime === '' ? NaN : Number(currentRestTime);
+                const shouldSuggestRestZero = nextMethod === 'Bi-Set' && (!Number.isFinite(currentRestTimeNum) || currentRestTimeNum === 60);
+                newExercises[index] = {
+                    ...ex,
+                    method: nextMethod,
+                    restTime: shouldSuggestRestZero ? 0 : (ex?.restTime ?? ex?.rest_time ?? null),
+                    sets: setsCount,
+                    setDetails: nextDetails
+                };
+            } else if (field === 'reps' || field === 'rpe') {
                 const prevValue = ex[field];
                 const nextValue = value;
-                const setsCount = Math.max(0, parseInt(ex?.sets) || 0);
+                const setsCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
                 const existingDetails = ensureSetDetails(ex, setsCount);
                 const updatedDetails = existingDetails.map((s) => {
                     if (field === 'reps') {
@@ -341,7 +415,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     }
                     if (field === 'rpe') {
                         const currentRpe = s?.rpe;
-                        if (currentRpe == null || currentRpe === '' || String(currentRpe) === String(prevValue)) {
+                        if (currentRpe == null || String(currentRpe) === String(prevValue)) {
                             return { ...s, rpe: nextValue === '' ? null : Number(nextValue) };
                         }
                     }
@@ -349,7 +423,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                 });
                 newExercises[index] = { ...ex, [field]: value, setDetails: updatedDetails };
             } else if (field === 'notes') {
-                const setsCount = Math.max(0, parseInt(ex?.sets) || 0);
+                const setsCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
                 const existingDetails = ensureSetDetails(ex, setsCount);
                 const parsed = parseExerciseNotesToSetOverrides({ notes: value, setsCount });
                 const overrides = Array.isArray(parsed?.overrides) ? parsed.overrides : [];
@@ -399,7 +473,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         onChange?.({ ...workout, exercises: newExercises });
     };
 
-    const removeExercise = async (index) => {
+    const removeExercise = async (index: number) => {
         if (await confirm('Tem certeza que deseja remover este exercício?', 'Remover Exercício')) {
             const newExercises = [...(workout.exercises || [])];
             newExercises.splice(index, 1);
@@ -415,12 +489,12 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
     const CARDIO_OPTIONS = ['Escada', 'Esteira', 'Bicicleta', 'Bike Outdoor', 'Corrida', 'Caminhada', 'Elíptico'];
 
-    const getExerciseType = (ex) => {
+    const getExerciseType = (ex: Exercise) => {
         if (ex.type) return ex.type;
         return ex.method === 'Cardio' ? 'cardio' : 'strength';
     };
 
-    const detectCardioFromScanner = (name, reps, notes) => {
+    const detectCardioFromScanner = (name: unknown, reps: unknown, notes: unknown) => {
         const rawName = String(name || '').trim();
         const text = `${rawName} ${String(reps || '')} ${String(notes || '')}`.toLowerCase();
 
@@ -483,7 +557,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         }
     };
 
-    const handleScannerFileChange = async (e) => {
+    const handleScannerFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         try {
             setScannerError('');
             const files = e?.target?.files;
@@ -494,7 +568,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
             setScannerLoading(true);
 
-            const allRawExercises: any[] = [];
+            const allRawExercises: unknown[] = [];
             let detectedTitle = '';
 
             for (let i = 0; i < selectedFiles.length; i += 1) {
@@ -536,7 +610,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             }
 
             const mappedExercises = allRawExercises
-                .map((item) => {
+                .map((item: any) => {
                     const rawName = String(item?.name || '').trim();
                     const canonical = resolveCanonicalExerciseName(rawName);
                     const name = String(canonical?.canonical || rawName).trim();
@@ -549,7 +623,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     const cardioInfo = detectCardioFromScanner(name, repsRaw, notesRaw);
                     if (cardioInfo) {
                         const minutesStr = String(cardioInfo.minutes);
-                        const exercise = {
+                        const exercise: Exercise = {
                             name: cardioInfo.modality,
                             type: 'cardio',
                             method: 'Cardio',
@@ -571,7 +645,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     const reps = restPauseInfo?.normalizedReps || repsRaw || '10';
                     const notes = restPauseInfo?.cleanedNotes ?? notesRaw;
 
-                    const exercise = {
+                    const exercise: Exercise = {
                         name,
                         sets: baseSets,
                         reps,
@@ -624,7 +698,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                 try {
                     const ok = await confirm(`Definir título como "${detectedTitle}"?`, 'Scanner');
                     if (ok) titleToApply = detectedTitle;
-                } catch {}
+                } catch { }
             }
 
             try {
@@ -634,7 +708,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     'Scanner'
                 );
                 if (!ok) return;
-            } catch {}
+            } catch { }
 
             const nextWorkout = {
                 ...(workout || {}),
@@ -644,7 +718,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
 
             onChange?.(nextWorkout);
             await alert('Treino importado pela IA. Revise antes de salvar.', 'Importação concluída');
-        } catch (err) {
+        } catch (err: any) {
             const msg = err?.message ? String(err.message) : String(err);
             const friendly = msg || 'Não conseguimos ler o treino. Tente uma foto mais nítida.';
             setScannerError(friendly);
@@ -657,7 +731,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         }
     };
 
-    const toggleExerciseType = (index, currentType) => {
+    const toggleExerciseType = (index: number, currentType: string) => {
         const newType = currentType === 'strength' ? 'cardio' : 'strength';
         const newExercises = [...(workout.exercises || [])];
         const ex = newExercises[index];
@@ -687,7 +761,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
         onChange?.({ ...workout, exercises: newExercises });
     };
 
-    const toggleBiSetWithNext = async (index) => {
+    const toggleBiSetWithNext = async (index: number) => {
         try {
             const list = Array.isArray(workout?.exercises) ? workout.exercises : [];
             const current = list[index];
@@ -714,7 +788,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             }
 
             updateExercise(index, 'method', 'Bi-Set');
-        } catch (e) {
+        } catch (e: any) {
             await alert('Não foi possível atualizar o link. ' + (e?.message ?? String(e)), 'Erro');
         }
     };
@@ -740,7 +814,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
     };
 
     const handleImportJsonClick = () => fileInputRef.current?.click();
-    const handleImportJson = async (e) => {
+    const handleImportJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
         try {
@@ -749,7 +823,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             const src = raw.workout || raw.session || raw;
             const title = src.title || src.workoutTitle || workout.title || 'Treino Importado';
             const exs = Array.isArray(src.exercises) ? src.exercises : [];
-            const mapped = exs.map(ex => ({
+            const mapped = exs.map((ex: any) => ({
                 name: ex.name || '',
                 sets: Number(ex.sets) || (Array.isArray(ex?.setDetails) ? ex.setDetails.length : (Array.isArray(ex?.set_details) ? ex.set_details.length : (Array.isArray(ex?.sets) && ex.sets.length && typeof ex.sets[0] === 'object' ? ex.sets.length : 0))),
                 reps: String(ex.reps || ''),
@@ -773,11 +847,13 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
                 }
             }
-        } catch (err) {
+        } catch (err: any) {
             const msg = (err && typeof err === 'object' && 'message' in err) ? err.message : String(err || '');
             await alert(`Falha ao importar JSON${msg ? `: ${msg}` : ''}`, 'Erro');
         } finally {
-            e.target.value = '';
+            if (e.target) {
+                e.target.value = '';
+            }
         }
     };
 
@@ -786,50 +862,50 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
             return await alert("Dê um nome ao treino!", "Atenção");
         }
 
-		setSaving(true);
-		if (typeof showLoading === 'function') {
-			showLoading('Seu treino está sendo salvo. Aguarde...', 'Salvando');
-		}
-	try {
+        setSaving(true);
+        if (typeof showLoading === 'function') {
+            showLoading('Seu treino está sendo salvo. Aguarde...', 'Salvando');
+        }
+        try {
             const supabase = createClient();
             const { data: { user } } = await supabase.auth.getUser();
-            
+
             if (!user) {
                 await alert("Usuário não logado. O treino não será salvo sem dono.", "Erro");
                 return;
             }
 
-			if (onSave) {
-				 const res = await onSave({ ...workout, created_by: user.id, user_id: user.id });
-                 if (res && typeof res === 'object' && res.ok === false) {
+            if (onSave) {
+                const res = await onSave({ ...workout, created_by: user.id, user_id: user.id });
+                if (res && typeof res === 'object' && res.ok === false) {
                     await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
                     return;
-                 }
-                 if (res && typeof res === 'object' && res.deferred === true) {
+                }
+                if (res && typeof res === 'object' && res.deferred === true) {
                     await alert('Exercício adicionado ao treino ativo.\nAo finalizar o treino, você poderá escolher se deseja salvar essa mudança no modelo.', 'Exercício adicionado');
                     if (typeof onSaved === 'function') onSaved();
                     return;
-                 }
-				 const sync = res?.sync || null;
-				 if (sync) {
-					const created = Number(sync?.created || 0);
-					const updated = Number(sync?.updated || 0);
-					const failed = Number(sync?.failed || 0);
-					const extra = sync?.error
-						? `\n\nSincronização: falhou (${String(sync.error)})`
-						: `\n\nSincronização: ${updated} atualizado(s), ${created} criado(s)${failed ? `, ${failed} falha(s)` : ''}`;
-					await alert("Treino Salvo com Sucesso!" + extra, "Sucesso");
-					if (typeof onSaved === 'function') onSaved();
-					return;
-				 }
-			} else {
-                 const exercisesPayload = (workout.exercises || []).map((ex, idx) => {
+                }
+                const sync = res?.sync || null;
+                if (sync) {
+                    const created = Number(sync?.created || 0);
+                    const updated = Number(sync?.updated || 0);
+                    const failed = Number(sync?.failed || 0);
+                    const extra = sync?.error
+                        ? `\n\nSincronização: falhou (${String(sync.error)})`
+                        : `\n\nSincronização: ${updated} atualizado(s), ${created} criado(s)${failed ? `, ${failed} falha(s)` : ''}`;
+                    await alert("Treino Salvo com Sucesso!" + extra, "Sucesso");
+                    if (typeof onSaved === 'function') onSaved();
+                    return;
+                }
+            } else {
+                const exercisesPayload = (workout.exercises || []).map((ex, idx) => {
                     const setDetails = Array.isArray(ex?.setDetails)
                         ? ex.setDetails
                         : (Array.isArray(ex?.set_details) ? ex.set_details : null);
-                    const headerSets = Number.parseInt(ex?.sets, 10) || 0;
+                    const headerSets = Number.parseInt(String(ex?.sets), 10) || 0;
                     const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0);
-                    const sets: any[] = [];
+                    const sets: unknown[] = [];
                     for (let i = 0; i < numSets; i += 1) {
                         const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null;
                         sets.push({
@@ -852,9 +928,9 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                         order: idx,
                         sets
                     };
-                 });
+                });
 
-                 const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', {
+                const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', {
                     p_workout_id: workout.id || null,
                     p_user_id: user.id,
                     p_created_by: user.id,
@@ -862,100 +938,100 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                     p_name: normalizeWorkoutTitle(workout.title),
                     p_notes: workout.notes,
                     p_exercises: exercisesPayload
-                 });
-                 if (error) throw error;
-                 if (!workoutId) throw new Error('Falha ao salvar treino');
-			}
-			
-			await alert("Treino Salvo com Sucesso!", "Sucesso");
-			if (typeof onSaved === 'function') {
-				onSaved();
-			}
+                });
+                if (error) throw error;
+                if (!workoutId) throw new Error('Falha ao salvar treino');
+            }
+
+            await alert("Treino Salvo com Sucesso!", "Sucesso");
+            if (typeof onSaved === 'function') {
+                onSaved();
+            }
             // window.location.href = '/'; // Removido para evitar reload forçado que causava tela preta
 
-		} catch (e) {
-			const msg = e?.message || String(e || '');
-			await alert("Erro ao salvar: " + msg);
-		} finally {
-			if (typeof closeDialog === 'function') {
-				closeDialog();
-			}
-			setSaving(false);
-		}
-	};
+        } catch (e: any) {
+            const msg = e?.message || String(e || '');
+            await alert("Erro ao salvar: " + msg);
+        } finally {
+            if (typeof closeDialog === 'function') {
+                closeDialog();
+            }
+            setSaving(false);
+        }
+    };
 
-	return (
-		<div className="h-full flex flex-col bg-neutral-900">
-			<div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between bg-neutral-950 sticky top-0 z-30 pt-safe">
-				<div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-[48px]">
-					<div className="flex items-center justify-between gap-3 min-w-0">
-						<h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap truncate min-w-0">
-							Editar Treino
-						</h2>
-						<div className="shrink-0 flex items-center gap-2">
-							<button
-								type="button"
-								onClick={handleSave}
-								disabled={saving}
-								className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
-							>
-								<Save size={18} />
-								<span className="hidden sm:inline">{saving ? 'SALVANDO...' : 'SALVAR'}</span>
-							</button>
-							<button
-								type="button"
-								onClick={() => onCancel?.()}
-								className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors"
-								title="Fechar"
-							>
-								<X size={16} />
-							</button>
-						</div>
-					</div>
-					<div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-						<button
-							onClick={handleScannerFileClick}
-							disabled={scannerLoading}
-							className="shrink-0 flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
-							title="Importar treino via IA (foto/PDF)"
-						>
-							<ImageIcon size={18} />
-							<span className="text-sm font-bold hidden sm:inline">Importar Treino (Foto/PDF)</span>
-							<span className="text-sm font-bold sm:hidden">Importar</span>
-						</button>
-						<input
-							ref={scannerFileInputRef}
-							type="file"
-							accept="image/*,application/pdf"
-							multiple
-							className="hidden"
-							onChange={handleScannerFileChange}
-						/>
-						<button
-							onClick={handleImportJsonClick}
-							className="shrink-0 flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
-							title="Carregar JSON"
-						>
-							<Upload size={18} />
-							<span className="text-sm font-bold hidden sm:inline">Carregar JSON</span>
-							<span className="text-sm font-bold sm:hidden">JSON</span>
-						</button>
-						<input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportJson} />
-					</div>
-				</div>
-			</div>
+    return (
+        <div className="h-full flex flex-col bg-neutral-900">
+            <div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between bg-neutral-950 sticky top-0 z-30 pt-safe">
+                <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-[48px]">
+                    <div className="flex items-center justify-between gap-3 min-w-0">
+                        <h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap truncate min-w-0">
+                            Editar Treino
+                        </h2>
+                        <div className="shrink-0 flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
+                            >
+                                <Save size={18} />
+                                <span className="hidden sm:inline">{saving ? 'SALVANDO...' : 'SALVAR'}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onCancel?.()}
+                                className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors"
+                                title="Fechar"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <button
+                            onClick={handleScannerFileClick}
+                            disabled={scannerLoading}
+                            className="shrink-0 flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
+                            title="Importar treino via IA (foto/PDF)"
+                        >
+                            <ImageIcon size={18} />
+                            <span className="text-sm font-bold hidden sm:inline">Importar Treino (Foto/PDF)</span>
+                            <span className="text-sm font-bold sm:hidden">Importar</span>
+                        </button>
+                        <input
+                            ref={scannerFileInputRef}
+                            type="file"
+                            accept="image/*,application/pdf"
+                            multiple
+                            className="hidden"
+                            onChange={handleScannerFileChange}
+                        />
+                        <button
+                            onClick={handleImportJsonClick}
+                            className="shrink-0 flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
+                            title="Carregar JSON"
+                        >
+                            <Upload size={18} />
+                            <span className="text-sm font-bold hidden sm:inline">Carregar JSON</span>
+                            <span className="text-sm font-bold sm:hidden">JSON</span>
+                        </button>
+                        <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportJson} />
+                    </div>
+                </div>
+            </div>
 
-				<div className="flex-1 overflow-y-auto p-4 space-y-6">
-					{scannerLoading && (
-						<div className="mb-3 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5 text-yellow-200 text-xs font-semibold">
-							A IA está lendo seu treino...
-						</div>
-					)}
-					{!scannerLoading && scannerError && (
-						<div className="mb-3 p-3 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-xs font-semibold">
-							{scannerError}
-						</div>
-					)}
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {scannerLoading && (
+                    <div className="mb-3 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5 text-yellow-200 text-xs font-semibold">
+                        A IA está lendo seu treino...
+                    </div>
+                )}
+                {!scannerLoading && scannerError && (
+                    <div className="mb-3 p-3 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-xs font-semibold">
+                        {scannerError}
+                    </div>
+                )}
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
@@ -994,7 +1070,7 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                         const nextExercise = hasNext ? (workout.exercises || [])[index + 1] : null;
                         const nextType = nextExercise ? getExerciseType(nextExercise) : null;
                         const canShowLinkButton = hasNext && exerciseType !== 'cardio' && nextType !== 'cardio';
-                        const setsFromField = Math.max(0, parseInt(exercise?.sets) || 0);
+                        const setsFromField = Math.max(0, parseInt(String(exercise?.sets)) || 0);
                         const setsFromDetails = Array.isArray(exercise?.setDetails) ? exercise.setDetails.length : 0;
                         const setsCount = Math.max(setsFromField, setsFromDetails);
                         const setDetails = ensureSetDetails(exercise, setsCount);
@@ -1010,11 +1086,10 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                     <div className="absolute top-2 right-2 flex gap-2">
                                         <button
                                             onClick={() => toggleExerciseType(index, exerciseType)}
-                                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${
-                                                exerciseType === 'cardio'
+                                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${exerciseType === 'cardio'
                                                 ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
                                                 : 'bg-neutral-700 text-neutral-400 border-neutral-600 hover:border-neutral-400'
-                                            }`}
+                                                }`}
                                         >
                                             {exerciseType === 'cardio' ? 'Cardio' : 'Força'}
                                         </button>
@@ -1037,624 +1112,624 @@ const ExerciseEditor = ({ workout, onSave, onCancel, onChange, onSaved }) => {
                                     </div>
 
                                     <div className="space-y-4 pr-0 pt-6">
-                                    {exerciseType === 'cardio' ? (
-                                        <div>
-                                            <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Modalidade</label>
-                                            <select
-                                                value={exercise.name || ''}
-                                                onChange={e => updateExercise(index, 'name', e.target.value)}
-                                                className="w-full bg-neutral-900 font-bold text-white text-lg p-3 rounded-xl border border-neutral-700 outline-none focus:border-blue-500 transition-colors appearance-none"
-                                            >
-                                                {CARDIO_OPTIONS.map(opt => (
-                                                    <option key={opt} value={opt}>{opt}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <input
-                                                value={exercise.name || ''}
-                                                onChange={e => updateExercise(index, 'name', e.target.value)}
-                                                className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
-                                                placeholder="Nome do exercício"
-                                            />
-                                            {(() => {
-                                                const info = resolveCanonicalExerciseName(exercise.name || '')
-                                                if (!info?.changed || !info?.canonical) return null
-                                                return (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => updateExercise(index, 'name', info.canonical)}
-                                                        className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-bold text-xs hover:bg-yellow-500/15"
-                                                    >
-                                                        Padronizar: {info.canonical}
-                                                    </button>
-                                                )
-                                            })()}
-                                        </div>
-                                    )}
-
-									{exerciseType === 'cardio' ? (
-                                        <>
-										<div className="grid grid-cols-2 gap-4">
-											<div>
-												<label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
-													{String(exercise?.name || '').toLowerCase() === 'bike outdoor'
-														? 'Tempo (minutos) (opcional)'
-														: 'Tempo (minutos)'}
-												</label>
-									<input
-										type="number"
-										min={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? undefined : 1}
-										value={exercise.reps || ''}
-										onChange={e => updateExercise(index, 'reps', e.target.value)}
-										className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-blue-500 border border-neutral-700"
-										placeholder={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? 'Livre' : '30'}
-									/>
-											</div>
-											<div>
-												<label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</label>
-												<input
-                                                    type="number"
-                                                    min="1"
-                                                    value={exercise.rpe || ''}
-                                                    onChange={e => updateExercise(index, 'rpe', e.target.value)}
-                                                    className="w-full bg-neutral-900 border border-yellow-500/20 rounded-xl p-4 text-center text-xl font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
-                                                    placeholder="5"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Cardio Advanced Config (HIT / Incline / Speed) */}
-                                        {(() => {
-                                            const cardioSet = setDetails[0];
-                                            const config = cardioSet?.advanced_config || {};
-                                            const isHIT = !!config?.isHIT;
-                                            
-                                            const updateCardioConfig = (field, val) => {
-                                                const newConfig = { ...config, [field]: val };
-                                                if (val === '' || val === null || val === undefined) delete newConfig[field];
-                                                
-                                                // If turning off HIT, clean up HIT fields
-                                                if (field === 'isHIT' && !val) {
-                                                    delete newConfig.workSec;
-                                                    delete newConfig.restSec;
-                                                    delete newConfig.rounds;
-                                                    delete newConfig.hitIntensity;
-                                                }
-
-                                                updateSetDetail(index, 0, { 
-                                                    advanced_config: Object.keys(newConfig).length > 0 ? newConfig : null 
-                                                });
-                                            };
-
-                                            const workSec = Number(config?.workSec) || 0;
-                                            const restSec = Number(config?.restSec) || 0;
-                                            const hitInvalid = isHIT && (workSec <= 0 || restSec >= workSec);
-
-                                            return (
-                                                <div className="mt-4 pt-4 border-t border-neutral-800">
-                                                    <div className="flex items-center justify-between mb-3">
-                                                        <label className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</label>
-                                                        <div className="flex items-center gap-2">
-                                                            <label className="text-[10px] font-bold text-white uppercase cursor-pointer select-none flex items-center gap-2">
-                                                                Modo HIT
-                                                                <input 
-                                                                    type="checkbox"
-                                                                    checked={isHIT}
-                                                                    onChange={(e) => updateCardioConfig('isHIT', e.target.checked)}
-                                                                    className="accent-yellow-500 w-4 h-4"
-                                                                />
-                                                            </label>
-                                                        </div>
-                                                    </div>
-
-                                                    {isHIT && (
-                                                        <div className="bg-neutral-900/50 p-3 rounded-xl border border-neutral-800 mb-3 animate-in slide-in-from-top-2">
-                                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                                <div>
-                                                                    <label className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={config.workSec ?? ''}
-                                                                        onChange={e => updateCardioConfig('workSec', Number(e.target.value))}
-                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700"
-                                                                        placeholder="30"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={config.restSec ?? ''}
-                                                                        onChange={e => updateCardioConfig('restSec', Number(e.target.value))}
-                                                                        className={`w-full bg-neutral-900 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 ${hitInvalid ? 'border-red-500/50' : 'border-neutral-700'}`}
-                                                                        placeholder="10"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={config.rounds ?? ''}
-                                                                        onChange={e => updateCardioConfig('rounds', Number(e.target.value))}
-                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                        placeholder="10"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</label>
-                                                                    <select
-                                                                        value={config.hitIntensity ?? 'high'}
-                                                                        onChange={e => updateCardioConfig('hitIntensity', e.target.value)}
-                                                                        className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 h-[38px]"
-                                                                    >
-                                                                        <option value="low">Baixa</option>
-                                                                        <option value="medium">Média</option>
-                                                                        <option value="high">Alta</option>
-                                                                    </select>
-                                                                </div>
-                                                            </div>
-                                                            {hitInvalid && (
-                                                                <div className="mt-2 text-[10px] text-red-400 font-bold">
-                                                                    ⚠️ O tempo de descanso deve ser menor que o tempo de trabalho.
-                                                                </div>
-                                                            )}
-                                                            {!hitInvalid && workSec > 0 && (
-                                                                <div className="mt-2 text-[10px] text-neutral-500 font-mono text-center">
-                                                                    Resumo: {config.rounds || '?'} rounds de {workSec}s ativo / {restSec}s descanso
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    <details className="group">
-                                                        <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
-                                                            <span>Parâmetros de Equipamento</span>
-                                                            <span className="group-open:rotate-180 transition-transform">▼</span>
-                                                        </summary>
-                                                        
-                                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
-                                                            {/* Inclinação */}
-                                                            <div>
-                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</label>
-                                                                <input
-                                                                    type="number"
-                                                                    value={config.incline ?? ''}
-                                                                    onChange={e => updateCardioConfig('incline', e.target.value)}
-                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                    placeholder="0"
-                                                                />
-                                                            </div>
-
-                                                            {/* Velocidade */}
-                                                            <div>
-                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</label>
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.1"
-                                                                    value={config.speed ?? ''}
-                                                                    onChange={e => updateCardioConfig('speed', e.target.value)}
-                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                    placeholder="km/h"
-                                                                />
-                                                            </div>
-
-                                                            {/* Resistência / Carga */}
-                                                            <div>
-                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</label>
-                                                                <input
-                                                                    type="number"
-                                                                    value={config.resistance ?? ''}
-                                                                    onChange={e => updateCardioConfig('resistance', e.target.value)}
-                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                    placeholder="Nível"
-                                                                />
-                                                            </div>
-
-                                                            {/* Frequência Cardíaca Alvo */}
-                                                            <div>
-                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</label>
-                                                                <input
-                                                                    type="number"
-                                                                    value={config.heart_rate ?? ''}
-                                                                    onChange={e => updateCardioConfig('heart_rate', e.target.value)}
-                                                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-red-400 font-bold outline-none focus:border-red-500 placeholder-neutral-700"
-                                                                    placeholder="♥"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </details>
-                                                </div>
-                                            );
-                                        })()}
-                                        </>
-                                    ) : (
-                                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                        {exerciseType === 'cardio' ? (
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</label>
-                                                <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="number"
-                                                        value={setsCount || ''}
-                                                        onChange={e => updateExercise(index, 'sets', e.target.value)}
-                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                    />
-                                                    <button
-                                                        onClick={() => updateExercise(index, 'duplicate', true)}
-                                                        className="h-8 w-8 bg-neutral-700 hover:bg-white hover:text-black text-neutral-400 rounded-lg flex items-center justify-center transition-colors"
-                                                        title="Duplicar Série"
-                                                    >
-                                                        <Plus size={14} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</label>
-                                                <input
-                                                    type="text"
-                                                    value={exercise.reps || ''}
-                                                    onChange={e => updateExercise(index, 'reps', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                    RPE
-                                                    <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    value={exercise.rpe || ''}
-                                                    onChange={e => updateExercise(index, 'rpe', e.target.value)}
-                                                    className="w-full bg-neutral-900 border border-yellow-500/20 rounded-lg p-2 text-center text-sm font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
-                                                    placeholder="8"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</label>
-                                                <input
-                                                    type="number"
-                                                    value={(exercise.restTime ?? '')}
-                                                    onChange={e => updateExercise(index, 'restTime', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                    Cad
-                                                    <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={exercise.cadence || ''}
-                                                    onChange={e => updateExercise(index, 'cadence', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                    Método
-                                                    {(() => {
-                                                        const m = String(safeMethod || 'Normal');
-                                                        const term =
-                                                            m === 'Drop-set'
-                                                                ? HELP_TERMS.dropSet
-                                                                : m === 'Rest-Pause'
-                                                                    ? HELP_TERMS.restPause
-                                                                    : m === 'Cluster'
-                                                                        ? HELP_TERMS.cluster
-                                                                        : m === 'Bi-Set'
-                                                                            ? HELP_TERMS.biSet
-                                                                            : null;
-                                                        return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
-                                                    })()}
-                                                </label>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Modalidade</label>
                                                 <select
-                                                    value={safeMethod || 'Normal'}
-                                                    onChange={e => updateExercise(index, 'method', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
+                                                    value={exercise.name || ''}
+                                                    onChange={e => updateExercise(index, 'name', e.target.value)}
+                                                    className="w-full bg-neutral-900 font-bold text-white text-lg p-3 rounded-xl border border-neutral-700 outline-none focus:border-blue-500 transition-colors appearance-none"
                                                 >
-                                                    <option value="Normal">Normal</option>
-                                                    <option value="Drop-set">Drop</option>
-                                                    <option value="Rest-Pause">Rest-P</option>
-                                                    <option value="Bi-Set">Bi-Set</option>
-                                                    <option value="Cluster">Cluster</option>
+                                                    {CARDIO_OPTIONS.map(opt => (
+                                                        <option key={opt} value={opt}>{opt}</option>
+                                                    ))}
                                                 </select>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-3 pt-2">
-                                        <div>
-                                            <div className="flex items-center justify-between gap-3 mb-1">
-                                                <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
-                                                {String(exercise.videoUrl || '').trim() ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            try {
-                                                                e.preventDefault();
-                                                                e.stopPropagation();
-                                                            } catch {}
-                                                            try {
-                                                                window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
-                                                            } catch {}
-                                                        }}
-                                                        className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
-                                                        title="Ver vídeo"
-                                                    >
-                                                        <Play size={14} />
-                                                        Ver vídeo
-                                                    </button>
-                                                ) : null}
+                                        ) : (
+                                            <div>
+                                                <input
+                                                    value={exercise.name || ''}
+                                                    onChange={e => updateExercise(index, 'name', e.target.value)}
+                                                    className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
+                                                    placeholder="Nome do exercício"
+                                                />
+                                                {(() => {
+                                                    const info = resolveCanonicalExerciseName(exercise.name || '')
+                                                    if (!info?.changed || !info?.canonical) return null
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateExercise(index, 'name', info.canonical)}
+                                                            className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-bold text-xs hover:bg-yellow-500/15"
+                                                        >
+                                                            Padronizar: {info.canonical}
+                                                        </button>
+                                                    )
+                                                })()}
                                             </div>
-                                            <input
-                                                value={exercise.videoUrl || ''}
-                                                onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
-                                                className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
-                                                placeholder="https://youtube.com/..."
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
-                                            <textarea
-                                                value={exercise.notes || ''}
-                                                onChange={e => updateExercise(index, 'notes', e.target.value)}
-                                                className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"
-                                                placeholder="Dicas de execução..."
-                                            />
-                                        </div>
-                                    </div>
+                                        )}
 
-                                    {exerciseType !== 'cardio' && setsCount > 0 && (
-                                        <div className="pt-4 space-y-2">
-                                            <div className="flex items-center justify-between">
-                                                <div className="text-[10px] text-neutral-500 uppercase font-bold">Séries</div>
-                                                <div className="text-[10px] text-neutral-600">{setsCount}</div>
-                                            </div>
+                                        {exerciseType === 'cardio' ? (
+                                            <>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
+                                                            {String(exercise?.name || '').toLowerCase() === 'bike outdoor'
+                                                                ? 'Tempo (minutos) (opcional)'
+                                                                : 'Tempo (minutos)'}
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            min={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? undefined : 1}
+                                                            value={exercise.reps ? String(exercise.reps) : ''}
+                                                            onChange={e => updateExercise(index, 'reps', e.target.value)}
+                                                            className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-blue-500 border border-neutral-700"
+                                                            placeholder={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? 'Livre' : '30'}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</label>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            value={exercise.rpe ? String(exercise.rpe) : ''}
+                                                            onChange={e => updateExercise(index, 'rpe', e.target.value)}
+                                                            className="w-full bg-neutral-900 border border-yellow-500/20 rounded-xl p-4 text-center text-xl font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
+                                                            placeholder="5"
+                                                        />
+                                                    </div>
+                                                </div>
 
-                                            {setDetails.map((s, setIdx) => {
-                                                const isWarmup = !!(s?.is_warmup ?? s?.isWarmup)
-                                                const borderClass = isWarmup ? 'border-yellow-500/60' : 'border-neutral-700'
-                                                const config = s?.advanced_config ?? s?.advancedConfig ?? null
-                                                const isObj = config && typeof config === 'object' && !Array.isArray(config)
-                                                const isDropCfg = Array.isArray(config)
-                                                const isClusterCfg = isObj && (config?.cluster_size != null || config?.intra_rest_sec != null || config?.total_reps != null)
-                                                const isRestPauseCfg = isObj && (config?.mini_sets != null || config?.rest_time_sec != null || config?.initial_reps != null)
+                                                {/* Cardio Advanced Config (HIT / Incline / Speed) */}
+                                                {(() => {
+                                                    const cardioSet = setDetails[0];
+                                                    const config: AdvancedConfig = (cardioSet?.advanced_config as AdvancedConfig) || {};
+                                                    const isHIT = !!config?.isHIT;
 
-                                                const updateConfig = (nextConfig) => {
-                                                    updateSetDetail(index, setIdx, { advanced_config: nextConfig })
-                                                }
+                                                    const updateCardioConfig = (field: string, val: any) => {
+                                                        const newConfig = { ...config, [field]: val };
+                                                        if (val === '' || val === null || val === undefined) delete newConfig[field];
 
-                                                return (
-                                                    <div key={setIdx} className={`bg-neutral-900 border ${borderClass} rounded-xl p-3`}>
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="text-xs font-bold text-white">Série {s?.set_number ?? (setIdx + 1)}</div>
-                                                                <label className="flex items-center gap-2 text-[10px] text-neutral-300 font-bold">
-                                                                    {setIdx === 0 && (
+                                                        // If turning off HIT, clean up HIT fields
+                                                        if (field === 'isHIT' && !val) {
+                                                            delete newConfig.workSec;
+                                                            delete newConfig.restSec;
+                                                            delete newConfig.rounds;
+                                                            delete newConfig.hitIntensity;
+                                                        }
+
+                                                        updateSetDetail(index, 0, {
+                                                            advanced_config: Object.keys(newConfig).length > 0 ? newConfig : null
+                                                        });
+                                                    };
+
+                                                    const workSec = Number(config?.workSec) || 0;
+                                                    const restSec = Number(config?.restSec) || 0;
+                                                    const hitInvalid = isHIT && (workSec <= 0 || restSec >= workSec);
+
+                                                    return (
+                                                        <div className="mt-4 pt-4 border-t border-neutral-800">
+                                                            <div className="flex items-center justify-between mb-3">
+                                                                <label className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</label>
+                                                                <div className="flex items-center gap-2">
+                                                                    <label className="text-[10px] font-bold text-white uppercase cursor-pointer select-none flex items-center gap-2">
+                                                                        Modo HIT
                                                                         <input
                                                                             type="checkbox"
-                                                                            checked={isWarmup}
-                                                                            onChange={(e) => updateSetDetail(index, setIdx, { is_warmup: !!e.target.checked })}
-                                                                            className="accent-yellow-500"
+                                                                            checked={isHIT}
+                                                                            onChange={(e) => updateCardioConfig('isHIT', e.target.checked)}
+                                                                            className="accent-yellow-500 w-4 h-4"
                                                                         />
-                                                                    )}
-                                                                    {setIdx === 0 && 'Série de Aquecimento'}
-                                                                </label>
-                                                            </div>
-                                                            <select
-                                                                value={isDropCfg ? 'Drop-set' : (config?.type === 'sst' ? 'SST' : (isRestPauseCfg ? 'Rest-Pause' : 'Normal'))}
-                                                                onChange={(e) => {
-                                                                    const val = e.target.value;
-                                                                    if (val === 'Normal') {
-                                                                        updateConfig(null);
-                                                                    } else if (val === 'Drop-set') {
-                                                                        updateConfig([{ weight: null, reps: '' }]);
-                                                                    } else if (val === 'SST') {
-                                                                        updateConfig({ type: 'sst', initial_reps: 10, mini_sets: 2, rest_time_sec: 10 });
-                                                                    } else if (val === 'Rest-Pause') {
-                                                                        updateConfig({ initial_reps: 10, mini_sets: 2, rest_time_sec: 20 });
-                                                                    }
-                                                                }}
-                                                                className="bg-neutral-800 text-[10px] font-bold text-neutral-300 border border-neutral-700 rounded-md px-2 py-1 outline-none focus:border-yellow-500"
-                                                            >
-                                                                <option value="Normal">Normal</option>
-                                                                <option value="Drop-set">Drop Set</option>
-                                                                <option value="SST">SST</option>
-                                                                <option value="Rest-Pause">Rest-Pause</option>
-                                                            </select>
-                                                        </div>
-
-												{(!isDropCfg && !isClusterCfg && !isRestPauseCfg && (safeMethod === 'Normal' || safeMethod === 'Bi-Set' || safeMethod === 'Rest-Pause' || safeMethod === 'Drop-set' || safeMethod === 'Cluster')) && (
-													<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-														<div>
-															<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</label>
-															<input
-																type="number"
-                                                                        value={(s?.weight ?? '')}
-                                                                        onChange={(e) => updateSetDetail(index, setIdx, { weight: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={(s?.reps ?? '')}
-                                                                        onChange={(e) => updateSetDetail(index, setIdx, { reps: e.target.value })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-yellow-500 uppercase font-bold">RPE</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(s?.rpe ?? '')}
-                                                                        onChange={(e) => updateSetDetail(index, setIdx, { rpe: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-yellow-500/20 rounded-lg p-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
+                                                                    </label>
                                                                 </div>
                                                             </div>
-                                                        )}
 
-                                                        {(isDropCfg || safeMethod === 'Drop-set') && (
-                                                            <div className="mt-3 space-y-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Drop Set</div>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            const list = Array.isArray(config) ? config : []
-                                                                            updateConfig([...(list || []), { weight: null, reps: '' }])
-                                                                        }}
-                                                                        className="text-[10px] font-bold text-yellow-500 hover:text-yellow-400"
-                                                                    >
-                                                                        (+) Add Drop
-                                                                    </button>
-                                                                </div>
-
-                                                                {(Array.isArray(config) ? config : []).map((d, dIdx) => (
-                                                                    <div key={dIdx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                                                            {isHIT && (
+                                                                <div className="bg-neutral-900/50 p-3 rounded-xl border border-neutral-800 mb-3 animate-in slide-in-from-top-2">
+                                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                                         <div>
-                                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold">Peso (kg)</label>
+                                                                            <label className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</label>
                                                                             <input
                                                                                 type="number"
-                                                                                value={(d?.weight ?? '')}
-                                                                                onChange={(e) => {
-                                                                                    const list = Array.isArray(config) ? [...config] : []
-                                                                                    const next = { ...(list[dIdx] || {}), weight: e.target.value === '' ? null : Number(e.target.value) }
-                                                                                    list[dIdx] = next
-                                                                                    updateConfig(list)
-                                                                                }}
-                                                                                className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                                value={config.workSec ?? ''}
+                                                                                onChange={e => updateCardioConfig('workSec', Number(e.target.value))}
+                                                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700"
+                                                                                placeholder="30"
                                                                             />
                                                                         </div>
                                                                         <div>
-                                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
+                                                                            <label className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</label>
                                                                             <input
-                                                                                type="text"
-                                                                                value={(d?.reps ?? '')}
-                                                                                onChange={(e) => {
-                                                                                    const list = Array.isArray(config) ? [...config] : []
-                                                                                    const next = { ...(list[dIdx] || {}), reps: e.target.value }
-                                                                                    list[dIdx] = next
-                                                                                    updateConfig(list)
-                                                                                }}
-                                                                                className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                                type="number"
+                                                                                value={config.restSec ?? ''}
+                                                                                onChange={e => updateCardioConfig('restSec', Number(e.target.value))}
+                                                                                className={`w-full bg-neutral-900 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 ${hitInvalid ? 'border-red-500/50' : 'border-neutral-700'}`}
+                                                                                placeholder="10"
                                                                             />
                                                                         </div>
+                                                                        <div>
+                                                                            <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</label>
+                                                                            <input
+                                                                                type="number"
+                                                                                value={config.rounds ?? ''}
+                                                                                onChange={e => updateCardioConfig('rounds', Number(e.target.value))}
+                                                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                                placeholder="10"
+                                                                            />
+                                                                        </div>
+                                                                        <div>
+                                                                            <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</label>
+                                                                            <select
+                                                                                value={config.hitIntensity ?? 'high'}
+                                                                                onChange={e => updateCardioConfig('hitIntensity', e.target.value)}
+                                                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 h-[38px]"
+                                                                            >
+                                                                                <option value="low">Baixa</option>
+                                                                                <option value="medium">Média</option>
+                                                                                <option value="high">Alta</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                    {hitInvalid && (
+                                                                        <div className="mt-2 text-[10px] text-red-400 font-bold">
+                                                                            ⚠️ O tempo de descanso deve ser menor que o tempo de trabalho.
+                                                                        </div>
+                                                                    )}
+                                                                    {!hitInvalid && workSec > 0 && (
+                                                                        <div className="mt-2 text-[10px] text-neutral-500 font-mono text-center">
+                                                                            Resumo: {config.rounds || '?'} rounds de {workSec}s ativo / {restSec}s descanso
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            <details className="group">
+                                                                <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
+                                                                    <span>Parâmetros de Equipamento</span>
+                                                                    <span className="group-open:rotate-180 transition-transform">▼</span>
+                                                                </summary>
+
+                                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
+                                                                    {/* Inclinação */}
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={config.incline ?? ''}
+                                                                            onChange={e => updateCardioConfig('incline', e.target.value)}
+                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                            placeholder="0"
+                                                                        />
+                                                                    </div>
+
+                                                                    {/* Velocidade */}
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            step="0.1"
+                                                                            value={config.speed ?? ''}
+                                                                            onChange={e => updateCardioConfig('speed', e.target.value)}
+                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                            placeholder="km/h"
+                                                                        />
+                                                                    </div>
+
+                                                                    {/* Resistência / Carga */}
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={config.resistance ?? ''}
+                                                                            onChange={e => updateCardioConfig('resistance', e.target.value)}
+                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                                                            placeholder="Nível"
+                                                                        />
+                                                                    </div>
+
+                                                                    {/* Frequência Cardíaca Alvo */}
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={config.heart_rate ?? ''}
+                                                                            onChange={e => updateCardioConfig('heart_rate', e.target.value)}
+                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-red-400 font-bold outline-none focus:border-red-500 placeholder-neutral-700"
+                                                                            placeholder="♥"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </details>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </>
+                                        ) : (
+                                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                                <div>
+                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</label>
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            value={setsCount || ''}
+                                                            onChange={e => updateExercise(index, 'sets', e.target.value)}
+                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        />
+                                                        <button
+                                                            onClick={() => updateExercise(index, 'duplicate', true)}
+                                                            className="h-8 w-8 bg-neutral-700 hover:bg-white hover:text-black text-neutral-400 rounded-lg flex items-center justify-center transition-colors"
+                                                            title="Duplicar Série"
+                                                        >
+                                                            <Plus size={14} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</label>
+                                                    <input
+                                                        type="text"
+                                                        value={exercise.reps ? String(exercise.reps) : ''}
+                                                        onChange={e => updateExercise(index, 'reps', e.target.value)}
+                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                        RPE
+                                                        <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        value={exercise.rpe ? String(exercise.rpe) : ''}
+                                                        onChange={e => updateExercise(index, 'rpe', e.target.value)}
+                                                        className="w-full bg-neutral-900 border border-yellow-500/20 rounded-lg p-2 text-center text-sm font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
+                                                        placeholder="8"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={(exercise.restTime ?? '')}
+                                                        onChange={e => updateExercise(index, 'restTime', e.target.value)}
+                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                        Cad
+                                                        <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={exercise.cadence || ''}
+                                                        onChange={e => updateExercise(index, 'cadence', e.target.value)}
+                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                        Método
+                                                        {(() => {
+                                                            const m = String(safeMethod || 'Normal');
+                                                            const term =
+                                                                m === 'Drop-set'
+                                                                    ? HELP_TERMS.dropSet
+                                                                    : m === 'Rest-Pause'
+                                                                        ? HELP_TERMS.restPause
+                                                                        : m === 'Cluster'
+                                                                            ? HELP_TERMS.cluster
+                                                                            : m === 'Bi-Set'
+                                                                                ? HELP_TERMS.biSet
+                                                                                : null;
+                                                            return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
+                                                        })()}
+                                                    </label>
+                                                    <select
+                                                        value={safeMethod || 'Normal'}
+                                                        onChange={e => updateExercise(index, 'method', e.target.value)}
+                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
+                                                    >
+                                                        <option value="Normal">Normal</option>
+                                                        <option value="Drop-set">Drop</option>
+                                                        <option value="Rest-Pause">Rest-P</option>
+                                                        <option value="Bi-Set">Bi-Set</option>
+                                                        <option value="Cluster">Cluster</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div className="space-y-3 pt-2">
+                                            <div>
+                                                <div className="flex items-center justify-between gap-3 mb-1">
+                                                    <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
+                                                    {String(exercise.videoUrl || '').trim() ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                try {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                } catch { }
+                                                                try {
+                                                                    window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
+                                                                } catch { }
+                                                            }}
+                                                            className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
+                                                            title="Ver vídeo"
+                                                        >
+                                                            <Play size={14} />
+                                                            Ver vídeo
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                                <input
+                                                    value={exercise.videoUrl || ''}
+                                                    onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
+                                                    className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
+                                                    placeholder="https://youtube.com/..."
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
+                                                <textarea
+                                                    value={exercise.notes || ''}
+                                                    onChange={e => updateExercise(index, 'notes', e.target.value)}
+                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"
+                                                    placeholder="Dicas de execução..."
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {exerciseType !== 'cardio' && setsCount > 0 && (
+                                            <div className="pt-4 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Séries</div>
+                                                    <div className="text-[10px] text-neutral-600">{setsCount}</div>
+                                                </div>
+
+                                                {setDetails.map((s, setIdx) => {
+                                                    const isWarmup = !!(s?.is_warmup ?? s?.isWarmup)
+                                                    const borderClass = isWarmup ? 'border-yellow-500/60' : 'border-neutral-700'
+                                                    const config: AdvancedConfig = (s?.advanced_config as AdvancedConfig) ?? (s?.advancedConfig as AdvancedConfig) ?? null
+                                                    const isObj = config && typeof config === 'object' && !Array.isArray(config)
+                                                    const isDropCfg = Array.isArray(config)
+                                                    const isClusterCfg = isObj && (config?.cluster_size != null || config?.intra_rest_sec != null || config?.total_reps != null)
+                                                    const isRestPauseCfg = isObj && (config?.mini_sets != null || config?.rest_time_sec != null || config?.initial_reps != null)
+
+                                                    const updateConfig = (nextConfig: AdvancedConfig | AdvancedConfig[] | null) => {
+                                                        updateSetDetail(index, setIdx, { advanced_config: nextConfig })
+                                                    }
+
+                                                    return (
+                                                        <div key={setIdx} className={`bg-neutral-900 border ${borderClass} rounded-xl p-3`}>
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="text-xs font-bold text-white">Série {s?.set_number ?? (setIdx + 1)}</div>
+                                                                    <label className="flex items-center gap-2 text-[10px] text-neutral-300 font-bold">
+                                                                        {setIdx === 0 && (
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                checked={isWarmup}
+                                                                                onChange={(e) => updateSetDetail(index, setIdx, { is_warmup: !!e.target.checked })}
+                                                                                className="accent-yellow-500"
+                                                                            />
+                                                                        )}
+                                                                        {setIdx === 0 && 'Série de Aquecimento'}
+                                                                    </label>
+                                                                </div>
+                                                                <select
+                                                                    value={isDropCfg ? 'Drop-set' : (config?.type === 'sst' ? 'SST' : (isRestPauseCfg ? 'Rest-Pause' : 'Normal'))}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        if (val === 'Normal') {
+                                                                            updateConfig(null);
+                                                                        } else if (val === 'Drop-set') {
+                                                                            updateConfig([{ weight: null, reps: '' }]);
+                                                                        } else if (val === 'SST') {
+                                                                            updateConfig({ type: 'sst', initial_reps: 10, mini_sets: 2, rest_time_sec: 10 });
+                                                                        } else if (val === 'Rest-Pause') {
+                                                                            updateConfig({ initial_reps: 10, mini_sets: 2, rest_time_sec: 20 });
+                                                                        }
+                                                                    }}
+                                                                    className="bg-neutral-800 text-[10px] font-bold text-neutral-300 border border-neutral-700 rounded-md px-2 py-1 outline-none focus:border-yellow-500"
+                                                                >
+                                                                    <option value="Normal">Normal</option>
+                                                                    <option value="Drop-set">Drop Set</option>
+                                                                    <option value="SST">SST</option>
+                                                                    <option value="Rest-Pause">Rest-Pause</option>
+                                                                </select>
+                                                            </div>
+
+                                                            {(!isDropCfg && !isClusterCfg && !isRestPauseCfg && (safeMethod === 'Normal' || safeMethod === 'Bi-Set' || safeMethod === 'Rest-Pause' || safeMethod === 'Drop-set' || safeMethod === 'Cluster')) && (
+                                                                <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(s?.weight ?? '')}
+                                                                            onChange={(e) => updateSetDetail(index, setIdx, { weight: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={(s?.reps ?? '')}
+                                                                            onChange={(e) => updateSetDetail(index, setIdx, { reps: e.target.value })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-yellow-500 uppercase font-bold">RPE</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(s?.rpe ?? '')}
+                                                                            onChange={(e) => updateSetDetail(index, setIdx, { rpe: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-yellow-500/20 rounded-lg p-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {(isDropCfg || safeMethod === 'Drop-set') && (
+                                                                <div className="mt-3 space-y-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">Drop Set</div>
                                                                         <button
                                                                             type="button"
                                                                             onClick={() => {
-                                                                                const list = Array.isArray(config) ? [...config] : []
-                                                                                list.splice(dIdx, 1)
-                                                                                updateConfig(list)
+                                                                                const list: AdvancedConfig[] = Array.isArray(config) ? config : []
+                                                                                updateConfig([...(list || []), { weight: null, reps: '' }])
                                                                             }}
-                                                                            className="h-9 w-9 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-300 hover:text-red-400"
-                                                                            title="Remover drop"
+                                                                            className="text-[10px] font-bold text-yellow-500 hover:text-yellow-400"
                                                                         >
-                                                                            <Trash2 size={14} className="mx-auto" />
+                                                                            (+) Add Drop
                                                                         </button>
                                                                     </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
 
-													{(isRestPauseCfg || safeMethod === 'Rest-Pause' || config?.type === 'sst') && !isDropCfg && config && typeof config === 'object' && (
-														<div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                                            <div className="col-span-full mb-1">
-                                                                <span className="text-[10px] uppercase font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded">
-                                                                    Configuração {config?.type === 'sst' ? 'SST' : 'Rest-Pause'}
-                                                                </span>
-                                                            </div>
-															<div>
-																<label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
-																<input
-																	type="number"
-                                                                        value={(config?.weight ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
+                                                                    {(Array.isArray(config) ? config : []).map((d: AdvancedConfig, dIdx: number) => (
+                                                                        <div key={dIdx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
+                                                                            <div>
+                                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Peso (kg)</label>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    value={(d?.weight ?? '')}
+                                                                                    onChange={(e) => {
+                                                                                        const list = Array.isArray(config) ? [...config] : []
+                                                                                        const next = { ...(list[dIdx] || {}), weight: e.target.value === '' ? null : Number(e.target.value) }
+                                                                                        list[dIdx] = next
+                                                                                        updateConfig(list)
+                                                                                    }}
+                                                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                                />
+                                                                            </div>
+                                                                            <div>
+                                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
+                                                                                <input
+                                                                                    type="text"
+                                                                                    value={(d?.reps ? String(d.reps) : '')}
+                                                                                    onChange={(e) => {
+                                                                                        const list = Array.isArray(config) ? [...config] : []
+                                                                                        const next = { ...(list[dIdx] || {}), reps: e.target.value }
+                                                                                        list[dIdx] = next
+                                                                                        updateConfig(list)
+                                                                                    }}
+                                                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                                />
+                                                                            </div>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    const list = Array.isArray(config) ? [...config] : []
+                                                                                    list.splice(dIdx, 1)
+                                                                                    updateConfig(list)
+                                                                                }}
+                                                                                className="h-9 w-9 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-300 hover:text-red-400"
+                                                                                title="Remover drop"
+                                                                            >
+                                                                                <Trash2 size={14} className="mx-auto" />
+                                                                            </button>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps Iniciais</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(config?.initial_reps ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), initial_reps: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Pausa (s)</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(config?.rest_time_sec ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), rest_time_sec: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Mini-sets</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(config?.mini_sets ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), mini_sets: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                            )}
 
-                                                        {(isClusterCfg || safeMethod === 'Cluster') && !isDropCfg && (
-                                                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(config?.weight ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
+                                                            {(isRestPauseCfg || safeMethod === 'Rest-Pause' || config?.type === 'sst') && !isDropCfg && config && typeof config === 'object' && (
+                                                                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                                    <div className="col-span-full mb-1">
+                                                                        <span className="text-[10px] uppercase font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded">
+                                                                            Configuração {config?.type === 'sst' ? 'SST' : 'Rest-Pause'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.weight ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps Iniciais</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.initial_reps ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), initial_reps: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Pausa (s)</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.rest_time_sec ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), rest_time_sec: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Mini-sets</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.mini_sets ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), mini_sets: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
                                                                 </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Total Reps</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(config?.total_reps ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), total_reps: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Cluster</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(config?.cluster_size ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), cluster_size: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold">Intra (s)</label>
-                                                                    <input
-                                                                        type="number"
-                                                                        value={(config?.intra_rest_sec ?? '')}
-                                                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), intra_rest_sec: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        )}
+                                                            )}
 
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
+                                                            {(isClusterCfg || safeMethod === 'Cluster') && !isDropCfg && (
+                                                                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.weight ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Total Reps</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.total_reps ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), total_reps: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Cluster</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.cluster_size ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), cluster_size: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Intra (s)</label>
+                                                                        <input
+                                                                            type="number"
+                                                                            value={(config?.intra_rest_sec ?? '')}
+                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), intra_rest_sec: e.target.value === '' ? null : Number(e.target.value) })}
+                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
 
                                     {isBiSet && hasNext && (
                                         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-neutral-900 border border-neutral-700 rounded-full px-3 py-1 flex items-center gap-2 z-20 shadow-lg">

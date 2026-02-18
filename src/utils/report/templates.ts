@@ -1,10 +1,32 @@
-export function workoutPlanHtml(workout, user) {
+
+export interface WorkoutExercise {
+  name?: string
+  sets?: number | string
+  reps?: string
+  method?: string
+  cadence?: string
+  rpe?: string
+  notes?: string
+  restTime?: string | number
+}
+
+export interface WorkoutData {
+  title?: string
+  exercises?: WorkoutExercise[]
+}
+
+export interface UserData {
+  displayName?: string
+  email?: string
+}
+
+export function workoutPlanHtml(workout: WorkoutData, user: UserData) {
   const title = workout?.title || 'Treino'
   const exs = Array.isArray(workout?.exercises) ? workout.exercises : []
   const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const owner = user?.displayName || user?.email || ''
 
-  const rows = exs.map((ex, idx) => {
+  const rows = exs.map((ex: WorkoutExercise, idx: number) => {
     const sets = Number(ex?.sets || 0)
     const reps = ex?.reps || '-'
     const method = ex?.method || 'Normal'
@@ -24,7 +46,7 @@ export function workoutPlanHtml(workout, user) {
             <tr><th>Série</th><th>Reps</th><th>Descanso</th></tr>
           </thead>
           <tbody>
-            ${Array.from({ length: sets }).map((_, sIdx) => `<tr><td>#${sIdx + 1}</td><td>${reps}</td><td>${ex?.restTime ? `${parseInt(ex.restTime)}s` : '-'}</td></tr>`).join('')}
+            ${Array.from({ length: sets }).map((_, sIdx) => `<tr><td>#${sIdx + 1}</td><td>${reps}</td><td>${ex?.restTime ? `${parseInt(String(ex.restTime))}s` : '-'}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>

@@ -1,10 +1,35 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 
-const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) => {
+interface RestTimerContext {
+    kind?: string;
+    exerciseId?: string;
+    setId?: string;
+}
+
+interface RestTimerSettings {
+    enableSounds?: boolean;
+    soundVolume?: number;
+    restTimerNotify?: boolean;
+    restTimerVibrate?: boolean;
+    restTimerRepeatAlarm?: boolean;
+    restTimerRepeatIntervalMs?: number;
+    restTimerTickCountdown?: boolean;
+}
+
+interface RestTimerOverlayProps {
+    targetTime: number | null;
+    context: RestTimerContext | null;
+    onFinish: (context?: RestTimerContext | null) => void;
+    onClose: () => void;
+    settings: RestTimerSettings | null;
+}
+
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onClose, settings }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
     const warnedRef = useRef(false);
@@ -25,7 +50,7 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
     })();
     const allowTickCountdown = safeSettings ? safeSettings.restTimerTickCountdown !== false : true;
 
-    const formatDuration = (s) => {
+    const formatDuration = (s: number) => {
         const mins = Math.floor(s / 60);
         const secs = Math.floor(s % 60);
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
@@ -34,7 +59,7 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
     useEffect(() => {
         try {
             warnedRef.current = false;
-        } catch {}
+        } catch { }
     }, [targetTime]);
 
     useEffect(() => {
@@ -48,14 +73,14 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
             if (!soundsEnabled) return;
             try {
                 playTick({ volume: soundVolume, enabled: soundsEnabled });
-            } catch {}
+            } catch { }
             warnedRef.current = true;
-        } catch {}
+        } catch { }
     }, [allowTickCountdown, context?.kind, isFinished, soundVolume, soundsEnabled, timeLeft]);
 
     useEffect(() => {
-        let soundInterval;
-        let vibrateInterval;
+        let soundInterval: NodeJS.Timeout | undefined;
+        let vibrateInterval: NodeJS.Timeout | undefined;
 
         if (isFinished) {
             if (soundsEnabled) {
@@ -74,11 +99,11 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
                         vibrateInterval = setInterval(() => {
                             try {
                                 navigator.vibrate([220, 90, 220]);
-                            } catch {}
+                            } catch { }
                         }, repeatIntervalMs);
                     }
                 }
-            } catch {}
+            } catch { }
         }
 
         return () => {
@@ -130,11 +155,11 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
                     } catch {
                         try {
                             if (typeof onFinish === 'function') onFinish();
-                        } catch {}
+                        } catch { }
                     }
                 }}
             >
-                <Timer size={120} className="text-black mb-8 animate-bounce"/>
+                <Timer size={120} className="text-black mb-8 animate-bounce" />
                 <h1 className="text-6xl font-black text-black uppercase tracking-tighter">BORA!</h1>
                 <p className="text-black font-bold mt-4 text-xl">TOQUE PARA VOLTAR</p>
             </div>
@@ -147,25 +172,25 @@ const RestTimerOverlay = ({ targetTime, context, onFinish, onClose, settings }) 
                 <div className="flex items-center gap-4">
                     <div className="relative">
                         <div className="absolute inset-0 bg-yellow-500 blur-lg opacity-20 animate-pulse"></div>
-                        <Timer className="text-yellow-500 relative z-10" size={36}/>
+                        <Timer className="text-yellow-500 relative z-10" size={36} />
                     </div>
                     <div>
                         <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Recuperação</p>
                         <p className="text-4xl font-mono font-black text-white tabular-nums leading-none">{formatDuration(timeLeft)}</p>
                     </div>
                 </div>
-                    <div className="flex gap-2">
+                <div className="flex gap-2">
                     <button
                         onClick={() => {
                             try {
                                 if (typeof onClose === 'function') onClose();
-                            } catch {}
+                            } catch { }
                         }}
                         className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2"
                     >
-                        <ArrowLeft size={16}/> <span className="text-xs font-bold">Voltar</span>
+                        <ArrowLeft size={16} /> <span className="text-xs font-bold">Voltar</span>
                     </button>
-                    </div>
+                </div>
             </div>
         </div>
     );

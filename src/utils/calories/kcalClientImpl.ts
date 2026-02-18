@@ -57,7 +57,7 @@ export const getKcalEstimate = async ({ session, workoutId }: { session: unknown
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session: s, workoutId: typeof workoutId === 'string' ? workoutId : null }),
     })
-    const json = await resp.json().catch(() => null)
+    const json = await resp.json().catch((): any => null)
     const kcal = Number((json as Record<string, unknown>)?.kcal)
     if (!resp.ok) return fallback
     if (!Number.isFinite(kcal) || kcal <= 0) return fallback

@@ -1,6 +1,6 @@
 import { parseTrainingNumber } from '../trainingNumber'
 
-const safeString = (v) => {
+const safeString = (v: unknown): string => {
   try {
     return String(v ?? '').trim()
   } catch {
@@ -8,7 +8,7 @@ const safeString = (v) => {
   }
 }
 
-const normalize = (v) => {
+const normalize = (v: unknown): string => {
   const s = safeString(v)
   if (!s) return ''
   try {
@@ -26,7 +26,7 @@ const normalize = (v) => {
   }
 }
 
-const hashString = (input) => {
+const hashString = (input: unknown): string => {
   const str = safeString(input)
   let h = 5381
   for (let i = 0; i < str.length; i += 1) {
@@ -35,9 +35,15 @@ const hashString = (input) => {
   return (h >>> 0).toString(36)
 }
 
-const range = (count) => Array.from({ length: Math.max(0, count) }).map((_, i) => i)
+const range = (count: number): number[] => Array.from({ length: Math.max(0, count) }).map((_, i) => i)
 
-const parseTargetIndices = ({ head, setsCount, defaultTarget }) => {
+interface ParseTargetIndicesInput {
+  head: string
+  setsCount: number
+  defaultTarget: string
+}
+
+const parseTargetIndices = ({ head, setsCount, defaultTarget }: ParseTargetIndicesInput): number[] => {
   const s = normalize(head)
   const nSets = Math.max(0, Math.floor(Number(setsCount) || 0))
   if (!nSets) return []
@@ -68,7 +74,7 @@ const parseTargetIndices = ({ head, setsCount, defaultTarget }) => {
   return [nSets - 1]
 }
 
-const splitDirectives = (notes) => {
+const splitDirectives = (notes: unknown): string[] => {
   const raw = safeString(notes)
   if (!raw) return []
   return raw
@@ -77,7 +83,7 @@ const splitDirectives = (notes) => {
     .filter(Boolean)
 }
 
-const parseSteps = (pattern) => {
+const parseSteps = (pattern: unknown): string[] => {
   const raw = normalize(pattern)
   if (!raw) return []
   return raw
@@ -87,7 +93,7 @@ const parseSteps = (pattern) => {
     .filter(Boolean)
 }
 
-const parseFirstNumber = (text) => {
+const parseFirstNumber = (text: unknown): number | null => {
   const s = normalize(text)
   if (!s) return null
   const m = s.match(/(-?\d+(?:[.,]\d+)?)/)
@@ -96,7 +102,7 @@ const parseFirstNumber = (text) => {
   return Number.isFinite(n) ? n : null
 }
 
-const isTimeToken = (p) => {
+const isTimeToken = (p: unknown): boolean => {
   const s = normalize(p)
   if (!s) return false
   if (s.includes('seg') || s.includes('sec')) return true
@@ -105,11 +111,11 @@ const isTimeToken = (p) => {
   return false
 }
 
-const parseCluster = (pattern) => {
+const parseCluster = (pattern: unknown) => {
   const steps = parseSteps(pattern)
   if (!steps.length) return null
-  const blocks: any[] = [];
-  const rests: any[] = [];
+  const blocks: unknown[] = [];
+  const rests: unknown[] = [];
   steps.forEach((p) => {
     const n = parseFirstNumber(p)
     if (n == null || n <= 0) return
@@ -117,20 +123,20 @@ const parseCluster = (pattern) => {
     else if (isTimeToken(p)) rests.push(n)
   })
   if (blocks.length < 2) return null
-  const total = blocks.reduce((acc, v) => acc + (Number(v) || 0), 0)
+  const total = blocks.reduce((acc, v) => (acc as number) + (Number(v) || 0), 0)
   const intra = rests.length ? Number(rests[0]) : 15
   const clusterSize = Number(blocks[0]) || null
   return {
     plannedReps: safeString(pattern),
     config: {
-      total_reps: Number.isFinite(total) && total > 0 ? Math.round(total) : null,
+      total_reps: Number.isFinite(total) && (total as number) > 0 ? Math.round(total as number) : null,
       cluster_size: Number.isFinite(Number(clusterSize)) && Number(clusterSize) > 0 ? Math.round(Number(clusterSize)) : null,
       intra_rest_sec: Number.isFinite(Number(intra)) && Number(intra) > 0 ? Math.round(Number(intra)) : 15,
     },
   }
 }
 
-const parseRestPauseLike = ({ pattern, label }) => {
+const parseRestPauseLike = ({ pattern, label }: { pattern: unknown; label: string }) => {
   const steps = parseSteps(pattern)
   if (!steps.length) return null
   const blocksCount = steps.filter((p) => p.includes('falha') || p.includes('failure') || (parseFirstNumber(p) != null && !p.includes('%'))).length
@@ -153,10 +159,10 @@ const parseRestPauseLike = ({ pattern, label }) => {
   }
 }
 
-const parseDropSet = (pattern) => {
+const parseDropSet = (pattern: unknown) => {
   const steps = parseSteps(pattern)
   if (!steps.length) return null
-  const stages: any[] = [];
+  const stages: unknown[] = [];
   steps.forEach((p) => {
     if (p.includes('falha') || p.includes('failure')) {
       stages.push({ weight: null, reps: 'Falha' })
@@ -172,7 +178,7 @@ const parseDropSet = (pattern) => {
   return { config: stages }
 }
 
-const detectMethod = (headRaw) => {
+const detectMethod = (headRaw: unknown) => {
   const head = normalize(headRaw)
   if (!head) return null
   if (head.includes('cluster')) return { kind: 'cluster', label: 'Cluster', defaultTarget: 'all' }
@@ -186,7 +192,12 @@ const detectMethod = (headRaw) => {
   return null
 }
 
-export function parseExerciseNotesToSetOverrides({ notes, setsCount }) {
+interface SetOverridesInput {
+  notes: unknown
+  setsCount: number
+}
+
+export function parseExerciseNotesToSetOverrides({ notes, setsCount }: SetOverridesInput) {
   const directives = splitDirectives(notes)
   const nSets = Math.max(0, Math.floor(Number(setsCount) || 0))
   const overrides = Array.from({ length: nSets }).map(() => null)
@@ -211,7 +222,7 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }) {
           label: detected.label,
           plannedReps: parsed.plannedReps,
           advanced_config: parsed.config,
-        }
+        } as any
       })
       return
     }
@@ -225,7 +236,7 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }) {
           label: detected.kind === 'sst' ? 'SST' : 'Rest-P',
           plannedReps: safeString(pattern),
           advanced_config: parsed.config,
-        }
+        } as any
       })
       return
     }
@@ -239,7 +250,7 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }) {
           label: 'Drop',
           plannedReps: safeString(pattern),
           advanced_config: parsed.config,
-        }
+        } as any
       })
     }
   })

@@ -51,7 +51,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
     setUpgradeCta(false)
     try {
       const res = await fetch('/api/workouts/history?limit=30', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = await res.json().catch(() => null)
+      const json = await res.json().catch((): any => null)
       if (!json?.ok) {
         setRows([])
         setError(String(json?.error || 'Falha ao carregar histórico.'))

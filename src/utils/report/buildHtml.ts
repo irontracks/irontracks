@@ -337,7 +337,7 @@ export function buildReportData(
     athlete: {
       id: sessionObj?.user_id || sessionObj?.userId || null,
       name: String(studentName || '').trim(),
-      coachName: null,
+      coachName: null as string | null,
       units: 'kg',
     },
     session: {
@@ -354,12 +354,12 @@ export function buildReportData(
         if (!(d instanceof Date) || Number.isNaN(d.getTime())) return null
         return d.toISOString()
       })(),
-      endAt: null,
+      endAt: null as string | null,
       totalTimeSeconds,
       realTimeSeconds: realTotalTimeSeconds,
       status: 'completed',
       isTeamSession: false,
-      notes: null,
+      notes: null as string | null,
     },
     summaryMetrics,
     outdoorBike,
@@ -493,7 +493,7 @@ export function buildReportHTML(
     const avg = Number(bike?.avgSpeedKmh)
     const max = Number(bike?.maxSpeedKmh)
     if ((!Number.isFinite(km) || km <= 0) && (!Number.isFinite(dur) || dur <= 0)) return ''
-    const formatKmh = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? `${Number(v).toFixed(1)} km/h` : '-')
+    const formatKmh = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? `${Number(v).toFixed(1)} km/h` : '-')
     return `
       <div style="margin: 12px 0 24px">
         <div class="muted" style="margin-bottom:8px">Bike Outdoor</div>

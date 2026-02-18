@@ -6,18 +6,28 @@ import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
 
-const isObject = (v) => v && typeof v === 'object' && !Array.isArray(v)
+const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
-export default function SettingsModal(props) {
+interface SettingsModalProps {
+  isOpen?: boolean
+  saving?: boolean
+  settings?: unknown
+  userRole?: string
+  onClose?: () => void
+  onSave?: (settings: unknown) => Promise<boolean | void>
+  onOpenWhatsNew?: () => void
+}
+
+export default function SettingsModal(props: SettingsModalProps) {
   const { alert } = useDialog()
   const isOpen = !!props?.isOpen
   const saving = !!props?.saving
   const rawSettings = props?.settings
   const base = useMemo(() => (isObject(rawSettings) ? rawSettings : {}), [rawSettings])
-  const [draft, setDraft] = useState(() => base)
+  const [draft, setDraft] = useState<Record<string, unknown>>(() => base)
   const [modulesModalOpen, setModulesModalOpen] = useState(false)
 
-  const setValue = (key, value) => {
+  const setValue = (key: string, value: unknown) => {
     if (!key) return
     setDraft((prev) => ({ ...(isObject(prev) ? prev : {}), [key]: value }))
   }
@@ -65,18 +75,18 @@ export default function SettingsModal(props) {
 
   useEffect(() => {
     if (!isOpen) return
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return
       e.preventDefault()
       props?.onClose?.()
     }
     try {
       window.addEventListener('keydown', onKeyDown)
-    } catch {}
+    } catch { }
     return () => {
       try {
         window.removeEventListener('keydown', onKeyDown)
-      } catch {}
+      } catch { }
     }
   }, [isOpen, props])
 
@@ -796,17 +806,17 @@ export default function SettingsModal(props) {
                 onClick={async () => {
                   try {
                     if (typeof window === 'undefined') return
-                    const keys: any[] = [];
+                    const keys: string[] = [];
                     for (let i = 0; i < window.localStorage.length; i += 1) {
                       const k = window.localStorage.key(i)
                       if (k) keys.push(k)
                     }
                     keys.forEach((k) => {
                       if (k.startsWith('irontracks.')) {
-                        try { window.localStorage.removeItem(k) } catch {}
+                        try { window.localStorage.removeItem(k) } catch { }
                       }
                     })
-                    try { window.location.reload() } catch {}
+                    try { window.location.reload() } catch { }
                   } catch (e) {
                     await alert('Falha ao limpar cache: ' + (e?.message ?? String(e)))
                   }
@@ -824,7 +834,7 @@ export default function SettingsModal(props) {
                 onClick={async () => {
                   try {
                     const res = await fetch('/api/account/export', { method: 'GET' })
-                    const data = await res.json().catch(() => null)
+                    const data = await res.json().catch((): any => null)
                     if (!data || !data.ok) {
                       await alert('Falha ao exportar dados: ' + (data?.error || ''))
                       return
@@ -861,7 +871,7 @@ export default function SettingsModal(props) {
                       return
                     }
                     await supabase.auth.signOut({ scope: 'global' })
-                    try { window.location.href = '/auth/login' } catch {}
+                    try { window.location.href = '/auth/login' } catch { }
                   } catch (e) {
                     await alert('Falha ao sair: ' + (e?.message ?? String(e)))
                   }
@@ -885,7 +895,7 @@ export default function SettingsModal(props) {
                       headers: { 'content-type': 'application/json' },
                       body: JSON.stringify({ confirm: 'EXCLUIR' }),
                     })
-                    const data = await res.json().catch(() => null)
+                    const data = await res.json().catch((): any => null)
                     if (!data || !data.ok) {
                       await alert('Falha ao excluir conta: ' + (data?.error || ''))
                       return
@@ -898,8 +908,8 @@ export default function SettingsModal(props) {
                         supabase = null
                       }
                       if (supabase) await supabase.auth.signOut({ scope: 'global' })
-                    } catch {}
-                    try { window.location.href = '/auth/login' } catch {}
+                    } catch { }
+                    try { window.location.href = '/auth/login' } catch { }
                   } catch (e) {
                     await alert('Falha ao excluir conta: ' + (e?.message ?? String(e)))
                   }

@@ -31,6 +31,6 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, message: data })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

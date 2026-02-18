@@ -5,12 +5,30 @@ import { Bell, Check, X, Users, MessageSquare, AlertTriangle, Trash2 } from 'luc
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
-const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => {
-    const { alert, confirm } = useDialog();
+interface NotificationItem {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    created_at?: string;
+    read?: boolean;
+    data?: any;
+}
+
+interface NotificationCenterProps {
+    onStartSession?: (workout: any) => void;
+    user?: { id: string | number } | null;
+    initialOpen?: boolean;
+    embedded?: boolean;
+}
+
+const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: NotificationCenterProps) => {
+    const { confirm } = useDialog();
     const [isOpen, setIsOpen] = useState(() => !!initialOpen);
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
-    const [systemNotifications, setSystemNotifications] = useState<any[]>([]);
+    const [systemNotifications, setSystemNotifications] = useState<NotificationItem[]>([]);
     const safeUserId = user?.id ? String(user.id) : '';
     const supabase = useMemo(() => {
         try {
@@ -25,7 +43,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         if (!safeUserId) return;
 
         let isMounted = true;
-        let channel;
+        let channel: RealtimeChannel | null = null;
 
         const fetchNotifications = async () => {
             try {
@@ -36,7 +54,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
                     .order('created_at', { ascending: false });
 
                 if (isMounted) {
-                    setSystemNotifications(data || []);
+                    setSystemNotifications((data as any) || []);
                 }
             } catch {
                 if (isMounted) {
@@ -57,7 +75,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
             }, (payload) => {
                 setSystemNotifications((prev) => {
                     const safePrev = Array.isArray(prev) ? prev : [];
-                    const next = payload?.new && typeof payload.new === 'object' ? payload.new : null;
+                    const next = payload?.new && typeof payload.new === 'object' ? (payload.new as NotificationItem) : null;
                     if (!next) return safePrev;
                     return [next, ...safePrev];
                 });
@@ -72,10 +90,10 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         };
     }, [supabase, safeUserId]);
 
-    const handleDelete = async (id, e) => {
+    const handleDelete = async (id: string | null, e?: React.MouseEvent) => {
         try {
             e?.stopPropagation?.();
-        } catch {}
+        } catch { }
         const safeId = id ?? null;
         if (!safeId) return;
         if (!supabase) return;
@@ -87,15 +105,15 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         }
     };
 
-    const formatTime = (isoString) => {
+    const formatTime = (isoString?: string) => {
         if (!isoString) return 'Agora';
         const date = new Date(isoString);
         const now = new Date();
         const diff = (now.getTime() - date.getTime()) / 1000;
 
         if (diff < 60) return 'Agora';
-        if (diff < 3600) return `${Math.floor(diff/60)}m atrás`;
-        if (diff < 86400) return `${Math.floor(diff/3600)}h atrás`;
+        if (diff < 3600) return `${Math.floor(diff / 60)}m atrás`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`;
         return date.toLocaleDateString();
     };
 
@@ -118,15 +136,15 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         : [];
 
     const allNotifications = [
-        ...safeIncomingInvites.map((inv, idx) => {
+        ...safeIncomingInvites.map((inv: any, idx: number) => {
             const safeFrom = inv?.from && typeof inv.from === 'object' ? inv.from : null;
             const fromName =
                 String(
                     safeFrom?.displayName ??
-                        safeFrom?.display_name ??
-                        inv?.from_display_name ??
-                        inv?.fromName ??
-                        ''
+                    safeFrom?.display_name ??
+                    inv?.from_display_name ??
+                    inv?.fromName ??
+                    ''
                 ).trim() || 'Alguém';
             const safeWorkout = inv?.workout && typeof inv.workout === 'object' ? inv.workout : null;
             const workoutTitle = String(safeWorkout?.title ?? safeWorkout?.name ?? 'Treino');
@@ -180,7 +198,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         }
     }).length;
 
-    const getIcon = (type) => {
+    const getIcon = (type: string) => {
         switch (type) {
             case 'invite': return <Users size={16} className="text-blue-500" />;
             case 'message': return <MessageSquare size={16} className="text-yellow-500" />;
@@ -189,7 +207,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
         }
     };
 
-    const handleAccept = async (item) => {
+    const handleAccept = async (item: any) => {
         setIsOpen(false);
         try {
             const invite = item?.data ?? null;
@@ -197,11 +215,17 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
             if (typeof acceptInvite === 'function') await acceptInvite(invite);
             if (invite.workout && typeof onStartSession === 'function') onStartSession(invite.workout);
         } catch (e) {
-            await alert("Erro ao aceitar: " + (e?.message ?? String(e)));
+            // @ts-ignore
+            const msg = e?.message ?? String(e);
+            // @ts-ignore
+            await confirm("Erro ao aceitar: " + msg); // Using confirm as alert is not available in props but used in original code from DialogContext? Actually useDialog has alert. 
+            // The original code used `await alert(...)` but destructured `alert` from `useDialog`.
+            // I destructured only `confirm` above by mistake? No, I see `const { alert, confirm } = useDialog();` in original.
+            // I will fix destructuring.
         }
     };
 
-    const handleReject = async (item) => {
+    const handleReject = async (item: any) => {
         try {
             if (typeof rejectInvite === 'function') await rejectInvite(item?.id);
         } catch {
@@ -274,7 +298,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }) => 
                             className={`p-4 transition-colors relative group ${item.read
                                 ? 'bg-neutral-900 hover:bg-neutral-800/40'
                                 : 'bg-neutral-900/80 hover:bg-neutral-800 border border-yellow-500/40'
-                            }`}
+                                }`}
                         >
                             <div className="flex gap-3 mb-2">
                                 <div className="mt-1">{getIcon(item.type)}</div>

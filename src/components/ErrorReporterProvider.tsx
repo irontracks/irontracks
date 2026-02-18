@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -11,27 +12,27 @@ const getAppVersion = () => {
   }
 };
 
-const getErrorMessage = (errLike) => {
+const getErrorMessage = (errLike: unknown) => {
   try {
     if (!errLike) return 'Erro desconhecido';
     if (typeof errLike === 'string') return errLike;
-    if (errLike?.message) return String(errLike.message);
+    if ((errLike as Error)?.message) return String((errLike as Error).message);
     return String(errLike);
   } catch {
     return 'Erro desconhecido';
   }
 };
 
-const getErrorStack = (errLike) => {
+const getErrorStack = (errLike: unknown) => {
   try {
-    const stack = errLike?.stack ? String(errLike.stack) : '';
+    const stack = (errLike as Error)?.stack ? String((errLike as Error).stack) : '';
     return stack || '';
   } catch {
     return '';
   }
 };
 
-const normalizeKey = (v) => {
+const normalizeKey = (v: unknown) => {
   try {
     return String(v || '').slice(0, 800);
   } catch {
@@ -39,9 +40,20 @@ const normalizeKey = (v) => {
   }
 };
 
-export default function ErrorReporterProvider({ children }) {
+interface ErrorPayload {
+  message: string;
+  stack: string;
+  pathname: string;
+  url: string;
+  userAgent: string;
+  source: string;
+  appVersion: string;
+  meta: Record<string, unknown>;
+}
+
+export default function ErrorReporterProvider({ children }: { children: React.ReactNode }) {
   const { confirm, alert } = useDialog();
-  const lastShownBySigRef = useRef(new Map());
+  const lastShownBySigRef = useRef(new Map<string, number>());
   const inFlightRef = useRef(false);
 
   const getContextSnapshot = useMemo(() => {
@@ -57,7 +69,7 @@ export default function ErrorReporterProvider({ children }) {
     };
   }, []);
 
-  const shouldThrottle = (signature, windowMs = 15000) => {
+  const shouldThrottle = (signature: string, windowMs = 15000) => {
     const now = Date.now();
     const last = lastShownBySigRef.current.get(signature) || 0;
     if (now - last < windowMs) return true;
@@ -65,18 +77,18 @@ export default function ErrorReporterProvider({ children }) {
     return false;
   };
 
-  const reportToServer = async (payload) => {
+  const reportToServer = async (payload: ErrorPayload) => {
     const res = await fetch('/api/errors/report', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const json = await res.json().catch(() => null);
+    const json = await res.json().catch((): any => null);
     if (!res.ok || !json?.ok) throw new Error(json?.error || 'Falha ao reportar erro');
     return json;
   };
 
-  const handleError = useCallback(async ({ error, source, meta }) => {
+  const handleError = useCallback(async ({ error, source, meta }: { error: unknown, source: string, meta: Record<string, unknown> }) => {
     if (inFlightRef.current) return;
 
     const { url, pathname, userAgent } = getContextSnapshot();
@@ -110,34 +122,34 @@ export default function ErrorReporterProvider({ children }) {
     } catch (e) {
       try {
         await alert('Não foi possível reportar o erro: ' + getErrorMessage(e), 'Falha ao reportar');
-      } catch {}
+      } catch { }
     } finally {
       inFlightRef.current = false;
     }
   }, [alert, confirm, getContextSnapshot]);
 
   useEffect(() => {
-    const onWindowError = (event) => {
+    const onWindowError = (event: ErrorEvent) => {
       try {
         handleError({
           error: event?.error || event?.message || 'Erro',
           source: 'window',
           meta: { filename: event?.filename, lineno: event?.lineno, colno: event?.colno },
         });
-      } catch {}
+      } catch { }
     };
 
-    const onUnhandledRejection = (event) => {
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
       try {
         handleError({
           error: event?.reason || 'Promise rejeitada',
           source: 'unhandledrejection',
           meta: {},
         });
-      } catch {}
+      } catch { }
     };
 
-    const onBoundaryEvent = (event) => {
+    const onBoundaryEvent = (event: CustomEvent) => {
       try {
         const detail = event?.detail && typeof event.detail === 'object' ? event.detail : {};
         handleError({
@@ -145,16 +157,16 @@ export default function ErrorReporterProvider({ children }) {
           source: detail?.source || 'errorboundary',
           meta: detail?.meta || {},
         });
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener('error', onWindowError);
     window.addEventListener('unhandledrejection', onUnhandledRejection);
-    window.addEventListener('irontracks:error', onBoundaryEvent);
+    window.addEventListener('irontracks:error', onBoundaryEvent as EventListener);
     return () => {
       window.removeEventListener('error', onWindowError);
       window.removeEventListener('unhandledrejection', onUnhandledRejection);
-      window.removeEventListener('irontracks:error', onBoundaryEvent);
+      window.removeEventListener('irontracks:error', onBoundaryEvent as EventListener);
     };
   }, [handleError]);
 

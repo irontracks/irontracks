@@ -1,19 +1,25 @@
-let __ctx;
+let __ctx: AudioContext | null;
 let __unlocked = false;
 
 const UNLOCK_SILENT_GAIN = 0.000001;
 const UNLOCK_SILENT_DURATION_S = 0.03;
 
-const clamp01 = (v) => Math.max(0, Math.min(1, v));
+interface SoundOpts {
+    enabled?: boolean;
+    volume?: number | string;
+    create?: boolean;
+}
 
-const resolveSoundOpts = (opts) => {
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+const resolveSoundOpts = (opts: SoundOpts | null | undefined) => {
     const o = opts && typeof opts === 'object' ? opts : {};
     const enabled = o.enabled !== false;
     const volume = clamp01(Number.isFinite(Number(o.volume)) ? Number(o.volume) : 1);
     return { enabled, volume };
 };
 
-const ensureCtx = (opts) => {
+const ensureCtx = (opts: SoundOpts | null | undefined): AudioContext | null => {
     if (typeof window === 'undefined') return null;
     const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
     const AC = w.AudioContext || w.webkitAudioContext;
@@ -23,7 +29,7 @@ const ensureCtx = (opts) => {
         if (!__unlocked && !allowCreate) return null;
         __ctx = new AC();
     }
-    if (__ctx.state === 'suspended') { try { __ctx.resume(); } catch {} }
+    if (__ctx.state === 'suspended') { try { __ctx.resume(); } catch { } }
     return __ctx;
 };
 
@@ -36,9 +42,9 @@ export const unlockAudio = () => {
             try {
                 const maybePromise = ctx.resume();
                 if (maybePromise && typeof maybePromise.then === 'function') {
-                    maybePromise.catch(() => {});
+                    maybePromise.catch(() => { });
                 }
-            } catch {}
+            } catch { }
         }
         try {
             const osc = ctx.createOscillator();
@@ -48,11 +54,11 @@ export const unlockAudio = () => {
             gain.gain.setValueAtTime(UNLOCK_SILENT_GAIN, ctx.currentTime);
             osc.start();
             osc.stop(ctx.currentTime + UNLOCK_SILENT_DURATION_S);
-        } catch {}
-    } catch {}
+        } catch { }
+    } catch { }
 };
 
-export const playStartSound = (opts) => {
+export const playStartSound = (opts?: SoundOpts) => {
     try {
         const { enabled, volume } = resolveSoundOpts(opts);
         if (!enabled || volume <= 0) return;
@@ -78,13 +84,13 @@ export const playStartSound = (opts) => {
     }
 };
 
-export const playFinishSound = (opts) => {
+export const playFinishSound = (opts?: SoundOpts) => {
     try {
         const { enabled, volume } = resolveSoundOpts(opts);
         if (!enabled || volume <= 0) return;
         const ctx = ensureCtx(null);
         if (!ctx) return;
-        const playNote = (freq, time, duration) => {
+        const playNote = (freq: number, time: number, duration: number) => {
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
@@ -106,7 +112,7 @@ export const playFinishSound = (opts) => {
     }
 };
 
-export const playTimerFinishSound = (opts) => {
+export const playTimerFinishSound = (opts?: SoundOpts) => {
     try {
         const { enabled, volume } = resolveSoundOpts(opts);
         if (!enabled || volume <= 0) return;
@@ -131,7 +137,7 @@ export const playTimerFinishSound = (opts) => {
     }
 };
 
-export const playTick = (opts) => {
+export const playTick = (opts?: SoundOpts) => {
     try {
         const { enabled, volume } = resolveSoundOpts(opts);
         if (!enabled || volume <= 0) return;

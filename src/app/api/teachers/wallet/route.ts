@@ -15,8 +15,7 @@ const ZodBodySchema = z
   .passthrough()
 
 const isMissingColumn = (err: unknown, column: string): boolean => {
-  const e = err && typeof err === 'object' ? (err as Record<string, unknown>) : {}
-  const msg = String(e?.message || '').toLowerCase()
+  const msg = String((err as any)?.message || '').toLowerCase()
   return msg.includes(column.toLowerCase()) && (msg.includes('could not find') || msg.includes('column'))
 }
 
@@ -62,7 +61,7 @@ export async function GET() {
 
     let byUser = await fetchByUserId(selectFull)
     if (byUser?.error && !canUseWalletFields(byUser.error)) byUser = await fetchByUserId(selectFallback)
-    teacher = byUser?.data || null
+    teacher = byUser?.data && typeof byUser.data === 'object' ? (byUser.data as Record<string, unknown>) : null
 
     if (teacher && normalizedEmail) {
       const rowEmail = String(teacher?.email || '').toLowerCase().trim()
@@ -72,7 +71,7 @@ export async function GET() {
     if (!teacher && normalizedEmail) {
       let byEmail = await fetchByEmail(selectFull)
       if (byEmail?.error && !canUseWalletFields(byEmail.error)) byEmail = await fetchByEmail(selectFallback)
-      teacher = byEmail?.data || null
+      teacher = byEmail?.data && typeof byEmail.data === 'object' ? (byEmail.data as Record<string, unknown>) : null
     }
 
     if (teacher?.id && !teacher?.user_id) {
@@ -134,12 +133,12 @@ export async function POST(req: Request) {
 
     let byUser = await fetchByUserId(selectFull)
     if (byUser?.error && !canUseWalletFields(byUser.error)) byUser = await fetchByUserId(selectFallback)
-    teacherRow = byUser?.data || null
+    teacherRow = byUser?.data && typeof byUser.data === 'object' ? (byUser.data as Record<string, unknown>) : null
 
     if (!teacherRow && normalizedEmail) {
       let byEmail = await fetchByEmail(selectFull)
       if (byEmail?.error && !canUseWalletFields(byEmail.error)) byEmail = await fetchByEmail(selectFallback)
-      teacherRow = byEmail?.data || null
+      teacherRow = byEmail?.data && typeof byEmail.data === 'object' ? (byEmail.data as Record<string, unknown>) : null
     }
 
     if (!teacherRow) {

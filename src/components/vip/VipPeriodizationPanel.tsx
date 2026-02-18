@@ -112,16 +112,16 @@ export default function VipPeriodizationPanel({
     setError('')
     try {
       const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch(() => null)) as ActiveProgramResponse | null
+      const json = (await res.json().catch((): any => null)) as ActiveProgramResponse | null
       if (!json?.ok) {
         setProgram(null)
         setSchedule([])
-        if (json?.error) setError(String(json.error))
+        if (json && 'error' in json && typeof json.error === 'string') setError(json.error)
         return
       }
       setProgram(json.program || null)
       setSchedule(Array.isArray(json.workouts) ? json.workouts : [])
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Falha ao carregar periodização.')
     } finally {
       setLoading(false)
@@ -132,7 +132,7 @@ export default function VipPeriodizationPanel({
     if (isLocked) return
     try {
       const res = await fetch('/api/vip/periodization/stats', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch(() => null)) as StatsResponse | null
+      const json = (await res.json().catch((): any => null)) as StatsResponse | null
       if (!json?.ok) return
       setStats(Array.isArray(json.weekly) ? json.weekly : [])
     } catch {}
@@ -178,7 +178,7 @@ export default function VipPeriodizationPanel({
         credentials: 'include',
         body: JSON.stringify(payload),
       })
-      const json = await res.json().catch(() => null)
+      const json = await res.json().catch((): any => null)
       if (!json?.ok) {
         setError(friendlyCreateError(json?.error))
         return
@@ -202,7 +202,7 @@ export default function VipPeriodizationPanel({
     setSuccess('')
     try {
       const res = await fetch('/api/vip/periodization/cleanup', { method: 'POST', credentials: 'include', cache: 'no-store' })
-      const json = await res.json().catch(() => null)
+      const json = await res.json().catch((): any => null)
       if (!json?.ok) {
         setError(friendlyCreateError(json?.error))
         return

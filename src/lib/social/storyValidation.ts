@@ -21,10 +21,11 @@ export const isAllowedStoryPath = (userId: string, path: string) => {
   return true
 }
 
-export const validateStoryPayload = (body: any) => {
-  const mediaPath = String(body?.mediaPath || body?.media_path || '').trim()
-  const caption = body?.caption != null ? String(body.caption).trim() : null
-  const meta = body?.meta && typeof body.meta === 'object' ? body.meta : {}
+export const validateStoryPayload = (body: unknown) => {
+  const b = body && typeof body === 'object' ? body as Record<string, any> : {}
+  const mediaPath = String(b?.mediaPath || b?.media_path || '').trim()
+  const caption = b?.caption != null ? String(b.caption).trim() : null
+  const meta = b?.meta && typeof b.meta === 'object' ? b.meta : {}
 
   if (!mediaPath) return { ok: false, error: 'media_path required' }
   

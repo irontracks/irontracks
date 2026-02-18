@@ -11,7 +11,7 @@ const ZodBodySchema = z
   })
   .passthrough()
 
-const sanitizeHtml = (value) => {
+const sanitizeHtml = (value: unknown): string => {
   try {
     let s = String(value ?? '')
     s = s.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -117,7 +117,8 @@ export async function POST(req: Request) {
         .replaceAll(/[\r\n"]/g, '')
         .slice(0, 80) || 'IronTracks_Report'
 
-      return new Response(pdfBuffer, {
+      const body = typeof Buffer !== 'undefined' ? Buffer.from(pdfBuffer as any) : pdfBuffer
+      return new Response(body as any, {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${safeName}.pdf"`,

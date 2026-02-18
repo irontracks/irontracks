@@ -76,9 +76,9 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
           data: base64,
           mimeType,
         },
-      } as any,
+      },
       { text: prompt },
-    ] as any);
+    ]);
 
     const response = result?.response;
     const text = (await response?.text()) || "";
@@ -114,13 +114,13 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
       }
     }
 
-    const asObj = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as any) : null;
+    const asObj = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
     const workoutTitle = asObj ? String(asObj.workoutTitle || "").trim() : "";
     const arr = Array.isArray(parsed) ? parsed : Array.isArray(asObj?.exercises) ? asObj.exercises : [];
-    const exercises: IronScannerExercise[] = arr
-      .map((item: any) => {
+    const exercises: IronScannerExercise[] = (Array.isArray(arr) ? arr : [])
+      .map((item: unknown) => {
         if (!item || typeof item !== "object") return null;
-        const anyItem = item as any;
+        const anyItem = item as Record<string, unknown>;
         const name = String(anyItem.name || "").trim();
         const setsRaw = anyItem.sets;
         const setsNum = typeof setsRaw === "number" ? setsRaw : Number(setsRaw || 0);
@@ -139,7 +139,7 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
           ...(Number.isFinite(rest_time_sec) && rest_time_sec > 0 ? { rest_time_sec } : {}),
         };
       })
-      .filter((x: any): x is IronScannerExercise => !!x);
+      .filter((x: unknown): x is IronScannerExercise => !!x);
 
     if (!exercises.length) {
       return { ok: false, error: "Nenhum exercício válido encontrado" };

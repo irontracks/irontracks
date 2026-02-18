@@ -92,7 +92,7 @@ const buildPlannedBlocks = (totalReps: unknown, clusterSize: unknown) => {
   const c = Number(clusterSize);
   if (!Number.isFinite(t) || t <= 0) return [];
   if (!Number.isFinite(c) || c <= 0) return [];
-  const blocks: any[] = [];
+  const blocks: unknown[] = [];
   let remaining = t;
   while (remaining > 0) {
     const next = Math.min(c, remaining);
@@ -559,7 +559,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0) || 0;
     const inferredStages = shouldInjectDropSetForSet(ex, setIdx, setsCount);
     if (inferredStages > 0) {
-      const stages = Array.from({ length: inferredStages }).map(() => ({ weight: null, reps: null }));
+      const stages = Array.from({ length: inferredStages }).map(() => ({ weight: null as number | null, reps: null as number | null }));
       return {
         ...(sd || {}),
         it_auto: { ...(isObject(sd?.it_auto) ? (sd?.it_auto as UnknownRecord) : {}), label: 'Drop' },
@@ -929,7 +929,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
         return;
       }
 
-      const stages: any[] = [];
+      const stages: { weight: string; reps: number }[] = [];
       let total = 0;
       for (let i = 0; i < stagesRaw.length; i += 1) {
         const s = stagesRaw[i] && typeof stagesRaw[i] === 'object' ? stagesRaw[i] : {};
@@ -1557,7 +1557,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       const ratio = targetWeight / baseWeight;
       const minWeight = Number(deloadModal.minWeight || 0);
       const appliedAt = new Date().toISOString();
-      const appliedWeights: any[] = [];
+      const appliedWeights: unknown[] = [];
       for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
         const key = `${exIdx}-${setIdx}`;
         const log = getLog(key);
@@ -1784,7 +1784,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       sets,
       restTime,
       method: 'Normal',
-      setDetails: [],
+      setDetails: [] as unknown[],
     };
     try {
       props.onUpdateSession({ workout: { ...workout, exercises: [...exercises, nextExercise] } });
@@ -1837,8 +1837,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: workoutId, workout: payload }),
-      }).catch(() => null);
-      const result = response ? await response.json().catch(() => null) : null;
+      }).catch((): any => null);
+      const result = response ? await response.json().catch((): any => null) : null;
       if (!response || !response.ok || !result?.ok) {
         setOrganizeError(String(result?.error || 'Falha ao salvar a ordem.'));
         setOrganizeSaving(false);
@@ -1930,7 +1930,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     setFinishing(true);
     try {
       persistDeloadHistoryFromSession();
-      const payload = buildFinishWorkoutPayload({ workout, elapsedSeconds, logs, ui, postCheckin });
+      const safePostCheckin = postCheckin && typeof postCheckin === 'object' ? (postCheckin as Record<string, unknown>) : null;
+      const payload = buildFinishWorkoutPayload({ workout, elapsedSeconds, logs, ui, postCheckin: safePostCheckin });
 
       let savedId = null;
       if (shouldSaveHistory) {
@@ -2448,7 +2449,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
                 <div key={`${key}-block-${idx}`} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
-                    <div className="text-[10px] font-mono text-neutral-500">plan {planned}</div>
+                    <div className="text-[10px] font-mono text-neutral-500">plan {String(planned)}</div>
                   </div>
                   <input
                     inputMode="decimal"
@@ -2747,8 +2748,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
             <ExecutionVideoCapture
               exerciseName={name}
               workoutId={workout?.id || null}
-              exerciseId={ex?.id || ex?.exercise_id || null}
-              exerciseLibraryId={ex?.exercise_library_id || null}
+              exerciseId={String(ex?.id || ex?.exercise_id || '')}
+              exerciseLibraryId={String(ex?.exercise_library_id || '')}
             />
             <button
               type="button"
@@ -3005,7 +3006,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
                         const plannedBlocks = Array.isArray(prev?.plannedBlocks) ? prev.plannedBlocks : [];
                         const restsByGap = Array.isArray(prev?.restsByGap) ? prev.restsByGap : [];
                         const baseWeight = String(prev?.baseWeight ?? '').trim();
-                        const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: null }));
+                        const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: null as number | null }));
                         return { ...prev, restsByGap, blocks, error: '' };
                       });
                     }}
@@ -3082,7 +3083,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
                         }
                         const restsByGap = plannedBlocks.length > 1 ? Array.from({ length: plannedBlocks.length - 1 }).map(() => intra) : [];
                         const baseWeight = String(clusterModal?.baseWeight ?? '').trim();
-                        const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: null }));
+                        const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: null as number | null }));
                         setClusterModal((prev) => {
                           if (!prev || typeof prev !== 'object') return prev;
                           const planned = prev.planned && typeof prev.planned === 'object' ? prev.planned : {};
@@ -3297,7 +3298,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
                       }
                       setRestPauseModal((prev) => {
                         if (!prev || typeof prev !== 'object') return prev;
-                        return { ...prev, miniSets: minisCount, minis: Array.from({ length: minisCount }).map(() => null), error: '' };
+                        return { ...prev, miniSets: minisCount, minis: Array.from({ length: minisCount }).map((): number | null => null), error: '' };
                       });
                     }}
                     className="min-h-[40px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"

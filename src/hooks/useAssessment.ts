@@ -1,6 +1,7 @@
 // Hook para gerenciamento de avaliações físicas
 'use client';
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { createClient } from '@/utils/supabase/client';
 import {
   Assessment,
@@ -25,7 +26,7 @@ interface UseAssessmentReturn {
   assessments: Assessment[];
   loading: boolean;
   error: string | null;
-  
+
   // Ações
   createAssessment: (data: AssessmentFormData, studentId: string) => Promise<AssessmentResponse>;
   updateAssessment: (id: string, data: UpdateAssessmentRequest) => Promise<AssessmentResponse>;
@@ -33,7 +34,7 @@ interface UseAssessmentReturn {
   getAssessment: (id: string) => Promise<Assessment | null>;
   getStudentAssessments: (studentId: string) => Promise<Assessment[]>;
   refreshAssessments: () => Promise<void>;
-  
+
   // Utilitários
   clearError: () => void;
   formDataToAssessment: (data: AssessmentFormData, studentId: string) => CreateAssessmentRequest;
@@ -41,7 +42,7 @@ interface UseAssessmentReturn {
 
 export const useAssessment = (): UseAssessmentReturn => {
   const supabase = useMemo(() => createClient(), []);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -177,12 +178,12 @@ export const useAssessment = (): UseAssessmentReturn => {
     [supabase]
   );
 
-  const normalizeAssessmentRow = useCallback((row: any): Assessment => {
+  const normalizeAssessmentRow = useCallback((row: Record<string, unknown>): Assessment => {
     if (!row || typeof row !== 'object') {
-      return row;
+      return row as unknown as Assessment;
     }
 
-    const toNumberOrUndefined = (value: any) => {
+    const toNumberOrUndefined = (value: unknown): number | undefined => {
       if (typeof value === 'number') return value;
       if (typeof value === 'string') {
         const parsed = parseFloat(value);
@@ -196,7 +197,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       weight: toNumberOrUndefined(row.weight) ?? 0,
       height: toNumberOrUndefined(row.height) ?? 0,
       age: toNumberOrUndefined(row.age) ?? 0,
-      
+
       // Circunferências (com fallback para schema antigo)
       arm_circ: toNumberOrUndefined(row.arm_circ ?? row.arm),
       chest_circ: toNumberOrUndefined(row.chest_circ ?? row.chest),
@@ -249,7 +250,7 @@ export const useAssessment = (): UseAssessmentReturn => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const resolvedId = await resolveStudentRecordId(studentId);
       setCurrentStudentId(resolvedId);
 
@@ -260,7 +261,7 @@ export const useAssessment = (): UseAssessmentReturn => {
         .order('assessment_date', { ascending: false });
 
       if (error) throw error;
-      
+
       const normalized = (data || []).map(normalizeAssessmentRow);
       setAssessments(normalized);
       return normalized;
@@ -321,7 +322,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       height,
       age,
       gender,
-      
+
       // Circunferências
       arm_circ: parseNumberInput(data.arm_circ) ?? undefined,
       chest_circ: parseNumberInput(data.chest_circ) ?? undefined,
@@ -345,7 +346,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       fat_mass: fatMass,
       bmi,
       bmr,
-      
+
       observations: data.observations
     };
   }, [user?.id]);
@@ -359,7 +360,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       const resolvedStudentId = await resolveStudentRecordId(studentId);
       const payload = formDataToAssessment(data, resolvedStudentId);
-      
+
       // Garantir trainer_id
       payload.trainer_id = user.id;
 
@@ -373,7 +374,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       const normalized = normalizeAssessmentRow(newAssessment);
       setAssessments(prev => [normalized, ...prev]);
-      
+
       return { success: true, data: normalized };
     } catch (e) {
       console.error('Erro ao criar avaliação:', e);

@@ -28,7 +28,7 @@ export default function VipWeeklySummaryCard() {
     setError('')
     try {
       const res = await fetch('/api/vip/weekly-summary', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch(() => null)) as WeeklySummary | null
+      const json = (await res.json().catch((): any => null)) as WeeklySummary | null
       if (!json?.ok) {
         setData(null)
         setError(String(json?.error || 'Falha ao carregar resumo semanal.'))

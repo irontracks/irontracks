@@ -43,7 +43,7 @@ const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlrea
       subject,
       html,
     }),
-  }).catch(() => null)
+  }).catch((): any => null)
 }
 
 export async function POST(req: Request) {

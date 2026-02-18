@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 
-export default function ServiceWorkerRegister() {
+export default function ServiceWorkerRegister(): null {
   useEffect(() => {
     try {
       if (!('serviceWorker' in navigator)) return
@@ -15,9 +15,8 @@ export default function ServiceWorkerRegister() {
         }
       })()
       if (isLocal) return
-      navigator.serviceWorker.register('/sw.js').catch(() => null)
+      navigator.serviceWorker.register('/sw.js').catch((): any => null)
     } catch {}
   }, [])
   return null
 }
-

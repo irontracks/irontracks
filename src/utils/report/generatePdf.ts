@@ -1,4 +1,4 @@
-export async function generateAssessmentPdf(formData, results, studentName) {
+export async function generateAssessmentPdf(formData: any, results: any, studentName: string): Promise<Blob> {
   try {
     const data = formData && typeof formData === 'object' ? formData : {};
     const metrics = results && typeof results === 'object' ? results : {};
@@ -171,4 +171,3 @@ export async function generateAssessmentPdf(formData, results, studentName) {
     return new Blob([fallback], { type: 'text/html' });
   }
 }
-

@@ -17,7 +17,19 @@ const enabled = () => {
   }
 };
 
-export default function ExecutionVideoCapture(props) {
+interface ExecutionVideoCaptureProps {
+    exerciseName?: string;
+    exerciseId?: string;
+    workoutId?: string;
+    exerciseLibraryId?: string;
+    notes?: string;
+    variant?: 'icon' | 'compact' | 'wide' | 'normal';
+    label?: string;
+    onUploaded?: (data: { submissionId: string }) => void;
+    [key: string]: any;
+}
+
+export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps) {
   const { alert } = useDialog();
   const supabase = useRef(createClient()).current;
   const inputRef = useRef<any>(null);
@@ -39,9 +51,9 @@ export default function ExecutionVideoCapture(props) {
 
   if (!enabled()) return null;
 
-  const runIdle = (fn) => {
+  const runIdle = (fn: () => void) => {
     try {
-      const w = typeof window !== 'undefined' ? window : null;
+      const w = typeof window !== 'undefined' ? (window as any) : null;
       const idle = w && w.requestIdleCallback;
       if (typeof idle === 'function') {
         idle(() => {
@@ -57,7 +69,7 @@ export default function ExecutionVideoCapture(props) {
     } catch {}
   };
 
-  const processVideoFile = async (file) => {
+  const processVideoFile = async (file: File) => {
     let videoEl: HTMLVideoElement | null = null;
     let objectUrl: string | null = null;
     try {
@@ -84,10 +96,10 @@ export default function ExecutionVideoCapture(props) {
           if (settled) return;
           settled = true;
           try {
-            videoEl.removeEventListener('loadedmetadata', onLoaded);
+            videoEl?.removeEventListener('loadedmetadata', onLoaded);
           } catch {}
           try {
-            videoEl.removeEventListener('error', onError);
+            videoEl?.removeEventListener('error', onError);
           } catch {}
         };
         const onLoaded = () => {
@@ -98,10 +110,10 @@ export default function ExecutionVideoCapture(props) {
           cleanup();
           reject(new Error('Falha ao carregar o vídeo selecionado.'));
         };
-        videoEl.addEventListener('loadedmetadata', onLoaded);
-        videoEl.addEventListener('error', onError);
+        videoEl?.addEventListener('loadedmetadata', onLoaded);
+        videoEl?.addEventListener('error', onError);
         try {
-          if (videoEl.readyState >= 1) {
+          if (videoEl && videoEl.readyState >= 1) {
             cleanup();
             resolve(null);
           }
@@ -132,7 +144,7 @@ export default function ExecutionVideoCapture(props) {
         fps: 30,
         mimeTypeOverride: 'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
         videoBitsPerSecond: 4000000,
-        onDrawFrame: (ctx, vid) => {
+        onDrawFrame: (ctx: CanvasRenderingContext2D, vid: HTMLVideoElement) => {
           try {
             const vw = Number(vid?.videoWidth || 0);
             const vh = Number(vid?.videoHeight || 0);
@@ -165,7 +177,7 @@ export default function ExecutionVideoCapture(props) {
             ctx.font = '800 28px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
             const maxSubtitleWidth = width - 64;
             const words = subtitle.split(/\s+/).filter(Boolean);
-            const lines: any[] = [];
+            const lines: unknown[] = [];
             let current = '';
             for (let i = 0; i < words.length; i += 1) {
               const w = words[i];
@@ -182,7 +194,7 @@ export default function ExecutionVideoCapture(props) {
             if (current && lines.length < 2) lines.push(current);
             const startY = brandY + 48;
             for (let i = 0; i < lines.length; i += 1) {
-              const text = lines[i];
+              const text = String(lines[i]);
               const tw = ctx.measureText(text).width;
               const x = (width - tw) / 2;
               const y = startY + i * 32;
@@ -190,7 +202,7 @@ export default function ExecutionVideoCapture(props) {
             }
           } catch {}
         },
-        onProgress: (p) => {
+        onProgress: (p: number) => {
           try {
             const n = Number(p);
             if (!Number.isFinite(n)) return;
@@ -244,7 +256,7 @@ export default function ExecutionVideoCapture(props) {
     } catch {}
   };
 
-  const onChange = async (e) => {
+  const onChange = async (e: any) => {
     const file = e?.target?.files?.[0] || null;
     try {
       if (e?.target) e.target.value = '';
@@ -259,7 +271,7 @@ export default function ExecutionVideoCapture(props) {
       const processed = await processVideoFile(file).catch((err) => {
         throw err;
       });
-      const fileToUpload = processed || file;
+      const fileToUpload = (processed || file) as File;
 
       const res = await fetch('/api/execution-videos/prepare', {
         method: 'POST',
@@ -271,7 +283,7 @@ export default function ExecutionVideoCapture(props) {
           content_type: String(fileToUpload?.type || file?.type || ''),
         }),
       });
-      const json = await res.json().catch(() => null);
+      const json = await res.json().catch((): any => null);
       if (!res.ok || !json?.ok) {
         const msg = String(json?.error || `Falha ao preparar upload (${res.status})`);
         await alert(msg, 'Vídeo');
@@ -311,7 +323,7 @@ export default function ExecutionVideoCapture(props) {
         } catch {}
       }
       await alert('Vídeo enviado para o professor.', 'Vídeo');
-    } catch (err) {
+    } catch (err: any) {
       await alert('Erro: ' + (err?.message ?? String(err)), 'Vídeo');
     } finally {
       setUploading(false);

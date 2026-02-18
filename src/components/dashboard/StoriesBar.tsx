@@ -30,7 +30,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     setError('')
     try {
       const res = await fetch('/api/social/stories/list', { method: 'GET' })
-      const json = await res.json().catch(() => null)
+      const json = await res.json().catch((): any => null)
       if (!res.ok || !json?.ok) throw new Error(String(json?.error || 'Falha ao carregar stories'))
       const arr = Array.isArray(json?.data) ? (json.data as StoryGroup[]) : []
       setGroups(arr)
@@ -59,9 +59,6 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       const rawName = String(file?.name || '').trim().toLowerCase()
       const ext0 = parseExt(rawName) || extFromMime(file.type)
       const kind = guessMediaKind(file.type, ext0)
-      if (kind === 'video' && (ext0 === '.webm' || String(file?.type || '').toLowerCase() === 'video/webm')) {
-        throw new Error('WEBM pode não rodar no Safari. Prefira MP4/MOV.')
-      }
       const ext = ext0 || (kind === 'video' ? '.mp4' : '.jpg')
       const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
       const path = `${uid}/stories/${storyId}${ext}`
@@ -71,7 +68,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ path }),
       })
-      const signJson = await signResp.json().catch(() => null)
+      const signJson = await signResp.json().catch((): any => null)
       if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
 
       if (typeof signJson?.bucketLimitBytes === 'number' && Number.isFinite(signJson.bucketLimitBytes) && file.size > signJson.bucketLimitBytes) {
@@ -97,7 +94,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
           } 
         }),
       })
-      const createJson = await createResp.json().catch(() => null)
+      const createJson = await createResp.json().catch((): any => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
 
       await reload()

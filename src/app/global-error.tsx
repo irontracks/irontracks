@@ -2,7 +2,7 @@
 
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
-export default function GlobalError({ error, reset }) {
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
     <html lang="pt-BR">
       <body className="bg-neutral-950 text-white">
@@ -37,4 +37,3 @@ export default function GlobalError({ error, reset }) {
     </html>
   );
 }
-

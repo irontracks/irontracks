@@ -31,7 +31,7 @@ export default function RequestsTab() {
         fetchRequests()
     }, [])
 
-    const handleAction = async (req, action) => {
+    const handleAction = async (req: any, action: string) => {
         if (action === 'reject') {
             const ok = await confirm(
                 `Tem certeza que deseja recusar o acesso de ${req.full_name}?`,

@@ -1562,7 +1562,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                     {Array.from({ length: Number(ex?.sets) || 0 }).map((_, sIdx) => {
                                         const key = `${exIdx}-${sIdx}`;
                                         const log = sessionLogs[key];
-                                        const prevLog = prevLogs[sIdx];
+                                        const prevLog = Array.isArray(prevLogs) && prevLogs[sIdx] ? prevLogs[sIdx] : null;
 
                                         if (!log || typeof log !== 'object') return null;
                                         const logObj = log as AnyObj;

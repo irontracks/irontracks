@@ -108,7 +108,7 @@ export async function addTeacher(
         await checkAdmin()
         const adminDb = createAdminClient()
 
-        const normalizeString = (v) => {
+        const normalizeString = (v: unknown): string | null => {
             const s = String(v ?? '').trim()
             return s ? s : null
         }
@@ -125,7 +125,7 @@ export async function addTeacher(
         if (nextPhone !== null) payload.phone = nextPhone
         if (nextBirthDate !== null) payload.birth_date = nextBirthDate
 
-        const tryInsert = async (p) => {
+        const tryInsert = async (p: Record<string, string | null>) => {
             const { error } = await adminDb.from('teachers').insert(p)
             if (error) throw error
         }
@@ -194,7 +194,7 @@ export async function updateTeacher(id: unknown, data: Record<string, unknown>):
         const safeId = String(id || '').trim()
         if (!safeId) throw new Error('Missing teacher id')
 
-        const normalizeString = (v) => {
+        const normalizeString = (v: unknown): string | null => {
             const s = String(v ?? '').trim()
             return s ? s : null
         }
@@ -210,7 +210,7 @@ export async function updateTeacher(id: unknown, data: Record<string, unknown>):
         if (nextPhone !== null) payload.phone = nextPhone
         if (nextBirthDate !== null) payload.birth_date = nextBirthDate
 
-        const tryUpdate = async (p) => {
+        const tryUpdate = async (p: Record<string, unknown>) => {
             const { error } = await adminDb.from('teachers').update(p).eq('id', safeId)
             if (error) throw error
         }
@@ -360,7 +360,7 @@ export async function assignWorkoutToStudent(
 
             const safeInsertedExs = Array.isArray(insertedExs) ? insertedExs : []
 
-            const insertSetSafe = async (payload) => {
+            const insertSetSafe = async (payload: Record<string, any>) => {
                 try {
                     const { error } = await adminDb.from('sets').insert(payload);
                     if (!error) return;
@@ -516,7 +516,7 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
             messages: messages || [],
             invites: invites || [],
             team_sessions: team_sessions || [],
-            workouts: (Array.isArray(workouts) ? workouts : []).map(w => ({
+            workouts: (Array.isArray(workouts) ? workouts : []).map((w: any) => ({
                 id: w?.id,
                 user_id: w?.user_id ?? null,
                 student_id: w?.student_id ?? null,
@@ -524,7 +524,7 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
                 notes: w?.notes ?? null,
                 is_template: !!w?.is_template,
                 created_by: w?.created_by ?? null,
-                exercises: (Array.isArray(w?.exercises) ? w.exercises : []).map(e => ({
+                exercises: (Array.isArray(w?.exercises) ? w.exercises : []).map((e: any) => ({
                     id: e?.id,
                     name: e?.name ?? '',
                     notes: e?.notes ?? null,
@@ -533,7 +533,7 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
                     cadence: e?.cadence ?? null,
                     method: e?.method ?? null,
                     order: e?.order ?? null,
-                    sets: (Array.isArray(e?.sets) ? e.sets : []).map(s => ({
+                    sets: (Array.isArray(e?.sets) ? e.sets : []).map((s: any) => ({
                         reps: s?.reps ?? null,
                         rpe: s?.rpe ?? null,
                         set_number: s?.set_number ?? null

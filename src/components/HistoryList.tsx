@@ -18,23 +18,40 @@ const PERIOD_SESSIONS_LIMIT = 30;
 const TOP_EXERCISES_LIMIT = 5;
 
 interface WorkoutLog {
-    weight?: unknown;
-    reps?: unknown;
+    weight?: string | number | null;
+    reps?: string | number | null;
     done?: boolean;
+    [key: string]: unknown;
+}
+
+interface RawSession {
+    id?: string;
+    user_id?: string;
+    student_id?: string;
+    workoutTitle?: string;
+    date?: string;
+    totalTime?: number;
+    logs?: Record<string, WorkoutLog>;
+    exercises?: unknown[];
+    notes?: string;
     [key: string]: unknown;
 }
 
 interface WorkoutSummary {
     id: string;
     workoutTitle?: string | null;
-    date?: unknown;
-    dateMs?: unknown;
-    totalTime?: unknown;
-    rawSession?: Record<string, unknown> | null;
+    date?: string | null;
+    dateMs?: number | null;
+    totalTime?: number;
+    rawSession?: RawSession | null;
     raw?: Record<string, unknown> | null;
     isTemplate?: boolean;
     exercises?: Array<Record<string, unknown>>;
     name?: string | null;
+    created_at?: string;
+    notes?: string | Record<string, unknown>;
+    is_template?: boolean;
+    completed_at?: string;
     [key: string]: unknown;
 }
 
@@ -47,23 +64,47 @@ interface WorkoutTemplate {
 
 interface ManualExercise {
     name: string;
-    sets: number;
+    sets: number | string;
     reps: string;
     restTime: number;
     cadence: string;
     notes: string;
-    weights?: unknown[];
-    repsPerSet?: unknown[];
+    weights?: string[];
+    repsPerSet?: string[];
+    rest_time?: number;
     [key: string]: unknown;
 }
 
-type PeriodReport = { type: 'week' | 'month'; stats: Record<string, unknown> };
+interface PeriodStats {
+    count: number;
+    totalMinutes: number;
+    avgMinutes: number;
+    totalVolumeKg: number;
+    avgVolumeKg: number;
+    [key: string]: unknown;
+}
+
+type PeriodReport = { type: 'week' | 'month'; stats: PeriodStats };
 type PeriodAiState = { status: 'idle' | 'loading' | 'ready' | 'error'; ai: Record<string, unknown> | null; error: string };
 type PeriodPdfState = { status: 'idle' | 'loading' | 'ready' | 'error'; url: string | null; blob: Blob | null; error: string };
 
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
-const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false, vipLimits, onUpgrade }) => {
+interface HistoryListProps {
+    user: { id: string; email?: string; displayName?: string; name?: string; role?: string } | null;
+    settings?: Record<string, unknown>;
+    onViewReport?: (session: unknown) => void;
+    onBack?: () => void;
+    targetId?: string;
+    targetEmail?: string;
+    readOnly?: boolean;
+    title?: string;
+    embedded?: boolean;
+    vipLimits?: { history_days?: number };
+    onUpgrade?: () => void;
+}
+
+const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport, onBack, targetId, targetEmail, readOnly, title, embedded = false, vipLimits, onUpgrade }) => {
     const { confirm, alert } = useDialog();
     const [history, setHistory] = useState<WorkoutSummary[]>([]);
     const [loading, setLoading] = useState(true);
@@ -73,7 +114,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const isReadOnly = !!readOnly;
     const [range, setRange] = useState(() => (readOnly ? 'all' : '30'));
     const [showManual, setShowManual] = useState(false);
-    const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0,16));
+    const [manualDate, setManualDate] = useState(new Date().toISOString().slice(0, 16));
     const [manualDuration, setManualDuration] = useState('45');
     const [manualNotes, setManualNotes] = useState('');
     const [manualTab, setManualTab] = useState('existing');
@@ -86,7 +127,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const [selectedSession, setSelectedSession] = useState<Record<string, unknown> | null>(null);
     const [editId, setEditId] = useState<string | null>(null);
     const [editTitle, setEditTitle] = useState('');
-    const [editDate, setEditDate] = useState(new Date().toISOString().slice(0,16));
+    const [editDate, setEditDate] = useState(new Date().toISOString().slice(0, 16));
     const [editDuration, setEditDuration] = useState('45');
     const [editNotes, setEditNotes] = useState('');
     const [editExercises, setEditExercises] = useState<ManualExercise[]>([]);
@@ -102,7 +143,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         setSelectedIds(new Set());
     };
 
-    const toggleItemSelection = (id) => {
+    const toggleItemSelection = (id: string) => {
         setSelectedIds(prev => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -114,7 +155,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const handleBulkDelete = async () => {
         if (selectedIds.size === 0) return;
         if (!(await confirm(`Excluir ${selectedIds.size} itens selecionados?`))) return;
-        
+
         try {
             const ids = Array.from(selectedIds);
             const { error } = await supabase
@@ -124,24 +165,24 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 .eq('is_template', false);
 
             if (error) throw error;
-            
+
             setHistory(prev => prev.filter(h => !selectedIds.has(h.id)));
             setIsSelectionMode(false);
             setSelectedIds(new Set());
             await alert('Itens excluídos com sucesso');
-        } catch (e) {
+        } catch (e: any) {
             await alert('Erro ao excluir: ' + (e?.message ?? String(e)));
         }
     };
 
-    const formatHistoryTitle = (title) => {
-        return title || 'Treino';
+    const formatHistoryTitle = (title: unknown) => {
+        return typeof title === 'string' && title ? title : 'Treino';
     };
 
-    const formatCompletedAt = (dateValue) => {
+    const formatCompletedAt = (dateValue: unknown) => {
         try {
             if (!dateValue) return 'Data desconhecida';
-            const d = new Date(dateValue);
+            const d = new Date(String(dateValue));
             if (isNaN(d.getTime())) return 'Data desconhecida';
             const dateStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
             const timeStr = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -162,7 +203,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         return Array.isArray(history) ? history : [];
     }, [history]);
 
-    const toDateMs = (value) => {
+    const toDateMs = (value: any): number | null => {
         try {
             if (!value) return null;
             if (value?.toDate) {
@@ -196,7 +237,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         const cutoff = Date.now() - days * DAY_MS;
         return historyItems.filter((s) => {
             const t = toDateMs(s?.dateMs) ?? toDateMs(s?.date);
-            return Number.isFinite(t) && t >= cutoff;
+            return Number.isFinite(t) && t !== null && t >= cutoff;
         });
     }, [historyItems, range]);
 
@@ -210,7 +251,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
 
         filteredHistory.forEach(item => {
             const t = toDateMs(item?.dateMs) ?? toDateMs(item?.date);
-            if (Number.isFinite(t) && t >= cutoff) {
+            if (Number.isFinite(t) && t !== null && t >= cutoff) {
                 visible.push(item);
             } else {
                 blocked++;
@@ -246,7 +287,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         }
     };
 
-    const buildPeriodStats = (days) => {
+    const buildPeriodStats = (days: unknown): PeriodStats | null => {
         try {
             const historyList = Array.isArray(historyItems) ? historyItems : [];
             const daysNumber = Number(days);
@@ -254,7 +295,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
             const cutoff = Date.now() - daysNumber * DAY_MS;
             const list = historyList.filter((s) => {
                 const t = toDateMs(s?.dateMs) ?? toDateMs(s?.date);
-                return Number.isFinite(t) && t >= cutoff;
+                return Number.isFinite(t) && t !== null && t >= cutoff;
             });
             if (!list.length) return null;
             const totalSeconds = list.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
@@ -278,11 +319,11 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 let dayKey = '';
                 try {
                     const t = toDateMs(dateValue);
-                    if (Number.isFinite(t)) {
+                    if (Number.isFinite(t) && t !== null) {
                         dayKey = new Date(t).toISOString().slice(0, 10);
                         uniqueDays.add(dayKey);
                     }
-                } catch {}
+                } catch { }
                 const sessionMinutes = Math.max(0, Math.round((Number(item?.totalTime ?? raw?.totalTime) || 0) / 60));
                 sessionSummaries.push({ date: dateValue, minutes: sessionMinutes, volumeKg: Math.max(0, Math.round(safeVolume || 0)) });
                 Object.entries(logs || {}).forEach(([key, log]) => {
@@ -338,11 +379,11 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         }
     };
 
-    const buildShareText = (report) => {
+    const buildShareText = (report: PeriodReport | null) => {
         const data = report && typeof report === 'object' ? report : null;
         if (!data) return '';
         const label = data.type === 'week' ? 'semanal' : data.type === 'month' ? 'mensal' : 'período';
-        const stats = data.stats && typeof data.stats === 'object' ? data.stats : {};
+        const stats = (data.stats && typeof data.stats === 'object' ? data.stats : {}) as any;
         const count = Number(stats.count) || 0;
         const totalMinutes = Number(stats.totalMinutes) || 0;
         const avgMinutes = Number(stats.avgMinutes) || 0;
@@ -367,23 +408,23 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         return lines.join('\n');
     };
 
-    const openSession = (session) => {
+    const openSession = (session: WorkoutSummary) => {
         const rawSession = session?.rawSession && typeof session.rawSession === 'object' ? session.rawSession : null;
         const payload = rawSession
             ? {
                 ...rawSession,
                 id: rawSession.id ?? session?.id ?? null,
-                user_id: session?.raw?.user_id ?? rawSession?.user_id ?? session?.user_id ?? null,
-                student_id: session?.raw?.student_id ?? rawSession?.student_id ?? session?.student_id ?? null
+                user_id: session?.raw?.user_id ?? rawSession?.user_id ?? (session as any)?.user_id ?? null,
+                student_id: session?.raw?.student_id ?? rawSession?.student_id ?? (session as any)?.student_id ?? null
             }
             : session;
         if (typeof onViewReport === 'function') {
             try {
                 onViewReport(payload);
                 return;
-            } catch {}
+            } catch { }
         }
-        setSelectedSession(payload);
+        setSelectedSession(payload as Record<string, unknown>);
     };
 
     useEffect(() => {
@@ -408,13 +449,13 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                     return;
                 }
 
-                let data = [];
+                let data: WorkoutSummary[] = [];
 
                 if (hasTarget) {
                     const qs = targetId
                         ? `id=${encodeURIComponent(targetId)}`
                         : `email=${encodeURIComponent(targetEmail || '')}`;
-                    const json = await adminFetchJson<{ ok: boolean; rows?: unknown[]; error?: string }>(
+                    const json = await adminFetchJson<{ ok: boolean; rows?: WorkoutSummary[]; error?: string }>(
                         supabase as any,
                         `/api/admin/workouts/history?${qs}`,
                     );
@@ -526,9 +567,9 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
             const json = await resp.json();
             if (!json.ok) throw new Error(json.error || 'Falha ao salvar');
             setShowManual(false);
-            setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
+            setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate).toISOString(), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
             await alert('Histórico adicionado');
-        } catch (e) {
+        } catch (e: any) {
             await alert('Erro: ' + (e?.message ?? String(e)));
         }
     };
@@ -536,7 +577,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const saveManualNew = async () => {
         try {
             if (!newWorkout.title) throw new Error('Informe o título');
-            const exercises = (newWorkout.exercises || []).map(e => ({
+            const exercises: ManualExercise[] = (newWorkout.exercises || []).map((e: any) => ({
                 name: e.name || '',
                 sets: Number(e.sets) || 0,
                 reps: e.reps || '',
@@ -568,9 +609,9 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
             const json = await resp.json();
             if (!json.ok) throw new Error(json.error || 'Falha ao salvar');
             setShowManual(false);
-            setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
+            setHistory(prev => [{ id: json.saved.id, workoutTitle: session.workoutTitle, date: new Date(manualDate).toISOString(), totalTime: parseInt(manualDuration, 10) * 60, rawSession: session }, ...prev]);
             await alert('Histórico adicionado');
-        } catch (e) {
+        } catch (e: any) {
             await alert('Erro: ' + (e?.message ?? String(e)));
         }
     };
@@ -622,8 +663,8 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                     restTime: Number(row.rest_time) || Number(row.restTime) || 0,
                     cadence: String(row.cadence ?? ''),
                     notes: String(row.notes ?? ''),
-                    weights: setRows.map(s => s.weight ?? ''),
-                    repsPerSet: setRows.map(s => s.reps ?? '')
+                    weights: setRows.map(s => String(s.weight ?? '')),
+                    repsPerSet: setRows.map(s => String(s.reps ?? ''))
                 };
             });
             setManualExercises(exs);
@@ -631,7 +672,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         if (selectedTemplate && manualTab === 'existing') buildManualFromTemplate();
     }, [manualTab, selectedTemplate, supabase]);
 
-    const updateManualExercise = (idx, field, value) => {
+    const updateManualExercise = (idx: number, field: string, value: any) => {
         setManualExercises(prev => {
             const next = [...prev];
             if (field === 'weight') {
@@ -657,7 +698,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
         });
     };
 
-    const handleDeleteClick = async (e, session) => {
+    const handleDeleteClick = async (e: React.MouseEvent, session: WorkoutSummary) => {
         e.stopPropagation();
         e.preventDefault();
 
@@ -671,30 +712,30 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 .eq('is_template', false);
             if (error) throw error;
             setHistory(prev => prev.filter(h => h.id !== session.id));
-        } catch (error) {
+        } catch (error: any) {
             await alert("Erro ao excluir: " + (error?.message ?? String(error)));
         }
     };
 
-    const openEdit = (session) => {
+    const openEdit = (session: WorkoutSummary) => {
         const raw = session.rawSession || (typeof session.notes === 'string' && session.notes?.startsWith('{') ? (() => { try { return JSON.parse(session.notes); } catch { return null; } })() : null);
         setEditId(session.id);
         setEditTitle(session.workoutTitle || raw?.workoutTitle || 'Treino');
-        const d = raw?.date ? new Date(raw.date) : new Date(session.date);
-        setEditDate(new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16));
+        const d = raw?.date ? new Date(raw.date) : (session.date ? new Date(session.date) : new Date());
+        setEditDate(new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16));
         setEditDuration(String(Math.floor((raw?.totalTime || session.totalTime || 0) / 60) || 45));
         setEditNotes(raw?.notes || '');
-        const exs = (raw?.exercises || []).map((ex, exIdx) => {
+        const exs: ManualExercise[] = (raw?.exercises || []).map((ex: any, exIdx: number) => {
             const count = Number(ex.sets) || 0;
-            const weights = Array.from({ length: count }, (_, sIdx) => raw?.logs?.[`${exIdx}-${sIdx}`]?.weight ?? '');
-            const repsPerSet = Array.from({ length: count }, (_, sIdx) => raw?.logs?.[`${exIdx}-${sIdx}`]?.reps ?? ex.reps ?? '');
+            const weights = Array.from({ length: count }, (_, sIdx) => String(raw?.logs?.[`${exIdx}-${sIdx}`]?.weight ?? ''));
+            const repsPerSet = Array.from({ length: count }, (_, sIdx) => String(raw?.logs?.[`${exIdx}-${sIdx}`]?.reps ?? ex.reps ?? ''));
             return { name: ex.name || '', sets: count, reps: ex.reps || '', restTime: Number(ex.restTime) || 0, cadence: ex.cadence || '', notes: ex.notes || '', weights, repsPerSet };
         });
         setEditExercises(exs);
         setShowEdit(true);
     };
 
-    const updateEditExercise = (idx, field, value) => {
+    const updateEditExercise = (idx: number, field: string, value: any) => {
         setEditExercises(prev => {
             const next = [...prev];
             if (field === 'weight') {
@@ -721,8 +762,9 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     };
 
     const saveEdit = async () => {
+        if (!user?.id) return;
         try {
-            const exercises = editExercises.map(ex => ({ name: ex.name || '', sets: Number(ex.sets) || 0, reps: ex.reps || '', restTime: Number(ex.restTime) || 0, cadence: ex.cadence || '', notes: ex.notes || '' }));
+            const exercises: ManualExercise[] = editExercises.map(ex => ({ name: ex.name || '', sets: Number(ex.sets) || 0, reps: ex.reps || '', restTime: Number(ex.restTime) || 0, cadence: ex.cadence || '', notes: ex.notes || '' }));
             const logs: Record<string, WorkoutLog> = {};
             exercises.forEach((ex, exIdx) => {
                 const count = Number(ex.sets) || 0;
@@ -734,19 +776,19 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
             const session = { workoutTitle: editTitle, date: new Date(editDate).toISOString(), totalTime: totalSeconds, realTotalTime: totalSeconds, logs, exercises, notes: editNotes || '' };
             const { error } = await supabase
                 .from('workouts')
-                .update({ name: editTitle, date: new Date(editDate), notes: JSON.stringify(session) })
+                .update({ name: editTitle, date: new Date(editDate).toISOString(), notes: JSON.stringify(session) })
                 .eq('id', editId)
                 .eq('user_id', user.id);
             if (error) throw error;
             setShowEdit(false);
-            setHistory(prev => prev.map(h => h.id === editId ? { ...h, workoutTitle: editTitle, date: new Date(editDate), totalTime: parseInt(editDuration||'0',10)*60, rawSession: session } : h));
+            setHistory(prev => prev.map(h => h.id === editId ? { ...h, workoutTitle: editTitle, date: new Date(editDate).toISOString(), totalTime: parseInt(editDuration || '0', 10) * 60, rawSession: session } : h));
             await alert('Histórico atualizado');
-        } catch (e) {
+        } catch (e: any) {
             await alert('Erro: ' + (e?.message ?? String(e)));
         }
     };
 
-    const openPeriodReport = async (type) => {
+    const openPeriodReport = async (type: 'week' | 'month') => {
         try {
             const key = type === 'week' ? REPORT_DAYS_WEEK : type === 'month' ? REPORT_DAYS_MONTH : null;
             if (!key) return;
@@ -764,10 +806,10 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                     return;
                 }
                 setPeriodAi({ status: 'ready', ai: res.ai || null, error: '' });
-            } catch (err) {
+            } catch (err: any) {
                 setPeriodAi({ status: 'error', ai: null, error: String(err?.message || err || 'Falha ao gerar insights') });
             }
-        } catch (e) {
+        } catch (e: any) {
             await alert('Erro ao gerar relatório: ' + (e?.message ?? String(e)));
         }
     };
@@ -775,7 +817,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
     const closePeriodReport = () => {
         setPeriodReport(null);
         setPeriodAi({ status: 'idle', ai: null, error: '' });
-        try { if (periodPdf?.url) URL.revokeObjectURL(periodPdf.url); } catch {}
+        try { if (periodPdf?.url) URL.revokeObjectURL(periodPdf.url); } catch { }
         setPeriodPdf({ status: 'idle', url: null, blob: null, error: '' });
         setShareError('');
     };
@@ -817,9 +859,9 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
-            } catch {}
+            } catch { }
             setPeriodPdf({ status: 'ready', url, blob, error: '' });
-        } catch (e) {
+        } catch (e: any) {
             const msg = e?.message ? String(e.message) : String(e);
             setPeriodPdf((prev) => ({ ...prev, status: 'error', error: msg || 'Falha ao gerar PDF' }));
         } finally {
@@ -860,7 +902,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 setShareError('');
                 return;
             }
-        } catch {}
+        } catch { }
         try {
             const nav = typeof navigator !== 'undefined' ? navigator : null;
             if (nav && nav.clipboard && typeof nav.clipboard.writeText === 'function') {
@@ -875,7 +917,7 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                 await alert('Texto do relatório copiado para a área de transferência.');
                 return;
             }
-        } catch (e) {
+        } catch (e: any) {
             const msg = e?.message ? String(e.message) : String(e);
             const copied = await legacyCopy();
             if (copied) {
@@ -893,31 +935,55 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
 
     return (
         <>
-        <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra"}>
-            {!embedded && (
-                <div className="mb-4 flex items-center gap-2 sm:gap-3">
-                    <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
-                    <div className="flex-1 min-w-0">
-                        <div className="min-w-0">
-                            <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
-                            <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{rangeLabel}</div>
+            <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra"}>
+                {!embedded && (
+                    <div className="mb-4 flex items-center gap-2 sm:gap-3">
+                        <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
+                        <div className="flex-1 min-w-0">
+                            <div className="min-w-0">
+                                <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
+                                <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{rangeLabel}</div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 justify-end shrink-0">
+                            {weeklyReportCtaEnabled && !loading && historyItems.length > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={() => openPeriodReport('week')}
+                                    className="h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 bg-neutral-800 border border-neutral-700 text-neutral-100 hover:bg-neutral-700"
+                                >
+                                    Semanal
+                                </button>
+                            ) : null}
+                            {!isReadOnly && historyItems.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={toggleSelectionMode}
+                                    className={`h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}
+                                >
+                                    {isSelectionMode ? 'Cancelar' : 'Selecionar'}
+                                </button>
+                            )}
+                            {!isReadOnly && !isSelectionMode && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowManual(true)}
+                                    className="cursor-pointer relative z-10 w-9 h-9 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center justify-center shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
+                                >
+                                    <Plus size={16} />
+                                </button>
+                            )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 justify-end shrink-0">
-                        {weeklyReportCtaEnabled && !loading && historyItems.length > 0 ? (
-                            <button
-                                type="button"
-                                onClick={() => openPeriodReport('week')}
-                                className="h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 bg-neutral-800 border border-neutral-700 text-neutral-100 hover:bg-neutral-700"
-                            >
-                                Semanal
-                            </button>
-                        ) : null}
+                )}
+
+                {embedded && (
+                    <div className="flex items-center justify-end gap-2 mb-4">
                         {!isReadOnly && historyItems.length > 0 && (
                             <button
                                 type="button"
                                 onClick={toggleSelectionMode}
-                                className={`h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-800 border border-neutral-700 text-yellow-400 hover:bg-neutral-700'}`}
+                                className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-900 border border-neutral-800 text-yellow-400 hover:bg-neutral-800'}`}
                             >
                                 {isSelectionMode ? 'Cancelar' : 'Selecionar'}
                             </button>
@@ -926,624 +992,600 @@ const HistoryList = ({ user, settings, onViewReport, onBack, targetId, targetEma
                             <button
                                 type="button"
                                 onClick={() => setShowManual(true)}
-                                className="cursor-pointer relative z-10 w-9 h-9 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center justify-center shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
+                                className="cursor-pointer relative z-10 min-h-[44px] px-4 py-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center gap-2 shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
                             >
                                 <Plus size={16} />
+                                <span className="hidden sm:inline">Adicionar treino</span>
+                                <span className="sm:hidden">Adicionar</span>
                             </button>
                         )}
                     </div>
-                </div>
-            )}
+                )}
 
-            {embedded && (
-                <div className="flex items-center justify-end gap-2 mb-4">
-                    {!isReadOnly && historyItems.length > 0 && (
-                        <button
-                            type="button"
-                            onClick={toggleSelectionMode}
-                            className={`min-h-[44px] px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition-all duration-300 active:scale-95 ${isSelectionMode ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-900 border border-neutral-800 text-yellow-400 hover:bg-neutral-800'}`}
-                        >
-                            {isSelectionMode ? 'Cancelar' : 'Selecionar'}
-                        </button>
-                    )}
-                    {!isReadOnly && !isSelectionMode && (
-                        <button
-                            type="button"
-                            onClick={() => setShowManual(true)}
-                            className="cursor-pointer relative z-10 min-h-[44px] px-4 py-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center gap-2 shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
-                        >
-                            <Plus size={16} />
-                            <span className="hidden sm:inline">Adicionar treino</span>
-                            <span className="sm:hidden">Adicionar</span>
-                        </button>
-                    )}
-                </div>
-            )}
-
-            <div className="space-y-4">
-                <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/10 via-transparent to-transparent pointer-events-none" />
-                    <div className="relative">
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
-                            <div>
-                                <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Resumo</div>
-                                <div className="text-base font-black tracking-tight text-white">{rangeLabel}</div>
+                <div className="space-y-4">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/10 via-transparent to-transparent pointer-events-none" />
+                        <div className="relative">
+                            <div className="flex items-start justify-between gap-3 flex-wrap">
+                                <div>
+                                    <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Resumo</div>
+                                    <div className="text-base font-black tracking-tight text-white">{rangeLabel}</div>
+                                </div>
+                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                    {[
+                                        { key: '7', label: '7 dias' },
+                                        { key: '30', label: '30 dias' },
+                                        { key: '90', label: '90 dias' },
+                                        { key: 'all', label: 'Tudo' },
+                                    ].map((opt) => (
+                                        <button
+                                            key={opt.key}
+                                            type="button"
+                                            onClick={() => setRange(opt.key)}
+                                            className={`min-h-[40px] px-3 rounded-full text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 whitespace-nowrap ${range === opt.key ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-950 border border-neutral-800 text-neutral-300 hover:bg-neutral-900'}`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-                                {[
-                                    { key: '7', label: '7 dias' },
-                                    { key: '30', label: '30 dias' },
-                                    { key: '90', label: '90 dias' },
-                                    { key: 'all', label: 'Tudo' },
-                                ].map((opt) => (
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
+                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
+                                    <div className="text-xl font-black tracking-tight text-white">{summary.count}</div>
+                                </div>
+                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total</div>
+                                    <div className="text-xl font-black tracking-tight text-white">{summary.totalMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                                </div>
+                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 col-span-2 sm:col-span-1">
+                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
+                                    <div className="text-xl font-black tracking-tight text-white">{summary.avgMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {!loading && historyItems.length > 0 && (
+                        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30">
+                            <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
+                                <div>
+                                    <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatórios rápidos</div>
+                                    <div className="text-base font-black tracking-tight text-white">Compartilhe sua evolução</div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                                     <button
-                                        key={opt.key}
                                         type="button"
-                                        onClick={() => setRange(opt.key)}
-                                        className={`min-h-[40px] px-3 rounded-full text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 whitespace-nowrap ${range === opt.key ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-950 border border-neutral-800 text-neutral-300 hover:bg-neutral-900'}`}
+                                        onClick={() => openPeriodReport('week')}
+                                        className="min-h-[44px] px-4 rounded-xl bg-yellow-500 text-black text-xs font-black uppercase tracking-wide shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95 w-full sm:w-auto"
                                     >
-                                        {opt.label}
+                                        Relatório semanal
                                     </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
-                                <div className="text-xl font-black tracking-tight text-white">{summary.count}</div>
-                            </div>
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total</div>
-                                <div className="text-xl font-black tracking-tight text-white">{summary.totalMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
-                            </div>
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 col-span-2 sm:col-span-1">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
-                                <div className="text-xl font-black tracking-tight text-white">{summary.avgMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {!loading && historyItems.length > 0 && (
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30">
-                        <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
-                            <div>
-                                <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatórios rápidos</div>
-                                <div className="text-base font-black tracking-tight text-white">Compartilhe sua evolução</div>
-                            </div>
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                                <button
-                                    type="button"
-                                    onClick={() => openPeriodReport('week')}
-                                    className="min-h-[44px] px-4 rounded-xl bg-yellow-500 text-black text-xs font-black uppercase tracking-wide shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95 w-full sm:w-auto"
-                                >
-                                    Relatório semanal
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => openPeriodReport('month')}
-                                    className="min-h-[44px] px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-black uppercase tracking-wide hover:bg-neutral-900 transition-all duration-300 active:scale-95 w-full sm:w-auto"
-                                >
-                                    Relatório mensal
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {loading && (
-                    <div className="grid gap-3">
-                        {Array.from({ length: 4 }).map((_, idx) => (
-                            <div key={idx} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 animate-pulse">
-                                <div className="h-4 bg-neutral-800 rounded w-2/3" />
-                                <div className="mt-3 h-3 bg-neutral-800 rounded w-1/2" />
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {!loading && historyItems.length === 0 && (
-                    <div className="text-center py-10 border border-neutral-800 bg-neutral-900 rounded-2xl">
-                        <div className="text-neutral-400 font-bold">Nenhum treino finalizado ainda.</div>
-                        {!isReadOnly && (
-                            <div className="mt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowManual(true)}
-                                    className="min-h-[44px] px-5 py-2.5 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
-                                >
-                                    Adicionar primeiro treino
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {!loading && historyItems.length > 0 && filteredHistory.length === 0 && (
-                    <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-4">
-                        <div className="text-white font-black">Sem treinos nesse período</div>
-                        <div className="text-sm text-neutral-400 mt-1">Tente aumentar o período para ver mais resultados.</div>
-                        <div className="mt-4 flex gap-2 flex-wrap">
-                            <button type="button" onClick={() => setRange('all')} className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95">Ver tudo</button>
-                            <button type="button" onClick={() => setRange('90')} className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black transition-all duration-300 active:scale-95">Últimos 90 dias</button>
-                        </div>
-                    </div>
-                )}
-
-                {!loading && (visibleHistory.length > 0 || blockedCount > 0) && (
-                    <div className="space-y-3 pb-24">
-                        {visibleHistory.map((session) => {
-                            const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
-                            const isSelected = selectedIds.has(session.id);
-                            return (
-                                <div
-                                    key={session.id}
-                                    onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
-                                    className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        {isSelectionMode && (
-                                            <div className="mt-0.5">
-                                                {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
-                                            </div>
-                                        )}
-
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
-                                                    <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            <CalendarDays size={14} className="text-yellow-500/70" />
-                                                            {formatCompletedAt(session?.date)}
-                                                        </span>
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            <Clock size={14} className="text-yellow-500/70" />
-                                                            {minutes} min
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                {!isReadOnly && !isSelectionMode && (
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => handleDeleteClick(e, session)}
-                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
-                                                            aria-label="Excluir"
-                                                        >
-                                                            <Trash2 size={18} className="pointer-events-none" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                openEdit(session);
-                                                            }}
-                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
-                                                            aria-label="Editar"
-                                                        >
-                                                            <Edit3 size={18} className="pointer-events-none" />
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-
-                        {blockedCount > 0 && (
-                            <div className="bg-neutral-950/50 border border-yellow-500/20 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden group cursor-pointer" onClick={onUpgrade}>
-                                <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent pointer-events-none" />
-                                <div className="relative z-10 flex flex-col items-center gap-2">
-                                    <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform duration-300">
-                                        <Lock className="text-yellow-500" size={20} />
-                                    </div>
-                                    <h3 className="text-lg font-black text-white">
-                                        {blockedCount} treinos antigos bloqueados
-                                    </h3>
-                                    <p className="text-sm text-neutral-400 max-w-xs mx-auto">
-                                        Seu plano atual permite visualizar apenas os últimos {vipLimits?.history_days} dias de histórico.
-                                    </p>
-                                    <button 
+                                    <button
                                         type="button"
-                                        className="mt-2 px-5 py-2 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-wider hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/10"
+                                        onClick={() => openPeriodReport('month')}
+                                        className="min-h-[44px] px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-black uppercase tracking-wide hover:bg-neutral-900 transition-all duration-300 active:scale-95 w-full sm:w-auto"
                                     >
-                                        Desbloquear Histórico
+                                        Relatório mensal
                                     </button>
                                 </div>
                             </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
+                        </div>
+                    )}
 
-        {!isReadOnly && isSelectionMode && (
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950 border-t border-neutral-800 pb-safe z-50 flex justify-between items-center">
-                <span className="text-neutral-500 text-sm font-bold">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
-                <button 
-                    onClick={handleBulkDelete} 
-                    disabled={selectedIds.size === 0}
-                    className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 hover:bg-red-500/20 transition-colors"
-                >
-                    <Trash2 size={18} /> Excluir
-                </button>
-            </div>
-        )}
-
-        {!isReadOnly && showManual && (
-            <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowManual(false)}>
-                <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-4 border-b border-neutral-800">
-                        <h3 className="font-bold text-white">Adicionar Histórico</h3>
-                        <div className="mt-3 flex gap-2">
-                            <button onClick={() => setManualTab('existing')} className={`px-3 py-2 rounded-lg text-xs font-bold ${manualTab==='existing'?'bg-yellow-500 text-black':'bg-neutral-800 text-neutral-300'}`}>Usar Treino</button>
-                            <button onClick={() => setManualTab('new')} className={`px-3 py-2 rounded-lg text-xs font-bold ${manualTab==='new'?'bg-yellow-500 text-black':'bg-neutral-800 text-neutral-300'}`}>Treino Novo</button>
-                        </div>
-                    </div>
-                    <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
-                        <div>
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</label>
-                            <input type="datetime-local" value={manualDate} onChange={(e)=>setManualDate(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</label>
-                            <input type="number" value={manualDuration} onChange={(e)=>setManualDuration(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Notas</label>
-                            <textarea value={manualNotes} onChange={(e)=>setManualNotes(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none h-20 resize-none" />
-                        </div>
-                        {manualTab === 'existing' && (
-                            <div className="space-y-2">
-                                <label className="text-[10px] uppercase font-bold text-neutral-500">Selecionar Treino</label>
-                                <select value={selectedTemplate?.id || ''} onChange={async (e) => {
-                                    const id = e.target.value;
-                                    if (!id) { setSelectedTemplate(null); return; }
-                                    const { data } = await supabase
-                                        .from('workouts')
-                                        .select('id, name, exercises(*)')
-                                        .eq('id', id)
-                                        .single();
-                                    setSelectedTemplate(data);
-                                }} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none">
-                                    <option value="">Selecione...</option>
-                                    {availableWorkouts.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
-                                </select>
-                                {selectedTemplate && (
-                                    <div className="space-y-2">
-                                        {manualExercises.map((ex,idx)=>(
-                                            <div key={idx} className="p-3 bg-neutral-800 rounded-lg border border-neutral-700 space-y-2">
-                                                <p className="text-sm font-bold text-white">{ex.name}</p>
-                                                <div className="grid grid-cols-4 gap-2">
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500">Sets</label>
-                                                        <input type="number" value={ex.sets} onChange={(e)=>updateManualExercise(idx,'sets',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500">Reps</label>
-                                                        <input value={ex.reps || ''} onChange={(e)=>updateManualExercise(idx,'reps',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500">Cadência</label>
-                                                        <input value={ex.cadence || ''} onChange={(e)=>updateManualExercise(idx,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500">Descanso (s)</label>
-                                                        <input type="number" value={ex.restTime || 0} onChange={(e)=>updateManualExercise(idx,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                                    </div>
-                                                </div>
-                                                        <div>
-                                                    <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                            <input key={sIdx} value={String(ex.weights?.[sIdx] ?? '')} onChange={(e)=>updateManualExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] text-neutral-500">Reps por série</label>
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                            <input key={sIdx} value={String(ex.repsPerSet?.[sIdx] ?? '')} onChange={(e)=>updateManualExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx+1}`} />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-						{manualTab === 'new' && (
-							<div>
-								<ExerciseEditor workout={newWorkout} onSave={setNewWorkout} onCancel={()=>{}} onChange={setNewWorkout} onSaved={()=>{}} />
-							</div>
-						)}
-                    </div>
-                    <div className="p-4 bg-neutral-900/50 flex gap-2">
-                        <button onClick={()=>setShowManual(false)} className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700">Cancelar</button>
-                        {manualTab==='existing' ? (
-                            <button onClick={saveManualExisting} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400">Salvar</button>
-                        ) : (
-                            <button onClick={saveManualNew} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400">Salvar</button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {periodReport && (
-            <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={closePeriodReport}>
-                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-4 border-b border-neutral-800">
-                        <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatório de evolução</div>
-                        <div className="text-lg font-black text-white">
-                            {periodReport.type === 'week' ? 'Resumo semanal' : periodReport.type === 'month' ? 'Resumo mensal' : 'Resumo'}
-                        </div>
-                    </div>
-                    <div className="p-4 space-y-4">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
-                                <div className="text-xl font-black tracking-tight text-white font-mono">
-                                    {Number(periodReport.stats?.count || 0)}
-                                </div>
-                            </div>
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total (min)</div>
-                                <div className="text-xl font-black tracking-tight text-white font-mono">
-                                    {Number(periodReport.stats?.totalMinutes || 0)}
-                                </div>
-                            </div>
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média (min)</div>
-                                <div className="text-xl font-black tracking-tight text-white font-mono">
-                                    {Number(periodReport.stats?.avgMinutes || 0)}
-                                </div>
-                            </div>
-                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Volume total (kg)</div>
-                                <div className="text-xl font-black tracking-tight text-white font-mono">
-                                    {(() => {
-                                        const v = Number(periodReport.stats?.totalVolumeKg || 0);
-                                        if (!Number.isFinite(v) || v <= 0) return '0';
-                                        return v.toLocaleString('pt-BR');
-                                    })()}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-3">
-                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">IA • Insights</div>
-                            {periodAi.status === 'loading' && (
-                                <div className="text-sm text-neutral-300 animate-pulse">Gerando insights com IA...</div>
-                            )}
-                            {periodAi.status === 'error' && (
-                                <div className="text-sm text-red-400">{periodAi.error || 'Falha ao gerar insights.'}</div>
-                            )}
-                            {periodAi.status === 'ready' && periodAi.ai && (
-                                <div className="space-y-3">
-                                    {Array.isArray(periodAi.ai.summary) && periodAi.ai.summary.length > 0 && (
-                                        <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Resumo</div>
-                                            <ul className="space-y-1 text-sm text-neutral-100">
-                                                {(Array.isArray(periodAi.ai.summary) ? periodAi.ai.summary : []).map((item, idx) => (
-                                                    <li key={idx}>• {String(item || '').trim()}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {Array.isArray(periodAi.ai.highlights) && periodAi.ai.highlights.length > 0 && (
-                                        <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Destaques</div>
-                                            <ul className="space-y-1 text-sm text-neutral-100">
-                                                {(Array.isArray(periodAi.ai.highlights) ? periodAi.ai.highlights : []).map((item, idx) => (
-                                                    <li key={idx}>• {String(item || '').trim()}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {Array.isArray(periodAi.ai.focus) && periodAi.ai.focus.length > 0 && (
-                                        <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Foco</div>
-                                            <ul className="space-y-1 text-sm text-neutral-100">
-                                                {(Array.isArray(periodAi.ai.focus) ? periodAi.ai.focus : []).map((item, idx) => (
-                                                    <li key={idx}>• {String(item || '').trim()}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {Array.isArray(periodAi.ai.nextSteps) && periodAi.ai.nextSteps.length > 0 && (
-                                        <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Próximos passos</div>
-                                            <ul className="space-y-1 text-sm text-neutral-100">
-                                                {(Array.isArray(periodAi.ai.nextSteps) ? periodAi.ai.nextSteps : []).map((item, idx) => (
-                                                    <li key={idx}>• {String(item || '').trim()}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                    {Array.isArray(periodAi.ai.warnings) && periodAi.ai.warnings.length > 0 && (
-                                        <div>
-                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Atenções</div>
-                                            <ul className="space-y-1 text-sm text-yellow-400">
-                                                {(Array.isArray(periodAi.ai.warnings) ? periodAi.ai.warnings : []).map((item, idx) => (
-                                                    <li key={idx}>• {String(item || '').trim()}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        <div>
-                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Texto para compartilhar</div>
-                            <textarea
-                                readOnly
-                                value={buildShareText(periodReport)}
-                                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-neutral-100 outline-none h-32 resize-none"
-                            />
-                        </div>
-                        {shareError ? (
-                            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200 flex items-start justify-between gap-3">
-                                <div className="min-w-0 break-words">
-                                    <div className="font-black">Falha ao compartilhar</div>
-                                    <div className="text-xs text-red-200/90">{String(shareError).slice(0, 260)}</div>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        try {
-                                            if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
-                                                window.dispatchEvent(new CustomEvent('irontracks:error', {
-                                                    detail: {
-                                                        error: new Error(String(shareError)),
-                                                        source: 'period_report_share',
-                                                        meta: {
-                                                            reportType: String(periodReport?.type || ''),
-                                                            hasShare: typeof navigator !== 'undefined' && typeof navigator.share === 'function',
-                                                            hasClipboard: typeof navigator !== 'undefined' && !!navigator.clipboard,
-                                                            userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
-                                                        }
-                                                    }
-                                                }));
-                                            }
-                                        } catch {}
-                                    }}
-                                    className="shrink-0 h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 transition-all duration-300 active:scale-95"
-                                >
-                                    Reportar
-                                </button>
-                            </div>
-                        ) : null}
-                        {periodPdf.status === 'error' && (
-                            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
-                                {String(periodPdf.error || 'Falha ao gerar PDF.')}
-                            </div>
-                        )}
-                    </div>
-                    <div className="p-4 bg-neutral-900/50 flex flex-col sm:flex-row gap-2">
-                        <button
-                            type="button"
-                            onClick={closePeriodReport}
-                            className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
-                        >
-                            Fechar
-                        </button>
-                        <button
-                            type="button"
-                            onClick={downloadPeriodPdf}
-                            disabled={periodPdf.status === 'loading'}
-                            className="flex-1 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-bold hover:bg-neutral-900 disabled:opacity-60 inline-flex items-center justify-center gap-2"
-                        >
-                            {periodPdf.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                            Baixar PDF
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleShareReport}
-                            className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400"
-                        >
-                            Compartilhar
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
-
-        {showEdit && (
-            <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowEdit(false)}>
-                <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                    <div className="p-4 border-b border-neutral-800">
-                        <h3 className="font-bold text-white">Editar Histórico</h3>
-                    </div>
-                    <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-neutral-500">Título</label>
-                                <input value={editTitle} onChange={(e)=>setEditTitle(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
-                            </div>
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</label>
-                                <input type="number" value={editDuration} onChange={(e)=>setEditDuration(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</label>
-                            <input type="datetime-local" value={editDate} onChange={(e)=>setEditDate(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Notas</label>
-                            <textarea value={editNotes} onChange={(e)=>setEditNotes(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text.white outline-none h-20 resize-none" />
-                        </div>
-                        <div className="space-y-2">
-                            {editExercises.map((ex,idx)=>(
-                                <div key={idx} className="p-3 bg-neutral-800 rounded-lg border border-neutral-700 space-y-2">
-                                    <p className="text-sm font-bold text-white">{ex.name}</p>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        <div>
-                                            <label className="text-[10px] text-neutral-500">Sets</label>
-                                            <input type="number" value={ex.sets} onChange={(e)=>updateEditExercise(idx,'sets',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-neutral-500">Reps</label>
-                                            <input value={ex.reps || ''} onChange={(e)=>updateEditExercise(idx,'reps',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-neutral-500">Cadência</label>
-                                            <input value={ex.cadence || ''} onChange={(e)=>updateEditExercise(idx,'cadence',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                        </div>
-                                        <div>
-                                            <label className="text-[10px] text-neutral-500">Descanso (s)</label>
-                                            <input type="number" value={ex.restTime || 0} onChange={(e)=>updateEditExercise(idx,'restTime',e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                <input key={sIdx} value={String(ex.weights?.[sIdx] ?? '')} onChange={(e)=>updateEditExercise(idx,'weight',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-neutral-500">Reps por série</label>
-                                        <div className="grid grid-cols-4 gap-2">
-                                            {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
-                                                <input key={sIdx} value={String(ex.repsPerSet?.[sIdx] ?? '')} onChange={(e)=>updateEditExercise(idx,'rep',[sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx+1}`} />
-                                            ))}
-                                        </div>
-                                    </div>
+                    {loading && (
+                        <div className="grid gap-3">
+                            {Array.from({ length: 4 }).map((_, idx) => (
+                                <div key={idx} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 animate-pulse">
+                                    <div className="h-4 bg-neutral-800 rounded w-2/3" />
+                                    <div className="mt-3 h-3 bg-neutral-800 rounded w-1/2" />
                                 </div>
                             ))}
                         </div>
-                    </div>
-                    <div className="p-4 bg-neutral-900/50 flex gap-2">
-                        <button onClick={()=>setShowEdit(false)} className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700">Cancelar</button>
-                        <button onClick={saveEdit} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400">Salvar</button>
-                    </div>
+                    )}
+
+                    {!loading && historyItems.length === 0 && (
+                        <div className="text-center py-10 border border-neutral-800 bg-neutral-900 rounded-2xl">
+                            <div className="text-neutral-400 font-bold">Nenhum treino finalizado ainda.</div>
+                            {!isReadOnly && (
+                                <div className="mt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowManual(true)}
+                                        className="min-h-[44px] px-5 py-2.5 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
+                                    >
+                                        Adicionar primeiro treino
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {!loading && historyItems.length > 0 && filteredHistory.length === 0 && (
+                        <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-4">
+                            <div className="text-white font-black">Sem treinos nesse período</div>
+                            <div className="text-sm text-neutral-400 mt-1">Tente aumentar o período para ver mais resultados.</div>
+                            <div className="mt-4 flex gap-2 flex-wrap">
+                                <button type="button" onClick={() => setRange('all')} className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95">Ver tudo</button>
+                                <button type="button" onClick={() => setRange('90')} className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black transition-all duration-300 active:scale-95">Últimos 90 dias</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {!loading && (visibleHistory.length > 0 || blockedCount > 0) && (
+                        <div className="space-y-3 pb-24">
+                            {visibleHistory.map((session) => {
+                                const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
+                                const isSelected = selectedIds.has(session.id);
+                                return (
+                                    <div
+                                        key={session.id}
+                                        onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
+                                        className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}
+                                    >
+                                        <div className="flex items-start gap-3">
+                                            {isSelectionMode && (
+                                                <div className="mt-0.5">
+                                                    {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
+                                                </div>
+                                            )}
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
+                                                        <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                <CalendarDays size={14} className="text-yellow-500/70" />
+                                                                {formatCompletedAt(session?.date)}
+                                                            </span>
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                <Clock size={14} className="text-yellow-500/70" />
+                                                                {minutes} min
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    {!isReadOnly && !isSelectionMode && (
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleDeleteClick(e, session)}
+                                                                className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                                aria-label="Excluir"
+                                                            >
+                                                                <Trash2 size={18} className="pointer-events-none" />
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openEdit(session);
+                                                                }}
+                                                                className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                                aria-label="Editar"
+                                                            >
+                                                                <Edit3 size={18} className="pointer-events-none" />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {blockedCount > 0 && (
+                                <div className="bg-neutral-950/50 border border-yellow-500/20 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden group cursor-pointer" onClick={onUpgrade}>
+                                    <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent pointer-events-none" />
+                                    <div className="relative z-10 flex flex-col items-center gap-2">
+                                        <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform duration-300">
+                                            <Lock className="text-yellow-500" size={20} />
+                                        </div>
+                                        <h3 className="text-lg font-black text-white">
+                                            {blockedCount} treinos antigos bloqueados
+                                        </h3>
+                                        <p className="text-sm text-neutral-400 max-w-xs mx-auto">
+                                            Seu plano atual permite visualizar apenas os últimos {vipLimits?.history_days} dias de histórico.
+                                        </p>
+                                        <button
+                                            type="button"
+                                            className="mt-2 px-5 py-2 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-wider hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-500/10"
+                                        >
+                                            Desbloquear Histórico
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
-        )}
-        {selectedSession && (
-            <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe" onClick={() => setSelectedSession(null)}>
-                <div onClick={(e) => e.stopPropagation()}>
-                    <WorkoutReport
-                        session={selectedSession}
-                        previousSession={null}
-                        user={user}
-                        isVip={false}
-                        settings={settings}
-                        onClose={() => setSelectedSession(null)}
-                        onUpgrade={onUpgrade}
-                    />
+
+            {!isReadOnly && isSelectionMode && (
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950 border-t border-neutral-800 pb-safe z-50 flex justify-between items-center">
+                    <span className="text-neutral-500 text-sm font-bold">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                    <button
+                        onClick={handleBulkDelete}
+                        disabled={selectedIds.size === 0}
+                        className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 hover:bg-red-500/20 transition-colors"
+                    >
+                        <Trash2 size={18} /> Excluir
+                    </button>
                 </div>
-            </div>
-        )}
+            )}
+
+            {!isReadOnly && showManual && (
+                <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowManual(false)}>
+                    <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4 border-b border-neutral-800">
+                            <h3 className="font-bold text-white">Adicionar Histórico</h3>
+                            <div className="mt-3 flex gap-2">
+                                <button onClick={() => setManualTab('existing')} className={`px-3 py-2 rounded-lg text-xs font-bold ${manualTab === 'existing' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-300'}`}>Usar Treino</button>
+                                <button onClick={() => setManualTab('new')} className={`px-3 py-2 rounded-lg text-xs font-bold ${manualTab === 'new' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-300'}`}>Treino Novo</button>
+                            </div>
+                        </div>
+                        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</label>
+                                <input type="datetime-local" value={manualDate} onChange={(e) => setManualDate(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</label>
+                                <input type="number" value={manualDuration} onChange={(e) => setManualDuration(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-neutral-500">Notas</label>
+                                <textarea value={manualNotes} onChange={(e) => setManualNotes(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none h-20 resize-none" />
+                            </div>
+                            {manualTab === 'existing' && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] uppercase font-bold text-neutral-500">Selecionar Treino</label>
+                                    <select value={selectedTemplate?.id || ''} onChange={async (e) => {
+                                        const id = e.target.value;
+                                        if (!id) { setSelectedTemplate(null); return; }
+                                        const { data } = await supabase
+                                            .from('workouts')
+                                            .select('id, name, exercises(*)')
+                                            .eq('id', id)
+                                            .single();
+                                        setSelectedTemplate(data);
+                                    }} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none">
+                                        <option value="">Selecione...</option>
+                                        {availableWorkouts.map(t => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                                    </select>
+                                    {selectedTemplate && (
+                                        <div className="space-y-2">
+                                            {manualExercises.map((ex, idx) => (
+                                                <div key={idx} className="p-3 bg-neutral-800 rounded-lg border border-neutral-700 space-y-2">
+                                                    <p className="text-sm font-bold text-white">{ex.name}</p>
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        <div>
+                                                            <label className="text-[10px] text-neutral-500">Sets</label>
+                                                            <input type="number" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-neutral-500">Reps</label>
+                                                            <input value={ex.reps || ''} onChange={(e) => updateManualExercise(idx, 'reps', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-neutral-500">Cadência</label>
+                                                            <input value={ex.cadence || ''} onChange={(e) => updateManualExercise(idx, 'cadence', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-neutral-500">Descanso (s)</label>
+                                                            <input type="number" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
+                                                        <div className="grid grid-cols-4 gap-2">
+                                                            {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
+                                                                <input key={sIdx} value={String(ex.weights?.[sIdx] ?? '')} onChange={(e) => updateManualExercise(idx, 'weight', [sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx + 1}`} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-neutral-500">Reps por série</label>
+                                                        <div className="grid grid-cols-4 gap-2">
+                                                            {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
+                                                                <input key={sIdx} value={String(ex.repsPerSet?.[sIdx] ?? '')} onChange={(e) => updateManualExercise(idx, 'rep', [sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0" placeholder={`#${sIdx + 1}`} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {manualTab === 'new' && (
+                                <div>
+                                    <ExerciseEditor workout={newWorkout} onSave={setNewWorkout as any} onCancel={() => { }} onChange={setNewWorkout as any} onSaved={() => { }} />
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-neutral-900/50 flex gap-2">
+                            <button onClick={() => setShowManual(false)} className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700">Cancelar</button>
+                            {manualTab === 'existing' ? (
+                                <button onClick={saveManualExisting} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400">Salvar</button>
+                            ) : (
+                                <button onClick={saveManualNew} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400">Salvar</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {periodReport && (
+                <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={closePeriodReport}>
+                    <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4 border-b border-neutral-800">
+                            <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatório de evolução</div>
+                            <div className="text-lg font-black text-white">
+                                {periodReport.type === 'week' ? 'Resumo semanal' : periodReport.type === 'month' ? 'Resumo mensal' : 'Resumo'}
+                            </div>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
+                                    <div className="text-xl font-black tracking-tight text-white font-mono">
+                                        {Number(periodReport.stats?.count || 0)}
+                                    </div>
+                                </div>
+                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total (min)</div>
+                                    <div className="text-xl font-black tracking-tight text-white font-mono">
+                                        {Number(periodReport.stats?.totalMinutes || 0)}
+                                    </div>
+                                </div>
+                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média (min)</div>
+                                    <div className="text-xl font-black tracking-tight text-white font-mono">
+                                        {Number(periodReport.stats?.avgMinutes || 0)}
+                                    </div>
+                                </div>
+                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
+                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Volume total (kg)</div>
+                                    <div className="text-xl font-black tracking-tight text-white font-mono">
+                                        {(() => {
+                                            const v = Number(periodReport.stats?.totalVolumeKg || 0);
+                                            if (!Number.isFinite(v) || v <= 0) return '0';
+                                            return v.toLocaleString('pt-BR');
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-3">
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">IA • Insights</div>
+                                {periodAi.status === 'loading' && (
+                                    <div className="text-sm text-neutral-300 animate-pulse">Gerando insights com IA...</div>
+                                )}
+                                {periodAi.status === 'error' && (
+                                    <div className="text-sm text-red-400">{periodAi.error || 'Falha ao gerar insights.'}</div>
+                                )}
+                                {periodAi.status === 'ready' && periodAi.ai && (
+                                    <div className="space-y-3">
+                                        {Array.isArray(periodAi.ai.summary) && periodAi.ai.summary.length > 0 && (
+                                            <div>
+                                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Resumo</div>
+                                                <ul className="space-y-1 text-sm text-neutral-100">
+                                                    {(Array.isArray(periodAi.ai.summary) ? periodAi.ai.summary : []).map((item, idx) => (
+                                                        <li key={idx}>• {String(item || '').trim()}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {Array.isArray(periodAi.ai.highlights) && periodAi.ai.highlights.length > 0 && (
+                                            <div>
+                                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Destaques</div>
+                                                <ul className="space-y-1 text-sm text-neutral-100">
+                                                    {(Array.isArray(periodAi.ai.highlights) ? periodAi.ai.highlights : []).map((item, idx) => (
+                                                        <li key={idx}>• {String(item || '').trim()}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {Array.isArray(periodAi.ai.focus) && periodAi.ai.focus.length > 0 && (
+                                            <div>
+                                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Foco</div>
+                                                <ul className="space-y-1 text-sm text-neutral-100">
+                                                    {(Array.isArray(periodAi.ai.focus) ? periodAi.ai.focus : []).map((item, idx) => (
+                                                        <li key={idx}>• {String(item || '').trim()}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {Array.isArray(periodAi.ai.nextSteps) && periodAi.ai.nextSteps.length > 0 && (
+                                            <div>
+                                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Próximos passos</div>
+                                                <ul className="space-y-1 text-sm text-neutral-100">
+                                                    {(Array.isArray(periodAi.ai.nextSteps) ? periodAi.ai.nextSteps : []).map((item, idx) => (
+                                                        <li key={idx}>• {String(item || '').trim()}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                        {Array.isArray(periodAi.ai.warnings) && periodAi.ai.warnings.length > 0 && (
+                                            <div>
+                                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Atenções</div>
+                                                <ul className="space-y-1 text-sm text-yellow-400">
+                                                    {(Array.isArray(periodAi.ai.warnings) ? periodAi.ai.warnings : []).map((item, idx) => (
+                                                        <li key={idx}>• {String(item || '').trim()}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Texto para compartilhar</div>
+                                <textarea
+                                    readOnly
+                                    value={buildShareText(periodReport)}
+                                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-neutral-100 outline-none h-32 resize-none"
+                                />
+                            </div>
+                            {shareError ? (
+                                <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200 flex items-start justify-between gap-3">
+                                    <div className="min-w-0 break-words">
+                                        <div className="font-black">Falha ao compartilhar</div>
+                                        <div className="text-xs text-red-200/90">{String(shareError).slice(0, 260)}</div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            try {
+                                                if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+                                                    window.dispatchEvent(new CustomEvent('irontracks:error', {
+                                                        detail: {
+                                                            error: new Error(String(shareError)),
+                                                            source: 'period_report_share',
+                                                            meta: {
+                                                                reportType: String(periodReport?.type || ''),
+                                                                hasShare: typeof navigator !== 'undefined' && typeof navigator.share === 'function',
+                                                                hasClipboard: typeof navigator !== 'undefined' && !!navigator.clipboard,
+                                                                userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+                                                            }
+                                                        }
+                                                    }));
+                                                }
+                                            } catch { }
+                                        }}
+                                        className="shrink-0 h-9 px-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 transition-all duration-300 active:scale-95"
+                                    >
+                                        Reportar
+                                    </button>
+                                </div>
+                            ) : null}
+                            {periodPdf.status === 'error' && (
+                                <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
+                                    {String(periodPdf.error || 'Falha ao gerar PDF.')}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-neutral-900/50 flex flex-col sm:flex-row gap-2">
+                            <button
+                                type="button"
+                                onClick={closePeriodReport}
+                                className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
+                            >
+                                Fechar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={downloadPeriodPdf}
+                                disabled={periodPdf.status === 'loading'}
+                                className="flex-1 py-3 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-bold hover:bg-neutral-900 disabled:opacity-60 inline-flex items-center justify-center gap-2"
+                            >
+                                {periodPdf.status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                                Baixar PDF
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleShareReport}
+                                className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400"
+                            >
+                                Compartilhar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showEdit && (
+                <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowEdit(false)}>
+                    <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="p-4 border-b border-neutral-800">
+                            <h3 className="font-bold text-white">Editar Histórico</h3>
+                        </div>
+                        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-neutral-500">Título</label>
+                                    <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</label>
+                                    <input type="number" value={editDuration} onChange={(e) => setEditDuration(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</label>
+                                <input type="datetime-local" value={editDate} onChange={(e) => setEditDate(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none" />
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-neutral-500">Notas</label>
+                                <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text.white outline-none h-20 resize-none" />
+                            </div>
+                            <div className="space-y-2">
+                                {editExercises.map((ex, idx) => (
+                                    <div key={idx} className="p-3 bg-neutral-800 rounded-lg border border-neutral-700 space-y-2">
+                                        <p className="text-sm font-bold text-white">{ex.name}</p>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500">Sets</label>
+                                                <input type="number" value={ex.sets} onChange={(e) => updateEditExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500">Reps</label>
+                                                <input value={ex.reps || ''} onChange={(e) => updateEditExercise(idx, 'reps', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500">Cadência</label>
+                                                <input value={ex.cadence || ''} onChange={(e) => updateEditExercise(idx, 'cadence', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500">Descanso (s)</label>
+                                                <input type="number" value={ex.restTime || 0} onChange={(e) => updateEditExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
+                                                    <input key={sIdx} value={String(ex.weights?.[sIdx] ?? '')} onChange={(e) => updateEditExercise(idx, 'weight', [sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx + 1}`} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-neutral-500">Reps por série</label>
+                                            <div className="grid grid-cols-4 gap-2">
+                                                {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
+                                                    <input key={sIdx} value={String(ex.repsPerSet?.[sIdx] ?? '')} onChange={(e) => updateEditExercise(idx, 'rep', [sIdx, e.target.value])} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" placeholder={`#${sIdx + 1}`} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="p-4 bg-neutral-900/50 flex gap-2">
+                            <button onClick={() => setShowEdit(false)} className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700">Cancelar</button>
+                            <button onClick={saveEdit} className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400">Salvar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {selectedSession && (
+                <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe" onClick={() => setSelectedSession(null)}>
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <WorkoutReport
+                            session={selectedSession}
+                            previousSession={null}
+                            user={user}
+                            isVip={false}
+                            settings={settings}
+                            onClose={() => setSelectedSession(null)}
+                            onUpgrade={onUpgrade}
+                        />
+                    </div>
+                </div>
+            )}
         </>
     );
 };

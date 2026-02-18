@@ -5,6 +5,26 @@ import Image from 'next/image'
 import { Bell, Calendar, Cog, Command, CreditCard, History, LogOut, MessageSquare, Sparkles, Users } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 
+interface HeaderActionsMenuProps {
+  user: {
+    photoURL?: string | null
+    displayName?: string | null
+  } | null
+  isCoach?: boolean
+  hasUnreadChat?: boolean
+  hasUnreadNotification?: boolean
+  onOpenAdmin?: () => void
+  onOpenChatList?: () => void
+  onOpenGlobalChat?: () => void
+  onOpenHistory?: () => void
+  onOpenNotifications?: () => void
+  onLogout?: () => void
+  onOpenSchedule?: () => void
+  onOpenWallet?: () => void
+  onOpenSettings?: () => void
+  onOpenTour?: () => void
+}
+
 export default function HeaderActionsMenu({
   user,
   isCoach,
@@ -20,14 +40,14 @@ export default function HeaderActionsMenu({
   onOpenWallet,
   onOpenSettings,
   onOpenTour,
-}) {
+}: HeaderActionsMenuProps) {
   const [open, setOpen] = useState(false)
   const [cancellingVip, setCancellingVip] = useState(false)
   const hideVipCtas = isIosNative()
 
   useEffect(() => {
     if (!open) return
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
     window.addEventListener('keydown', onKeyDown)

@@ -3,6 +3,16 @@ import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } fr
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { isIosNative } from '@/utils/platform';
 
+interface CoachChatModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    session?: any;
+    previousSession?: any;
+    isVip?: boolean;
+    onSaveToReport?: (summary: string) => void;
+    onUpgrade?: () => void;
+}
+
 export default function CoachChatModal({
     isOpen,
     onClose,
@@ -11,7 +21,7 @@ export default function CoachChatModal({
     isVip,
     onSaveToReport,
     onUpgrade
-}) {
+}: CoachChatModalProps) {
     const { credits } = useVipCredits();
     const [messages, setMessages] = useState<any[]>([]);
     const [input, setInput] = useState('');
@@ -33,13 +43,13 @@ export default function CoachChatModal({
                 return;
             }
 
-            const anomalies: any[] = [];
+            const anomalies: unknown[] = [];
             if (session && previousSession) {
                 const currentExs = session.exercises || [];
                 const prevExs = previousSession.exercises || [];
                 
-                currentExs.forEach(curr => {
-                    const prev = prevExs.find(p => p.name === curr.name);
+                currentExs.forEach((curr: any) => {
+                    const prev = prevExs.find((p: any) => p.name === curr.name);
                     if (prev) {
                         const currWeight = Number(curr.sets?.[0]?.weight || 0);
                         const prevWeight = Number(prev.sets?.[0]?.weight || 0);
@@ -138,8 +148,8 @@ export default function CoachChatModal({
         }
     };
 
-    const confirmSave = (shouldSave) => {
-        if (shouldSave) {
+    const confirmSave = (shouldSave: boolean) => {
+        if (shouldSave && onSaveToReport) {
             const summary = messages
                 .filter(m => m.role !== 'system')
                 .map(m => `${m.role === 'user' ? 'Você' : 'Coach'}: ${m.content}`)

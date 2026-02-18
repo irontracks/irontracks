@@ -39,7 +39,7 @@ const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
       const p = u.pathname.slice(idx2 + alt.length)
       return decodeURIComponent(p).replace(/^\/+/, '')
     }
-  } catch {}
+  } catch { }
   return null
 }
 
@@ -116,7 +116,7 @@ export async function GET(req: Request) {
         ids.push(id)
         if (media) paths.push(media)
         if (thumb) paths.push(thumb)
-      } catch {}
+      } catch { }
     }
 
     if (paths.length) {
@@ -129,10 +129,12 @@ export async function GET(req: Request) {
     }
 
     if (ids.length) {
-      const { error } = await admin.from(table).delete().in('id', ids)
-      if (!error) {
-        if (table === 'messages') result.chat.deletedRows += ids.length
-        else result.direct.deletedRows += ids.length
+      for (const part of chunk(ids, 100)) {
+        const { error } = await admin.from(table).delete().in('id', part)
+        if (!error) {
+          if (table === 'messages') result.chat.deletedRows += part.length
+          else result.direct.deletedRows += part.length
+        }
       }
     }
 

@@ -37,7 +37,7 @@ export async function POST(req: Request) {
       if (prefs && prefs.allowSocialFollows === false) {
         return NextResponse.json({ ok: false, error: 'user_not_accepting_follows' }, { status: 403 })
       }
-    } catch {}
+    } catch { }
 
     const { error } = await auth.supabase
       .from('social_follows')
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
                 .eq('user_id', followingId)
                 .eq('type', 'follow_request')
                 .eq('sender_id', followerId)
-            } catch {}
+            } catch { }
 
             const inserted = await insertNotifications([
               {
@@ -117,7 +117,7 @@ export async function POST(req: Request) {
           .eq('user_id', followingId)
           .eq('type', 'follow_request')
           .eq('sender_id', followerId)
-      } catch {}
+      } catch { }
 
       const inserted = await insertNotifications([
         {
@@ -137,6 +137,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, notified })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

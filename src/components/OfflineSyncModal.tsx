@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, RefreshCw, Trash2, X, Bug, Clock } from 'lucide-react'
 import { bumpOfflineJob, clearOfflineJobs, flushOfflineQueue, getOfflineQueueSummary, isOnline } from '@/lib/offline/offlineSync'
+import type { QueueSummary, OfflineJob } from '@/lib/offline/offlineSync'
 import { useDialog } from '@/contexts/DialogContext'
 
-const formatEta = (ms) => {
+const formatEta = (ms: number | string | null | undefined) => {
   const n = Number(ms)
   if (!Number.isFinite(n) || n <= 0) return ''
   const diff = n - Date.now()
@@ -17,16 +18,22 @@ const formatEta = (ms) => {
   return `${h}h`
 }
 
-const labelForType = (t) => {
+const labelForType = (t: unknown) => {
   const type = String(t || '')
   if (type === 'workout_finish') return 'Finalizar treino'
   return type || 'Job'
 }
 
-export default function OfflineSyncModal({ open, onClose, userId }) {
+interface OfflineSyncModalProps {
+  open: boolean
+  onClose?: () => void
+  userId?: string | number | null
+}
+
+export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncModalProps) {
   const { confirm, alert } = useDialog()
   const uid = String(userId || '').trim()
-  const [state, setState] = useState<any>({ online: true, pending: 0, failed: 0, due: 0, nextDueAt: null, jobs: [] })
+  const [state, setState] = useState<QueueSummary>({ online: true, pending: 0, failed: 0, due: 0, nextDueAt: null, jobs: [], ok: true })
   const [busy, setBusy] = useState(false)
 
   const hasJobs = (Number(state?.pending || 0) + Number(state?.failed || 0)) > 0
@@ -34,8 +41,8 @@ export default function OfflineSyncModal({ open, onClose, userId }) {
   const refresh = useCallback(async () => {
     if (!uid) return
     const res = await getOfflineQueueSummary({ userId: uid })
-    if (res?.ok) setState(res as any)
-    else setState((prev) => ({ ...prev, online: isOnline() }))
+    if (res?.ok) setState(res)
+    else setState((prev: QueueSummary) => ({ ...prev, online: isOnline() }))
   }, [uid])
 
   useEffect(() => {
@@ -139,7 +146,7 @@ export default function OfflineSyncModal({ open, onClose, userId }) {
                 <div className="p-4 text-sm text-neutral-400">Nenhuma pendência encontrada.</div>
               ) : (
                 <div className="divide-y divide-neutral-800">
-                  {jobs.map((j) => {
+                  {jobs.map((j: OfflineJob) => {
                     const id = String(j?.id || '')
                     const status = String(j?.status || 'pending')
                     const attempts = Number(j?.attempts || 0)
@@ -202,7 +209,7 @@ export default function OfflineSyncModal({ open, onClose, userId }) {
                                     }))
                                   }
                                   await alert('Janela de reporte aberta. Obrigado!', 'Reportar')
-                                } catch {}
+                                } catch { }
                               }}
                               className="h-9 w-10 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black hover:bg-neutral-900 disabled:opacity-60 inline-flex items-center justify-center"
                               title="Reportar"

@@ -60,6 +60,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, days, total: rows.length, topEvents, topTypes })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -8,7 +8,7 @@ export type RateLimitResult = {
 type Entry = { count: number; resetAt: number }
 
 const getStore = (): Map<string, Entry> => {
-  const g: any = globalThis as any
+  const g = globalThis as unknown as { __irontracksRateLimitStore?: Map<string, Entry> }
   if (!g.__irontracksRateLimitStore) g.__irontracksRateLimitStore = new Map()
   return g.__irontracksRateLimitStore as Map<string, Entry>
 }

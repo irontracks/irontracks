@@ -233,7 +233,7 @@ export async function generatePostWorkoutInsights(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch(() => null)
+    const json = await res.json().catch((): any => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as unknown as ActionResult<Record<string, unknown>>
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -251,7 +251,7 @@ export async function generateExerciseMuscleMap(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch(() => null)
+    const json = await res.json().catch((): any => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao mapear exercícios' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -269,7 +269,7 @@ export async function getMuscleMapWeek(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch(() => null)
+    const json = await res.json().catch((): any => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -287,7 +287,7 @@ export async function getMuscleMapDay(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch(() => null)
+    const json = await res.json().catch((): any => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular do dia' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -305,7 +305,7 @@ export async function backfillExerciseMuscleMaps(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch(() => null)
+    const json = await res.json().catch((): any => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao reprocessar histórico' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -323,7 +323,7 @@ export async function applyProgressionToNextTemplate(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch(() => null)
+    const json = await res.json().catch((): any => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao aplicar progressão' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -493,9 +493,9 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
       .order('created_at', { ascending: false })
       .limit(180)
 
-    const isDayKey = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '').trim())
+    const isDayKey = (s: unknown): boolean => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '').trim())
     const fmtDay = new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', day: '2-digit' })
-    const toDayKey = (v) => {
+    const toDayKey = (v: unknown): string | null => {
       try {
         if (!v) return null
         if (typeof v === 'string') {
@@ -506,7 +506,8 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
           if (!Number.isFinite(d.getTime())) return null
           return fmtDay.format(d)
         }
-        const d = v instanceof Date ? v : new Date(v)
+        const d =
+          v instanceof Date ? v : typeof v === 'string' || typeof v === 'number' ? new Date(v) : new Date(String(v))
         if (!Number.isFinite(d.getTime())) return null
         return fmtDay.format(d)
       } catch {
@@ -514,7 +515,7 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
       }
     }
 
-    const daySet = new Set()
+    const daySet = new Set<string>()
     for (const r of Array.isArray(recentRaw) ? recentRaw : []) {
       const dayKey = toDayKey(r?.date) || toDayKey(r?.created_at)
       if (!dayKey) continue
@@ -522,7 +523,7 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
     }
     const days = Array.from(daySet.values()).sort()
 
-    const toDayMs = (day) => {
+    const toDayMs = (day: unknown): number | null => {
       const t = new Date(`${day}T00:00:00.000Z`).getTime()
       return Number.isFinite(t) ? t : null
     }
@@ -591,9 +592,9 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
   }
 }
 
-export async function generatePeriodReportInsights(input) {
+export async function generatePeriodReportInsights(input: unknown) {
   try {
-    const body = input && typeof input === 'object' ? input : {}
+    const body = input && typeof input === 'object' ? (input as Record<string, any>) : {}
     const type = safeString(body?.type)
     const stats = body?.stats && typeof body.stats === 'object' ? body.stats : null
     if (!type || !stats) return { ok: false, error: 'missing input' }
@@ -621,7 +622,7 @@ export async function generatePeriodReportInsights(input) {
         `${totalMinutes} min no total (${avgMinutes} min/treino)`,
         `${totalVolumeKg.toLocaleString('pt-BR')}kg de volume (${avgVolumeKg.toLocaleString('pt-BR')}kg/treino)`,
       ],
-      highlights: topByVolume.map((x) => `${safeString(x?.name) || 'Exercício'}: ${Number(x?.volumeKg || 0).toLocaleString('pt-BR')}kg`),
+      highlights: topByVolume.map((x: any) => `${safeString(x?.name) || 'Exercício'}: ${Number(x?.volumeKg || 0).toLocaleString('pt-BR')}kg`),
       focus: [
         uniqueDaysCount ? `Consistência: ${uniqueDaysCount} dia(s) treinados ${cadenceLabel}.` : '',
         topFreqName ? `Exercício mais frequente: ${topFreqName}.` : '',
@@ -650,8 +651,8 @@ export async function generatePeriodReportInsights(input) {
   }
 }
 
-export async function generateAssessmentPlanAi(input) {
-  const payload = input && typeof input === 'object' ? input : {}
+export async function generateAssessmentPlanAi(input: unknown) {
+  const payload = input && typeof input === 'object' ? (input as Record<string, any>) : {}
   const assessment = payload?.assessment && typeof payload.assessment === 'object' ? payload.assessment : null
   if (!assessment) return { ok: false, error: 'missing assessment' }
 
@@ -675,7 +676,7 @@ export async function generateAssessmentPlanAi(input) {
     ],
     nutrition: ['Proteína alta e consistente; carbo em torno do treino; hidratação.'],
     habits: ['Sono: 7–9h.', 'Passos: 7k–10k/dia (ajuste conforme objetivo).'],
-    warnings: [],
+    warnings: [] as string[],
   }
 
   return { ok: true, plan, usedAi: false, reason: 'fallback' }

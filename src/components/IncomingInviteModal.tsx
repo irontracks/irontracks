@@ -5,7 +5,11 @@ import { Users } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 
-const IncomingInviteModal = ({ onStartSession }) => {
+interface IncomingInviteModalProps {
+    onStartSession: (workout: any) => void;
+}
+
+const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
     const { alert } = useDialog();
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
 

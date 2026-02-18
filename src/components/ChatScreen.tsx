@@ -210,7 +210,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                 
                 if (json.ok && json.data) {
                     const rows = Array.isArray(json.data) ? json.data : []
-                    setMessages(rows.reverse().map((row) => formatMessage(isRecord(row) ? row : {})));
+                    setMessages(rows.reverse().map((row: any) => formatMessage(isRecord(row) ? row : {})));
                 } else {
                     console.error("API returned error or no data:", json);
                 }

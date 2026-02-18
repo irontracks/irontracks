@@ -61,23 +61,21 @@ function Meter({
 
   return (
     <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800 p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)] ring-1 ring-neutral-800/70">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">{label}</div>
-          <div className="mt-1 text-lg font-semibold text-white">
-            {Math.round(safeValue)}
-            <span className="text-neutral-500">/{Math.round(safeGoal || 0)}{unit}</span>
-          </div>
-        </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">{label}</div>
         <div
           className={
             clipping
-              ? 'text-[11px] font-semibold text-red-200 rounded-full px-2 py-1 bg-red-500/10 border border-red-500/20'
-              : 'text-[11px] font-semibold text-yellow-300 rounded-full px-2 py-1 bg-yellow-500/10 border border-yellow-500/20'
+              ? 'mt-2 inline-flex min-w-[46px] justify-center text-[11px] font-semibold leading-none tabular-nums text-red-200 rounded-full px-2 py-1 bg-red-500/10 border border-red-500/20'
+              : 'mt-2 inline-flex min-w-[46px] justify-center text-[11px] font-semibold leading-none tabular-nums text-yellow-300 rounded-full px-2 py-1 bg-yellow-500/10 border border-yellow-500/20'
           }
         >
           {pctValue}%
         </div>
+      </div>
+      <div className="mt-3 text-lg font-semibold text-white">
+        {Math.round(safeValue)}
+        <span className="text-neutral-500">/{Math.round(safeGoal || 0)}{unit}</span>
       </div>
       <div className="mt-3 h-1.5 rounded-full bg-neutral-800/70 overflow-hidden">
         <div className={`h-full ${barClass}`} style={{ width: `${pctValue}%` }} />
@@ -142,6 +140,9 @@ export default function NutritionMixer({
   const [aiBusy, setAiBusy] = useState(false)
   const [aiUpgrade, setAiUpgrade] = useState(false)
   const [entriesLoading, setEntriesLoading] = useState(false)
+  const safeEntries = Array.isArray(entries) ? entries : []
+  const hasEntries = safeEntries.length > 0
+  const shouldShowBottomCta = Boolean(input.trim()) || hasEntries || isPending
   const calorieRatio = safeGoals.calories > 0 ? safeNumber(totals?.calories) / safeGoals.calories : 0
   const caloriePct = Math.round(clamp01(calorieRatio) * PERCENT_SCALE)
   const calorieClipping = safeGoals.calories > 0 && calorieRatio > 1
@@ -376,7 +377,7 @@ export default function NutritionMixer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, dateKey }),
       })
-      const json = await res.json().catch(() => null)
+      const json = await res.json().catch((): any => null)
       if (!json?.ok) {
         const needsUpgrade = !!json?.upgradeRequired || String(json?.error || '') === 'vip_required'
         setAiUpgrade(needsUpgrade)
@@ -436,7 +437,9 @@ export default function NutritionMixer({
         <div className="mt-4 relative">
           <div className="flex items-center justify-between text-[11px] text-neutral-400">
             <span>Progresso da meta</span>
-            <span className="text-neutral-200 font-semibold">{caloriePct}%</span>
+            <span className="inline-flex items-center rounded-full bg-neutral-900/80 border border-neutral-800/80 px-2 py-0.5 text-[10px] font-semibold text-neutral-200">
+              {caloriePct}%
+            </span>
           </div>
           <div className="mt-2 h-1.5 rounded-full bg-neutral-800/70 overflow-hidden">
             <div className={`h-full ${calorieBarClass}`} style={{ width: `${caloriePct}%` }} />
@@ -546,41 +549,53 @@ export default function NutritionMixer({
         {goalsOpen ? (
           <div className="mt-4 rounded-2xl bg-neutral-950/80 border border-neutral-800 p-4 shadow-[0_18px_40px_rgba(0,0,0,0.45)] ring-1 ring-neutral-800/80">
             <div className="grid grid-cols-2 gap-2.5">
-              <input
-                value={String(goalsDraft.calories)}
-                onChange={(e) => setGoalsDraft((p) => ({ ...p, calories: safeNumber(e.target.value) }))}
-                inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
-                placeholder="Kcal"
-                aria-label="Meta de calorias"
-              />
-              <input
-                value={String(goalsDraft.protein)}
-                onChange={(e) => setGoalsDraft((p) => ({ ...p, protein: safeNumber(e.target.value) }))}
-                inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
-                placeholder="Proteína"
-                aria-label="Meta de proteína"
-                disabled={!canViewMacros}
-              />
-              <input
-                value={String(goalsDraft.carbs)}
-                onChange={(e) => setGoalsDraft((p) => ({ ...p, carbs: safeNumber(e.target.value) }))}
-                inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
-                placeholder="Carbo"
-                aria-label="Meta de carboidratos"
-                disabled={!canViewMacros}
-              />
-              <input
-                value={String(goalsDraft.fat)}
-                onChange={(e) => setGoalsDraft((p) => ({ ...p, fat: safeNumber(e.target.value) }))}
-                inputMode="numeric"
-                className="rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
-                placeholder="Gordura"
-                aria-label="Meta de gordura"
-                disabled={!canViewMacros}
-              />
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Calorias (kcal)</div>
+                <input
+                  value={String(goalsDraft.calories)}
+                  onChange={(e) => setGoalsDraft((p) => ({ ...p, calories: safeNumber(e.target.value) }))}
+                  inputMode="numeric"
+                  className="w-full rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
+                  placeholder="2000"
+                  aria-label="Meta de calorias"
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Proteína (g)</div>
+                <input
+                  value={String(goalsDraft.protein)}
+                  onChange={(e) => setGoalsDraft((p) => ({ ...p, protein: safeNumber(e.target.value) }))}
+                  inputMode="numeric"
+                  className="w-full rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
+                  placeholder="150"
+                  aria-label="Meta de proteína"
+                  disabled={!canViewMacros}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Carboidratos (g)</div>
+                <input
+                  value={String(goalsDraft.carbs)}
+                  onChange={(e) => setGoalsDraft((p) => ({ ...p, carbs: safeNumber(e.target.value) }))}
+                  inputMode="numeric"
+                  className="w-full rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
+                  placeholder="200"
+                  aria-label="Meta de carboidratos"
+                  disabled={!canViewMacros}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">Gordura (g)</div>
+                <input
+                  value={String(goalsDraft.fat)}
+                  onChange={(e) => setGoalsDraft((p) => ({ ...p, fat: safeNumber(e.target.value) }))}
+                  inputMode="numeric"
+                  className="w-full rounded-2xl bg-neutral-900/90 border border-neutral-800 px-3 py-3 text-neutral-100 font-semibold"
+                  placeholder="60"
+                  aria-label="Meta de gordura"
+                  disabled={!canViewMacros}
+                />
+              </div>
             </div>
             {goalsError ? <div className="mt-3 text-sm text-red-200">{goalsError}</div> : null}
             {!canViewMacros && !hideVipCtas ? <div className="mt-3 text-xs text-neutral-400">Macros liberado no VIP Pro.</div> : null}
@@ -620,7 +635,7 @@ export default function NutritionMixer({
               <div className="mt-3 h-3 w-56 rounded bg-neutral-800/60 animate-pulse" />
               <div className="mt-5 h-12 rounded-2xl bg-neutral-800/40 border border-neutral-800/60 animate-pulse" />
             </div>
-          ) : (Array.isArray(entries) ? entries : []).length === 0 ? (
+          ) : safeEntries.length === 0 ? (
             <div className="rounded-2xl bg-neutral-950/70 border border-neutral-800 p-5 text-center ring-1 ring-neutral-800/70">
               <div className="text-sm font-semibold text-white">Sem refeições hoje</div>
               <div className="mt-1 text-xs text-neutral-400">Adicione um lançamento para começar.</div>
@@ -633,7 +648,7 @@ export default function NutritionMixer({
               </button>
             </div>
           ) : (
-            (Array.isArray(entries) ? entries : []).map((item) => (
+            safeEntries.map((item) => (
               <div key={item.id} className="rounded-2xl bg-neutral-950/70 border border-neutral-800 p-4 ring-1 ring-neutral-800/70">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -660,18 +675,20 @@ export default function NutritionMixer({
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/85 backdrop-blur border-t border-neutral-800/60">
-        <div className="mx-auto max-w-md px-4 py-3">
-          <button
-            type="button"
-            onClick={submitOrFocus}
-            disabled={!!schemaMissing}
-            className="w-full h-12 rounded-2xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-semibold shadow-lg shadow-yellow-500/30 hover:from-yellow-300 hover:to-yellow-400 active:scale-95 transition duration-300 disabled:opacity-60 tracking-wide"
-          >
-            {isPending ? 'Processando...' : input.trim() ? 'Lançar refeição' : 'Adicionar refeição'}
-          </button>
+      {shouldShowBottomCta ? (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/85 backdrop-blur border-t border-neutral-800/60">
+          <div className="mx-auto max-w-md px-4 py-3">
+            <button
+              type="button"
+              onClick={submitOrFocus}
+              disabled={!!schemaMissing}
+              className="w-full h-12 rounded-2xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-semibold shadow-lg shadow-yellow-500/30 hover:from-yellow-300 hover:to-yellow-400 active:scale-95 transition duration-300 disabled:opacity-60 tracking-wide"
+            >
+              {isPending ? 'Processando...' : input.trim() ? 'Lançar refeição' : 'Adicionar refeição'}
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

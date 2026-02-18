@@ -295,8 +295,8 @@ export const buildWorkoutPlan = (q: VipPeriodizationQuestionnaire, opts: { getEs
           primary_muscle: ex.primary_muscle,
           is_compound: ex.is_compound,
           rest_time: restAdj,
-          method: null,
-          cadence: null,
+          method: null as string | null,
+          cadence: null as string | null,
           order: idx,
           sets: setRows,
         }

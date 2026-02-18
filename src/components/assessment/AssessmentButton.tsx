@@ -11,11 +11,11 @@ interface AssessmentButtonProps {
   className?: string;
 }
 
-export default function AssessmentButton({ 
-  studentId, 
-  studentName, 
+export default function AssessmentButton({
+  studentId,
+  studentName,
   variant = 'button',
-  className = '' 
+  className = ''
 }: AssessmentButtonProps) {
   const [showForm, setShowForm] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -106,7 +106,7 @@ export default function AssessmentButton({
         return;
       }
 
-      const payload: any = parsed as any;
+      const payload = parsed as Record<string, unknown>;
       const importedForm = payload.formData || payload;
       if (!importedForm || typeof importedForm !== "object") {
         if (typeof window !== "undefined") {
@@ -170,7 +170,7 @@ export default function AssessmentButton({
           body: form,
         });
 
-        const data = await res.json().catch(() => null);
+        const data = await res.json().catch((): unknown => null) as { ok?: boolean; error?: string; formData?: Record<string, unknown> } | null;
         if (!data || !data.ok) {
           const msg = String(data?.error || 'Falha ao processar arquivo');
           if (typeof window !== 'undefined') window.alert(msg);

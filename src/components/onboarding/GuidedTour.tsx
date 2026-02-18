@@ -4,9 +4,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n))
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n))
 
-const getRect = (el) => {
+interface Rect {
+  top: number
+  left: number
+  width: number
+  height: number
+  raw: DOMRect
+}
+
+const getRect = (el: Element | null): Rect | null => {
   try {
     if (!el?.getBoundingClientRect) return null
     const r = el.getBoundingClientRect()
@@ -30,7 +38,7 @@ const getRect = (el) => {
   }
 }
 
-const findTarget = (selector) => {
+const findTarget = (selector: string | null): Element | null => {
   try {
     const s = String(selector || '').trim()
     if (!s) return null
@@ -48,6 +56,30 @@ const findTarget = (selector) => {
   }
 }
 
+interface TourAction {
+  name?: string
+  args?: unknown[]
+}
+
+interface TourStep {
+  id?: string | number
+  title?: string
+  body?: string
+  action?: TourAction | (() => Promise<void> | void)
+  route?: string
+  selector?: string
+}
+
+interface GuidedTourProps {
+  open: boolean
+  steps: TourStep[]
+  actions?: Record<string, (...args: unknown[]) => Promise<void> | void>
+  onComplete?: () => void
+  onSkip?: () => void
+  onCancel?: () => void
+  onEvent?: (name: string, payload: unknown) => void
+}
+
 export default function GuidedTour({
   open,
   steps,
@@ -56,24 +88,24 @@ export default function GuidedTour({
   onSkip,
   onCancel,
   onEvent,
-}) {
+}: GuidedTourProps) {
   const router = useRouter()
   const pathname = usePathname()
   const safeSteps = Array.isArray(steps) ? steps : []
   const [idx, setIdx] = useState(0)
-  const [targetRect, setTargetRect] = useState<any>(null)
+  const [targetRect, setTargetRect] = useState<Rect | null>(null)
   const lastStepIdRef = useRef('')
-  const pollRef = useRef<any>(null)
-  const scrollRafRef = useRef<any>(null)
+  const pollRef = useRef<number | null>(null)
+  const scrollRafRef = useRef<number | null>(null)
   const lastActionStepIdRef = useRef('')
 
   const step = safeSteps[idx] || null
   const stepId = String(step?.id || idx)
 
-  const emit = useCallback((name, payload) => {
+  const emit = useCallback((name: string, payload: unknown) => {
     try {
       onEvent?.(name, payload)
-    } catch {}
+    } catch { }
   }, [onEvent])
 
   useEffect(() => {
@@ -113,7 +145,7 @@ export default function GuidedTour({
         const fn = map && typeof map[name] === 'function' ? map[name] : null
         if (!fn) return
         await Promise.resolve(fn(...args))
-      } catch {}
+      } catch { }
     }
     run()
   }, [actions, open, step, stepId])
@@ -126,7 +158,7 @@ export default function GuidedTour({
     if (route === pathname) return
     try {
       router.push(route)
-    } catch {}
+    } catch { }
   }, [open, pathname, router, step])
 
   useEffect(() => {
@@ -148,14 +180,14 @@ export default function GuidedTour({
         hasScrolled = true
         try {
           el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' })
-        } catch {}
+        } catch { }
       }
       const rect = getRect(el)
       setTargetRect(rect)
       if (rect && pollRef.current) {
         try {
           window.clearInterval(pollRef.current)
-        } catch {}
+        } catch { }
         pollRef.current = null
       }
     }
@@ -168,7 +200,7 @@ export default function GuidedTour({
       if (elapsed > 2500) {
         try {
           if (pollRef.current) window.clearInterval(pollRef.current)
-        } catch {}
+        } catch { }
         pollRef.current = null
       }
     }, 120)
@@ -189,30 +221,30 @@ export default function GuidedTour({
       cancelled = true
       try {
         window.clearTimeout(clearT)
-      } catch {}
+      } catch { }
       try {
         if (pollRef.current) window.clearInterval(pollRef.current)
-      } catch {}
+      } catch { }
       pollRef.current = null
       try {
         window.removeEventListener('scroll', onScrollOrResize, true)
         window.removeEventListener('resize', onScrollOrResize)
-      } catch {}
+      } catch { }
       try {
         if (scrollRafRef.current) window.cancelAnimationFrame(scrollRafRef.current)
-      } catch {}
+      } catch { }
       scrollRafRef.current = null
     }
   }, [open, pathname, step])
 
   useEffect(() => {
     if (!open) return
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
         try {
           onCancel?.()
-        } catch {}
+        } catch { }
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault()

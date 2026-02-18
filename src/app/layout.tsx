@@ -1,5 +1,6 @@
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import type { ReactNode } from 'react';
 
 export const metadata = {
   title: "IronTracks - Alta Performance",
@@ -48,7 +49,7 @@ export const viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   const inlineScript = process.env.NODE_ENV === "production" ? `(() => {
   const now = () => Date.now();
   const ss = () => {

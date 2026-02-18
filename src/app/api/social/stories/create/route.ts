@@ -19,9 +19,9 @@ export async function POST(req: Request) {
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
     const validation = validateStoryPayload(body)
-    
+
     if (!validation.ok || !validation.data) {
-        return NextResponse.json({ ok: false, error: validation.error || 'invalid_payload' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: validation.error || 'invalid_payload' }, { status: 400 })
     }
 
     const { mediaPath, caption, meta } = validation.data
@@ -65,9 +65,9 @@ export async function POST(req: Request) {
           )
         }
       }
-    } catch {}
+    } catch { }
     return NextResponse.json({ ok: true, data })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

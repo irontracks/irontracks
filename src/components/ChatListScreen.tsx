@@ -4,13 +4,19 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
     MessageSquare,
-    Circle,
     ChevronLeft
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 
-const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
+interface ChatListScreenProps {
+    user: { id: string | number } | null;
+    onClose: () => void;
+    onSelectUser?: (u: any) => void;
+    onSelectChannel?: (ch: { channel_id: string; other_user_id: string; other_user_name: string | null; other_user_photo: string | null }) => void;
+}
+
+const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatListScreenProps) => {
     const [users, setUsers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [nowMs, setNowMs] = useState(0);
@@ -36,7 +42,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
                 setUsers([]);
                 return;
             }
-            
+
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, display_name, photo_url, last_seen')
@@ -48,6 +54,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
             setUsers(data || []);
         } catch (error) {
             console.error('Erro ao carregar contatos:', error);
+            // @ts-ignore
             const msg = error?.message || String(error || '');
             await alert('Erro ao carregar contatos: ' + msg);
         } finally {
@@ -62,6 +69,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
                 try {
                     const p = payload?.new && typeof payload.new === 'object' ? payload.new : null
+                    // @ts-ignore
                     const pid = p?.id ? String(p.id) : ''
                     if (!pid) return
                     setUsers((prev) => {
@@ -71,8 +79,11 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
                         const next = [...safePrev]
                         next[idx] = {
                             ...next[idx],
+                            // @ts-ignore
                             display_name: p?.display_name,
+                            // @ts-ignore
                             photo_url: p?.photo_url,
+                            // @ts-ignore
                             last_seen: p?.last_seen,
                         }
                         return next
@@ -85,7 +96,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
         return () => { supabase.removeChannel(sub); };
     }, [loadUsers, supabase]);
 
-    const isUserOnline = (lastSeen) => {
+    const isUserOnline = (lastSeen: string | number | null) => {
         if (!lastSeen || !nowMs) return false;
         const ts = new Date(lastSeen).getTime();
         if (!Number.isFinite(ts)) return false;
@@ -93,7 +104,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
         return Number.isFinite(diff) ? diff < 5 * 60 * 1000 : false;
     };
 
-    const formatLastSeen = (lastSeen) => {
+    const formatLastSeen = (lastSeen: string | number | null) => {
         if (!lastSeen) return 'Nunca';
         if (!nowMs) return '...';
         const ts = new Date(lastSeen).getTime();
@@ -108,7 +119,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
         return `${Math.floor(hours / 24)}d`;
     };
 
-    const handleOpenChat = async (targetUser) => {
+    const handleOpenChat = async (targetUser: any) => {
         try {
             const safeTargetId = targetUser?.id ? String(targetUser.id) : '';
             if (!safeUserId || !safeTargetId) {
@@ -128,56 +139,57 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
             }
         } catch (e) {
             console.error('Erro ao abrir conversa:', e);
+            // @ts-ignore
             const msg = e?.message || String(e || '');
             await alert('Erro ao abrir conversa: ' + msg);
         }
     };
 
-	if (loading) {
-			return (
-			<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
-				<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center sticky top-0 z-20 shadow-lg shadow-black/30">
-					<div className="flex items-center gap-3">
-						<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
-							<ChevronLeft size={20} />
-						</button>
-						<div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
-						<h3 className="font-bold text-lg text-white">Conversas</h3>
-					</div>
-				</div>
-				<div className="flex-1 flex items-center justify-center">
-					<div className="text-neutral-500">Carregando...</div>
-				</div>
-			</div>
-		);
-	}
+    if (loading) {
+        return (
+            <div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
+                <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center sticky top-0 z-20 shadow-lg shadow-black/30">
+                    <div className="flex items-center gap-3">
+                        <button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
+                            <ChevronLeft size={20} />
+                        </button>
+                        <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
+                        <h3 className="font-bold text-lg text-white">Conversas</h3>
+                    </div>
+                </div>
+                <div className="flex-1 flex items-center justify-center">
+                    <div className="text-neutral-500">Carregando...</div>
+                </div>
+            </div>
+        );
+    }
 
     const onlineUsers = users.filter(u => isUserOnline(u.last_seen));
     const offlineUsers = users.filter(u => !isUserOnline(u.last_seen));
 
-		return (
-		<div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
-			<div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center sticky top-0 z-20 shadow-lg shadow-black/30">
-				<div className="flex items-center gap-3">
-					<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
-						<ChevronLeft size={20} />
-					</button>
-					<div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
-					<div>
-						<h3 className="font-bold text-lg text-white">Conversas</h3>
-						<p className="text-xs text-neutral-400">Chat direto com seus contatos</p>
-					</div>
-				</div>
-				<div className="flex gap-2"></div>
-			</div>
-			<div className="p-4 border-b border-neutral-800">
-				<h4 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Contatos</h4>
-			</div>
+    return (
+        <div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
+            <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center sticky top-0 z-20 shadow-lg shadow-black/30">
+                <div className="flex items-center gap-3">
+                    <button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
+                        <ChevronLeft size={20} />
+                    </button>
+                    <div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
+                    <div>
+                        <h3 className="font-bold text-lg text-white">Conversas</h3>
+                        <p className="text-xs text-neutral-400">Chat direto com seus contatos</p>
+                    </div>
+                </div>
+                <div className="flex gap-2"></div>
+            </div>
+            <div className="p-4 border-b border-neutral-800">
+                <h4 className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Contatos</h4>
+            </div>
 
-			<div className="flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),16px)]">
-				{users.length === 0 ? (
-					<div className="p-8 text-center text-neutral-500">
-						<MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
+            <div className="flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),16px)]">
+                {users.length === 0 ? (
+                    <div className="p-8 text-center text-neutral-500">
+                        <MessageSquare size={48} className="mx-auto mb-4 opacity-50" />
                         <p className="text-lg mb-2">Nenhum contato encontrado</p>
                         <p className="text-sm">Crie usuários para iniciar conversas</p>
                     </div>
@@ -195,7 +207,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
                                         {u.photo_url ? (
                                             <Image src={u.photo_url} width={48} height={48} className="rounded-full object-cover" alt={u.display_name} />
                                         ) : (
-									<div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold text-white">{u.display_name?.[0] || '?'}</div>
+                                            <div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold text-white">{u.display_name?.[0] || '?'}</div>
                                         )}
                                         <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-neutral-900 bg-green-500"></div>
                                     </div>
@@ -222,7 +234,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }) => {
                                         {u.photo_url ? (
                                             <Image src={u.photo_url} width={48} height={48} className="rounded-full object-cover" alt={u.display_name} />
                                         ) : (
-									<div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold text-white">{u.display_name?.[0] || '?'}</div>
+                                            <div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold text-white">{u.display_name?.[0] || '?'}</div>
                                         )}
                                         <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-neutral-900 bg-neutral-600"></div>
                                     </div>

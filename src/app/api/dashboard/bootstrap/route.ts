@@ -3,12 +3,14 @@ import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-const hydrateWorkouts = async (supabase: any, rows: any[]) => {
-  const base = Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []
-  const workoutIds = base.map((w) => w?.id).filter(Boolean)
-  if (!workoutIds.length) return base.map((w) => ({ ...w, exercises: [] }))
+import { SupabaseClient } from '@supabase/supabase-js'
 
-  let exercises: any[] = []
+const hydrateWorkouts = async (supabase: SupabaseClient, rows: unknown[]) => {
+  const base = Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []
+  const workoutIds = base.map((w) => (w as any)?.id).filter(Boolean)
+  if (!workoutIds.length) return base.map((w) => ({ ...(w as object), exercises: [] }))
+
+  let exercises: unknown[] = []
   try {
     const { data } = await supabase
       .from('exercises')
@@ -21,8 +23,8 @@ const hydrateWorkouts = async (supabase: any, rows: any[]) => {
     exercises = []
   }
 
-  const exerciseIds = exercises.map((e) => e?.id).filter(Boolean)
-  let sets: any[] = []
+  const exerciseIds = exercises.map((e) => (e as any)?.id).filter(Boolean)
+  let sets: unknown[] = []
   if (exerciseIds.length) {
     try {
       const { data } = await supabase
@@ -39,7 +41,7 @@ const hydrateWorkouts = async (supabase: any, rows: any[]) => {
 
   const setsByExercise = new Map<string, any[]>()
   for (const s of sets) {
-    const eid = s?.exercise_id
+    const eid = (s as any)?.exercise_id
     if (!eid) continue
     const list = setsByExercise.get(eid) || []
     list.push(s)
@@ -48,20 +50,20 @@ const hydrateWorkouts = async (supabase: any, rows: any[]) => {
 
   const exByWorkout = new Map<string, any[]>()
   for (const ex of exercises) {
-    const wid = ex?.workout_id
+    const wid = (ex as any)?.workout_id
     if (!wid) continue
-    const exWithSets = { ...ex, sets: setsByExercise.get(ex.id) || [] }
+    const exWithSets = { ...(ex as any), sets: setsByExercise.get((ex as any).id) || [] }
     const list = exByWorkout.get(wid) || []
     list.push(exWithSets)
     exByWorkout.set(wid, list)
   }
 
-  return base.map((w) => ({ ...w, exercises: exByWorkout.get(w.id) || [] }))
+  return base.map((w) => ({ ...(w as any), exercises: exByWorkout.get((w as any).id) || [] }))
 }
 
 export async function GET() {
   try {
-    const supabase: any = await createClient()
+    const supabase = await createClient()
     const {
       data: { user },
       error: userErr,
@@ -76,7 +78,7 @@ export async function GET() {
       .eq('id', user.id)
       .maybeSingle()
 
-    let workouts: any[] = []
+    let workouts: unknown[] = []
     try {
       const { data } = await supabase
         .from('workouts')

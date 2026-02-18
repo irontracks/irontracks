@@ -48,14 +48,15 @@ export async function GET(req: Request) {
     const tEmails = new Set((teachers || []).map(t => (t.email || '').toLowerCase()))
     const students = (profiles || [])
       .filter(p => (p.role !== 'teacher') && (!p.email || !tEmails.has(p.email.toLowerCase())))
-      .map(p => ({
-        id: p.id,
-        name: p.display_name,
-        email: p.email,
-        teacher_id: null,
-        user_id: p.id,
-        is_legacy: true
+      .map((p: any) => ({
+        id: String(p?.id || '').trim(),
+        name: p?.display_name != null ? String(p.display_name) : null,
+        email: p?.email != null ? String(p.email) : null,
+        teacher_id: null as string | null,
+        user_id: String(p?.id || '').trim(),
+        is_legacy: true as const,
       }))
+      .filter((s) => Boolean(s.id))
 
     return NextResponse.json({ ok: true, students })
   } catch (e) {

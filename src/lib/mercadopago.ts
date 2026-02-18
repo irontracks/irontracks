@@ -52,7 +52,7 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
   })
 
   const text = await res.text()
-  let json: any = null
+  let json: unknown = null
   try {
     json = text ? JSON.parse(text) : null
   } catch {

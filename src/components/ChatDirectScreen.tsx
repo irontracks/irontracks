@@ -20,6 +20,7 @@ interface ChatUser {
     displayName: string
     photoUrl?: string | null
     email?: string | null
+    last_seen?: string | null
 }
 
 interface ChannelState {
@@ -316,7 +317,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     }, [markMessagesAsRead, supabase, userObj?.id]);
 
     useEffect(() => {
-        let unsubscribe;
+        let unsubscribe: (() => void) | undefined;
         (async () => {
             try {
                 setLoading(true);
@@ -470,7 +471,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     }
 
     const isUserOnline = () => {
-        const lastSeen = (otherUser as unknown as Record<string, unknown>)?.last_seen
+        const lastSeen = otherUser?.last_seen
         if (!lastSeen || !nowMs) return false;
         const diff = nowMs - new Date(String(lastSeen)).getTime();
         return diff < 5 * 60 * 1000;

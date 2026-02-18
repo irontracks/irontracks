@@ -1,4 +1,4 @@
-export async function compressImage(file, { maxWidth = 1280, quality = 0.8 } = {}) {
+export async function compressImage(file: File | Blob, { maxWidth = 1280, quality = 0.8 }: { maxWidth?: number, quality?: number } = {}): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => {
@@ -7,6 +7,10 @@ export async function compressImage(file, { maxWidth = 1280, quality = 0.8 } = {
       canvas.width = Math.floor(img.width * scale)
       canvas.height = Math.floor(img.height * scale)
       const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        reject(new Error('Falha ao obter contexto 2d'))
+        return
+      }
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       canvas.toBlob(
         (blob) => {
@@ -17,16 +21,16 @@ export async function compressImage(file, { maxWidth = 1280, quality = 0.8 } = {
         quality
       )
     }
-    img.onerror = reject
+    img.onerror = () => reject(new Error('Falha ao carregar imagem'))
     const url = URL.createObjectURL(file)
     img.src = url
   })
 }
 
-export async function generateImageThumbnail(file, { thumbWidth = 360 } = {}) {
+export async function generateImageThumbnail(file: File | Blob, { thumbWidth = 360 }: { thumbWidth?: number } = {}): Promise<Blob> {
   return compressImage(file, { maxWidth: thumbWidth, quality: 0.7 })
 }
 
-export async function fileToArrayBuffer(file) {
+export async function fileToArrayBuffer(file: File | Blob): Promise<ArrayBuffer> {
   return await file.arrayBuffer()
 }

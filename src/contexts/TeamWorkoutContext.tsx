@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { playStartSound } from '@/lib/sounds';
 import { useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
@@ -257,8 +258,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                                 photoURL: profile?.photo_url || null,
                                 text: `${fromName} te convidou para treinar junto.`,
                             });
-                        } catch {}
-                        try { playStartSound(soundOpts); } catch {}
+                        } catch { }
+                        try { playStartSound(soundOpts); } catch { }
                     } catch {
                         return;
                     }
@@ -354,9 +355,9 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                         const n = payload?.new && typeof payload.new === 'object' ? payload.new : null;
                         if (!n) return;
                         const type = String(n?.type ?? '');
-                    if (type !== 'invite') return;
+                        if (type !== 'invite') return;
                         refetchInvites();
-                        try { playStartSound(soundOpts); } catch {}
+                        try { playStartSound(soundOpts); } catch { }
                     } catch {
                         return;
                     }
@@ -366,7 +367,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
 
         const POLL_MS = 20_000;
         const pollId = setInterval(() => {
-            try { refetchInvites(); } catch {}
+            try { refetchInvites(); } catch { }
         }, POLL_MS);
 
         const handleVisibility = () => {
@@ -374,18 +375,18 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
                     refetchInvites();
                 }
-            } catch {}
+            } catch { }
         };
         const handleFocus = () => {
-            try { refetchInvites(); } catch {}
+            try { refetchInvites(); } catch { }
         };
 
         try {
             if (typeof document !== 'undefined') document.addEventListener('visibilitychange', handleVisibility);
-        } catch {}
+        } catch { }
         try {
             if (typeof window !== 'undefined') window.addEventListener('focus', handleFocus);
-        } catch {}
+        } catch { }
 
         return () => {
             mounted = false;
@@ -394,13 +395,13 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             } catch {
                 return;
             }
-            try { clearInterval(pollId); } catch {}
+            try { clearInterval(pollId); } catch { }
             try {
                 if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibility);
-            } catch {}
+            } catch { }
             try {
                 if (typeof window !== 'undefined') window.removeEventListener('focus', handleFocus);
-            } catch {}
+            } catch { }
         };
     }, [supabase, user?.id, refetchInvites, canReceiveInvites, soundOpts]);
 
@@ -455,7 +456,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         if (!teamSession?.id) return;
         if (!user?.id) return;
         let cancelled = false;
-        let channel = null;
+        let channel: RealtimeChannel | null = null;
 
         const hydrate = async () => {
             try {
@@ -487,7 +488,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                         { event: '*', schema: 'public', table: 'team_session_presence', filter: `session_id=eq.${teamSession.id}` },
                         (payload: unknown) => {
                             try {
-                                const p = payload as any
+                                const p = payload as { eventType?: string; old?: Record<string, unknown>; new?: Record<string, unknown> }
                                 const ev = String(p?.eventType || '').toUpperCase();
                                 const row = ev === 'DELETE' ? p?.old : p?.new;
                                 const uid = String(row?.user_id || '').trim();
@@ -568,10 +569,10 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                         const next = new URL(window.location.href);
                         next.searchParams.delete('join');
                         window.history.replaceState({}, '', next.pathname + next.search + next.hash);
-                    } catch {}
-                } catch {}
+                    } catch { }
+                } catch { }
             }, 0);
-        } catch {}
+        } catch { }
     }, [joinByCode, onStartSession, teamworkV2Enabled, user?.id]);
 
     // 3. Host: listen for invite acceptance (realtime + polling fallback)
@@ -615,7 +616,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                         uid: toUid || null,
                     },
                 });
-                try { playStartSound(soundOpts); } catch {}
+                try { playStartSound(soundOpts); } catch { }
             } catch {
                 return;
             }
@@ -633,8 +634,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     .eq('from_uid', userId)
                     .eq('team_session_id', currentSessionId)
                     .eq('status', 'accepted')
-                    .order('created_at', { ascending: false })
-                    .limit(5);
+                    .order('created_at', { ascending: false });
 
                 const list = Array.isArray(data) ? data : [];
                 for (const inv of list) {
@@ -677,24 +677,24 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     }
                 )
                 .subscribe();
-        } catch {}
+        } catch { }
 
         const pollId = setInterval(() => {
-            try { pollAccepted(); } catch {}
+            try { pollAccepted(); } catch { }
         }, 20_000);
 
-        try { pollAccepted(); } catch {}
+        try { pollAccepted(); } catch { }
 
         return () => {
             mounted = false;
             try {
                 if (channel) supabase.removeChannel(channel);
-            } catch {}
-            try { clearInterval(pollId); } catch {}
+            } catch { }
+            try { clearInterval(pollId); } catch { }
         };
     }, [supabase, user?.id, teamSession?.id, soundOpts]);
 
-    const sendInvite = async (targetUser: any, workout: any, currentTeamSessionId: string | null = null) => {
+    const sendInvite = async (targetUser: { id: string }, workout: Record<string, unknown>, currentTeamSessionId: string | null = null) => {
         try {
             if (!user?.id) throw new Error('Usuário inválido');
             const targetUserId = targetUser?.id ? String(targetUser.id) : '';
@@ -731,7 +731,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                             { session_id: sessionId, user_id: user.id, status: 'online' },
                             { onConflict: 'session_id,user_id' }
                         );
-                    } catch {}
+                    } catch { }
                 }
             }
 
@@ -760,7 +760,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         return out;
     };
 
-    const createJoinCode = async (workout, ttlMinutes = 90) => {
+    const createJoinCode = async (workout: Record<string, unknown>, ttlMinutes = 90) => {
         try {
             if (!teamworkV2Enabled) return { ok: false, error: 'disabled' };
             if (!user?.id) throw new Error('Usuário inválido');
@@ -811,7 +811,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         }
     };
 
-    const acceptInvite = async (invite, onStartSession) => {
+    const acceptInvite = async (invite: IncomingInvite, onStartSession?: (workout: Record<string, unknown>) => void) => {
+        if (!user) return;
         try {
             const inviteId = invite?.id ? String(invite.id) : '';
             if (!inviteId) throw new Error('Convite inválido');
@@ -857,7 +858,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         }
     };
 
-    const rejectInvite = async (inviteId) => {
+    const rejectInvite = async (inviteId: string) => {
         try {
             const safeId = inviteId ? String(inviteId) : '';
             if (!safeId) return;

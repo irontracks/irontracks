@@ -1129,7 +1129,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ path }),
         })
-        const signJson = await signResp.json().catch(() => null)
+        const signJson = await signResp.json().catch((): any => null)
         if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
         const { error: upErr } = await supabase.storage
           .from('social-stories')
@@ -1155,7 +1155,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ path }),
           })
-          const signJson = await signResp.json().catch(() => null)
+          const signJson = await signResp.json().catch((): any => null)
           if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
           const { error: upErr } = await supabase.storage
             .from('social-stories')
@@ -1177,7 +1177,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ mediaPath: path, caption: String(metrics?.title || ''), meta }),
       })
-      const createJson = await createResp.json().catch(() => null)
+      const createJson = await createResp.json().catch((): any => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
       
       setInfo('Publicado no IronTracks!')

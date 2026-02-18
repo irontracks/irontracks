@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import Image from 'next/image'
 import { X } from 'lucide-react'
 
-export default function NotificationToast(props) {
+export default function NotificationToast(props: any) {
   const settings = props?.settings && typeof props.settings === 'object' ? props.settings : null
   const allowToast = settings ? settings.inAppToasts !== false : true
   const rawNotification = props?.notification ?? null
@@ -44,7 +44,7 @@ export default function NotificationToast(props) {
     } catch {}
   }
 
-  const handleCloseClick = (event) => {
+  const handleCloseClick = (event: any) => {
     try {
       event?.stopPropagation?.()
     } catch {}

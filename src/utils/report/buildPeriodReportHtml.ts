@@ -1,4 +1,4 @@
-const escapeHtml = (v) => {
+const escapeHtml = (v: unknown) => {
   try {
     return String(v ?? '')
       .replaceAll('&', '&amp;')
@@ -11,7 +11,7 @@ const escapeHtml = (v) => {
   }
 }
 
-const formatDate = (v) => {
+const formatDate = (v: any) => {
   try {
     if (!v) return ''
     const d = v?.toDate ? v.toDate() : new Date(v)
@@ -22,7 +22,7 @@ const formatDate = (v) => {
   }
 }
 
-const formatDateTime = (v) => {
+const formatDateTime = (v: any) => {
   try {
     if (!v) return ''
     const d = v?.toDate ? v.toDate() : new Date(v)
@@ -33,31 +33,31 @@ const formatDateTime = (v) => {
   }
 }
 
-const safeNumber = (n, fallback = 0) => {
+const safeNumber = (n: unknown, fallback = 0) => {
   const v = Number(n)
   return Number.isFinite(v) ? v : fallback
 }
 
-const toLocaleInt = (n) => {
+const toLocaleInt = (n: unknown) => {
   const v = Math.max(0, Math.round(safeNumber(n, 0)))
   return v.toLocaleString('pt-BR')
 }
 
-const toPeriodLabel = (type) => (type === 'week' ? 'Relatório semanal' : type === 'month' ? 'Relatório mensal' : 'Relatório do período')
+const toPeriodLabel = (type: string) => (type === 'week' ? 'Relatório semanal' : type === 'month' ? 'Relatório mensal' : 'Relatório do período')
 
-const toPeriodSubtitle = (type) => (type === 'week' ? 'Últimos 7 dias' : type === 'month' ? 'Últimos 30 dias' : 'Período selecionado')
+const toPeriodSubtitle = (type: string) => (type === 'week' ? 'Últimos 7 dias' : type === 'month' ? 'Últimos 30 dias' : 'Período selecionado')
 
-const inferRange = (stats) => {
+const inferRange = (stats: any) => {
   try {
     const list = Array.isArray(stats?.sessionSummaries) ? stats.sessionSummaries : []
     const ms = list
-      .map((s) => {
+      .map((s: any) => {
         const d = s?.date
         const t = d?.toDate ? d.toDate() : new Date(d)
         const value = t instanceof Date ? t.getTime() : NaN
         return Number.isFinite(value) ? value : null
       })
-      .filter((x) => x != null)
+      .filter((x: any) => x != null)
     const days = safeNumber(stats?.days, 0)
     const now = Date.now()
     if (!ms.length) {
@@ -73,8 +73,8 @@ const inferRange = (stats) => {
   }
 }
 
-export function buildPeriodReportHtml(input) {
-  const data = input && typeof input === 'object' ? input : {}
+export function buildPeriodReportHtml(input: unknown) {
+  const data = input && typeof input === 'object' ? (input as Record<string, any>) : {}
   const type = String(data.type || '').trim()
   const stats = data.stats && typeof data.stats === 'object' ? data.stats : {}
   const ai = data.ai && typeof data.ai === 'object' ? data.ai : null
@@ -105,9 +105,9 @@ export function buildPeriodReportHtml(input) {
   const listByFreq = (Array.isArray(stats?.topExercisesByFrequency) ? stats.topExercisesByFrequency : []).slice(0, 8)
   const sessions = (Array.isArray(stats?.sessionSummaries) ? stats.sessionSummaries : []).slice(0, 60)
 
-  const aiList = (key) => {
+  const aiList = (key: string) => {
     const arr = ai && Array.isArray(ai?.[key]) ? ai[key] : []
-    return arr.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 10)
+    return arr.map((x: unknown) => String(x || '').trim()).filter(Boolean).slice(0, 10)
   }
 
   const aiSummary = aiList('summary')
@@ -116,12 +116,12 @@ export function buildPeriodReportHtml(input) {
   const aiNextSteps = aiList('nextSteps')
   const aiWarnings = aiList('warnings')
 
-  const section = (label, content) => {
+  const section = (label: string, content: string) => {
     if (!content) return ''
     return `<div class="section"><div class="section-title">${escapeHtml(label)}</div>${content}</div>`
   }
 
-  const listSection = (label, items, tone = 'neutral') => {
+  const listSection = (label: string, items: unknown[], tone = 'neutral') => {
     const list = Array.isArray(items) ? items : []
     if (!list.length) return ''
     const cls = tone === 'warn' ? 'list warn' : tone === 'accent' ? 'list accent' : 'list'
@@ -131,7 +131,7 @@ export function buildPeriodReportHtml(input) {
     )
   }
 
-  const topExercisesTable = (label, rows) => {
+  const topExercisesTable = (label: string, rows: any[]) => {
     const list = Array.isArray(rows) ? rows : []
     if (!list.length) return ''
     const body = list
@@ -153,12 +153,12 @@ export function buildPeriodReportHtml(input) {
     if (!sessions.length) return ''
     const body = sessions
       .slice()
-      .sort((a, b) => {
+      .sort((a: any, b: any) => {
         const ta = new Date(a?.date || 0).getTime()
         const tb = new Date(b?.date || 0).getTime()
         return tb - ta
       })
-      .map((s) => {
+      .map((s: any) => {
         const date = escapeHtml(formatDate(s?.date) || '')
         const minutes = toLocaleInt(s?.minutes)
         const vol = toLocaleInt(s?.volumeKg)

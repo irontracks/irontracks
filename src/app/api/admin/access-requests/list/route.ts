@@ -19,7 +19,7 @@ export async function GET(req: Request) {
     const offset = (page - 1) * limit
 
     const admin = createAdminClient()
-    
+
     let query = admin
       .from('access_requests')
       .select('*', { count: 'exact' })
@@ -33,20 +33,20 @@ export async function GET(req: Request) {
     const { data, error, count } = await query
 
     if (error) {
-        return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     }
 
-    return NextResponse.json({ 
-        ok: true, 
-        data, 
-        meta: {
-            page,
-            limit,
-            total: count,
-            totalPages: Math.ceil((count || 0) / limit)
-        }
+    return NextResponse.json({
+      ok: true,
+      data,
+      meta: {
+        page,
+        limit,
+        total: count,
+        totalPages: Math.ceil((count || 0) / limit)
+      }
     })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

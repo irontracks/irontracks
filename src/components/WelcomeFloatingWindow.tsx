@@ -1,14 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { X, Sparkles, Crown, ArrowRight } from 'lucide-react';
+import { X, Sparkles, Crown } from 'lucide-react';
 
-export default function WelcomeFloatingWindow({ user, onClose }) {
+interface WelcomeFloatingWindowProps {
+    user: {
+        id?: string | number | null
+        displayName?: string | null
+        name?: string | null
+    } | null
+    onClose?: () => void
+}
+
+export default function WelcomeFloatingWindow({ user, onClose }: WelcomeFloatingWindowProps) {
     const [isVisible, setIsVisible] = useState(false);
     const WELCOME_SEEN_KEY_VERSION = 1;
     const WELCOME_DELAY_MS = 1000;
 
     useEffect(() => {
         let cancelled = false;
-        let timer = null;
+        let timer: number | null = null;
         const uid = user?.id ? String(user.id) : '';
         if (!uid) return;
         try {
@@ -20,7 +29,7 @@ export default function WelcomeFloatingWindow({ user, onClose }) {
         let seen = false;
         try {
             seen = window.localStorage.getItem(key) === '1';
-        } catch {}
+        } catch { }
         if (seen) return;
         (async () => {
             try {
@@ -30,7 +39,7 @@ export default function WelcomeFloatingWindow({ user, onClose }) {
                 timer = window.setTimeout(() => {
                     if (!cancelled) setIsVisible(true);
                 }, WELCOME_DELAY_MS);
-            } catch {}
+            } catch { }
         })();
         return () => {
             cancelled = true;
@@ -45,15 +54,15 @@ export default function WelcomeFloatingWindow({ user, onClose }) {
             const key = `irontracks.vipWelcome.seen.v${WELCOME_SEEN_KEY_VERSION}.${uid}`;
             try {
                 localStorage.setItem(key, '1');
-            } catch {}
+            } catch { }
         }
         try {
             fetch('/api/vip/welcome-seen', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({})
-            }).catch(() => {});
-        } catch {}
+            }).catch(() => { });
+        } catch { }
         if (onClose) onClose();
     };
 
@@ -66,13 +75,13 @@ export default function WelcomeFloatingWindow({ user, onClose }) {
             <div className="relative bg-neutral-900/80 backdrop-blur-xl border border-yellow-500/30 rounded-2xl shadow-2xl overflow-hidden p-6">
                 {/* Glow Effect */}
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-500/20 rounded-full blur-3xl pointer-events-none" />
-                
+
                 <div className="relative z-10">
                     <div className="flex items-start justify-between gap-4">
                         <div className="w-12 h-12 rounded-xl bg-yellow-500 flex items-center justify-center shrink-0 shadow-lg shadow-yellow-500/20">
                             <Crown size={24} className="text-black" />
                         </div>
-                        <button 
+                        <button
                             onClick={handleClose}
                             className="text-neutral-400 hover:text-white transition-colors"
                         >
@@ -90,7 +99,7 @@ export default function WelcomeFloatingWindow({ user, onClose }) {
                     </div>
 
                     <div className="mt-5">
-                        <button 
+                        <button
                             onClick={handleClose}
                             className="w-full h-10 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-lg text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-colors shadow-lg shadow-yellow-500/10"
                         >

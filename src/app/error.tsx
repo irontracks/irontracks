@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
-export default function Error({ error, reset }) {
+export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error("Next.js App Error:", error);
   }, [error]);
@@ -43,4 +43,3 @@ export default function Error({ error, reset }) {
     </div>
   );
 }
-

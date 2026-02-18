@@ -61,7 +61,7 @@ const LoginScreen = () => {
         cref: ''
     });
 
-    const getOAuthHref = (provider) => {
+    const getOAuthHref = (provider: string) => {
         const safeProvider = String(provider || '').trim().toLowerCase() === 'apple' ? 'apple' : 'google';
         let holdLoading = false;
         try {
@@ -119,7 +119,7 @@ const LoginScreen = () => {
         }
     };
 
-    const handleEmailAuth = async (e) => {
+    const handleEmailAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         if (authMode === 'recover' && recoverCooldownLeft > 0) {
             setErrorMsg(`Aguarde ${recoverCooldownLeft}s para tentar novamente.`);
@@ -266,7 +266,7 @@ const LoginScreen = () => {
         }
     };
 
-    const handleRequestSubmit = async (e) => {
+    const handleRequestSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setReqLoading(true);
         setReqError('');
@@ -317,7 +317,7 @@ const LoginScreen = () => {
         }
     };
 
-    const handleInputChange = (e) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };

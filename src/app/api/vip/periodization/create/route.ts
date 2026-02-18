@@ -101,8 +101,8 @@ const ensureExerciseLibrarySeeded = async (admin: ReturnType<typeof createAdminC
     return {
       display_name_pt: display,
       normalized_name: normalized,
-      video_url: null,
-      aliases: null,
+      video_url: null as string | null,
+      aliases: null as string[] | null,
       primary_muscle: safeString((ex as any).primary_muscle) || null,
       secondary_muscles: Array.isArray((ex as any).secondary_muscles) ? (ex as any).secondary_muscles : [],
       equipment: Array.isArray((ex as any).equipment) ? (ex as any).equipment : [],

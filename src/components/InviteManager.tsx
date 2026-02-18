@@ -3,12 +3,25 @@ import { Search, UserPlus, Check, X } from 'lucide-react';
 import Image from 'next/image';
 import { useDialog } from '@/contexts/DialogContext';
 
-const InviteManager = ({ isOpen, onClose, onInvite }) => {
+interface InviteCandidate {
+    id: string
+    displayName: string
+    photoURL: string | null
+    lastSeen: string | number | null
+}
+
+interface InviteManagerProps {
+    isOpen: boolean
+    onClose: () => void
+    onInvite: (user: InviteCandidate) => Promise<void> | void
+}
+
+const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
     const { alert } = useDialog();
     const alertRef = useRef(alert);
     const safeOnInvite = typeof onInvite === 'function' ? onInvite : null;
     const [searchTerm, setSearchTerm] = useState('');
-    const [users, setUsers] = useState<any[]>([]);
+    const [users, setUsers] = useState<InviteCandidate[]>([]);
     const [loading, setLoading] = useState(false);
     const [invitedIds, setInvitedIds] = useState(new Set());
     const [pendingIds, setPendingIds] = useState(new Set());
@@ -50,7 +63,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                             }
                         }
                         if (items && !cancelled) {
-                            const normalized = (Array.isArray(items) ? items : []).map((item) => {
+                            const normalized = (Array.isArray(items) ? items : []).map((item: any) => {
                                 const safe = item || {};
                                 const rawId = safe.id ?? safe.uid ?? safe.user_id ?? '';
                                 const id = rawId ? String(rawId) : '';
@@ -60,14 +73,14 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                                     photoURL: safe.photoURL || safe.photoUrl || null,
                                     lastSeen: safe.lastSeen || null,
                                 };
-                            }).filter((u) => u && typeof u.id === 'string' && u.id.length > 0);
+                            }).filter((u: any) => u && typeof u.id === 'string' && u.id.length > 0);
 
                             setUsers(normalized);
                         }
-                    } catch {}
+                    } catch { }
                 }
             }
-        } catch {}
+        } catch { }
 
         (async () => {
             await Promise.resolve();
@@ -84,7 +97,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                 }
 
                 const list = Array.isArray(json.items) ? json.items : [];
-                const normalized = list.map((item) => {
+                const normalized = list.map((item: any) => {
                     const safe = item || {};
                     const rawId = safe.id ?? safe.uid ?? safe.user_id ?? '';
                     const id = rawId ? String(rawId) : '';
@@ -94,7 +107,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                         photoURL: safe.photoURL || safe.photoUrl || null,
                         lastSeen: safe.lastSeen || null,
                     };
-                }).filter((u) => u && typeof u.id === 'string' && u.id.length > 0);
+                }).filter((u: any) => u && typeof u.id === 'string' && u.id.length > 0);
 
                 setUsers(normalized);
 
@@ -103,10 +116,10 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                         const payload = { ts: Date.now(), items: list };
                         window.localStorage.setItem('irontracks.inviteCache.v1', JSON.stringify(payload));
                     }
-                } catch {}
+                } catch { }
             } catch (e) {
                 if (!cancelled) {
-                    const msg = e?.message || String(e || '');
+                    const msg = (e as Error)?.message || String(e || '');
                     await alertRef.current('Erro ao carregar usuários: ' + msg);
                     setUsers([]);
                 }
@@ -142,7 +155,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                 }
 
                 const list = Array.isArray(json.items) ? json.items : [];
-                const normalized = list.map((item) => {
+                const normalized = list.map((item: any) => {
                     const safe = item || {};
                     const rawId = safe.id ?? safe.uid ?? safe.user_id ?? '';
                     const id = rawId ? String(rawId) : '';
@@ -152,7 +165,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                         photoURL: safe.photoURL || safe.photoUrl || null,
                         lastSeen: safe.lastSeen || null,
                     };
-                }).filter((u) => u && typeof u.id === 'string' && u.id.length > 0);
+                }).filter((u: any) => u && typeof u.id === 'string' && u.id.length > 0);
 
                 setUsers(normalized);
 
@@ -161,21 +174,21 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                         const payload = { ts: Date.now(), items: list };
                         window.localStorage.setItem('irontracks.inviteCache.v1', JSON.stringify(payload));
                     }
-                } catch {}
+                } catch { }
             } catch (e) {
-                const msg = e?.message || String(e || '');
+                const msg = (e as Error)?.message || String(e || '');
                 await alertRef.current('Erro ao buscar usuários: ' + msg);
                 setUsers([]);
             } finally {
                 setLoading(false);
             }
         };
-        
+
         const timer = setTimeout(searchProfiles, 500);
         return () => clearTimeout(timer);
     }, [searchTerm, isOpen]);
 
-    const handleInvite = async (user) => {
+    const handleInvite = async (user: InviteCandidate) => {
         const userId = user?.id ? String(user.id) : '';
         if (!userId) return;
         if (!safeOnInvite) return;
@@ -193,7 +206,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                 return next;
             });
         } catch (e) {
-            const msg = e?.message || String(e || '');
+            const msg = (e as Error)?.message || String(e || '');
             await alert("Erro ao enviar: " + msg);
         } finally {
             setPendingIds((prev) => {
@@ -204,7 +217,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
         }
     };
 
-    const isOnline = (lastSeen) => {
+    const isOnline = (lastSeen: string | number | null) => {
         try {
             if (!lastSeen || !nowMs) return false;
             const ts = new Date(lastSeen).getTime();
@@ -217,7 +230,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
         }
     };
 
-    const getLastSeenText = (lastSeen) => {
+    const getLastSeenText = (lastSeen: string | number | null) => {
         try {
             if (!lastSeen) return 'Nunca';
             if (!nowMs) return '...';
@@ -320,7 +333,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }) => {
                                         ? 'bg-green-500/20 text-green-500 cursor-default'
                                         : pending
                                             ? 'bg-neutral-700 text-white cursor-wait'
-                                        : 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-lg shadow-yellow-500/20'
+                                            : 'bg-yellow-500 text-black hover:bg-yellow-400 shadow-lg shadow-yellow-500/20'
                                         }`}
                                 >
                                     {invited

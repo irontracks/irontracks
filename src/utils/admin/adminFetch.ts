@@ -25,13 +25,13 @@ export const adminFetchJson = async <T = any>(
   supabase: SupabaseClient,
   url: string,
   init?: RequestInit,
-): Promise<{ ok: false; error: string } | (T & { ok?: any })> => {
+): Promise<{ ok: false; error: string } | (T & { ok?: boolean })> => {
   const authHeaders = await getAdminAuthHeaders(supabase)
   const headers = { ...(init?.headers || {}), ...authHeaders } as Record<string, string>
   const res = await fetch(url, { ...(init || {}), headers })
   const text = await res.text().catch(() => '')
   const json = safeJsonParse(text)
-  if (json) return json as any
+  if (json) return json as T
   if (!res.ok) return { ok: false, error: `http_${res.status}` }
   return { ok: false, error: 'invalid_json' }
 }

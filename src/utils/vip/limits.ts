@@ -81,7 +81,7 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     if (override && Object.keys(override).length > 0) {
       return {
         tier: String(ent.plan_id || 'custom'),
-        limits: { ...FREE_LIMITS, ...(override as any) },
+        limits: { ...FREE_LIMITS, ...(override as Record<string, unknown>) },
         source: 'entitlement_table',
         debug: {
           entitlement_id: ent.id || null,

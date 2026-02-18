@@ -104,32 +104,31 @@ export class VideoCompositor {
     }
 
     private getBestMimeType(): string {
-        const ua = navigator.userAgent;
-        const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
-
-        // Ordem de preferência: H.264 (MP4) > VP9 (WebM) > VP8 (WebM)
-        const candidates = [
-            'video/mp4;codecs="avc1.42E01E,mp4a.40.2"', // H.264 Main Profile
+        const mp4Candidates = [
+            'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
             'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-            'video/mp4',
+            'video/mp4'
+        ];
+
+        for (const type of mp4Candidates) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+
+        const webmCandidates = [
             'video/webm;codecs=vp9,opus',
             'video/webm;codecs=vp8,opus',
             'video/webm'
         ];
 
-        // No iOS/Safari, forçamos a verificação estrita de MP4 primeiro
-        if (isIOS || isSafari) {
-            const mp4 = candidates.find(c => MediaRecorder.isTypeSupported(c));
-            if (mp4) return mp4;
-        }
-
-        for (const type of candidates) {
+        for (const type of webmCandidates) {
             if (MediaRecorder.isTypeSupported(type)) {
+                console.warn('MP4 não suportado, usando WebM. Compatibilidade pode ser limitada.');
                 return type;
             }
         }
-        
+
         throw new Error('Nenhum formato de vídeo suportado encontrado neste navegador.');
     }
 

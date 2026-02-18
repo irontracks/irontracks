@@ -367,7 +367,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           body: form,
         });
 
-        const data = await res.json().catch(() => null);
+        const data = await res.json().catch((): any => null);
         if (!data || !data.ok) {
           const msg = String(data?.error || 'Falha ao processar arquivo');
           if (typeof window !== 'undefined') window.alert(msg);

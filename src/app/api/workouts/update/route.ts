@@ -24,7 +24,7 @@ const buildExercisesPayload = (workout: any) => {
         Array.isArray(ex.setDetails) ? ex.setDetails : Array.isArray(ex.set_details) ? ex.set_details : Array.isArray(ex.sets) ? ex.sets : null
       const headerSets = Number.parseInt(String(ex.sets ?? ''), 10) || 0
       const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0)
-      const sets: any[] = [];
+      const sets: unknown[] = [];
       for (let i = 0; i < numSets; i += 1) {
         const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null
         sets.push({

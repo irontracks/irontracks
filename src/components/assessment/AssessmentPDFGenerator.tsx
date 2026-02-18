@@ -36,12 +36,12 @@ export async function generateAssessmentPDF({
   const th = Number(formData.thigh_skinfold || 0)
 
   const sum = tr + ch + mx + sc + ab + si + th
-  const density = (sum > 0 && Number(formData.age) > 0) ? calculateBodyDensity(sum, Number(formData.age), formData.gender as any) : 1.05
+  const density = (sum > 0 && Number(formData.age) > 0) ? calculateBodyDensity(sum, Number(formData.age), formData.gender) : 1.05
   const bfp = calculateBodyFatPercentage(density)
-  const bmr = calculateBMR(Number(formData.weight), Number(formData.height), Number(formData.age), formData.gender as any)
+  const bmr = calculateBMR(Number(formData.weight), Number(formData.height), Number(formData.age), formData.gender)
   const bmi = calculateBMI(Number(formData.weight), Number(formData.height))
   const bmiClassification = classifyBMI(bmi)
-  const bodyFatClassification = classifyBodyFat(bfp, formData.gender as any, Number(formData.age))
+  const bodyFatClassification = classifyBodyFat(bfp, formData.gender, Number(formData.age))
   const leanMass = Number(formData.weight) * (1 - bfp / 100)
   const fatMass = Number(formData.weight) * (bfp / 100)
 
@@ -60,7 +60,7 @@ export async function generateAssessmentPDF({
     weight: String(formData.weight),
     height: String(formData.height),
     age: String(formData.age),
-    gender: formData.gender as any,
+    gender: formData.gender,
     arm_circ: '',
     chest_circ: '',
     waist_circ: '',
@@ -75,7 +75,7 @@ export async function generateAssessmentPDF({
     thigh_skinfold: String(th),
     calf_skinfold: String(formData.calf_skinfold || 0),
     observations: ''
-  } as any, results as any, studentName)
+  }, results, studentName)
 }
 
 // Componente React para geração de PDF
@@ -94,7 +94,7 @@ export default function AssessmentPDFGenerator({
       setIsGenerating(true);
 
       const safeStudentName = String(studentName || 'Aluno');
-      const safeDate = assessmentDate instanceof Date && !isNaN(assessmentDate as any)
+      const safeDate = assessmentDate instanceof Date && !isNaN(assessmentDate.getTime())
         ? assessmentDate
         : new Date();
 

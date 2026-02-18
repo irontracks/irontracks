@@ -193,7 +193,7 @@ export default function StudentDashboard(props: Props) {
     ;(async () => {
       try {
         const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const json = await res.json().catch(() => null)
+        const json = await res.json().catch((): any => null)
         if (cancelled) return
         if (!json?.ok) {
           const msg = String(json?.error || 'Falha ao carregar periodização.')
@@ -269,7 +269,7 @@ export default function StudentDashboard(props: Props) {
           const id = String(w?.id || '').trim()
           if (id) byId.set(id, w)
         })
-        const ordered = ids.map((id) => byId.get(id)).filter(Boolean) as DashboardWorkout[]
+        const ordered = ids.map((id: string) => byId.get(id)).filter(Boolean) as DashboardWorkout[]
         setPeriodizedWorkouts(ordered)
         setPeriodizedLoaded(true)
       } catch {

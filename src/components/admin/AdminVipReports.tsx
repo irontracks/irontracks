@@ -25,24 +25,38 @@ ChartJS.register(
     ArcElement
 );
 
-const TIER_COLORS = {
+const TIER_COLORS: Record<string, string> = {
     free: '#9ca3af', // gray-400
     vip_start: '#eab308', // yellow-500
     vip_pro: '#22c55e', // green-500
     vip_elite: '#a855f7' // purple-500
 };
 
-const TIER_LABELS = {
+const TIER_LABELS: Record<string, string> = {
     free: 'Gratuito',
     vip_start: 'VIP Start',
     vip_pro: 'VIP Pro',
     vip_elite: 'VIP Elite'
 };
 
-export default function AdminVipReports({ supabase }) {
+interface VipStatsRow {
+    tier: string;
+    user_count: number;
+    stats: {
+        chat: { usage: number; capacity: number };
+        insights: { usage: number; capacity: number };
+        wizard: { usage: number };
+    };
+}
+
+interface AdminVipReportsProps {
+    supabase: any; // Mantendo any por enquanto para compatibilidade, idealmente seria SupabaseClient
+}
+
+export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
     const [loading, setLoading] = useState(true);
-    const [stats, setStats] = useState<any[]>([]);
-    const [period, setPeriod] = useState('7d'); // 7d, 30d
+    const [stats, setStats] = useState<VipStatsRow[]>([]);
+    const [period, setPeriod] = useState<'7d' | '30d'>('7d');
     const [error, setError] = useState('');
 
     const loadStats = useCallback(async () => {
@@ -92,7 +106,7 @@ export default function AdminVipReports({ supabase }) {
     const chartData = useMemo(() => {
         if (!stats.length) return null;
 
-        const tiers = ['free', 'vip_start', 'vip_pro', 'vip_elite'];
+        const tiers = ['free', 'vip_start', 'vip_pro', 'vip_elite'] as const;
         const labels = tiers.map(t => TIER_LABELS[t]);
         
         return {
@@ -126,15 +140,18 @@ export default function AdminVipReports({ supabase }) {
         if (!stats.length) return;
         
         const headers = ['Nível', 'Usuários', 'Chat (Uso)', 'Chat (Capacidade)', 'Insights (Uso)', 'Insights (Capacidade)', 'Wizard (Uso)'];
-        const rows = stats.map(s => [
-            TIER_LABELS[s.tier] || s.tier,
-            s.user_count,
-            s.stats.chat.usage,
-            s.stats.chat.capacity,
-            s.stats.insights.usage,
-            s.stats.insights.capacity,
-            s.stats.wizard.usage
-        ]);
+        const rows = stats.map((s: VipStatsRow) => {
+            const tierKey = s.tier || 'free';
+            return [
+                TIER_LABELS[tierKey] || String(s.tier || ''),
+                s.user_count,
+                s.stats?.chat?.usage,
+                s.stats?.chat?.capacity,
+                s.stats?.insights?.usage,
+                s.stats?.insights?.capacity,
+                s.stats?.wizard?.usage
+            ];
+        });
 
         const csvContent = "data:text/csv;charset=utf-8," 
             + [headers.join(','), ...rows.map(e => e.join(','))].join("\n");

@@ -23,11 +23,11 @@ const normalizeText = (v: unknown) => {
     .replace(/\s+/g, ' ')
 }
 
-const extractLogsStatsByExercise = (session: any) => {
+const extractLogsStatsByExercise = (session: unknown) => {
   try {
-    const s = session && typeof session === 'object' ? session : {}
-    const logs = s?.logs && typeof s.logs === 'object' ? s.logs : {}
-    const exercises = Array.isArray(s?.exercises) ? s.exercises : []
+    const s = session && typeof session === 'object' ? (session as Record<string, unknown>) : {}
+    const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
+    const exercises = Array.isArray(s?.exercises) ? (s.exercises as Record<string, unknown>[]) : []
     const byKey = new Map<string, { exercise: string; weight: number; reps: number; volume: number }>()
 
     Object.entries(logs).forEach(([k, v]) => {
@@ -58,7 +58,7 @@ const extractLogsStatsByExercise = (session: any) => {
   }
 }
 
-const computePrs = (latestNotes: any, prevNotesList: any[]) => {
+const computePrs = (latestNotes: unknown, prevNotesList: unknown[]) => {
   const currentMap = extractLogsStatsByExercise(latestNotes)
   const prevBest = new Map<string, { weight: number; reps: number; volume: number }>()
 
@@ -67,14 +67,14 @@ const computePrs = (latestNotes: any, prevNotesList: any[]) => {
     for (const [k, st] of Array.from(m.entries())) {
       const cur = prevBest.get(k) || { weight: 0, reps: 0, volume: 0 }
       prevBest.set(k, {
-        weight: Math.max(cur.weight, st.weight || 0),
-        reps: Math.max(cur.reps, st.reps || 0),
-        volume: Math.max(cur.volume, st.volume || 0),
+        weight: Math.max(cur.weight, (st as any).weight || 0),
+        reps: Math.max(cur.reps, (st as any).reps || 0),
+        volume: Math.max(cur.volume, (st as any).volume || 0),
       })
     }
   }
 
-  const prs: any[] = []
+  const prs: Record<string, unknown>[] = []
   for (const [k, st] of Array.from(currentMap.entries())) {
     const base = prevBest.get(k) || { weight: 0, reps: 0, volume: 0 }
     const improved = {
@@ -86,11 +86,11 @@ const computePrs = (latestNotes: any, prevNotesList: any[]) => {
     prs.push({ ...st, improved })
   }
 
-  prs.sort((a, b) => (b.volume || 0) - (a.volume || 0))
+  prs.sort((a, b) => ((b as any).volume || 0) - ((a as any).volume || 0))
   return prs.slice(0, 6)
 }
 
-const avg = (rows: any[], key: string) => {
+const avg = (rows: Record<string, unknown>[], key: string) => {
   const vals = rows.map((r) => Number(r?.[key])).filter((n) => Number.isFinite(n))
   if (!vals.length) return null
   return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
@@ -147,7 +147,7 @@ export async function GET() {
       .limit(1)
       .maybeSingle()
 
-    let prs: any[] = []
+    let prs: unknown[] = []
     if (latest?.id) {
       const { data: prevRows } = await supabase
         .from('workouts')
@@ -183,7 +183,7 @@ export async function GET() {
     if (prs.length) {
       const prTxt = prs
         .slice(0, 3)
-        .map((p) => `${String(p?.exercise || '').trim()} (${p?.weight || 0}kg x ${p?.reps || 0})`)
+        .map((p) => `${String((p as any)?.exercise || '').trim()} (${(p as any)?.weight || 0}kg x ${(p as any)?.reps || 0})`)
         .filter(Boolean)
         .join(', ')
       if (prTxt) lines.push(`- PRs recentes: ${prTxt}`)
@@ -193,6 +193,6 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

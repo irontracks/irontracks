@@ -5,7 +5,12 @@ import Image from 'next/image';
 import { Flame, ArrowLeft, Activity } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
-const StudentEvolution = ({ user, onClose }) => {
+interface StudentEvolutionProps {
+    user: { id: string } | null;
+    onClose: () => void;
+}
+
+const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
     const [mode, setMode] = useState('simple');
     const [assessments, setAssessments] = useState<any[]>([]);
     const [photos, setPhotos] = useState<any[]>([]);
@@ -83,7 +88,7 @@ const StudentEvolution = ({ user, onClose }) => {
     const safeAssessments = Array.isArray(assessments) ? assessments.filter((a) => a && typeof a === 'object') : [];
     const safePhotos = Array.isArray(photos) ? photos.filter((p) => p && typeof p === 'object') : [];
     const latest = safeAssessments[0] || null;
-    const formatDate = (value) => {
+    const formatDate = (value: string | number | Date | null) => {
         try {
             const t = new Date(value || 0).getTime();
             if (!Number.isFinite(t)) return 'Data desconhecida';
