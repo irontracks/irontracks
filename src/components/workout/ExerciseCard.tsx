@@ -3,7 +3,7 @@ import { Dumbbell, ChevronDown, ChevronUp, Play, Loader2, ArrowDown, Pencil, Plu
 import { HelpHint } from '@/components/ui/HelpHint';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { useActiveWorkout } from './ActiveWorkoutContext';
-import { ExerciseSet } from './sets/ExerciseSet';
+import { ExerciseSet } from './ExerciseSet';
 import { toNumber } from './utils';
 import { UnknownRecord } from './types';
 

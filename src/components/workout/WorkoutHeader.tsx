@@ -13,7 +13,7 @@ type HeaderProps = {
   onInvite: () => void;
 };
 
-export const Header: React.FC<HeaderProps> = ({
+export const WorkoutHeader: React.FC<HeaderProps> = ({
   title,
   elapsedSeconds,
   exercisesCount,

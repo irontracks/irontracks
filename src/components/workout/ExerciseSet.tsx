@@ -1,8 +1,8 @@
 import React from 'react';
-import { useActiveWorkout } from '../ActiveWorkoutContext';
-import { isObject, isClusterConfig, isRestPauseConfig } from '../utils';
-import { UnknownRecord } from '../types';
-import { NormalSet } from './NormalSet';
+import { useActiveWorkout } from './ActiveWorkoutContext';
+import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
+import { UnknownRecord } from './types';
+import { SetInputRow } from './SetInputRow';
 
 type Props = {
   ex: UnknownRecord;
@@ -22,7 +22,7 @@ export const ExerciseSet: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
 
   if (Array.isArray(rawCfg) || hasDropStages) {
     // TODO: Implement DropSetSet
-    return <NormalSet ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    return <SetInputRow ex={ex} exIdx={exIdx} setIdx={setIdx} />;
   }
 
   const cfg = getPlanConfig(ex, setIdx);
@@ -32,12 +32,12 @@ export const ExerciseSet: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
 
   if (isCluster) {
     // TODO: Implement ClusterSet
-    return <NormalSet ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    return <SetInputRow ex={ex} exIdx={exIdx} setIdx={setIdx} />;
   }
   if (isRestPause) {
     // TODO: Implement RestPauseSet
-    return <NormalSet ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    return <SetInputRow ex={ex} exIdx={exIdx} setIdx={setIdx} />;
   }
 
-  return <NormalSet ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+  return <SetInputRow ex={ex} exIdx={exIdx} setIdx={setIdx} />;
 };

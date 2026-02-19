@@ -1,9 +1,9 @@
 import React from 'react';
 import { MessageSquare, Check } from 'lucide-react';
 import { HelpHint } from '@/components/ui/HelpHint';
-import { useActiveWorkout } from '../ActiveWorkoutContext';
-import { isObject, toNumber } from '../utils';
-import { UnknownRecord } from '../types';
+import { useActiveWorkout } from './ActiveWorkoutContext';
+import { isObject, toNumber } from './utils';
+import { UnknownRecord } from './types';
 
 type Props = {
   ex: UnknownRecord;
@@ -11,7 +11,7 @@ type Props = {
   setIdx: number;
 };
 
-export const NormalSet: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
+export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
   const {
     getLog,
     updateLog,

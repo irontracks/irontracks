@@ -2,12 +2,13 @@
 
 import React from 'react';
 import { BackButton } from '@/components/ui/BackButton';
-import { ActiveWorkoutProvider } from './active-workout/ActiveWorkoutContext';
-import { useActiveWorkoutController, ActiveWorkoutProps } from './active-workout/useActiveWorkoutController';
-import { Header } from './active-workout/Header';
-import { ExerciseList } from './active-workout/ExerciseList';
-import { Modals } from './active-workout/Modals';
-import { UnknownRecord } from './active-workout/types';
+import { ActiveWorkoutProvider } from './workout/ActiveWorkoutContext';
+import { useActiveWorkoutController, ActiveWorkoutProps } from './workout/useActiveWorkoutController';
+import { WorkoutHeader } from './workout/WorkoutHeader';
+import { ExerciseList } from './workout/ExerciseList';
+import { WorkoutFooter } from './workout/WorkoutFooter';
+import { Modals } from './workout/Modals';
+import { UnknownRecord } from './workout/types';
 import { z } from 'zod';
 
 const UnknownRecordSchema: z.ZodType<UnknownRecord> = z.record(z.unknown());
@@ -48,7 +49,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   return (
     <ActiveWorkoutProvider value={controller}>
       <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
-        <Header 
+        <WorkoutHeader 
           title={String(workout?.title || 'Treino')}
           elapsedSeconds={elapsedSeconds}
           exercisesCount={exercises.length}
@@ -76,15 +77,10 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           }}
         />
 
-        <div className="p-4 md:px-6 pb-safe safe-area-bottom mt-auto">
-            <button
-              onClick={finishWorkout}
-              disabled={finishing}
-              className="w-full py-4 rounded-xl bg-yellow-500 text-black font-black uppercase tracking-widest hover:bg-yellow-400 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-yellow-500/20"
-            >
-              {finishing ? 'Finalizando...' : 'Finalizar Treino'}
-            </button>
-        </div>
+        <WorkoutFooter
+            onFinish={finishWorkout}
+            finishing={finishing}
+        />
 
         <Modals />
       </div>
