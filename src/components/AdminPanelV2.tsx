@@ -56,7 +56,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
 
     return (
         <AdminPanelProvider value={controller}>
-            <div className="flex h-screen bg-neutral-950 text-white overflow-hidden font-sans selection:bg-yellow-500/30">
+            <div className="fixed inset-0 z-[2000] flex h-screen bg-neutral-950 text-white overflow-hidden font-sans selection:bg-yellow-500/30">
                 {/* Sidebar */}
                 <aside className="w-20 lg:w-64 bg-neutral-900 border-r border-neutral-800 flex flex-col shrink-0 transition-all duration-300 relative z-20">
                     <div className="p-4 lg:p-6 flex items-center gap-3 border-b border-neutral-800/50">
