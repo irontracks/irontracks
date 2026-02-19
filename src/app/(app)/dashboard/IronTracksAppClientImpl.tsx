@@ -694,18 +694,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const storedTabRaw = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
             const storedTab = validTabs.has(storedTabRaw) ? storedTabRaw : '';
 
-            // Só abre se tiver 'open=1' explícito (vindo de navegação interna)
-            // OU se tiver tab na URL (link direto)
-            const shouldOpen = open === '1' || !!urlTab;
+            // Só abre se tiver 'open=1' explícito no storage E uma aba válida
+            // OU se tiver tab na URL
+            const shouldOpen = (open === '1' && !!storedTab) || !!urlTab;
             
-            // Se não deve abrir, garante que está fechado
             if (!shouldOpen) {
-                setShowAdminPanel(false);
+                // Garante que fecha se não deve abrir
+                if (showAdminPanel) setShowAdminPanel(false);
                 return;
             }
 
             const tab = urlTab || storedTab || 'dashboard';
-            // Se veio pela URL, atualiza o storage
+            
+            // Sincroniza storage se veio pela URL
             if (urlTab) {
                 try {
                     sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
@@ -715,7 +716,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             
             setShowAdminPanel(true);
         } catch { }
-    }, [setUrlTabParam, user?.role]);
+    }, [setUrlTabParam, user?.role, showAdminPanel]);
 
     const resolveExerciseVideos = useCallback(async (exercises: unknown): Promise<{ exercises: Array<Record<string, unknown>>; updates: Array<Record<string, unknown>> }> => {
         try {
