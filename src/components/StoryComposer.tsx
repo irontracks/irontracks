@@ -600,6 +600,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const dragRef = useRef({ key: null as string | null, pointerId: null as number | null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } })
   const [mediaLoadIdRef] = useState({ current: 0 })
   const backgroundUrlRef = useRef('')
+  const drawLoopActiveRef = useRef(true)
   
   // Trimming State
   const [showTrimmer, setShowTrimmer] = useState(false)
@@ -923,9 +924,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    // if (mediaKind === 'video') return // Removed to allow drawing overlay on video
+    
+    // Se está exportando, parar completamente o loop
+    if (isExporting) return
+    
     let raf = 0
+    let cancelled = false
+    
     const draw = () => {
+      if (cancelled) return
       drawStory({ 
         ctx, 
         canvasW: CANVAS_W, 
@@ -933,31 +940,32 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         backgroundImage, 
         metrics, 
         layout, 
-        livePositions,
+        livePositions, 
         transparentBg: mediaKind === 'video' 
       })
-    }
-    if (isExporting) {
-        draw()
-        return
-    }
-    // Only animate if LIVE and dragging, otherwise draw once to save battery
-    if (layout === 'live' && draggingKey) {
+      // Só animar em LIVE mode com drag ativo
+      if (layout === 'live' && draggingKey) {
         raf = requestAnimationFrame(draw)
-    } else {
-        draw()
+      }
     }
-    return () => cancelAnimationFrame(raf)
+    
+    draw()
+    
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(raf)
+    }
   }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting])
 
   const renderVideo = async (): Promise<{ blob: Blob; filename: string; mime: string }> => {
     if (!videoRef.current) throw new Error('Vídeo não disponível')
     
     // Initialize compositor
-    compositorRef.current = new VideoCompositor()
-    setIsExporting(true)
-    
     try {
+        compositorRef.current = new VideoCompositor()
+        setIsExporting(true)
+        await new Promise(r => setTimeout(r, 50)) // aguarda React parar o loop
+        
         const result = await compositorRef.current.render({
             videoElement: videoRef.current,
             trimRange,
@@ -1037,19 +1045,41 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   }
 
   const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => {
-      try {
-        URL.revokeObjectURL(url)
-      } catch {
+    try {
+      const url = URL.createObjectURL(blob)
+      // No mobile, <a>.click() pode redirecionar a página.
+      // Usamos window.open em nova aba como fallback seguro.
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(
+        typeof navigator !== 'undefined' ? navigator.userAgent : ''
+      )
+      if (isMobile) {
+        // Abre em nova aba — o browser do mobile oferece "Salvar" nativamente
+        const win = window.open(url, '_blank')
+        if (!win) {
+          // popup bloqueado: fallback para <a>
+          const a = document.createElement('a')
+          a.href = url
+          a.download = filename
+          a.target = '_blank'
+          a.rel = 'noopener'
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+        }
+        setTimeout(() => { try { URL.revokeObjectURL(url) } catch {} }, 5000)
+      } else {
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.style.display = 'none'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => { try { URL.revokeObjectURL(url) } catch {} }, 1000)
       }
-    }, 1000)
+    } catch (e) {
+      console.warn('downloadBlob failed', e)
+    }
   }
 
   const shareImage = async () => {
@@ -1060,28 +1090,37 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     try {
       const result = await createImageBlob({ type: 'jpg' })
       const file = new File([result.blob], result.filename, { type: result.mime })
-      
+
+      // Tenta Web Share API (funciona no Safari iOS e Chrome Android)
       let shared = false
-      if (typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (typeof navigator.share === 'function') {
+        const canShareFile = typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })
         try {
-          await navigator.share({ files: [file], title: 'Story IronTracks' })
+          if (canShareFile) {
+            await navigator.share({ files: [file], title: 'Story IronTracks' })
+          } else {
+            // Compartilha só a URL (fallback sem arquivo)
+            const url = URL.createObjectURL(result.blob)
+            await navigator.share({ url, title: 'Story IronTracks' })
+            setTimeout(() => { try { URL.revokeObjectURL(url) } catch {} }, 3000)
+          }
           shared = true
         } catch (shareErr: any) {
           const name = String(shareErr?.name || '').trim()
-          // If user cancelled, stop here
           if (name === 'AbortError') {
-             setBusy(false)
-             setBusyAction(null)
-             return
+            setBusy(false)
+            setBusyAction(null)
+            return
           }
-          // If not allowed or other error, fall through to download
           console.warn('Share API failed, falling back to download:', shareErr)
         }
       }
 
       if (!shared) {
         downloadBlob(result.blob, result.filename)
-        setInfo('Baixado com sucesso!')
+        setInfo('Arquivo pronto! Salve-o pelo seu navegador.')
+      } else {
+        setInfo('Compartilhado com sucesso!')
       }
     } catch (e: any) {
       const name = String(e?.name || '').trim()
@@ -1210,10 +1249,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
+      className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col"
     >
         {/* Mobile Header / Close */}
-        <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-transparent border-b border-neutral-800/50">
+        <div className="flex-none px-4 pb-4 pt-12 flex justify-between items-center w-full z-10 sm:hidden bg-transparent border-b border-neutral-800/50">
             <div className="text-white min-w-0 flex-1 mr-4">
                 <h3 className="font-bold text-lg truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
                 <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
@@ -1230,7 +1269,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         initial={{ y: 20, scale: 0.95 }}
         animate={{ y: 0, scale: 1 }}
         exit={{ y: 20, scale: 0.95 }}
-        className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-5xl bg-black sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+        className="w-full h-full sm:h-auto flex-1 min-h-0 sm:mx-auto sm:my-auto sm:max-h-[90vh] sm:max-w-5xl bg-black sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
       >
         {/* Desktop Header */}
         <div className="hidden sm:flex px-6 py-5 border-b border-neutral-800 items-center justify-between flex-none bg-neutral-900">
@@ -1247,13 +1286,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         </div>
 
         <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent">
-          <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
+          <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-4 sm:gap-8 max-w-5xl mx-auto items-stretch lg:items-start">
             
             {/* Preview Column */}
             <div className="flex-none flex flex-col items-center gap-6">
               <div
                 ref={previewRef}
-                className="relative w-full max-w-[300px] sm:max-w-[340px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl ring-1 ring-white/10 shrink-0"
+                className="relative w-full max-w-[220px] sm:max-w-[320px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl ring-1 ring-white/10 shrink-0 mx-auto"
               >
                 {isVideo && (
                   <video
@@ -1326,7 +1365,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
               </div>
 
               {/* Media Controls */}
-              <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
+              <div className="w-full max-w-[220px] sm:max-w-[320px] flex items-center gap-3 mx-auto">
                 <label
                   className={[
                     'flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]',
@@ -1379,7 +1418,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             </div>
 
             {/* Controls Column */}
-            <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
+            <div className="flex-1 w-full max-w-full lg:max-w-[360px] flex flex-col gap-6">
                 
                 {/* Trimmer UI */}
                 <AnimatePresence>

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2, Crown } from 'lucide-react'
+import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2, Crown, Ellipsis, Archive, ListFilter } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { z } from 'zod'
@@ -1021,83 +1021,107 @@ export default function StudentDashboard(props: Props) {
           </button>
 
           <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
-            <div className="flex items-center justify-between">
-              <div className="inline-flex items-center rounded-xl bg-neutral-900/40 border border-neutral-800 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowArchived(false)
-                    setWorkoutsTab('normal')
-                  }}
-                  className={
-                    workoutsTab === 'normal'
-                      ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
-                      : 'min-h-[44px] px-3 py-2 text-neutral-300 font-bold text-xs uppercase tracking-widest hover:bg-neutral-800'
-                  }
-                >
-                  Meus Treinos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowArchived(false)
-                    setPeriodizedLoaded(false)
-                    setPeriodizedWorkouts([])
-                    setPeriodizedError('')
-                    setWorkoutsTab('periodized')
-                  }}
-                  className={
-                    workoutsTab === 'periodized'
-                      ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
-                      : 'min-h-[44px] px-3 py-2 text-neutral-300 font-bold text-xs uppercase tracking-widest hover:bg-neutral-800'
-                  }
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Crown size={12} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
-                    Treinos Periodizados
-                  </span>
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                {archivedCount > 0 ? (
-                  <button
-                    onClick={() => setShowArchived((v) => !v)}
-                    className={
-                      showArchived
-                        ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black rounded-xl font-black text-xs uppercase'
-                        : 'min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700'
-                    }
-                  >
-                    {showArchived ? `Arquivados (${archivedCount})` : `Mostrar arquivados (${archivedCount})`}
-                  </button>
-                ) : null}
-                <button
-                  onClick={() => {
-                    try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch {}
-                    const items = visibleWorkouts
-                      .map((w, idx) => {
-                        const id = String(w?.id || '').trim()
-                        if (!id) return null
-                        return { id, title: String(w?.title || 'Treino'), sort_order: idx }
-                      })
-                      .filter(Boolean) as { id: string; title: string; sort_order: number }[]
-                    setEditListDraft(items)
-                    setEditListOpen(true)
-                    setToolsOpen(false)
-                  }}
-                  className="min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
-                >
-                  Organizar
-                </button>
-                <div className="relative">
-                  <button
-                    onClick={() => setToolsOpen((v) => !v)}
-                    className="min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
-                    aria-expanded={toolsOpen}
-                  >
-                    Ferramentas
-                  </button>
-                  {toolsOpen && (
+            
+            {/* Premium Filter Bar (Scrollable) */}
+            <div className="relative -mx-4">
+                <div className="flex items-center gap-3 overflow-x-auto px-4 pb-2 no-scrollbar snap-x snap-mandatory">
+                    {/* Meus Treinos */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowArchived(false)
+                            setWorkoutsTab('normal')
+                        }}
+                        className={`
+                            snap-start shrink-0 h-10 px-5 rounded-full font-bold text-xs uppercase tracking-wide transition-all active:scale-95 border
+                            ${workoutsTab === 'normal' 
+                                ? 'bg-white text-black border-white shadow-lg shadow-white/10' 
+                                : 'bg-neutral-900/50 text-neutral-400 border-neutral-800 hover:border-neutral-600 hover:text-white backdrop-blur-sm'}
+                        `}
+                    >
+                        Meus Treinos
+                    </button>
+
+                    {/* Periodizados */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setShowArchived(false)
+                            setPeriodizedLoaded(false)
+                            setPeriodizedWorkouts([])
+                            setPeriodizedError('')
+                            setWorkoutsTab('periodized')
+                        }}
+                        className={`
+                            snap-start shrink-0 h-10 px-5 rounded-full font-bold text-xs uppercase tracking-wide transition-all active:scale-95 border flex items-center gap-2
+                            ${workoutsTab === 'periodized' 
+                                ? 'bg-white text-black border-white shadow-lg shadow-white/10' 
+                                : 'bg-neutral-900/50 text-neutral-400 border-neutral-800 hover:border-neutral-600 hover:text-white backdrop-blur-sm'}
+                        `}
+                    >
+                        <Crown size={14} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
+                        Periodizados
+                    </button>
+
+                    {/* Arquivados Toggle */}
+                    {archivedCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setShowArchived((v) => !v)}
+                            className={`
+                                snap-start shrink-0 h-10 px-5 rounded-full font-bold text-xs uppercase tracking-wide transition-all active:scale-95 border flex items-center gap-2
+                                ${showArchived
+                                    ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg shadow-yellow-500/20'
+                                    : 'bg-neutral-900/50 text-neutral-400 border-neutral-800 hover:border-neutral-600 hover:text-white backdrop-blur-sm'}
+                            `}
+                        >
+                            <Archive size={14} />
+                            {showArchived ? `Arquivados (${archivedCount})` : `Ver Arquivados (${archivedCount})`}
+                        </button>
+                    )}
+
+                    {/* Divider */}
+                    <div className="w-[1px] h-6 bg-neutral-800 shrink-0 mx-1" />
+
+                    {/* Organizar */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch {}
+                            const items = visibleWorkouts
+                                .map((w, idx) => {
+                                    const id = String(w?.id || '').trim()
+                                    if (!id) return null
+                                    return { id, title: String(w?.title || 'Treino'), sort_order: idx }
+                                })
+                                .filter(Boolean) as { id: string; title: string; sort_order: number }[]
+                            setEditListDraft(items)
+                            setEditListOpen(true)
+                            setToolsOpen(false)
+                        }}
+                        className="snap-start shrink-0 h-10 w-10 rounded-full bg-neutral-900/50 border border-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors active:scale-95"
+                        aria-label="Organizar"
+                    >
+                        <ListFilter size={18} />
+                    </button>
+
+                    {/* Ferramentas Menu */}
+                    <div className="relative snap-start shrink-0">
+                        <button
+                            onClick={() => setToolsOpen((v) => !v)}
+                            className={`
+                                h-10 w-10 rounded-full border flex items-center justify-center transition-all active:scale-95
+                                ${toolsOpen 
+                                    ? 'bg-neutral-800 text-white border-neutral-700' 
+                                    : 'bg-neutral-900/50 text-neutral-400 border-neutral-800 hover:text-white hover:bg-neutral-800'}
+                            `}
+                            aria-expanded={toolsOpen}
+                            aria-label="Mais opções"
+                        >
+                            <Ellipsis size={20} />
+                        </button>
+                        
+                        {toolsOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
                       <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden text-neutral-300">
@@ -1390,17 +1414,6 @@ export default function StudentDashboard(props: Props) {
                     onClick={async (e) => {
                       e.stopPropagation()
                       const key = getWorkoutKey(w, idx)
-                      await runWorkoutAction(key, 'duplicate', () => props.onDuplicateWorkout(w))
-                    }}
-                    disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-                  >
-                    {isActionBusy(getWorkoutKey(w, idx), 'duplicate') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Copy size={14} />}
-                  </button>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      const key = getWorkoutKey(w, idx)
                       await runWorkoutAction(key, 'edit', () => props.onEditWorkout(w))
                     }}
                     disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
@@ -1408,19 +1421,17 @@ export default function StudentDashboard(props: Props) {
                   >
                     {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
                   </button>
-                  {w?.user_id && props.currentUserId && w.user_id === props.currentUserId ? (
-                    <button
-                      onClick={async (e) => {
+                  <button
+                    onClick={async (e) => {
                         e.stopPropagation()
                         const key = getWorkoutKey(w, idx)
                         await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
-                      }}
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-                    >
-                      {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
-                    </button>
-                  ) : null}
+                    }}
+                    disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                  >
+                    {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
+                  </button>
                 </div>
               </div>
             ))}

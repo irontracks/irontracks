@@ -9,7 +9,7 @@
     "predev": "tsx scripts/ensure-next-compiled-commander.ts",
     "prebuild": "tsx scripts/ensure-next-compiled-commander.ts && tsx scripts/clean-next.ts",
     "prestart": "tsx scripts/ensure-next-compiled-commander.ts",
-    "dev": "next dev --webpack --hostname localhost --port 3000",
+    "dev": "next dev --webpack --hostname 0.0.0.0 --port 3000",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.ts .",

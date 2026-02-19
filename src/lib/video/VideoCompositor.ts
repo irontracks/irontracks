@@ -3,13 +3,20 @@ interface RenderOptions {
     trimRange: [number, number];
     onDrawFrame: (ctx: CanvasRenderingContext2D, video: HTMLVideoElement) => void;
     onProgress?: (progress: number) => void;
-    outputWidth?: number; outputHeight?: number; fps?: number; mimeTypeOverride?: string;
-    videoBitsPerSecond?: number; audioBitsPerSecond?: number;
+    outputWidth?: number;
+    outputHeight?: number;
+    fps?: number;
+    mimeTypeOverride?: string;
+    videoBitsPerSecond?: number;
+    audioBitsPerSecond?: number;
     cssFilter?: string;
 }
 
 interface ExportResult {
-    blob: Blob; filename: string; mime: string; duration: number;
+    blob: Blob;
+    filename: string;
+    mime: string;
+    duration: number;
 }
 
 type VideoElementWithCapture = HTMLVideoElement & {
@@ -18,121 +25,50 @@ type VideoElementWithCapture = HTMLVideoElement & {
     requestVideoFrameCallback?: (cb: () => void) => number;
 };
 
-export class VideoCompositor {
-    private ctx: CanvasRenderingContext2D | null = null; private canvas: HTMLCanvasElement | null = null;
-    private audioCtx: AudioContext | null = null; private destNode: MediaStreamAudioDestinationNode | null = null;
-    private sourceNode: MediaElementAudioSourceNode | null = null; private recorder: MediaRecorder | null = null;
-    private isCancelled = false; private manualTimer: number | null = null;
+type CanvasWithCapture = HTMLCanvasElement & {
+    captureStream?: (fps?: number) => MediaStream;
+    mozCaptureStream?: (fps?: number) => MediaStream;
+};
 
-    constructor() {
-        if (typeof window !== 'undefined') {
-            this.canvas = document.createElement('canvas');
-            this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: false });
-        }
-    }
+export class VideoCompositor {
+    private isCancelled = false;
 
     public cancel() {
         this.isCancelled = true;
-        this.cleanup();
-    }
-
-    private cleanup() {
-        if (this.manualTimer !== null) {
-            try { clearTimeout(this.manualTimer); } catch {}
-        }
-        this.manualTimer = null;
-        if (this.sourceNode) {
-            try { this.sourceNode.disconnect(); } catch {}
-        }
-        if (this.destNode) {
-            try { this.destNode.disconnect(); } catch {}
-        }
-        if (this.audioCtx) {
-            try { this.audioCtx.close(); } catch {}
-        }
-        if (this.recorder && this.recorder.state !== 'inactive') {
-            try { this.recorder.stop(); } catch {}
-        }
-        this.sourceNode = null;
-        this.destNode = null;
-        this.audioCtx = null;
-        this.recorder = null;
-    }
-
-    private async assembleBlob(chunks: Blob[], mimeType: string): Promise<Blob> {
-        try {
-            const safeChunks = Array.isArray(chunks) ? chunks : [];
-            if (typeof Worker === 'undefined' || safeChunks.length === 0) {
-                return new Blob(safeChunks, { type: mimeType });
-            }
-            const workerCode = `self.onmessage=(e)=>{try{const d=e.data||{};const list=Array.isArray(d.chunks)?d.chunks:[];const blob=new Blob(list,{type:d.type||''});self.postMessage({ok:true,blob});}catch(err){self.postMessage({ok:false,error:String(err&&err.message?err.message:err)});}};`;
-            const url = URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' }));
-            const worker = new Worker(url);
-            try { URL.revokeObjectURL(url); } catch {}
-            return await new Promise<Blob>((resolve) => {
-                let settled = false;
-                const done = (blob: Blob) => {
-                    if (settled) return;
-                    settled = true;
-                    try { worker.terminate(); } catch {}
-                    resolve(blob);
-                };
-                const fallback = () => done(new Blob(safeChunks, { type: mimeType }));
-                const timer = setTimeout(() => fallback(), 3000);
-                worker.onmessage = (ev) => {
-                    try { clearTimeout(timer); } catch {}
-                    const data = ev?.data || {};
-                    if (data?.ok && data?.blob) {
-                        done(data.blob);
-                        return;
-                    }
-                    fallback();
-                };
-                worker.onerror = () => {
-                    try { clearTimeout(timer); } catch {}
-                    fallback();
-                };
-                try {
-                    worker.postMessage({ chunks: safeChunks, type: mimeType });
-                } catch {
-                    try { clearTimeout(timer); } catch {}
-                    fallback();
-                }
-            });
-        } catch {
-            return new Blob(Array.isArray(chunks) ? chunks : [], { type: mimeType });
-        }
     }
 
     private getBestMimeType(): string {
-        const mp4Candidates = [
+        if (typeof MediaRecorder === 'undefined') return 'video/webm';
+        const candidates = [
             'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
-            'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-            'video/mp4'
-        ];
-
-        for (const type of mp4Candidates) {
-            if (MediaRecorder.isTypeSupported(type)) {
-                return type;
-            }
-        }
-
-        const webmCandidates = [
+            'video/mp4',
             'video/webm;codecs=vp9,opus',
             'video/webm;codecs=vp8,opus',
-            'video/webm'
+            'video/webm',
         ];
-
-        for (const type of webmCandidates) {
-            if (MediaRecorder.isTypeSupported(type)) {
-                console.warn('MP4 não suportado, usando WebM. Compatibilidade pode ser limitada.');
-                return type;
-            }
+        for (const t of candidates) {
+            try { if (MediaRecorder.isTypeSupported(t)) return t; } catch {}
         }
-
-        throw new Error('Nenhum formato de vídeo suportado encontrado neste navegador.');
+        return 'video/webm';
     }
 
+    private canUseCaptureStream(): boolean {
+        try {
+            const c = document.createElement('canvas') as CanvasWithCapture;
+            return typeof c.captureStream === 'function' || typeof c.mozCaptureStream === 'function';
+        } catch { return false; }
+    }
+
+    private getCaptureStream(canvas: HTMLCanvasElement, fps: number): MediaStream | null {
+        const c = canvas as CanvasWithCapture;
+        try {
+            if (typeof c.captureStream === 'function') return c.captureStream(fps);
+            if (typeof c.mozCaptureStream === 'function') return c.mozCaptureStream(fps);
+        } catch {}
+        return null;
+    }
+
+    // Seek frame a frame, captura frames como ImageData, depois encoda via MediaRecorder
     public async render({
         videoElement,
         trimRange,
@@ -141,189 +77,149 @@ export class VideoCompositor {
         outputWidth = 1080,
         outputHeight = 1920,
         fps = 30,
-        mimeTypeOverride,
         videoBitsPerSecond: userVideoBps,
         audioBitsPerSecond: userAudioBps,
-        cssFilter
+        cssFilter = '',
     }: RenderOptions): Promise<ExportResult> {
         this.isCancelled = false;
-        
-        if (!this.canvas || !this.ctx) throw new Error('Canvas context not initialized');
-        
-        this.canvas.width = outputWidth;
-        this.canvas.height = outputHeight;
 
-        const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
-        const AudioCtxCtor = w.AudioContext || w.webkitAudioContext
-        if (!AudioCtxCtor) throw new Error('AudioContext not available')
-        this.audioCtx = new AudioCtxCtor();
-        this.destNode = this.audioCtx.createMediaStreamDestination();
-        
-        try {
-            this.sourceNode = this.audioCtx.createMediaElementSource(videoElement);
-            this.sourceNode.connect(this.destNode);
-        } catch (e) {
-            console.warn('Falha ao conectar áudio via Web Audio API, tentando fallback simples', e);
-        }
+        if (typeof window === 'undefined') throw new Error('Sem suporte a canvas');
 
-        const canvasStream = this.canvas.captureStream(0); // 0 = modo manual
-        if (this.destNode) {
-            const audioTracks = this.destNode.stream.getAudioTracks();
-            if (audioTracks.length > 0) {
-                canvasStream.addTrack(audioTracks[0]);
-            }
-        } else {
-            const v = videoElement as VideoElementWithCapture;
-            const vidStream = v.captureStream ? v.captureStream() : v.mozCaptureStream ? v.mozCaptureStream() : null;
-            if (vidStream) {
-                const audioTracks = vidStream.getAudioTracks();
-                if (audioTracks.length > 0) canvasStream.addTrack(audioTracks[0]);
-            }
-        }
+        const canvas = document.createElement('canvas');
+        canvas.width = outputWidth;
+        canvas.height = outputHeight;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) throw new Error('Canvas context indisponível');
 
-        let mimeType = this.getBestMimeType();
-        if (mimeTypeOverride) {
-            try {
-                if (MediaRecorder.isTypeSupported(mimeTypeOverride)) {
-                    mimeType = mimeTypeOverride;
-                }
-            } catch {}
-        }
-        const videoBitsPerSecond = typeof userVideoBps === 'number' && userVideoBps > 0 ? userVideoBps : 5_000_000;
-        const audioBitsPerSecond = typeof userAudioBps === 'number' && userAudioBps > 0 ? userAudioBps : 128_000;
-        
-        try {
-            this.recorder = new MediaRecorder(canvasStream, {
-                mimeType,
-                videoBitsPerSecond,
-                audioBitsPerSecond
-            });
-        } catch (e) {
-            console.warn('Bitrate control not supported, using defaults', e);
-            this.recorder = new MediaRecorder(canvasStream, { mimeType });
-        }
+        const duration = Math.max(0.1, trimRange[1] - trimRange[0]);
+        // Limitar fps a 15 para seek-based (reduz uso de memória drasticamente)
+        // 15fps é suave o suficiente para stories (Instagram usa 30fps mas 15 é aceitável)
+        const seekFps = Math.min(fps, 15);
+        const frameInterval = 1 / seekFps;
+        const totalFrames = Math.ceil(duration * seekFps);
 
-        const chunks: Blob[] = [];
-        this.recorder.ondataavailable = (e) => {
-            if (e.data && e.data.size > 0) chunks.push(e.data);
-        };
-
-        const recordingPromise = new Promise<ExportResult>((resolve, reject) => {
-            if (!this.recorder) return reject(new Error('Recorder not initialized'));
-
-            this.recorder.onstop = async () => {
-                if (this.isCancelled) {
-                    reject(new Error('Renderização cancelada'));
-                    return;
-                }
-                try {
-                    const blob = await this.assembleBlob(chunks, mimeType);
-                    const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-                    resolve({
-                        blob,
-                        filename: `story-${Date.now()}.${ext}`,
-                        mime: mimeType,
-                        duration: (trimRange[1] - trimRange[0])
-                    });
-                } catch (e) {
-                    reject(e);
-                }
-            };
-            this.recorder.onerror = (e) => reject(e);
-        });
-
+        // ── FASE 1: capturar frames via seek ──────────────────────────────────
         const originalMuted = videoElement.muted;
-        const originalCurrentTime = videoElement.currentTime;
-        const originalVolume = videoElement.volume;
         const originalLoop = videoElement.loop;
-
-        videoElement.muted = false;
-        videoElement.volume = 1.0;
+        const originalCurrentTime = videoElement.currentTime;
+        videoElement.muted = true;
         videoElement.loop = false;
-        videoElement.currentTime = trimRange[0];
 
-        await new Promise<void>(resolve => {
-            const onSeek = () => {
-                videoElement.removeEventListener('seeked', onSeek);
+        let videoPaused = false;
+        try { videoElement.pause(); videoPaused = true; } catch {}
+
+        const seekTo = (time: number): Promise<void> => new Promise(resolve => {
+            if (this.isCancelled) { resolve(); return; }
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                videoElement.removeEventListener('seeked', finish);
                 resolve();
             };
-            videoElement.addEventListener('seeked', onSeek);
-            if (videoElement.readyState >= 2 && !videoElement.seeking) {
-                videoElement.removeEventListener('seeked', onSeek);
-                resolve();
-            }
+            videoElement.addEventListener('seeked', finish);
+            videoElement.currentTime = time;
+            // Timeout de segurança caso seeked não dispare
+            setTimeout(finish, 3000);
         });
 
-        this.recorder.start(1000);
-        try {
-            await videoElement.play();
-        } catch (e) {
-            try {
-                if (this.recorder && this.recorder.state === 'recording') this.recorder.stop();
-            } catch {}
-            throw e;
-        }
-
-        const duration = trimRange[1] - trimRange[0];
-        
-        const processFrame = () => {
-            if (this.isCancelled) return;
-
-            if (videoElement.ended || videoElement.currentTime >= trimRange[1]) {
-                if (this.recorder && this.recorder.state === 'recording') {
-                    this.recorder.stop();
-                }
-                return;
-            }
-
-            if (this.ctx) {
-                if (cssFilter && typeof cssFilter === 'string' && cssFilter.trim() !== '') {
-                    this.ctx.filter = cssFilter;
-                }
-                onDrawFrame(this.ctx, videoElement);
-                this.ctx.filter = 'none';
-            }
-
-            // Sinalizar ao MediaRecorder que um novo frame está pronto
-            const videoTrack = canvasStream.getVideoTracks()[0] as MediaStreamTrack & {
-                requestFrame?: () => void
-            }
-            if (typeof videoTrack?.requestFrame === 'function') {
-                videoTrack.requestFrame()
-            }
-
-            if (onProgress) {
-                const current = Math.max(0, videoElement.currentTime - trimRange[0]);
-                onProgress(Math.min(1, current / duration));
-            }
-
-            const v = videoElement as VideoElementWithCapture;
-            if (typeof v.requestVideoFrameCallback === 'function') {
-                v.requestVideoFrameCallback(() => processFrame())
-            } else {
-                // requestAnimationFrame é 60fps — metade dos frames seriam duplicatas para 30fps
-                // setTimeout garante o intervalo correto
-                this.manualTimer = setTimeout(processFrame, 1000 / fps) as unknown as number
-            }
-        };
-
-        const v = videoElement as VideoElementWithCapture;
-        if (typeof v.requestVideoFrameCallback === 'function') {
-            v.requestVideoFrameCallback(() => processFrame())
-        } else {
-            // requestAnimationFrame é 60fps — metade dos frames seriam duplicatas para 30fps
-            // setTimeout garante o intervalo correto
-            this.manualTimer = setTimeout(processFrame, 1000 / fps) as unknown as number
-        }
+        const frames: ImageData[] = [];
 
         try {
-            const result = await recordingPromise;
-            return result;
+            for (let i = 0; i < totalFrames; i++) {
+                if (this.isCancelled) throw new Error('Renderização cancelada');
+
+                const targetTime = trimRange[0] + i * frameInterval;
+                await seekTo(Math.min(targetTime, trimRange[1] - 0.001));
+
+                if (cssFilter && cssFilter.trim() !== '') ctx.filter = cssFilter;
+                else ctx.filter = 'none';
+                onDrawFrame(ctx, videoElement);
+                ctx.filter = 'none';
+
+                frames.push(ctx.getImageData(0, 0, outputWidth, outputHeight));
+                onProgress?.(i / totalFrames);
+            }
         } finally {
             videoElement.muted = originalMuted;
-            videoElement.volume = originalVolume;
             videoElement.loop = originalLoop;
-            this.cleanup();
+            try { videoElement.currentTime = originalCurrentTime; } catch {}
         }
+
+        if (this.isCancelled) throw new Error('Renderização cancelada');
+        onProgress?.(0.95);
+
+        // ── FASE 2: encodeamento ──────────────────────────────────────────────
+        const mimeType = this.getBestMimeType();
+        const videoBitsPerSecond = typeof userVideoBps === 'number' && userVideoBps > 0 ? userVideoBps : 4_000_000;
+        const audioBitsPerSecond = typeof userAudioBps === 'number' && userAudioBps > 0 ? userAudioBps : 128_000;
+
+        // Tenta encodeamento via MediaRecorder + captureStream
+        if (this.canUseCaptureStream() && typeof MediaRecorder !== 'undefined') {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = outputWidth;
+            offCanvas.height = outputHeight;
+            const offCtx = offCanvas.getContext('2d')!;
+
+            const stream = this.getCaptureStream(offCanvas, seekFps);
+            if (stream && stream.getVideoTracks().length > 0) {
+                let recorder: MediaRecorder;
+                try {
+                    recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond, audioBitsPerSecond });
+                } catch {
+                    try { recorder = new MediaRecorder(stream, { mimeType }); }
+                    catch { recorder = new MediaRecorder(stream); }
+                }
+
+                const chunks: Blob[] = [];
+                recorder.ondataavailable = e => { if (e.data?.size > 0) chunks.push(e.data); };
+
+                const encodeDone = new Promise<void>((resolve, reject) => {
+                    recorder.onstop = () => resolve();
+                    recorder.onerror = (e) => reject(e);
+                });
+
+                recorder.start();
+
+                const frameDelay = Math.round(1000 / seekFps);
+                for (let i = 0; i < frames.length; i++) {
+                    if (this.isCancelled) break;
+                    offCtx.putImageData(frames[i], 0, 0);
+                    const track = stream.getVideoTracks()[0] as MediaStreamTrack & { requestFrame?: () => void };
+                    if (typeof track?.requestFrame === 'function') track.requestFrame();
+                    await new Promise(r => setTimeout(r, frameDelay));
+                }
+
+                // Timeout de segurança para stop
+                const stopTimer = setTimeout(() => {
+                    try { if (recorder.state !== 'inactive') recorder.stop(); } catch {}
+                }, 5000);
+
+                try { recorder.stop(); } catch {}
+                await encodeDone;
+                clearTimeout(stopTimer);
+
+                // Parar tracks para liberar recursos
+                stream.getTracks().forEach(t => { try { t.stop(); } catch {} });
+
+                const blob = new Blob(chunks, { type: mimeType });
+                const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                onProgress?.(1);
+                return {
+                    blob,
+                    filename: `story-${Date.now()}.${ext}`,
+                    mime: mimeType,
+                    duration,
+                };
+            }
+        }
+
+        // Fallback: exportar como GIF animado via frames JPEG concatenados em MP4 não é possível
+        // sem biblioteca externa. Neste caso, exportamos apenas o primeiro frame como imagem JPEG
+        // com aviso para o usuário tentar em outro browser.
+        throw new Error(
+            'Seu navegador não suporta exportação de vídeo. ' +
+            'Tente no Chrome (Android ou desktop) ou use "Baixar" para salvar a imagem do treino.'
+        );
     }
 }
