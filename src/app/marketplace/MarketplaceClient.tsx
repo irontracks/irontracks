@@ -208,7 +208,7 @@ export default function MarketplaceClient() {
           try {
             await Purchases.configure({ apiKey, appUserID: user.id })
             setIapConfigured(true)
-          } catch (e) {
+          } catch (e: any) {
             setIapConfigured(false)
             setIapError(e?.message ? String(e.message) : 'Falha ao iniciar compra pela App Store.')
           }
@@ -273,7 +273,7 @@ export default function MarketplaceClient() {
       setIapOfferings(offerings)
       const { customerInfo } = await Purchases.getCustomerInfo()
       setIapCustomerInfo(customerInfo || null)
-    } catch (e) {
+    } catch (e: any) {
       setIapError(e?.message ? String(e.message) : 'Falha ao carregar opções da App Store.')
     } finally {
       setIapLoading(false)
@@ -305,7 +305,7 @@ export default function MarketplaceClient() {
         throw new Error(String(json?.error || 'Falha ao validar assinatura.'))
       }
       return true
-    } catch (e) {
+    } catch (e: any) {
       setIapError(e?.message ? String(e.message) : 'Falha ao validar assinatura.')
       return false
     }
@@ -329,7 +329,7 @@ export default function MarketplaceClient() {
         window.alert('Assinatura ativada com sucesso.')
         closeCheckout()
       }
-    } catch (e) {
+    } catch (e: any) {
       const msg = e?.message ? String(e.message) : String(e || '')
       if (String(e?.userCancelled || '').toLowerCase() === 'true' || msg.toLowerCase().includes('cancel')) {
         setIapError('Compra cancelada.')
@@ -352,7 +352,7 @@ export default function MarketplaceClient() {
       setIapCustomerInfo(customerInfo || null)
       const ok = await syncIapToBackend()
       if (ok) window.alert('Compras restauradas.')
-    } catch (e) {
+    } catch (e: any) {
       setIapError(e?.message ? String(e.message) : 'Falha ao restaurar compras.')
     } finally {
       setIapLoading(false)
@@ -378,7 +378,7 @@ export default function MarketplaceClient() {
       })
       const json = (await res.json().catch(() => ({}))) as CheckoutResponse
       setCheckoutResult(json)
-    } catch (e) {
+    } catch (e: any) {
       setCheckoutResult({ ok: false, error: e?.message || String(e) })
     } finally {
       setCheckingOut(false)
@@ -407,7 +407,7 @@ export default function MarketplaceClient() {
         return
       }
       window.location.href = redirectUrl
-    } catch (e) {
+    } catch (e: any) {
       setCheckoutResult({ ok: false, error: e?.message || String(e) })
     } finally {
       setCardRedirecting(false)
@@ -429,7 +429,7 @@ export default function MarketplaceClient() {
       }
       setCheckoutResult(null)
       window.alert('Tentativa cancelada. Você pode tentar novamente.')
-    } catch (e) {
+    } catch (e: any) {
       setCheckoutResult({ ok: false, error: e?.message || String(e) })
     }
   }, [selectedPlan])

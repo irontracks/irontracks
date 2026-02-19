@@ -22,6 +22,7 @@ export async function GET(req: Request) {
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
+    if (!q) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
 
     const offset = (q.page - 1) * q.limit
 
@@ -57,7 +58,7 @@ export async function GET(req: Request) {
         totalPages: Math.ceil((count || 0) / q.limit)
       }
     })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

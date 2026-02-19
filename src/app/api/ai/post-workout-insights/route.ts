@@ -299,7 +299,7 @@ export async function POST(req: Request) {
     await incrementVipUsage(supabase, userId, 'insights');
 
     return NextResponse.json({ ok: true, ai, saved: true })
-  } catch (e) {
+  } catch (e: any) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }

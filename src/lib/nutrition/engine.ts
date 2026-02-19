@@ -114,7 +114,7 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
     if (error) throw new Error(error.message || 'nutrition_log_upsert_failed')
     const row = Array.isArray(data) ? data[0] : null
     return row || null
-  } catch (e) {
+  } catch (e: any) {
     throw new Error(e?.message || 'nutrition_track_meal_failed')
   }
 }

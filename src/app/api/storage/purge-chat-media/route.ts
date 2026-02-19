@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const { data: directDeleted } = await admin.from('direct_messages').delete().like('content', '%"type"%').select('id')
     
     return NextResponse.json({ ok: true, deleted: allPaths.length, messagesRemoved: (globalDeleted?.length || 0) + (directDeleted?.length || 0) })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

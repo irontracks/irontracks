@@ -25,7 +25,7 @@ export async function GET() {
     }
     const rows: WorkoutRow[] = (data || []) as unknown as WorkoutRow[]
     return NextResponse.json({ ok: true, rows })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

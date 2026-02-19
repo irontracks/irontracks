@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     if (error) return jsonError(400, error.message)
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e) {
+  } catch (e: any) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

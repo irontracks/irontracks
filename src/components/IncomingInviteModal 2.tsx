@@ -43,7 +43,7 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
             if (typeof acceptInvite !== 'function') return;
             const workout = await acceptInvite(latestInvite);
             if (workout && typeof onStartSession === 'function') onStartSession(workout);
-        } catch (e) {
+        } catch (e: any) {
             await alert("Erro: " + (e?.message ?? String(e)));
         }
     };
@@ -53,7 +53,7 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
         try {
             if (typeof rejectInvite !== 'function') return;
             await rejectInvite(latestInvite.id);
-        } catch (e) {
+        } catch (e: any) {
             await alert("Erro: " + (e?.message ?? String(e)));
         }
     };

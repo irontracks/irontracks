@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       try {
         const { error } = await query
         if (error && !isMissingTable(error)) throw error
-      } catch (e) {
+      } catch (e: any) {
         if (isMissingTable(e)) return
         throw e
       }
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
         }
         const rows = Array.isArray(data) ? data : []
         return rows.map((r: any) => r?.[key]).filter(Boolean)
-      } catch (e) {
+      } catch (e: any) {
         if (isMissingTable(e)) return []
         throw e
       }
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -104,7 +104,7 @@ const normalizeAiItems = (obj: unknown): Array<Record<string, unknown>> => {
     })
     .filter(Boolean)
 
-  return items.filter(isRecord)
+  return items.filter(isRecord) as Record<string, unknown>[]
 }
 
 const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
@@ -296,7 +296,7 @@ export async function POST(req: Request) {
       aiMapped,
       remainingUnmapped: remainingAfter.slice(0, 50),
     })
-  } catch (e) {
+  } catch (e: any) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }

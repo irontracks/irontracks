@@ -24,8 +24,8 @@ export async function GET(req: Request) {
     const { data: qParams, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const search = qParams.q?.trim() ?? ''
-    const limit = qParams.limit
+    const search = qParams?.q?.trim() ?? ''
+    const limit = qParams?.limit ?? 20
 
     let items: unknown[] = []
 
@@ -108,7 +108,7 @@ export async function GET(req: Request) {
     items = [...items, ...profileItems]
 
     return NextResponse.json({ ok: true, items })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

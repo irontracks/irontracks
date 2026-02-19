@@ -171,8 +171,8 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
         );
     }
 
-    const onlineUsers = users.filter(u => isUserOnline(u.last_seen));
-    const offlineUsers = users.filter(u => !isUserOnline(u.last_seen));
+    const onlineUsers = users.filter(u => isUserOnline(u.last_seen ?? null));
+    const offlineUsers = users.filter(u => !isUserOnline(u.last_seen ?? null));
 
     return (
         <div className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col h-[100dvh] overflow-hidden">
@@ -212,7 +212,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                                 <div className="flex items-center gap-4">
                                     <div className="relative">
                                         {u.photo_url ? (
-                                            <Image src={u.photo_url} width={48} height={48} className="rounded-full object-cover" alt={u.display_name} />
+                                            <Image src={u.photo_url} width={48} height={48} className="rounded-full object-cover" alt={u.display_name || 'Usuário'} />
                                         ) : (
                                             <div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold text-white">{u.display_name?.[0] || '?'}</div>
                                         )}
@@ -221,7 +221,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between mb-1">
                                             <h4 className="font-semibold text-white truncate">{u.display_name}</h4>
-                                            <span className="text-xs text-neutral-400">{formatLastSeen(u.last_seen)}</span>
+                                            <span className="text-xs text-neutral-400">{formatLastSeen(u.last_seen ?? null)}</span>
                                         </div>
                                         <p className="text-sm text-neutral-500 truncate">Toque para conversar</p>
                                     </div>
@@ -239,7 +239,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                                 <div className="flex items-center gap-4">
                                     <div className="relative">
                                         {u.photo_url ? (
-                                            <Image src={u.photo_url} width={48} height={48} className="rounded-full object-cover" alt={u.display_name} />
+                                            <Image src={u.photo_url} width={48} height={48} className="rounded-full object-cover" alt={u.display_name || 'Usuário'} />
                                         ) : (
                                             <div className="w-12 h-12 bg-neutral-700 rounded-full flex items-center justify-center font-bold text-white">{u.display_name?.[0] || '?'}</div>
                                         )}
@@ -248,7 +248,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between mb-1">
                                             <h4 className="font-semibold text-white truncate">{u.display_name}</h4>
-                                            <span className="text-xs text-neutral-400">{formatLastSeen(u.last_seen)}</span>
+                                            <span className="text-xs text-neutral-400">{formatLastSeen(u.last_seen ?? null)}</span>
                                         </div>
                                         <p className="text-sm text-neutral-500 truncate">Toque para conversar</p>
                                     </div>

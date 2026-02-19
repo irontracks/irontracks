@@ -173,7 +173,7 @@ export async function POST(req: Request) {
 
     await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)
     return NextResponse.json({ ok: true })
-  } catch (e) {
+  } catch (e: any) {
     try {
       await admin
         .from('asaas_webhook_events')

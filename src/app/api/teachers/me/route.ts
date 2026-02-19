@@ -82,7 +82,7 @@ export async function GET() {
     }
 
     return NextResponse.json({ ok: true, teacher: data || null })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

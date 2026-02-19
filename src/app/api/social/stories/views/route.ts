@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const storyId = q.story_id.trim()
+    const storyId = String(q?.story_id || '').trim()
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })
 
     const userId = String(auth.user.id || '').trim()
@@ -79,7 +79,7 @@ export async function GET(req: Request) {
         })
         .filter(Boolean),
     })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

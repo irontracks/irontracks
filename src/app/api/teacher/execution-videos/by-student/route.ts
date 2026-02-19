@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const studentUserId = q.student_id.trim()
+    const studentUserId = String(q?.student_id || '').trim()
     if (!studentUserId) return jsonError(400, 'student_user_id_required')
 
     const admin = createAdminClient()
@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     if (error) return jsonError(400, error.message)
 
     return NextResponse.json({ ok: true, items: Array.isArray(data) ? data : [] }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e) {
+  } catch (e: any) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

@@ -111,7 +111,7 @@ export async function GET() {
         rpc_error_raw: rpcRes.error ? safeJson(rpcRes.error) : null,
       },
     })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message ? String(e.message) : String(e), where: 'api/diagnostics/iron-rank' },
       { status: 500 }

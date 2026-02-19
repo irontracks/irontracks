@@ -45,7 +45,7 @@ export async function GET(req: Request) {
       history_days: historyDays,
       rows: data || [],
     })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

@@ -128,7 +128,7 @@ export async function POST(req: Request) {
       redirect_url: initPoint || null,
       provider_subscription_id: providerSubscriptionId,
     })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

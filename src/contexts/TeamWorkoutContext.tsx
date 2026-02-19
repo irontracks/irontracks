@@ -149,7 +149,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             const parts = Array.isArray(payload?.participants) ? payload.participants : [];
             setTeamSession({ id: sessionId, isHost: false, participants: parts as unknown as TeamParticipant[] });
             return { ok: true, teamSessionId: sessionId, participants: parts as unknown as TeamParticipant[], workout: (payload?.workout ?? null) as unknown as Record<string, unknown> | null };
-        } catch (e) {
+        } catch (e: any) {
             return { ok: false, error: e?.message || String(e || '') };
         }
     }, [supabase, teamworkV2Enabled]);
@@ -694,11 +694,12 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         };
     }, [supabase, user?.id, teamSession?.id, soundOpts]);
 
-    const sendInvite = async (targetUser: { id: string }, workout: Record<string, unknown>, currentTeamSessionId: string | null = null) => {
+    const sendInvite = async (targetUser: unknown, workout: Record<string, unknown>, currentTeamSessionId: string | null = null) => {
         try {
             if (!user?.id) throw new Error('Usuário inválido');
-            const targetUserId = targetUser?.id ? String(targetUser.id) : '';
-            if (!targetUserId) throw new Error('Aluno inválido');
+            const targetUserObj = targetUser && typeof targetUser === 'object' ? (targetUser as { id: string }) : null;
+            if (!targetUserObj?.id) throw new Error('Aluno inválido');
+            const targetUserId = String(targetUserObj.id);
 
             let sessionId = currentTeamSessionId;
             const u = user as unknown as { displayName?: string; photoURL?: string | null };
@@ -747,7 +748,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
 
             if (inviteError) throw inviteError;
             return sessionId;
-        } catch (e) {
+        } catch (e: any) {
             const msg = e?.message || String(e || 'Erro ao enviar convite');
             throw new Error(msg);
         }
@@ -806,7 +807,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 }
             })();
             return { ok: true, sessionId, code, expiresAt, url };
-        } catch (e) {
+        } catch (e: any) {
             return { ok: false, error: e?.message || String(e || '') };
         }
     };
@@ -852,7 +853,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             if (onStartSession) onStartSession(workoutFromInvite);
 
             return workoutFromInvite;
-        } catch (e) {
+        } catch (e: any) {
             const msg = e?.message || String(e || 'Erro ao aceitar convite');
             throw new Error(msg);
         }

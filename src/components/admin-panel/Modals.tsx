@@ -3,7 +3,7 @@ import { useAdminPanel } from './AdminPanelContext';
 import { X, UserPlus, Edit3, ArrowLeft } from 'lucide-react';
 import HistoryList from '../HistoryList'; // Import relative or alias
 import AdminWorkoutEditor from '../AdminWorkoutEditor'; // Import relative or alias
-import { AdminWorkout } from '@/types/admin';
+// import { AdminWorkout } from '@/types/admin';
 
 export const Modals: React.FC = () => {
     const {
@@ -43,7 +43,7 @@ export const Modals: React.FC = () => {
     } = useAdminPanel();
 
     // Placeholder functions for now (move to hook later)
-    const handleSaveTemplate = async (data: AdminWorkout) => {
+    const handleSaveTemplate = async (data: any) => {
          alert('Salvar template em implementação.');
     };
 

@@ -33,7 +33,7 @@ export async function logMealAction(mealText: string, dateKey?: string) {
 
     revalidatePath('/dashboard/nutrition')
     return { ok: true, meal, entry: row || null }
-  } catch (e) {
+  } catch (e: any) {
     const message = String(e?.message || '')
     const unknownPrefix = 'nutrition_parser_unknown_food:'
     if (message.startsWith(unknownPrefix)) {

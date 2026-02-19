@@ -95,7 +95,7 @@ export async function POST(req: Request) {
 
     await incrementVipUsage(supabase, userId, 'chat')
     return NextResponse.json({ ok: true, content: text })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -67,7 +67,7 @@ export async function POST(req: Request) {
       }
     } catch { }
     return NextResponse.json({ ok: true, data })
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

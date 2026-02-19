@@ -3060,7 +3060,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 onShareWorkout={(w) => handleShareWorkout(w)}
                                 onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
                                 onEditWorkout={(w) => handleEditWorkout(w)}
-                                onDeleteWorkout={(id, title) => handleDeleteWorkout(id, String(title || ''))}
+                                onDeleteWorkout={(id, title) => {
+                                    if (id) handleDeleteWorkout(id, String(title || ''))
+                                }}
                                 onBulkEditWorkouts={handleBulkEditWorkouts}
                                 currentUserId={String(user?.id || initialUserObj?.id || '')}
                                 exportingAll={Boolean(exportingAll)}
@@ -3107,7 +3109,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     if (draft?.exercises && Array.isArray(draft.exercises) && draft.exercises.length > 0) return draft
                                     if (data?.ok === false && data?.draft) return data.draft
                                     throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
-                                } catch (e) {
+                                } catch (e: any) {
                                     const msg = e?.message ? String(e.message) : String(e)
                                     const lower = msg.toLowerCase()
                                     const isConfig = lower.includes('api de ia não configurada') || lower.includes('google_generative_ai_api_key')
@@ -3140,7 +3142,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     } catch { }
                                     setCreateWizardOpen(false)
                                     await alert(`Plano salvo: ${list.length} treinos criados.`)
-                                } catch (e) {
+                                } catch (e: any) {
                                     const msg = e?.message ? String(e.message) : String(e)
                                     await alert('Erro ao salvar plano: ' + msg)
                                 }
@@ -3221,13 +3223,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             <HistoryList
                                 user={user as any}
                                 settings={userSettingsApi?.settings ?? null}
-                                onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
+                                onViewReport={(s: any) => { setReportBackView('history'); setReportData({ current: s, previous: null }); setView('report'); }}
                                 onBack={() => setView('dashboard')}
                                 targetId={user?.id || ''}
                                 targetEmail={user?.email ? String(user.email) : ''}
                                 readOnly={false}
                                 title="Histórico"
-                                vipLimits={vipStatus?.limits}
+                                vipLimits={vipStatus?.limits as any}
                                 onUpgrade={() => setView('vip')}
                             />
                         )}
@@ -3558,7 +3560,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                 <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
                                                     <Clock size={14} className="text-yellow-500" /><span>Descanso: {e?.restTime ? `${parseInt(String(e.restTime))}s` : '-'}</span>
                                                 </div>
-                                                {e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
+                                                {!!e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
                                             </div>
                                         )
                                     })}
@@ -3598,7 +3600,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     {activeSession?.timerTargetTime && (
                         <RestTimerOverlay
                             targetTime={activeSession.timerTargetTime}
-                            context={activeSession.timerContext}
+                            context={activeSession.timerContext as any}
                             settings={userSettingsApi?.settings ?? null}
                             onClose={handleCloseTimer}
                             onFinish={handleCloseTimer}
@@ -3829,7 +3831,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         return false
                                     }
                                     return true
-                                } catch (e) {
+                                } catch (e: any) {
                                     await alert('Falha ao salvar: ' + (e?.message ?? String(e)))
                                     return false
                                 }

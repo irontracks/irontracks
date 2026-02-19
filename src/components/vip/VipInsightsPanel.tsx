@@ -68,7 +68,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
         }))
         .filter((r: Row) => Boolean(r.id))
       setRows(mapped)
-    } catch (e) {
+    } catch (e: any) {
       setRows([])
       setError(e?.message ? String(e.message) : 'Falha ao carregar histórico.')
     } finally {

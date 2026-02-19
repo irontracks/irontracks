@@ -4,21 +4,20 @@ interface AssessmentFormData {
   height?: number | string | null
   age?: number | string | null
   gender?: string | null
-  arm_circ?: number | null
-  chest_circ?: number | null
-  waist_circ?: number | null
-  hip_circ?: number | null
-  thigh_circ?: number | null
-  calf_circ?: number | null
-  triceps_skinfold?: number | null
-  biceps_skinfold?: number | null
-  subscapular_skinfold?: number | null
-  suprailiac_skinfold?: number | null
-  abdominal_skinfold?: number | null
-  thigh_skinfold?: number | null
-  calf_skinfold?: number | null
+  arm_circ?: number | string | null
+  chest_circ?: number | string | null
+  waist_circ?: number | string | null
+  hip_circ?: number | string | null
+  thigh_circ?: number | string | null
+  calf_circ?: number | string | null
+  triceps_skinfold?: number | string | null
+  biceps_skinfold?: number | string | null
+  subscapular_skinfold?: number | string | null
+  suprailiac_skinfold?: number | string | null
+  abdominal_skinfold?: number | string | null
+  thigh_skinfold?: number | string | null
+  calf_skinfold?: number | string | null
   observations?: string | null
-  [key: string]: unknown
 }
 
 interface BodyComposition {

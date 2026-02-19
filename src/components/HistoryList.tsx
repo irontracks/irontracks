@@ -186,7 +186,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     const weeklyReportCtaEnabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.weeklyReportCTA), [settings]);
     const [availableWorkouts, setAvailableWorkouts] = useState<WorkoutTemplate[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
-    const [newWorkout, setNewWorkout] = useState({ title: '', exercises: [] });
+    const [newWorkout, setNewWorkout] = useState<Record<string, any>>({ title: '', exercises: [] });
     const [manualExercises, setManualExercises] = useState<ManualExercise[]>([]);
     const [showEdit, setShowEdit] = useState(false);
     const [selectedSession, setSelectedSession] = useState<Record<string, unknown> | null>(null);
@@ -593,7 +593,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             const exercises: ManualExercise[] = manualExercises.length
                 ? manualExercises
                 : sourceExercises.map((e) => {
-                    const row = isRecord(e) ? e : {};
+                    const row = (isRecord(e) ? e : {}) as Record<string, unknown>;
                     const id = String(row.id ?? '');
                     return {
                         name: String(row.name ?? ''),
@@ -647,7 +647,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         try {
             if (!newWorkout.title) throw new Error('Informe o título');
             const exercises: ManualExercise[] = (Array.isArray(newWorkout.exercises) ? newWorkout.exercises : []).map((e) => {
-                const row = isRecord(e) ? e : {};
+                const row = (isRecord(e) ? e : {}) as Record<string, unknown>;
                 return {
                     name: String(row.name ?? ''),
                     sets: Number(row.sets ?? 0) || 0,
@@ -732,7 +732,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                 });
             }
             const exs: ManualExercise[] = sourceExercises.map((e) => {
-                const row = isRecord(e) ? e : {};
+                const row = (isRecord(e) ? e : {}) as Record<string, unknown>;
                 const id = String(row.id ?? '');
                 const setRows = id ? (setsMap[id] || []) : [];
                 return {
@@ -810,7 +810,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         setEditDuration(String(Math.floor((raw?.totalTime || session.totalTime || 0) / 60) || 45));
         setEditNotes(raw?.notes || '');
         const exs: ManualExercise[] = (raw?.exercises || []).map((ex, exIdx: number) => {
-            const exRecord = isRecord(ex) ? ex : {};
+            const exRecord = (isRecord(ex) ? ex : {}) as Record<string, unknown>;
             const count = Number(exRecord.sets ?? 0) || 0;
             const logs = raw?.logs ?? {};
             const weights = Array.from({ length: count }, (_, sIdx) => {
@@ -1417,7 +1417,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                                 <div>
                                     <ExerciseEditor
                                         workout={newWorkout}
-                                        onSave={(w) => setNewWorkout(w)}
+                                        onSave={async (w) => setNewWorkout(w)}
                                         onCancel={() => { }}
                                         onChange={(w) => setNewWorkout(w)}
                                         onSaved={() => { }}

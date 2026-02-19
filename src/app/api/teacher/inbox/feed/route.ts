@@ -47,10 +47,6 @@ const normalizeCoachInboxSettings = (raw: unknown): CoachInboxConfig => {
     return Math.max(min, Math.min(max, x))
   }
 
-const QuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).default(30),
-  offset: z.coerce.number().int().min(0).default(0),
-})
   return {
     churnDays: toInt(s?.churnDays, 1, 60, COACH_INBOX_DEFAULTS.churnDays),
     volumeDropPct: toInt(s?.volumeDropPct, 5, 90, COACH_INBOX_DEFAULTS.volumeDropPct),
@@ -59,6 +55,11 @@ const QuerySchema = z.object({
     minCurrent7VolumeSpike: toInt(s?.minCurrent7VolumeSpike, 0, 1000000, COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike),
   }
 }
+
+const QuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+  offset: z.coerce.number().int().min(0).default(0),
+})
 
 const messageTemplate = (kind: string, studentName: string) => {
   const name = String(studentName || '').trim() || 'você'
@@ -85,7 +86,7 @@ export async function GET(req: Request) {
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const limit = clampNumber(q.limit, 1, 100)
+    const limit = clampNumber(q?.limit ?? 30, 1, 100)
     const now = new Date()
     const since7 = new Date(now.getTime() - 7 * DAY_MS)
     const since14 = new Date(now.getTime() - 14 * DAY_MS)
@@ -372,10 +373,10 @@ export async function GET(req: Request) {
     }
 
     items.sort((a, b) => (b.score || 0) - (a.score || 0))
-    const sliced = items.slice(q.offset, q.offset + limit)
+    const sliced = items.slice(q?.offset ?? 0, (q?.offset ?? 0) + limit)
 
     return NextResponse.json({ ok: true, items: sliced }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e) {
+  } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e)
     return jsonError(500, msg)
   }

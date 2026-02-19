@@ -181,7 +181,7 @@ export async function POST(request: Request) {
           if (existing?.id) {
             saved = existing as { id: string; [key: string]: unknown }
             idempotent = true
-            insertRes = { data: existing, error: null } as typeof insertRes
+            insertRes = { data: existing, error: null } as unknown as typeof insertRes
           }
         } catch {}
       } else if (msg.toLowerCase().includes('finish_idempotency_key') && msg.toLowerCase().includes('does not exist')) {
@@ -399,7 +399,7 @@ export async function POST(request: Request) {
     } catch {}
 
     return NextResponse.json({ ok: true, saved, idempotent })
-  } catch (e) {
+  } catch (e: any) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : 'unknown_error' }, { status: 500 })
   }

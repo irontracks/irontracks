@@ -692,7 +692,7 @@ export async function POST(req: Request) {
     if (refreshAi && apiKey) {
       try {
         insightsFromAi = await generateWeeklyInsightsWithAi(apiKey, insightInput)
-      } catch (e) {
+      } catch (e: any) {
         aiError = String((e as Error)?.message ?? e)
       }
     }
@@ -747,7 +747,7 @@ export async function POST(req: Request) {
       .upsert({ user_id: userId, week_start_date: cacheKeyDate, payload }, { onConflict: 'user_id,week_start_date' })
 
     return NextResponse.json(payload)
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 500 })
   }
 }

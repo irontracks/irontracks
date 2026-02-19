@@ -59,7 +59,7 @@ export async function GET(req: Request) {
       .filter((s) => Boolean(s.id))
 
     return NextResponse.json({ ok: true, students })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -33,11 +33,11 @@ export const StudentsTab: React.FC = () => {
             <div key={s.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-neutral-700 transition-all gap-4">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center font-black text-neutral-400 border border-neutral-700">
-                        {s.name.charAt(0).toUpperCase()}
+                        {(s.name || s.email || '?').charAt(0).toUpperCase()}
                     </div>
                     <div>
                         <div className="font-bold text-white group-hover:text-yellow-500 transition-colors">
-                            {s.name}
+                            {s.name || s.email || 'Sem Nome'}
                         </div>
                         <div className="text-xs text-neutral-500 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
                             <span>{s.email}</span>

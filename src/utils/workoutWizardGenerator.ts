@@ -131,7 +131,7 @@ export function generateWorkoutFromWizard(answers: WorkoutWizardAnswers, seed: n
 
   const exercises: unknown[] = []
 
-  const add = (name: string, overrides?: Partial<RepScheme>) => {
+  const add = (name: string | undefined, overrides?: Partial<RepScheme>) => {
     const n = String(name || '').trim()
     if (!n) return
     const used = overrides ? { ...scheme, ...overrides } : scheme
@@ -148,7 +148,7 @@ export function generateWorkoutFromWizard(answers: WorkoutWizardAnswers, seed: n
     })
   }
 
-  const addAccessory = (name: string) => add(name, { sets: Math.max(2, Math.min(3, scheme.sets)), restTime: Math.max(45, Math.min(90, scheme.restTime)) })
+  const addAccessory = (name: string | undefined) => add(name, { sets: Math.max(2, Math.min(3, scheme.sets)), restTime: Math.max(45, Math.min(90, scheme.restTime)) })
 
   if (pattern === 'push') {
     add(pickPush(0))

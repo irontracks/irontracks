@@ -45,7 +45,7 @@ export async function GET() {
     const weekly = computeWeeklyStatsFromSessions(sessions)
 
     return NextResponse.json({ ok: true, weekly })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

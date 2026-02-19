@@ -72,7 +72,7 @@ export async function GET(req: Request) {
     headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
     headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
     return new Response(null, { status: 307, headers })
-  } catch (e) {
+  } catch (e: any) {
     return new Response(e?.message ?? 'internal_error', { status: 500 })
   }
 }
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
     if (sErr || !data?.signedUrl) return NextResponse.json({ ok: false, error: sErr?.message || 'failed' }, { status: 400 })
 
     return NextResponse.json({ ok: true, url: data.signedUrl })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

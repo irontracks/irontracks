@@ -254,7 +254,7 @@ export default function NutritionMixer({
         fat: safeNumber(goalsDraft.fat),
       })
       setGoalsOpen(false)
-    } catch (e) {
+    } catch (e: any) {
       setGoalsError(e?.message ? String(e.message) : 'Falha ao salvar metas.')
     } finally {
       setGoalsSaving(false)
@@ -317,7 +317,7 @@ export default function NutritionMixer({
           if (typeof queueMicrotask === 'function') queueMicrotask(() => inputRef.current?.focus())
           else setTimeout(() => inputRef.current?.focus(), 0)
         } catch {}
-      } catch (e) {
+      } catch (e: any) {
         setError(e?.message || 'Falha ao processar a refeição.')
       }
     })
@@ -344,7 +344,7 @@ export default function NutritionMixer({
         })
       }
       setEntries((prev) => (Array.isArray(prev) ? prev : []).filter((x) => x.id !== entryId))
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Falha ao remover lançamento.')
     } finally {
       setEntryBusyId('')
@@ -407,7 +407,7 @@ export default function NutritionMixer({
       try {
         inputRef.current?.focus()
       } catch {}
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Falha ao estimar com IA.')
     } finally {
       setAiBusy(false)

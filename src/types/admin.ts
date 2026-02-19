@@ -9,7 +9,7 @@ export interface AdminUser {
   role?: string;
   photo_url?: string;
   status?: string;
-  teacher_id?: string;
+  teacher_id?: string | null;
   created_at?: string;
   last_sign_in_at?: string;
   plan?: string;

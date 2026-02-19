@@ -22,6 +22,7 @@ export async function GET(req: Request) {
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
+    if (!q) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
 
     const idOrStudent = q.student_id ?? q.id
     const email = q.email
@@ -81,7 +82,7 @@ export async function GET(req: Request) {
       .limit(q.limit)
 
     return NextResponse.json({ ok: true, rows: rows || [] })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

@@ -201,7 +201,7 @@ export async function POST(req: Request) {
       })
     }
 
-  } catch (e) {
+  } catch (e: any) {
     console.error('Access Action Error:', e)
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }

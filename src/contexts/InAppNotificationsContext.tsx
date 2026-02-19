@@ -9,7 +9,7 @@ import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge'
 import NotificationToast from '@/components/NotificationToast';
 
 interface ToastPayload {
-  id?: string
+  id?: string | null
   text?: string
   message?: string
   senderName?: string
@@ -17,7 +17,7 @@ interface ToastPayload {
   displayName?: string
   type?: SocialNotificationType | string
   link?: string
-  photoURL?: string
+  photoURL?: string | null
 }
 
 interface NormalizedToast {

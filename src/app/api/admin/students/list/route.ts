@@ -74,7 +74,7 @@ export async function GET(req: Request) {
     })
 
     return NextResponse.json({ ok: true, students: filtered })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

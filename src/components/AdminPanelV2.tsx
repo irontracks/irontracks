@@ -31,7 +31,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         tab, setTab, 
         isAdmin,
         selectedStudent,
-        setSelectedStudent
+        setSelectedStudent,
+        supabase
     } = controller;
 
     if (!user) return null;
@@ -145,7 +146,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                             
                             {/* Abas legadas ou ainda não extraídas */}
                             {tab === 'requests' && !selectedStudent && <RequestsTab />}
-                            {tab === 'vip' && !selectedStudent && <AdminVipReports />}
+                            {tab === 'vip' && !selectedStudent && <AdminVipReports supabase={supabase} />}
                             
                             {/* Student Details View (Manter lógica original se selectedStudent != null) */}
                             {selectedStudent && (

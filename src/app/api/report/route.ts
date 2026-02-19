@@ -127,7 +127,7 @@ export async function POST(req: Request) {
     } finally {
       try { await browser?.close() } catch {}
     }
-  } catch (e) {
+  } catch (e: any) {
     return new Response(JSON.stringify({ error: e?.message ?? String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

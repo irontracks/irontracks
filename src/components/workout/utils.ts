@@ -1,4 +1,29 @@
+
 import { UnknownRecord, ReportHistory, ReportHistoryItem } from './types';
+
+export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
+export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
+export const DELOAD_HISTORY_SIZE = 6;
+export const DELOAD_HISTORY_MIN = 4;
+export const DELOAD_RECENT_WINDOW = 3;
+export const DELOAD_STAGNATION_PCT = 0.02;
+export const DELOAD_REGRESSION_PCT = 0.03;
+export const DELOAD_REDUCTION_STABLE = 0.12;
+export const DELOAD_REDUCTION_STAGNATION = 0.15;
+export const DELOAD_REDUCTION_OVERTRAIN = 0.22;
+export const DELOAD_MIN_1RM_FACTOR = 0.5;
+export const DELOAD_REDUCTION_MIN = 0.05;
+export const DELOAD_REDUCTION_MAX = 0.4;
+export const WEIGHT_ROUND_STEP = 0.5;
+export const REPORT_HISTORY_LIMIT = 80;
+export const REPORT_CACHE_KEY = 'irontracks.report.history.v1';
+export const REPORT_CACHE_TTL_MS = 1000 * 60 * 15;
+export const REPORT_FETCH_TIMEOUT_MS = 9000;
+export const DELOAD_SUGGEST_MODE = 'watermark';
+export const DEFAULT_SUGGESTED_RPE = 8;
+export const AI_SUGGESTION_MIN_HISTORY = 2;
+export const AI_SUGGESTION_TIMEOUT_MS = 8000;
+export const DROPSET_STAGE_LIMIT = 20;
 
 export const isObject = (v: unknown): v is UnknownRecord => v !== null && typeof v === 'object' && !Array.isArray(v);
 
@@ -156,9 +181,6 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
   return { version, exercises };
 };
 
-export const REPORT_CACHE_KEY = 'irontracks.report.history.v1';
-export const REPORT_CACHE_TTL_MS = 1000 * 60 * 15;
-
 export const readReportCache = (): { data: ReportHistory; cachedAt: number; stale: boolean } | null => {
   try {
     const win = typeof window !== 'undefined' ? window : null;
@@ -207,31 +229,3 @@ export const estimate1Rm = (weight: unknown, reps: unknown): number | null => {
   if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return null;
   return w * (1 + r / 30);
 };
-
-export const formatElapsed = (sec: number) => {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-};
-
-export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
-export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
-export const DELOAD_HISTORY_SIZE = 6;
-export const DELOAD_HISTORY_MIN = 4;
-export const DELOAD_RECENT_WINDOW = 3;
-export const DELOAD_STAGNATION_PCT = 0.02;
-export const DELOAD_REGRESSION_PCT = 0.03;
-export const DELOAD_REDUCTION_STABLE = 0.12;
-export const DELOAD_REDUCTION_STAGNATION = 0.15;
-export const DELOAD_REDUCTION_OVERTRAIN = 0.22;
-export const DELOAD_MIN_1RM_FACTOR = 0.5;
-export const DELOAD_REDUCTION_MIN = 0.05;
-export const DELOAD_REDUCTION_MAX = 0.4;
-export const WEIGHT_ROUND_STEP = 0.5;
-export const REPORT_HISTORY_LIMIT = 80;
-export const REPORT_FETCH_TIMEOUT_MS = 9000;
-export const DELOAD_SUGGEST_MODE = 'watermark';
-export const DEFAULT_SUGGESTED_RPE = 8;
-export const AI_SUGGESTION_MIN_HISTORY = 2;
-export const AI_SUGGESTION_TIMEOUT_MS = 8000;
-export const DROPSET_STAGE_LIMIT = 20;

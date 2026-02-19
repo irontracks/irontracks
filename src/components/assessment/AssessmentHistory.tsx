@@ -482,7 +482,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             setStudentName(resolvedName);
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         if (mounted) setError(e?.message || 'Erro ao carregar avaliações');
       } finally {
         if (mounted) setLoading(false);

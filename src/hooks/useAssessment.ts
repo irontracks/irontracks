@@ -237,9 +237,9 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       if (error) throw error;
       return normalizeAssessmentRow(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao buscar avaliação:', e);
-      setError(e.message);
+      setError(e?.message || String(e));
       return null;
     } finally {
       setLoading(false);
@@ -265,9 +265,9 @@ export const useAssessment = (): UseAssessmentReturn => {
       const normalized = (data || []).map(normalizeAssessmentRow);
       setAssessments(normalized);
       return normalized;
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao buscar avaliações do aluno:', e);
-      setError(e.message);
+      setError(e?.message || String(e));
       return [];
     } finally {
       setLoading(false);
@@ -316,7 +316,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
     return {
       student_id: studentId,
-      trainer_id: user?.id, // Será preenchido pelo hook ou backend
+      trainer_id: user?.id || '', // Será preenchido pelo hook ou backend
       assessment_date: data.assessment_date,
       weight,
       height,
@@ -376,10 +376,10 @@ export const useAssessment = (): UseAssessmentReturn => {
       setAssessments(prev => [normalized, ...prev]);
 
       return { success: true, data: normalized };
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao criar avaliação:', e);
-      setError(e.message);
-      return { success: false, error: e.message };
+      setError(e?.message || String(e));
+      return { success: false, error: e?.message || String(e) };
     } finally {
       setLoading(false);
     }
@@ -403,10 +403,10 @@ export const useAssessment = (): UseAssessmentReturn => {
       setAssessments(prev => prev.map(a => a.id === id ? normalized : a));
 
       return { success: true, data: normalized };
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao atualizar avaliação:', e);
-      setError(e.message);
-      return { success: false, error: e.message };
+      setError(e?.message || String(e));
+      return { success: false, error: e?.message || String(e) };
     } finally {
       setLoading(false);
     }
@@ -427,10 +427,10 @@ export const useAssessment = (): UseAssessmentReturn => {
       setAssessments(prev => prev.filter(a => a.id !== id));
 
       return { success: true };
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao excluir avaliação:', e);
-      setError(e.message);
-      return { success: false, error: e.message };
+      setError(e?.message || String(e));
+      return { success: false, error: e?.message || String(e) };
     } finally {
       setLoading(false);
     }

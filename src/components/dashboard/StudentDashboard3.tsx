@@ -7,6 +7,7 @@ import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { z } from 'zod'
 import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database'
+import { AdvancedConfig } from '@/types/app'
 import BadgesGallery from './BadgesGallery'
 import RecentAchievements from './RecentAchievements'
 import WorkoutCalendarModal from './WorkoutCalendarModal'
@@ -154,8 +155,8 @@ export type DashboardSetDetail = {
   reps: string | null
   rpe: number | null
   weight: number | null
-  is_warmup: boolean
-  advanced_config: unknown | null
+  isWarmup: boolean
+  advancedConfig: AdvancedConfig | AdvancedConfig[] | null
 }
 
 export type DashboardExercise = {
@@ -370,13 +371,13 @@ export default function StudentDashboard(props: Props) {
         const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
         const mapped = (Array.isArray(data) ? data : [])
           .filter((w) => isRecord(w))
-          .map((w) => {
+          .map((w): DashboardWorkout | null => {
             const parsed = WorkoutListRowSchema.safeParse(w)
             if (!parsed.success) return null
             const workout = parsed.data
             const wid = String(workout.id || '').trim()
             return {
-              id: workout.id,
+              id: workout.id ?? undefined,
               title: String(workout.name ?? ''),
               notes: workout.notes,
               exercises: [],
@@ -491,7 +492,7 @@ export default function StudentDashboard(props: Props) {
           rpe: s.rpe,
           weight: s.weight,
           isWarmup: !!s.is_warmup,
-          advancedConfig: s.advanced_config ?? null,
+          advancedConfig: (s.advanced_config as AdvancedConfig | AdvancedConfig[] | null) ?? null,
         }))
         const nonEmptyReps = setDetails.map((s) => s.reps).filter((r): r is string => typeof r === 'string' && r.trim() !== '')
         const defaultReps = isCardio ? '20' : '10'

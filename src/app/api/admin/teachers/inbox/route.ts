@@ -80,6 +80,7 @@ export async function GET(req: Request) {
   try {
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
+    if (!q) return jsonError(400, 'invalid query')
 
     const teacherId = (q.teacher_id ?? q.teacher_user_id)?.trim()
     if (!teacherId) return jsonError(400, 'missing teacher_id')
@@ -349,7 +350,7 @@ export async function GET(req: Request) {
 
     items.sort((a, b) => (b.score || 0) - (a.score || 0))
     return NextResponse.json({ ok: true, items: items.slice(0, limit) }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e) {
+  } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e)
     return jsonError(500, msg)
   }

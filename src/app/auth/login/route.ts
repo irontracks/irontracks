@@ -74,7 +74,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'oauth_failed')}`, safeOrigin))
     }
     oauthUrl = data?.url || null
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(e?.message || 'oauth_failed')}`, safeOrigin))
   }
 

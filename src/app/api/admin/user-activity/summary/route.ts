@@ -28,6 +28,7 @@ export async function GET(req: Request) {
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
+    if (!q) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
 
     const userId = safeStr(q.user_id, 64)
     if (!userId) return NextResponse.json({ ok: false, error: 'user_id required' }, { status: 400 })
@@ -77,7 +78,7 @@ export async function GET(req: Request) {
     const days = Math.max(1, Math.round(msRange / (24 * 60 * 60 * 1000)))
 
     return NextResponse.json({ ok: true, days, total: rows.length, topEvents, topTypes })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

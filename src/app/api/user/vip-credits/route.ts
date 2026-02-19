@@ -70,8 +70,8 @@ export async function GET() {
       isVip: tier !== 'free'
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching VIP credits:', error)
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+    return NextResponse.json({ ok: false, error: error?.message || String(error) }, { status: 500 })
   }
 }

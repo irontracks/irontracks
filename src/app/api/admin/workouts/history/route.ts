@@ -23,6 +23,7 @@ export async function GET(req: Request) {
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
+    if (!q) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
 
     const { id, email } = q
 
@@ -71,7 +72,7 @@ export async function GET(req: Request) {
       .limit(200)
 
     return NextResponse.json({ ok: true, rows: rows || [] })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

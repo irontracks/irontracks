@@ -775,7 +775,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                     a.click()
                     a.remove()
                     URL.revokeObjectURL(url)
-                  } catch (e) {
+                  } catch (e: any) {
                     await alert('Falha ao exportar: ' + (e?.message ?? String(e)))
                   }
                 }}
@@ -791,7 +791,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   try {
                     setDraft(DEFAULT_SETTINGS)
                     await alert('Preferências resetadas. Clique em Salvar para aplicar.')
-                  } catch (e) {
+                  } catch (e: any) {
                     await alert('Falha ao resetar: ' + (e?.message ?? String(e)))
                   }
                 }}
@@ -817,7 +817,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       }
                     })
                     try { window.location.reload() } catch { }
-                  } catch (e) {
+                  } catch (e: any) {
                     await alert('Falha ao limpar cache: ' + (e?.message ?? String(e)))
                   }
                 }}
@@ -849,7 +849,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                     a.click()
                     a.remove()
                     URL.revokeObjectURL(url)
-                  } catch (e) {
+                  } catch (e: any) {
                     await alert('Falha ao exportar dados: ' + (e?.message ?? String(e)))
                   }
                 }}
@@ -872,7 +872,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                     }
                     await supabase.auth.signOut({ scope: 'global' })
                     try { window.location.href = '/auth/login' } catch { }
-                  } catch (e) {
+                  } catch (e: any) {
                     await alert('Falha ao sair: ' + (e?.message ?? String(e)))
                   }
                 }}
@@ -910,7 +910,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       if (supabase) await supabase.auth.signOut({ scope: 'global' })
                     } catch { }
                     try { window.location.href = '/auth/login' } catch { }
-                  } catch (e) {
+                  } catch (e: any) {
                     await alert('Falha ao excluir conta: ' + (e?.message ?? String(e)))
                   }
                 }}
@@ -1039,7 +1039,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                 const ok = await props?.onSave?.(draft)
                 if (ok === false) return
                 props?.onClose?.()
-              } catch (e) {
+              } catch (e: any) {
                 await alert('Falha ao salvar: ' + (e?.message ?? String(e)))
               }
             }}

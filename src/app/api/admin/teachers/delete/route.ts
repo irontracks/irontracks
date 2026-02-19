@@ -73,7 +73,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: msg || 'Falha ao excluir' }, { status: 400 })
     }
     return NextResponse.json({ ok: true, report: data ?? null })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

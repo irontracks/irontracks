@@ -192,7 +192,7 @@ export async function GET() {
     const summaryText = lines.join('\n')
 
     return NextResponse.json({ ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -136,10 +136,10 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
       // Handle Limit Reached
       if (res.status === 403 && json?.upgradeRequired) {
-        const msg = {
+        const msg: ChatMessage = {
           id: `${id}-limit`,
           role: 'assistant',
-          text: json.message || 'Limite atingido. Faça upgrade para continuar.',
+          text: String(json.message || 'Limite atingido. Faça upgrade para continuar.'),
           isLimit: true
         }
         setMessages((prev) => [...(Array.isArray(prev) ? prev : []), msg].slice(-60))
@@ -495,7 +495,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
       {weeklyOpen ? <VipWeeklySummaryCard /> : null}
 
-      {insightsOpen ? <VipInsightsPanel onOpenHistory={() => onOpenHistory?.()} onOpenReport={(s) => onOpenReport?.(s)} /> : null}
+      {insightsOpen ? <VipInsightsPanel onOpenHistory={() => onOpenHistory?.()} onOpenReport={(s) => onOpenReport?.(s as Record<string, unknown>)} /> : null}
 
       <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
         <div className="flex items-center justify-between gap-3">
@@ -545,7 +545,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       </div>
 
       <div id="vip-periodization">
-        <VipPeriodizationPanel locked={isLocked} onStartSession={onStartSession} onOpenWorkoutEditor={onOpenWorkoutEditor} />
+        <VipPeriodizationPanel locked={isLocked} onStartSession={(w) => onStartSession?.(w as Workout)} onOpenWorkoutEditor={(w) => onOpenWorkoutEditor?.(w as Workout)} />
       </div>
 
       <div ref={chatRef} className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden flex flex-col h-[600px]">

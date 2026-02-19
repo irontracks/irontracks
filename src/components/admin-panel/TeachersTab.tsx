@@ -74,11 +74,11 @@ export const TeachersTab: React.FC = () => {
                     <div key={t.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-yellow-500/30 transition-all gap-4">
                         <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => setSelectedTeacher(t)}>
                             <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 border border-neutral-700 group-hover:border-yellow-500 transition-colors">
-                                {t.name.charAt(0).toUpperCase()}
+                                {(t.name || t.email || '?').charAt(0).toUpperCase()}
                             </div>
                             <div>
                                 <div className="font-bold text-white group-hover:text-yellow-500 transition-colors text-lg">
-                                    {t.name}
+                                    {t.name || t.email || 'Sem Nome'}
                                 </div>
                                 <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-neutral-400">
                                     <div className="flex items-center gap-1.5">

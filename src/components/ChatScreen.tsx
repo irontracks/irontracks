@@ -93,7 +93,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         try {
             const gid = await fetchGlobalId()
             setGlobalChannel(gid ? { id: gid } : null);
-        } catch (e) {
+        } catch (e: any) {
             console.error("Error loading chat data:", e);
         } finally {
             setLoading(false);
@@ -177,7 +177,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     throw new Error("Unknown error creating global channel");
                 }
             }
-        } catch (e) {
+        } catch (e: any) {
             const msg = (e?.message ?? String(e ?? '')).trim();
             try {
                 await alertRef.current(`Erro ao conectar no chat global: ${msg || 'Erro desconhecido'}`);
@@ -390,7 +390,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     await alertRef.current(`Convite enviado para ${targetName}! Aguarde a aceitação.`, "Convite Enviado");
                     setView('list');
                 }
-            } catch (e) {
+            } catch (e: any) {
                 await alertRef.current("Erro ao enviar convite: " + (e?.message ?? String(e)));
             } finally {
                 setSendingInviteTo(null);
@@ -511,7 +511,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                                         {!isMe && activeChannel.type === 'global' && <p className="text-[10px] font-bold opacity-50 mb-1">{displayName || 'Usuário'}</p>}
                                         {msg.kind === 'image' && (
                                             <Image
-                                                src={msg.thumbUrl || msg.mediaUrl}
+                                                src={msg.thumbUrl || msg.mediaUrl || ''}
                                                 alt="imagem"
                                                 width={CHAT_MEDIA_PREVIEW_SIZE}
                                                 height={CHAT_MEDIA_PREVIEW_SIZE}
@@ -530,7 +530,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                                         )}
                                         {msg.kind === 'gif' && (
                                             <Image
-                                                src={msg.mediaUrl}
+                                                src={msg.mediaUrl || ''}
                                                 alt="gif"
                                                 width={CHAT_MEDIA_PREVIEW_SIZE}
                                                 height={CHAT_MEDIA_PREVIEW_SIZE}

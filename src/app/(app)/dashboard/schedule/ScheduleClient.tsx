@@ -146,7 +146,7 @@ export default function SchedulePage() {
           date: baseDate,
         }))
         await loadStudentsForCoach()
-      } catch (e) {
+      } catch (e: any) {
         if (!isMounted) return
         setError(e?.message || 'Erro ao carregar agenda.')
       } finally {
@@ -170,7 +170,7 @@ export default function SchedulePage() {
       try {
         setLoading(true)
         await loadAppointmentsForDate(selectedDate)
-      } catch (e) {
+      } catch (e: any) {
         if (isCancelled) return
         setError(e?.message || 'Erro ao carregar agenda.')
       } finally {
@@ -223,7 +223,7 @@ export default function SchedulePage() {
           type: 'appointment',
         }),
       })
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao enviar notificação de agendamento:', e)
     }
   }
@@ -296,7 +296,7 @@ export default function SchedulePage() {
 
       setIsModalOpen(false)
       setEditingAppointment(null)
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message || 'Erro ao salvar agendamento.')
     } finally {
       setSaving(false)
@@ -340,7 +340,7 @@ export default function SchedulePage() {
       if (deleteError) throw deleteError
       const targetDate = selectedDate || toDateInputValue(new Date())
       await loadAppointmentsForDate(targetDate)
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message || 'Erro ao excluir agendamento.')
     } finally {
       setSaving(false)

@@ -12,7 +12,7 @@ export async function GET() {
     const admin = createAdminClient()
     const { data } = await admin.from('students').select('status').eq('user_id', user.id).maybeSingle()
     return NextResponse.json({ ok: true, status: data?.status ?? null })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

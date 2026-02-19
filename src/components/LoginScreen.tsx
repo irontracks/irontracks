@@ -96,7 +96,7 @@ const LoginScreen = () => {
             const href = getOAuthHref('google');
             console.log('Navegando para:', href);
             window.location.assign(href);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Login Error:", error);
             setIsLoading(false);
             const msg = (error && error.message) ? error.message : 'Falha ao fazer login.';
@@ -111,7 +111,7 @@ const LoginScreen = () => {
         try {
             const href = getOAuthHref('apple');
             window.location.assign(href);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Login Error:", error);
             setIsLoading(false);
             const msg = (error && error.message) ? error.message : 'Falha ao fazer login.';
@@ -189,7 +189,7 @@ const LoginScreen = () => {
                     if (!res.ok || !json?.ok) {
                         throw new Error(json?.error || 'Não foi possível enviar sua solicitação.');
                     }
-                } catch (e) {
+                } catch (e: any) {
                     throw new Error(e?.message || 'Não foi possível enviar sua solicitação.');
                 }
 
@@ -251,7 +251,7 @@ const LoginScreen = () => {
                 router.replace('/dashboard');
                 try { router.refresh(); } catch {}
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error("Auth Error:", err);
             let msg = err.message || 'Erro na autenticação';
             if (msg.includes('Invalid login')) msg = 'E-mail ou senha incorretos.';
@@ -310,7 +310,7 @@ const LoginScreen = () => {
             }
             
             setReqSuccess(true);
-        } catch (err) {
+        } catch (err: any) {
             setReqError(err.message || 'Erro de conexão.');
         } finally {
             setReqLoading(false);

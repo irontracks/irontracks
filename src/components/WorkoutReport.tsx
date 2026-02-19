@@ -286,7 +286,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         });
     }, [session]);
 
-    const [applyState, setApplyState] = useState({ status: 'idle', error: '', templateId: null });
+    const [applyState, setApplyState] = useState<{ status: string; error: string; templateId: string | null }>({ status: 'idle', error: '', templateId: null });
 
     const targetUserId = useMemo(() => {
         const candidates = [
@@ -312,8 +312,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         const originWorkoutId = session?.originWorkoutId ? String(session.originWorkoutId) : '';
         const baseMs =
             toDateMs(session?.date) ?? toDateMs(session?.completed_at) ?? toDateMs(session?.completedAt) ?? (id ? Date.now() : null);
-        const windowStartIso = Number.isFinite(baseMs) ? new Date(baseMs - 12 * 60 * 60 * 1000).toISOString() : null;
-        const windowEndIso = Number.isFinite(baseMs) ? new Date(baseMs + 2 * 60 * 60 * 1000).toISOString() : null;
+        const validBaseMs = typeof baseMs === 'number' && Number.isFinite(baseMs) ? baseMs : null;
+        const windowStartIso = validBaseMs ? new Date(validBaseMs - 12 * 60 * 60 * 1000).toISOString() : null;
+        const windowEndIso = validBaseMs ? new Date(validBaseMs + 2 * 60 * 60 * 1000).toISOString() : null;
         let cancelled = false;
         (async () => {
             try {
@@ -401,8 +402,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 if (!parsed || typeof parsed !== 'object') continue;
 
                 const candidateMs = toDateMs(parsed?.date) ?? toDateMs(r?.date) ?? toDateMs(r?.created_at) ?? null;
-                if (!Number.isFinite(candidateMs)) continue;
-                if (Number.isFinite(currentMs) && candidateMs >= currentMs) continue;
+                if (typeof candidateMs !== 'number' || !Number.isFinite(candidateMs)) continue;
+                
+                if (typeof currentMs === 'number' && Number.isFinite(currentMs) && candidateMs >= currentMs) continue;
 
                 const { originId: candOriginId, titleKey: candTitleKey } = computeMatchKey(parsed);
                 const originMatches = !!(currentOriginId && candOriginId && currentOriginId === candOriginId);
@@ -483,8 +485,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 if (!parsed || typeof parsed !== 'object') continue;
 
                 const candidateMs = toDateMs(parsed?.date) ?? toDateMs(r?.date) ?? toDateMs(r?.created_at) ?? null;
-                if (!Number.isFinite(candidateMs)) continue;
-                if (Number.isFinite(currentMs) && candidateMs >= currentMs) continue;
+                const validCandidateMs = (typeof candidateMs === 'number' && Number.isFinite(candidateMs)) ? candidateMs : null;
+                if (validCandidateMs === null) continue;
+
+                const validCurrentMs = (typeof currentMs === 'number' && Number.isFinite(currentMs)) ? currentMs : null;
+                if (validCurrentMs !== null && validCandidateMs >= validCurrentMs) continue;
 
                 const exArr = Array.isArray(parsed?.exercises) ? parsed.exercises : [];
                 if (!exArr.length) continue;
@@ -499,7 +504,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     const logs = extractExerciseLogsByIndex(parsed, exIdx);
                     if (!hasAnyComparableLog(logs)) return;
                     resolvedLogs[key] = logs;
-                    resolvedBaseMs[key] = candidateMs;
+                    resolvedBaseMs[key] = validCandidateMs;
                     remaining.delete(key);
                 });
             }
@@ -671,10 +676,14 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 progression: items
             });
             if (!res || res.ok === false) {
-                throw new Error(res?.error || 'Falha ao aplicar progressão');
+                throw new Error((typeof res?.error === 'string' ? res.error : null) || 'Falha ao aplicar progressão');
             }
-            setApplyState({ status: 'success', error: '', templateId: res.templateId || null });
-        } catch (e) {
+            setApplyState({ 
+                status: 'success', 
+                error: '', 
+                templateId: (res.templateId && typeof res.templateId === 'string') ? res.templateId : null 
+            });
+        } catch (e: any) {
             const msg = e?.message ? String(e.message) : String(e);
             setApplyState({ status: 'error', error: msg || 'Falha ao aplicar progressão', templateId: null });
         }
@@ -765,7 +774,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 setPdfBlob(blob);
                 setPdfUrl(url);
             }
-        } catch (e) {
+        } catch (e: any) {
             alert('Não foi possível abrir impressão: ' + (e?.message ?? String(e)) + '\nPermita pop-ups para este site.');
         } finally {
             setIsGenerating(false);
@@ -861,7 +870,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     win.print();
                 } catch {}
             }, 300);
-        } catch (e) {
+        } catch (e: any) {
             alert('Não foi possível gerar o PDF do parceiro: ' + (e?.message || String(e)));
         }
     };
@@ -1256,7 +1265,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     {ai && (
                         <div className="mt-4 space-y-3">
                             {renderAiRating()}
-                            {ai.metrics && typeof ai.metrics === 'object' && (
+                            {!!(ai.metrics && typeof ai.metrics === 'object') && (
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                     <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
                                         <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Volume total</div>

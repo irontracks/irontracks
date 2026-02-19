@@ -155,7 +155,7 @@ export async function POST(req: Request) {
     if (!draftValidated.success) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
     await incrementVipUsage(supabase, userId, 'wizard')
     return NextResponse.json({ ok: true, draft: draftValidated.data })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -170,7 +170,7 @@ export default function WorkoutWizardModal(props: Props) {
         }
         setDraft({ title, exercises })
       }
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Falha ao gerar treino.')
       setDraft(null)
       setDrafts(null)
@@ -188,7 +188,7 @@ export default function WorkoutWizardModal(props: Props) {
     setError('')
     try {
       await Promise.resolve(props.onSaveDrafts(list))
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Falha ao salvar treinos.')
     } finally {
       setSavingAll(false)

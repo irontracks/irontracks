@@ -70,7 +70,7 @@ export const ErrorsTab: React.FC = () => {
                                     <div>
                                         <h3 className="font-bold text-white text-sm break-all">{err.message || 'Erro desconhecido'}</h3>
                                         <div className="flex flex-wrap gap-2 mt-1 text-xs text-neutral-400">
-                                            <span className="font-mono bg-neutral-800 px-1.5 py-0.5 rounded">{err.code || 'NO_CODE'}</span>
+                                            <span className="font-mono bg-neutral-800 px-1.5 py-0.5 rounded">{String(err.code || 'NO_CODE')}</span>
                                             <span>•</span>
                                             <span>{new Date(err.created_at).toLocaleString()}</span>
                                             <span>•</span>

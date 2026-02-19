@@ -59,8 +59,8 @@ export default function CoachChatModal({
                 currentExs.forEach((curr: Exercise) => {
                     const prev = prevExs.find((p: Exercise) => p.name === curr.name);
                     if (prev) {
-                        const currWeight = Number(curr.sets?.[0]?.weight || 0);
-                        const prevWeight = Number(prev.sets?.[0]?.weight || 0);
+                        const currWeight = Number((curr as any).sets?.[0]?.weight || 0);
+                        const prevWeight = Number((prev as any).sets?.[0]?.weight || 0);
                         
                         if (currWeight > 0 && prevWeight > 0 && currWeight < prevWeight) {
                             anomalies.push(`Notei que no ${curr.name} você reduziu a carga (de ${prevWeight}kg para ${currWeight}kg).`);
@@ -107,7 +107,7 @@ export default function CoachChatModal({
     const handleSend = async () => {
         if (!input.trim()) return;
 
-        const userMsg = { role: 'user', content: input };
+        const userMsg: CoachMessage = { role: 'user', content: input };
         const newMessages = [...messages, userMsg];
         setMessages(newMessages);
         setInput('');

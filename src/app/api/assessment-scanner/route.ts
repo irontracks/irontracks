@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ ok: true, formData: result.formData ?? {} });
-  } catch (e) {
+  } catch (e: any) {
     const msg = e?.message ? String(e.message) : String(e);
     return NextResponse.json({ ok: false, error: msg || "Erro inesperado" }, { status: 500 });
   }

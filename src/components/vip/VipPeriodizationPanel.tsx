@@ -187,7 +187,7 @@ export default function VipPeriodizationPanel({
       await loadStats()
       setCreateOpen(false)
       setSuccess('Programa criado! Os treinos já estão em Treinos Periodizados.')
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Falha ao criar periodização.')
     } finally {
       setLoading(false)
@@ -209,7 +209,7 @@ export default function VipPeriodizationPanel({
       }
       const n = Number(json?.archived || 0)
       setSuccess(n > 0 ? `Treinos antigos arquivados: ${n}.` : 'Nenhum treino antigo para arquivar.')
-    } catch (e) {
+    } catch (e: any) {
       setError(e?.message ? String(e.message) : 'Falha ao limpar treinos antigos.')
     } finally {
       setCleaning(false)

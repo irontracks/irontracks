@@ -45,7 +45,7 @@ export async function POST() {
     if (!res.ok) return NextResponse.json({ ok: false, error: res.error || 'failed' }, { status: 400 })
 
     return NextResponse.json({ ok: true, sent: res.inserted })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

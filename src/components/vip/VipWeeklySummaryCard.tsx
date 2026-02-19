@@ -35,7 +35,7 @@ export default function VipWeeklySummaryCard() {
         return
       }
       setData(json)
-    } catch (e) {
+    } catch (e: any) {
       setData(null)
       setError(e?.message ? String(e.message) : 'Falha ao carregar resumo semanal.')
     } finally {

@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     } catch {}
 
     return NextResponse.json({ ok: true, channel_id: channelId }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e) {
+  } catch (e: any) {
     return jsonError(500, e?.message ?? String(e))
   }
 }

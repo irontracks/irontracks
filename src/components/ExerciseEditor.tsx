@@ -40,9 +40,9 @@ interface SetDetail {
     reps: string | number | null;
     rpe: number | null;
     weight: number | null;
-    is_warmup: boolean;
+    is_warmup?: boolean;
     isWarmup?: boolean;
-    advanced_config: AdvancedConfig | AdvancedConfig[] | null;
+    advanced_config?: AdvancedConfig | AdvancedConfig[] | null;
     advancedConfig?: AdvancedConfig | AdvancedConfig[] | null;
     it_auto?: {
         source: string;
@@ -428,7 +428,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                 const setsCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
                 const existingDetails = ensureSetDetails(ex, setsCount);
                 const parsed = parseExerciseNotesToSetOverrides({ notes: value, setsCount });
-                const overrides: Array<Record<string, unknown>> = Array.isArray(parsed?.overrides) ? (parsed.overrides as Array<Record<string, unknown>>) : [];
+                const overrides: Array<Record<string, unknown> | null> = Array.isArray(parsed?.overrides) ? (parsed.overrides as Array<Record<string, unknown> | null>) : [];
                 const hash = String(parsed?.hash || '').trim();
 
                 const updatedDetails = existingDetails.map((sd, setIdx) => {

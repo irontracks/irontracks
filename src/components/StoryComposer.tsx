@@ -1066,7 +1066,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         try {
           await navigator.share({ files: [file], title: 'Story IronTracks' })
           shared = true
-        } catch (shareErr) {
+        } catch (shareErr: any) {
           const name = String(shareErr?.name || '').trim()
           // If user cancelled, stop here
           if (name === 'AbortError') {
@@ -1083,7 +1083,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         downloadBlob(result.blob, result.filename)
         setInfo('Baixado com sucesso!')
       }
-    } catch (e) {
+    } catch (e: any) {
       const name = String(e?.name || '').trim()
       if (name === 'AbortError') return
       const msg = String(e?.message || '').trim()
@@ -1189,7 +1189,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         window.setTimeout(() => onClose?.(), 1000)
       } catch {}
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err)
       const msg = String(err?.message || '').trim()
       setError(msg || 'Falha ao publicar story.')

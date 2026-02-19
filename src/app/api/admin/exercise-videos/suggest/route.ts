@@ -92,7 +92,7 @@ export async function POST(req: Request) {
 
     const count = Array.isArray(inserted) ? inserted.length : 0
     return NextResponse.json({ ok: true, exercise_library_id: libRow.id, created: count })
-  } catch (e) {
+  } catch (e: any) {
     const msg = e?.message ? String(e.message) : String(e)
     const status =
       msg === 'missing_youtube_key' || msg === 'missing_gemini_key'

@@ -159,7 +159,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, processed, created, skipped })
-  } catch (e) {
+  } catch (e: any) {
     const msg = e?.message ? String(e.message) : String(e)
     const status = msg === 'missing_youtube_key' || msg === 'missing_gemini_key' ? 400 : 500
     return NextResponse.json({ ok: false, error: msg }, { status })

@@ -491,7 +491,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       </div>
 
       <div id="vip-periodization">
-        <VipPeriodizationPanel locked={isLocked} onStartSession={onStartSession} onOpenWorkoutEditor={onOpenWorkoutEditor} />
+        <VipPeriodizationPanel locked={isLocked} onStartSession={onStartSession || (() => {})} onOpenWorkoutEditor={onOpenWorkoutEditor} />
       </div>
 
       <div ref={chatRef} className="rounded-2xl border border-neutral-800 bg-neutral-900/60 overflow-hidden flex flex-col h-[600px]">

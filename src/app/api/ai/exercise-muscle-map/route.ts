@@ -221,7 +221,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, items: [...heuristicItems, ...upsertRows] })
-  } catch (e) {
+  } catch (e: any) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }

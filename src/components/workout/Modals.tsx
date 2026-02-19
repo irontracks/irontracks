@@ -1,11 +1,24 @@
+'use client';
+
 import React from 'react';
-import { useActiveWorkout } from './ActiveWorkoutContext';
-import { X, Clock, Save, Plus, Link2, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Clock, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
-import InviteManager from '@/components/InviteManager';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+import { moveDraftItem, draftOrderKeys } from '@/lib/workoutReorder';
+import { useWorkoutContext } from './WorkoutContext';
+import {
+  buildPlannedBlocks,
+  buildBlocksByCount,
+  isObject,
+  toNumber,
+  clampNumber,
+  roundToStep,
+  DELOAD_REDUCTION_MIN,
+  DELOAD_REDUCTION_MAX,
+  WEIGHT_ROUND_STEP,
+  DELOAD_SUGGEST_MODE,
+} from './utils';
 import { UnknownRecord } from './types';
-import { isObject, buildBlocksByCount, DROPSET_STAGE_LIMIT, DELOAD_SUGGEST_MODE } from './utils';
 
 const ExerciseSortRow = ({
   item,
@@ -74,27 +87,522 @@ const ExerciseSortRow = ({
   );
 };
 
-export const Modals = () => {
+export default function Modals() {
   const {
-    clusterModal, setClusterModal, saveClusterModal, startTimer,
-    restPauseModal, setRestPauseModal, saveRestPauseModal,
-    dropSetModal, setDropSetModal, saveDropSetModal, deloadSuggestions,
-    addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft, addExtraExerciseToWorkout,
-    organizeOpen, setOrganizeOpen, organizeDraft, setOrganizeDraft, organizeSaving, organizeError, saveOrganize, requestCloseOrganize,
-    postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft, postCheckinResolveRef,
-    editExerciseOpen, setEditExerciseOpen, editExerciseDraft, setEditExerciseDraft, saveEditExercise,
-    deloadModal, setDeloadModal,
-    inviteOpen, setInviteOpen, handleInvite,
-    getLog
-  } = useActiveWorkout();
+    workout,
+    postCheckinOpen,
+    setPostCheckinOpen,
+    postCheckinDraft,
+    setPostCheckinDraft,
+    postCheckinResolveRef,
+    deloadModal,
+    setDeloadModal,
+    reportHistoryStatus,
+    reportHistoryUpdatedAt,
+    updateDeloadModalFromPercent,
+    updateDeloadModalFromWeight,
+    applyDeloadToExercise,
+    addExerciseOpen,
+    setAddExerciseOpen,
+    addExerciseDraft,
+    setAddExerciseDraft,
+    addExtraExerciseToWorkout,
+    editExerciseOpen,
+    setEditExerciseOpen,
+    editExerciseIdx,
+    setEditExerciseIdx,
+    editExerciseDraft,
+    setEditExerciseDraft,
+    saveEditExercise,
+    organizeOpen,
+    requestCloseOrganize,
+    organizeDraft,
+    setOrganizeDraft,
+    organizeError,
+    organizeSaving,
+    organizeDirty,
+    saveOrganize,
+    clusterModal,
+    setClusterModal,
+    startTimer,
+    clusterRefs,
+    saveClusterModal,
+    restPauseModal,
+    setRestPauseModal,
+    saveRestPauseModal,
+    dropSetModal,
+    setDropSetModal,
+    saveDropSetModal,
+    deloadSuggestions,
+  } = useWorkoutContext();
 
   return (
     <>
-      <InviteManager
-        isOpen={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-        onInvite={handleInvite}
-      />
+      {postCheckinOpen && (
+        <div
+          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          onClick={() => {
+            setPostCheckinOpen(false);
+            const r = postCheckinResolveRef.current;
+            postCheckinResolveRef.current = null;
+            if (typeof r === 'function') r(null);
+          }}
+        >
+          <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                <div className="text-white font-black text-lg truncate">Pós-treino</div>
+                <div className="text-xs text-neutral-400 truncate">{String(workout?.title || 'Treino')}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPostCheckinOpen(false);
+                  const r = postCheckinResolveRef.current;
+                  postCheckinResolveRef.current = null;
+                  if (typeof r === 'function') r(null);
+                }}
+                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                aria-label="Fechar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Esforço (RPE 1–10)</div>
+                <select
+                  value={String(postCheckinDraft?.rpe ?? '')}
+                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, rpe: String(e.target.value || '') }))}
+                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Não informar</option>
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <option key={i + 1} value={String(i + 1)}>
+                      {i + 1}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Satisfação (1–5)</div>
+                <div className="grid grid-cols-5 gap-2">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setPostCheckinDraft((prev) => ({ ...prev, satisfaction: String(n) }))}
+                      className={
+                        String(postCheckinDraft?.satisfaction || '') === String(n)
+                          ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
+                          : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
+                      }
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
+                <select
+                  value={String(postCheckinDraft?.soreness ?? '')}
+                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
+                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="">Não informar</option>
+                  {Array.from({ length: 11 }).map((_, i) => (
+                    <option key={i} value={String(i)}>
+                      {i}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
+                <textarea
+                  value={String(postCheckinDraft?.notes || '')}
+                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
+                  className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
+                  placeholder="Ex.: treino pesado, boa técnica, ajustar carga na próxima…"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-800 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPostCheckinOpen(false);
+                  const r = postCheckinResolveRef.current;
+                  postCheckinResolveRef.current = null;
+                  if (typeof r === 'function') r(null);
+                }}
+                className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+              >
+                Pular
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPostCheckinOpen(false);
+                  const r = postCheckinResolveRef.current;
+                  postCheckinResolveRef.current = null;
+                  if (typeof r === 'function') r(postCheckinDraft);
+                }}
+                className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deloadModal && (
+        <div
+          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          onClick={() => setDeloadModal(null)}
+        >
+          {(() => {
+            const baseWeight = Number(deloadModal?.baseWeight || 0);
+            const suggestedWeight = Number(deloadModal?.suggestedWeight || 0);
+            const reductionPct = Math.round((Number(deloadModal?.reductionPct || 0) * 1000) / 10) / 10;
+            const minWeight = Number(deloadModal?.minWeight || 0);
+            const canApply = Number.isFinite(baseWeight) && baseWeight > 0 && Number.isFinite(suggestedWeight) && suggestedWeight > 0;
+            const reportStatus = String(reportHistoryStatus?.status || 'idle');
+            const reportSource = String(reportHistoryStatus?.source || '');
+            const reportUpdatedLabel = reportHistoryUpdatedAt
+              ? new Date(reportHistoryUpdatedAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+              : '';
+            const reportLabel =
+              reportStatus === 'loading'
+                ? 'Carregando relatórios…'
+                : reportStatus === 'error'
+                  ? 'Relatórios indisponíveis. Usando dados locais.'
+                  : reportSource === 'cache'
+                    ? 'Relatórios carregados do cache.'
+                    : reportSource === 'cache-stale'
+                      ? 'Relatórios do cache (atualizando).'
+                      : reportSource === 'network'
+                        ? 'Relatórios atualizados.'
+                        : 'Relatórios prontos.';
+            return (
+              <div
+                className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[11px] uppercase tracking-widest text-yellow-500 font-black">Deload</div>
+                    <div className="text-lg font-black text-white truncate">{String(deloadModal?.name || 'Exercício')}</div>
+                    <div className="text-xs text-neutral-400 truncate">{String(deloadModal?.reason || '')}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeloadModal(null)}
+                    className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+                    aria-label="Fechar"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div className="rounded-xl bg-neutral-950/40 border border-neutral-800 p-3 text-xs text-neutral-400 flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate">{reportLabel}</span>
+                    {reportUpdatedLabel ? <span className="font-mono text-yellow-500">{reportUpdatedLabel}</span> : null}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-neutral-950/40 border border-neutral-800 p-3">
+                      <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Peso base</div>
+                      <div className="mt-2 text-xl font-black text-white">{baseWeight ? `${baseWeight} kg` : '-'}</div>
+                    </div>
+                    <div className="rounded-xl bg-neutral-950/40 border border-yellow-500/30 p-3">
+                      <div className="text-[10px] uppercase tracking-widest text-yellow-500 font-black">Peso sugerido</div>
+                      <div className="mt-2 text-xl font-black text-yellow-500">{suggestedWeight ? `${suggestedWeight} kg` : '-'}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Redução (%)</label>
+                      <input
+                        inputMode="decimal"
+                        value={Number.isFinite(reductionPct) ? String(reductionPct) : ''}
+                        onChange={(e) => updateDeloadModalFromPercent(e?.target?.value ?? '')}
+                        className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        placeholder="12"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Peso sugerido (kg)</label>
+                      <input
+                        inputMode="decimal"
+                        value={Number.isFinite(suggestedWeight) ? String(suggestedWeight) : ''}
+                        onChange={(e) => updateDeloadModalFromWeight(e?.target?.value ?? '')}
+                        className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        placeholder="100"
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-neutral-950/40 border border-neutral-800 p-3 text-xs text-neutral-400">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Histórico analisado</span>
+                      <span className="font-mono text-yellow-500">{Number(deloadModal?.historyCount || 0)} treinos</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span>Peso mínimo seguro</span>
+                      <span className="font-mono text-yellow-500">{minWeight ? `${Math.round(minWeight * 10) / 10} kg` : '-'}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4 border-t border-neutral-800 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeloadModal(null)}
+                    className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyDeloadToExercise}
+                    disabled={!canApply}
+                    className={
+                      canApply
+                        ? 'flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center justify-center gap-2'
+                        : 'flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-500 font-black'
+                    }
+                  >
+                    <Check size={16} />
+                    Aplicar agora
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {addExerciseOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setAddExerciseOpen(false)}>
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-lg font-black text-white truncate">Adicionar exercício extra</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddExerciseOpen(false)}
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <input
+                  value={String(addExerciseDraft?.name ?? '')}
+                  onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                  placeholder="Ex: Supino reto"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(addExerciseDraft?.sets ?? '')}
+                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="3"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(addExerciseDraft?.restTime ?? '')}
+                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="60"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-800 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAddExerciseOpen(false)}
+                className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={addExtraExerciseToWorkout}
+                className="flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
+              >
+                Adicionar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editExerciseOpen && editExerciseIdx != null && (
+        <div className="fixed inset-0 z-[95] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}>
+          <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-lg font-black text-white truncate">Editar exercício</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <input
+                  value={String(editExerciseDraft?.name ?? '')}
+                  onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                  placeholder="Ex: Supino reto"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(editExerciseDraft?.sets ?? '')}
+                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="3"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <input
+                    inputMode="decimal"
+                    value={String(editExerciseDraft?.restTime ?? '')}
+                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="60"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Método</label>
+                <select
+                  value={String(editExerciseDraft?.method ?? 'Normal')}
+                  onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, method: String(e.target.value || 'Normal') }))}
+                  className="mt-2 w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  <option value="Normal">Normal</option>
+                  <option value="Drop-set">Drop-set</option>
+                  <option value="Rest-Pause">Rest-Pause</option>
+                  <option value="Cluster">Cluster</option>
+                  <option value="Bi-Set">Bi-Set</option>
+                  <option value="Cardio">Cardio</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-4 border-t border-neutral-800 flex gap-2">
+              <button
+                type="button"
+                onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}
+                className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveEditExercise}
+                className="flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center justify-center gap-2"
+              >
+                <Save size={16} />
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {organizeOpen && (
+        <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={requestCloseOrganize}>
+          <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-lg font-black text-white truncate">Organizar exercícios</div>
+                <div className="text-xs text-neutral-500">Arraste ou use as setas para reordenar.</div>
+              </div>
+              <button
+                type="button"
+                onClick={requestCloseOrganize}
+                className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              {organizeDraft.length === 0 ? (
+                <div className="rounded-xl bg-neutral-800 border border-neutral-700 p-4 text-sm text-neutral-400">Sem exercícios para organizar.</div>
+              ) : (
+                <Reorder.Group axis="y" values={organizeDraft} onReorder={setOrganizeDraft} className="space-y-2">
+                  {organizeDraft.map((item, index) => (
+                    <ExerciseSortRow
+                      key={String(item?.key ?? `item-${index}`)}
+                      item={item}
+                      index={index}
+                      total={organizeDraft.length}
+                      onMoveUp={() => setOrganizeDraft((prev) => moveDraftItem(prev, index, index - 1))}
+                      onMoveDown={() => setOrganizeDraft((prev) => moveDraftItem(prev, index, index + 1))}
+                    />
+                  ))}
+                </Reorder.Group>
+              )}
+              {organizeError ? <div className="text-sm text-red-400">{organizeError}</div> : null}
+            </div>
+            <div className="p-4 border-t border-neutral-800 flex gap-2">
+              <button
+                type="button"
+                onClick={requestCloseOrganize}
+                className="flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={saveOrganize}
+                disabled={organizeSaving || !organizeDirty}
+                className={
+                  organizeSaving
+                    ? 'flex-1 min-h-[44px] rounded-xl bg-yellow-500/70 text-black font-black inline-flex items-center justify-center gap-2 cursor-wait'
+                    : !organizeDirty
+                      ? 'flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-500 font-bold'
+                      : 'flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center justify-center gap-2'
+                }
+              >
+                {organizeSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                <span>Salvar ordem</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {clusterModal && (
         <div
@@ -134,6 +642,7 @@ export const Modals = () => {
                   {String(clusterModal.error)}
                 </div>
               ) : null}
+
               {Array.isArray(clusterModal?.blocks) && clusterModal.blocks.length > 0 ? (
                 <div className="flex items-center justify-end">
                   <button
@@ -294,6 +803,12 @@ export const Modals = () => {
                         <input
                           inputMode="decimal"
                           value={repsValue}
+                          ref={(el) => {
+                            if (!clusterRefs.current) clusterRefs.current = {};
+                            const key = String(modal.key || '');
+                            if (!clusterRefs.current[key]) clusterRefs.current[key] = [];
+                            clusterRefs.current[key][idx] = el;
+                          }}
                           onChange={(e) => {
                             const v = parseTrainingNumber(e?.target?.value);
                             const next = v != null && v > 0 ? v : null;
@@ -635,95 +1150,63 @@ export const Modals = () => {
                           setDropSetModal((prev) => {
                             if (!prev || typeof prev !== 'object') return prev;
                             const stages = Array.isArray(prev.stages) ? prev.stages : [];
-                            const nextStages = stages.map((st) => {
-                              const cur = st && typeof st === 'object' ? st : {};
-                              return { ...cur, weight: w };
-                            });
+                            const nextStages = stages.map((s) => (s && typeof s === 'object' ? { ...s, weight: w } : { weight: w, reps: null }));
                             return { ...prev, stages: nextStages, error: '' };
                           });
                         }}
-                        className="min-h-[36px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 inline-flex items-center gap-2"
+                        className="text-[10px] text-yellow-500 underline"
                       >
-                        <Link2 size={14} />
-                        Linkar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setDropSetModal((prev) => {
-                            if (!prev || typeof prev !== 'object') return prev;
-                            const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
-                            if (list.length >= DROPSET_STAGE_LIMIT) return prev;
-                            list.push({ weight: '', reps: null });
-                            return { ...prev, stages: list, error: '' };
-                          });
-                        }}
-                        className="min-h-[36px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 inline-flex items-center gap-2"
-                      >
-                        <Plus size={14} />
-                        Adicionar
+                        Linkar peso
                       </button>
                     </div>
                   </div>
 
                   {Array.isArray(dropSetModal?.stages) &&
-                    dropSetModal.stages.map((st, idx) => (
-                      <div key={`ds-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Etapa {idx + 1}</div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDropSetModal((prev) => {
-                                if (!prev || typeof prev !== 'object') return prev;
-                                const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
-                                list.splice(idx, 1);
-                                return { ...prev, stages: list, error: '' };
-                              });
-                            }}
-                            className="h-9 w-9 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 inline-flex items-center justify-center"
-                            aria-label="Remover etapa"
-                          >
-                            <X size={14} />
-                          </button>
+                    ((dropSetModal as UnknownRecord).stages as unknown[]).map((stage, idx) => {
+                      const st = isObject(stage) ? (stage as UnknownRecord) : ({} as UnknownRecord);
+                      const w = String(st.weight ?? '');
+                      const r = st.reps == null ? '' : String(st.reps);
+                      return (
+                        <div key={`stage-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                          <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 mb-2">Etapa {idx + 1}</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              inputMode="decimal"
+                              value={w}
+                              onChange={(e) => {
+                                const v = e?.target?.value ?? '';
+                                setDropSetModal((prev) => {
+                                  if (!prev || typeof prev !== 'object') return prev;
+                                  const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
+                                  const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
+                                  list[idx] = { ...cur, weight: v };
+                                  return { ...prev, stages: list, error: '' };
+                                });
+                              }}
+                              placeholder={weightPlaceholder}
+                              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                            />
+                            <input
+                              inputMode="decimal"
+                              value={r}
+                              onChange={(e) => {
+                                const n = parseTrainingNumber(e?.target?.value);
+                                const next = n != null && n > 0 ? n : null;
+                                setDropSetModal((prev) => {
+                                  if (!prev || typeof prev !== 'object') return prev;
+                                  const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
+                                  const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
+                                  list[idx] = { ...cur, reps: next };
+                                  return { ...prev, stages: list, error: '' };
+                                });
+                              }}
+                              placeholder={repsPlaceholder}
+                              className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                            />
+                          </div>
                         </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <input
-                            inputMode="decimal"
-                            value={String(st?.weight ?? '')}
-                            onChange={(e) => {
-                              const v = e?.target?.value ?? '';
-                              setDropSetModal((prev) => {
-                                if (!prev || typeof prev !== 'object') return prev;
-                                const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
-                                const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
-                                list[idx] = { ...cur, weight: v };
-                                return { ...prev, stages: list, error: '' };
-                              });
-                            }}
-                            placeholder={weightPlaceholder}
-                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                          />
-                          <input
-                            inputMode="decimal"
-                            value={st?.reps == null ? '' : String(st.reps)}
-                            onChange={(e) => {
-                              const n = parseTrainingNumber(e?.target?.value);
-                              const next = n != null && n > 0 ? n : null;
-                              setDropSetModal((prev) => {
-                                if (!prev || typeof prev !== 'object') return prev;
-                                const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
-                                const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
-                                list[idx] = { ...cur, reps: next };
-                                return { ...prev, stages: list, error: '' };
-                              });
-                            }}
-                            placeholder={repsPlaceholder}
-                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
 
                 <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
@@ -748,404 +1231,6 @@ export const Modals = () => {
           })()}
         </div>
       )}
-
-      {addExerciseOpen && (
-        <div
-          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-          onClick={() => setAddExerciseOpen(false)}
-        >
-          <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Adicionar</div>
-                <div className="text-white font-black text-lg truncate">Novo exercício</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAddExerciseOpen(false)}
-                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-                aria-label="Fechar"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Nome</div>
-                <input
-                  value={addExerciseDraft.name}
-                  onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Ex: Agachamento Livre"
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Séries</div>
-                  <input
-                    inputMode="decimal"
-                    value={addExerciseDraft.sets}
-                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, sets: e.target.value }))}
-                    placeholder="3"
-                    className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Descanso (s)</div>
-                  <input
-                    inputMode="decimal"
-                    value={addExerciseDraft.restTime}
-                    onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, restTime: e.target.value }))}
-                    placeholder="60"
-                    className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-neutral-800 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setAddExerciseOpen(false)}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={addExtraExerciseToWorkout}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2"
-              >
-                <Plus size={16} />
-                Adicionar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {organizeOpen && (
-        <div
-          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-          onClick={requestCloseOrganize}
-        >
-          <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Organizar</div>
-                <div className="text-white font-black text-lg truncate">Reordenar exercícios</div>
-              </div>
-              <button
-                type="button"
-                onClick={requestCloseOrganize}
-                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-                aria-label="Fechar"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="p-4 flex-1 overflow-y-auto custom-scrollbar">
-              {organizeError ? (
-                <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
-                  {organizeError}
-                </div>
-              ) : null}
-              
-              <Reorder.Group axis="y" values={organizeDraft} onReorder={setOrganizeDraft} className="space-y-2">
-                {organizeDraft.map((item, index) => (
-                  <ExerciseSortRow
-                    key={String(item.id || item.workout_exercise_id || index)}
-                    item={item}
-                    index={index}
-                    total={organizeDraft.length}
-                    onMoveUp={() => {
-                        if (index > 0) {
-                            const next = [...organizeDraft];
-                            [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                            setOrganizeDraft(next);
-                        }
-                    }}
-                    onMoveDown={() => {
-                        if (index < organizeDraft.length - 1) {
-                            const next = [...organizeDraft];
-                            [next[index + 1], next[index]] = [next[index], next[index + 1]];
-                            setOrganizeDraft(next);
-                        }
-                    }}
-                  />
-                ))}
-              </Reorder.Group>
-            </div>
-
-            <div className="p-4 border-t border-neutral-800 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={requestCloseOrganize}
-                disabled={organizeSaving}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={saveOrganize}
-                disabled={organizeSaving}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2 disabled:opacity-50"
-              >
-                {organizeSaving ? <Clock size={16} className="animate-spin" /> : <Save size={16} />}
-                {organizeSaving ? 'Salvando...' : 'Salvar Ordem'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {postCheckinOpen && (
-        <div
-          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-          onClick={() => {
-            setPostCheckinOpen(false);
-            const r = postCheckinResolveRef.current;
-            postCheckinResolveRef.current = null;
-            if (typeof r === 'function') r(null);
-          }}
-        >
-          <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
-                <div className="text-white font-black text-lg truncate">Pós-treino</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setPostCheckinOpen(false);
-                  const r = postCheckinResolveRef.current;
-                  postCheckinResolveRef.current = null;
-                  if (typeof r === 'function') r(null);
-                }}
-                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-                aria-label="Fechar"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Esforço (RPE 1–10)</div>
-                <select
-                  value={String(postCheckinDraft?.rpe ?? '')}
-                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, rpe: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
-                >
-                  <option value="">Não informar</option>
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <option key={i + 1} value={String(i + 1)}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Satisfação (1–5)</div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setPostCheckinDraft((prev) => ({ ...prev, satisfaction: String(n) }))}
-                      className={
-                        String(postCheckinDraft?.satisfaction || '') === String(n)
-                          ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                          : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                      }
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
-                <select
-                  value={String(postCheckinDraft?.soreness ?? '')}
-                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
-                >
-                  <option value="">Não informar</option>
-                  <option value="0">0 - Sem dor</option>
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <option key={i + 1} value={String(i + 1)}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
-                <textarea
-                  value={String(postCheckinDraft?.notes ?? '')}
-                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Como você se sentiu?"
-                  className="w-full min-h-[80px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white resize-none outline-none focus:ring-1 ring-yellow-500"
-                />
-              </div>
-            </div>
-            <div className="p-4 border-t border-neutral-800 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setPostCheckinOpen(false);
-                  const r = postCheckinResolveRef.current;
-                  postCheckinResolveRef.current = null;
-                  if (typeof r === 'function') r(null);
-                }}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
-              >
-                Pular
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPostCheckinOpen(false);
-                  const r = postCheckinResolveRef.current;
-                  postCheckinResolveRef.current = null;
-                  if (typeof r === 'function') r({ ...postCheckinDraft });
-                }}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editExerciseOpen && (
-        <div
-          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-          onClick={() => setEditExerciseOpen(false)}
-        >
-          <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Editar</div>
-                <div className="text-white font-black text-lg truncate">Exercício</div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditExerciseOpen(false)}
-                className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-                aria-label="Fechar"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Nome</div>
-                <input
-                  value={editExerciseDraft.name}
-                  onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, name: e.target.value }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Séries</div>
-                  <input
-                    inputMode="decimal"
-                    value={editExerciseDraft.sets}
-                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e.target.value }))}
-                    className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Descanso (s)</div>
-                  <input
-                    inputMode="decimal"
-                    value={editExerciseDraft.restTime}
-                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, restTime: e.target.value }))}
-                    className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Método</div>
-                <select
-                  value={editExerciseDraft.method}
-                  onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, method: e.target.value }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
-                >
-                  <option value="Normal">Normal</option>
-                  <option value="Drop-set">Drop-set</option>
-                  <option value="Rest-Pause">Rest-Pause</option>
-                  <option value="SST">SST</option>
-                  <option value="Cluster">Cluster</option>
-                  <option value="Bi-Set">Bi-Set</option>
-                  <option value="FST-7">FST-7</option>
-                  <option value="GVT">GVT</option>
-                </select>
-              </div>
-            </div>
-            <div className="p-4 border-t border-neutral-800 flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditExerciseOpen(false)}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={saveEditExercise}
-                className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2"
-              >
-                <Save size={16} />
-                Salvar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {deloadModal && (
-        <div
-          className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-          onClick={() => setDeloadModal(null)}
-        >
-          <div className="w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl p-6 text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-2">Deload Sugerido</div>
-            <h3 className="text-xl font-black text-white mb-1">{String(deloadModal.name)}</h3>
-            <p className="text-sm text-neutral-400 mb-4">{String(deloadModal.reason)}</p>
-            
-            <div className="bg-neutral-800/50 rounded-xl p-4 mb-6 space-y-2">
-                <div className="flex justify-between text-sm">
-                    <span className="text-neutral-400">Carga Base</span>
-                    <span className="text-white font-mono">{Number(deloadModal.baseWeight || 0)} kg</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                    <span className="text-neutral-400">Redução</span>
-                    <span className="text-red-400 font-mono">-{Math.round(Number(deloadModal.reductionPct || 0) * 100)}%</span>
-                </div>
-                <div className="border-t border-neutral-700 pt-2 flex justify-between text-base font-bold">
-                    <span className="text-yellow-500">Sugerido</span>
-                    <span className="text-white font-mono">{Number(deloadModal.suggestedWeight || 0)} kg</span>
-                </div>
-            </div>
-
-            <button
-              onClick={() => setDeloadModal(null)}
-              className="w-full py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
-            >
-              Entendido
-            </button>
-          </div>
-        </div>
-      )}
     </>
   );
-};
+}

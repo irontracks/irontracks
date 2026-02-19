@@ -29,6 +29,7 @@ export async function GET(req: Request) {
 
     const { data: params, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
+    if (!params) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
 
     const teacherId = (params.teacher_id ?? params.teacher_user_id)?.trim()
     if (!teacherId) {
@@ -80,7 +81,7 @@ export async function GET(req: Request) {
     const next_cursor = last?.date || last?.created_at ? { cursor_date: last?.date || null, cursor_created_at: last?.created_at || null } : null
 
     return NextResponse.json({ ok: true, rows: enriched, next_cursor }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

@@ -74,7 +74,7 @@ export async function GET() {
     }))
 
     return NextResponse.json({ ok: true, program, workouts: enriched })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

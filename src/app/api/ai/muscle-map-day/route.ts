@@ -187,7 +187,7 @@ const normalizeAiExerciseMap = (obj: unknown) => {
     })
     .filter(Boolean)
 
-  return items
+  return items as Record<string, unknown>[]
 }
 
 const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
@@ -379,7 +379,7 @@ export async function POST(req: Request) {
         let newlyMapped: Array<Record<string, unknown>> = []
         try {
           newlyMapped = await classifyExercisesWithAi(apiKey, batch)
-        } catch (e) {
+        } catch (e: any) {
           aiError = String((e as Error)?.message ?? e)
           ai.status = aiError.includes('429') ? 'rate_limited' : 'failed'
           ai.error = aiError
@@ -549,7 +549,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(payload)
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 500 })
   }
 }

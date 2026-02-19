@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({ ok: true, items: Array.from(dedup.values()) })
-  } catch (e) {
+  } catch (e: any) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

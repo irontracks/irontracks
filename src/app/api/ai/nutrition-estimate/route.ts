@@ -115,7 +115,7 @@ export async function POST(req: Request) {
 
     const row = Array.isArray(data) ? data[0] : null
     return NextResponse.json({ ok: true, row })
-  } catch (e) {
+  } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message || 'unexpected_error' }, { status: 500 })
   }
 }

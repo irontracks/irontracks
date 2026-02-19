@@ -136,7 +136,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, notified })
-  } catch (e) {
-    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }

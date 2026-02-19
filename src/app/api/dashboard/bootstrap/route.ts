@@ -150,7 +150,7 @@ export async function GET() {
       },
       { headers: { 'cache-control': 'no-store, max-age=0' } },
     )
-  } catch (e) {
+  } catch (e: any) {
     return errorResponse(e)
   }
 }

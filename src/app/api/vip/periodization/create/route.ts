@@ -341,7 +341,7 @@ export async function POST(req: Request) {
       split: plan.split,
       weeks: plan.weeks,
     })
-  } catch (e) {
+  } catch (e: any) {
     return errorResponse(e)
   }
 }

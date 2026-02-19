@@ -2,38 +2,19 @@
 
 import React from 'react';
 import { BackButton } from '@/components/ui/BackButton';
-import { ActiveWorkoutProvider } from './workout/ActiveWorkoutContext';
-import { useActiveWorkoutController, ActiveWorkoutProps } from './workout/useActiveWorkoutController';
-import { WorkoutHeader } from './workout/WorkoutHeader';
-import { ExerciseList } from './workout/ExerciseList';
-import { WorkoutFooter } from './workout/WorkoutFooter';
-import { Modals } from './workout/Modals';
-import { UnknownRecord } from './workout/types';
-import { z } from 'zod';
-
-const UnknownRecordSchema: z.ZodType<UnknownRecord> = z.record(z.unknown());
+import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
+import { WorkoutProvider } from './workout/WorkoutContext';
+import WorkoutHeader from './workout/WorkoutHeader';
+import ExerciseList from './workout/ExerciseList';
+import WorkoutFooter from './workout/WorkoutFooter';
+import Modals from './workout/Modals';
+import { ActiveWorkoutProps } from './workout/types';
 
 export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
-  const { 
-    session, workout, 
-    ticker, exercises, 
-    collapsed, toggleCollapse,
-    addExtraSetToExercise, 
-    openOrganizeModal, 
-    finishWorkout,
-    openEditExercise,
-    openDeloadModal,
-    finishing,
-    setAddExerciseOpen,
-    setInviteOpen
-  } = controller;
+  const { session, workout } = controller;
 
-  // Derive elapsedSeconds from session.startedAt and ticker
-  const startedAtMs = session?.startedAt ? new Date(session.startedAt).getTime() : 0;
-  const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
-
-  if (!props.session || !workout) {
+  if (!session || !workout) {
     return (
       <div className="min-h-screen bg-neutral-900 text-white p-6">
         <div className="max-w-lg mx-auto rounded-xl bg-neutral-800 border border-neutral-700 p-6">
@@ -47,43 +28,13 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   }
 
   return (
-    <ActiveWorkoutProvider value={controller}>
+    <WorkoutProvider value={controller}>
       <div className="min-h-screen bg-neutral-900 text-white flex flex-col">
-        <WorkoutHeader 
-          title={String(workout?.title || 'Treino')}
-          elapsedSeconds={elapsedSeconds}
-          exercisesCount={exercises.length}
-          onBack={props.onBack}
-          onAddExercise={() => setAddExerciseOpen(true)}
-          onOrganize={openOrganizeModal}
-          onInvite={() => setInviteOpen(true)}
-        />
-        
-        <ExerciseList 
-          exercises={exercises}
-          collapsed={collapsed}
-          onToggleCollapse={toggleCollapse}
-          onAddSet={addExtraSetToExercise}
-          onOpenEdit={openEditExercise}
-          onOpenDeload={(ex, idx) => {
-            const parsed = UnknownRecordSchema.safeParse(ex);
-            if (!parsed.success) return;
-            openDeloadModal(parsed.data, idx);
-          }}
-          onOpenVideo={(url) => {
-             if (typeof window !== 'undefined' && url) {
-                 window.open(url, '_blank', 'noopener,noreferrer');
-             }
-          }}
-        />
-
-        <WorkoutFooter
-            onFinish={finishWorkout}
-            finishing={finishing}
-        />
-
+        <WorkoutHeader />
+        <ExerciseList />
+        <WorkoutFooter />
         <Modals />
       </div>
-    </ActiveWorkoutProvider>
+    </WorkoutProvider>
   );
 }

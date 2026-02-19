@@ -360,7 +360,7 @@ export default function StoryViewer({
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setComments(json.data || [])
-    } catch (e) {
+    } catch (e: any) {
       setCommentsError(e.message)
     } finally {
       setCommentsLoading(false)
@@ -376,7 +376,7 @@ export default function StoryViewer({
       if (!res.ok) throw new Error(json.error)
       setViewers(json.data || [])
       viewersStoryIdRef.current = storyId
-    } catch (e) {
+    } catch (e: any) {
       setViewersError(e.message)
     } finally {
       setViewersLoading(false)

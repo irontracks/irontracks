@@ -44,8 +44,8 @@ export async function GET(req: Request) {
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const limit = q.limit
-    const signedSeconds = q.signedSeconds
+    const limit = q?.limit ?? 200
+    const signedSeconds = q?.signedSeconds ?? 600
 
     const userId = String(auth.user.id || '').trim()
     if (!userId) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
@@ -190,8 +190,7 @@ export async function GET(req: Request) {
       })
 
     return NextResponse.json({ ok: true, data: groups })
-  } catch (e) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
   }
 }
