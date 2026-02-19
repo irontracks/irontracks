@@ -331,7 +331,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     try {
                         const raw = w.date || w.completed_at || w.created_at;
                         if (!raw) return;
-                        const d = raw?.toDate ? raw.toDate() : new Date(raw);
+                        const d = (raw as any)?.toDate ? (raw as any).toDate() : new Date(raw);
                         const t = d?.getTime ? d.getTime() : NaN;
                         if (!Number.isFinite(t)) return;
                         if (t > lastWorkoutMs) lastWorkoutMs = t;
