@@ -12,7 +12,7 @@ import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
 import { PeriodStats } from '@/types/workout';
 import { z } from 'zod';
-import { ExerciseSchema, SetSchema, WorkoutSchema } from '@/schemas/database';
+import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -59,24 +59,24 @@ const RawSessionJsonSchema = z
 
 const WorkoutIdNameSchema = z
     .object({
-        id: WorkoutSchema.shape.id,
-        name: WorkoutSchema.shape.name,
+        id: WorkoutRowSchema.shape.id,
+        name: WorkoutRowSchema.shape.name,
     })
     .passthrough();
 
 const ExerciseIdSchema = z
     .object({
-        id: ExerciseSchema.shape.id,
+        id: ExerciseRowSchema.shape.id,
     })
     .passthrough();
 
 const SetLiteSchema = z
     .object({
-        exercise_id: SetSchema.shape.exercise_id,
-        set_number: SetSchema.shape.set_number,
-        reps: SetSchema.shape.reps,
-        rpe: SetSchema.shape.rpe,
-        weight: SetSchema.shape.weight,
+        exercise_id: SetRowSchema.shape.exercise_id,
+        set_number: SetRowSchema.shape.set_number,
+        reps: SetRowSchema.shape.reps,
+        rpe: SetRowSchema.shape.rpe,
+        weight: SetRowSchema.shape.weight,
     })
     .passthrough();
 
@@ -274,22 +274,22 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             if (!value) return null;
             if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate?: unknown }).toDate === 'function') {
                 const d = (value as { toDate: () => unknown }).toDate();
-                const t = d instanceof Date ? d.getTime() : new Date(d).getTime();
+                const t = d instanceof Date ? d.getTime() : new Date(String(d)).getTime();
                 return Number.isFinite(t) ? t : null;
             }
             if (value instanceof Date) {
                 const t = value.getTime();
                 return Number.isFinite(t) ? t : null;
             }
-            if (typeof value === 'object') {
-                const seconds = Number(value?.seconds ?? value?._seconds ?? value?.sec ?? null);
-                const nanos = Number(value?.nanoseconds ?? value?._nanoseconds ?? 0);
+            if (isRecord(value)) {
+                const seconds = Number(value.seconds ?? value._seconds ?? value.sec ?? null);
+                const nanos = Number(value.nanoseconds ?? value._nanoseconds ?? 0);
                 if (Number.isFinite(seconds) && seconds > 0) {
                     const t = seconds * 1000 + Math.floor(nanos / 1e6);
                     return Number.isFinite(t) ? t : null;
                 }
             }
-            const t = new Date(value).getTime();
+            const t = new Date(String(value)).getTime();
             return Number.isFinite(t) ? t : null;
         } catch {
             return null;

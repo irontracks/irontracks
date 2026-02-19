@@ -26,12 +26,8 @@ export interface SetDetail {
   reps: string | number | null;
   rpe: number | null;
   weight: number | null;
-  is_warmup: boolean;
-  /** @deprecated Use is_warmup */
-  isWarmup?: boolean;
-  advanced_config: AdvancedConfig | AdvancedConfig[] | null;
-  /** @deprecated Use advanced_config */
-  advancedConfig?: AdvancedConfig | AdvancedConfig[] | null;
+  isWarmup: boolean;
+  advancedConfig: AdvancedConfig | AdvancedConfig[] | null;
   completed?: boolean;
   it_auto?: {
     source: string;
@@ -48,20 +44,12 @@ export interface Exercise {
   reps: string | number | null;
   rpe: number | string | null;
   method?: string | null;
-  /** @deprecated Use rest_time (DB column name) */
   restTime?: number | string | null;
-  /** DB column: rest_time */
-  rest_time?: number | string | null;
-  /** @deprecated Use video_url (DB column name) */
   videoUrl?: string | null;
-  /** DB column: video_url */
-  video_url?: string | null;
   notes?: string | null;
   cadence?: string | null;
   type?: string;
   setDetails?: SetDetail[];
-  /** DB column: set_details */
-  set_details?: SetDetail[];
   order?: number;
   workout_id?: string;
   _itx_exKey?: string; // Internal key for active session
@@ -155,7 +143,6 @@ export interface PendingUpdate {
   id?: string;
   title?: string;
   description?: string;
-  release_date?: string | null;
   releaseDate?: string | null;
   [key: string]: unknown;
 }

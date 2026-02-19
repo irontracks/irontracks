@@ -11,6 +11,8 @@ import { HELP_TERMS } from '@/utils/help/terms';
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
 
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+
 interface AdvancedConfig {
     initial_reps?: number | null;
     mini_sets?: number | null;
@@ -426,21 +428,21 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                 const setsCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
                 const existingDetails = ensureSetDetails(ex, setsCount);
                 const parsed = parseExerciseNotesToSetOverrides({ notes: value, setsCount });
-                const overrides = Array.isArray(parsed?.overrides) ? parsed.overrides : [];
+                const overrides: Array<Record<string, unknown>> = Array.isArray(parsed?.overrides) ? (parsed.overrides as Array<Record<string, unknown>>) : [];
                 const hash = String(parsed?.hash || '').trim();
 
                 const updatedDetails = existingDetails.map((sd, setIdx) => {
                     const current = sd && typeof sd === 'object' ? sd : buildDefaultSetDetail(ex, setIdx + 1);
                     const auto = current?.it_auto && typeof current.it_auto === 'object' ? current.it_auto : null;
                     const isAuto = String(auto?.source || '') === 'notes';
-                    const override = overrides?.[setIdx] && typeof overrides[setIdx] === 'object' ? overrides[setIdx] : null;
+                    const override = isRecord(overrides?.[setIdx]) ? overrides[setIdx] : null;
 
                     if (!override) {
                         if (!isAuto) return current;
-                        return { ...current, it_auto: null, advanced_config: null };
+                        return { ...current, it_auto: null, advancedConfig: null };
                     }
 
-                    const canOverwrite = isAuto || current?.advanced_config == null;
+                    const canOverwrite = isAuto || current?.advancedConfig == null;
                     if (!canOverwrite) return current;
 
                     const nextAuto = {
@@ -453,7 +455,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                     const next = {
                         ...current,
                         it_auto: nextAuto,
-                        advanced_config: override.advanced_config ?? null,
+                        advancedConfig: (override.advancedConfig ?? override.advanced_config ?? null) as AdvancedConfig | AdvancedConfig[] | null,
                     };
 
                     const plannedReps = String(override.plannedReps || '').trim();
