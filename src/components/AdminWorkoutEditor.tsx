@@ -15,7 +15,7 @@ export interface AdminExercise {
     videoUrl: string;
     video_url?: string; // Compatibility
     notes: string;
-    coachNotes: string;
+    coachNotes?: string;
     [key: string]: any;
 }
 
