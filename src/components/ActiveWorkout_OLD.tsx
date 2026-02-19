@@ -2747,7 +2747,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
             ) : null}
             <ExecutionVideoCapture
               exerciseName={name}
-              workoutId={workout?.id || null}
+              workoutId={workout?.id || undefined}
               exerciseId={String(ex?.id || ex?.exercise_id || '')}
               exerciseLibraryId={String(ex?.exercise_library_id || '')}
             />
