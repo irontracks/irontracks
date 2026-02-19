@@ -9,6 +9,8 @@ import { parseJsonBody } from '@/utils/zod'
 export const dynamic = 'force-dynamic'
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '')
+const model = genAI.getGenerativeModel({ model: MODEL })
 
 const BodySchema = z
   .object({
@@ -25,7 +27,7 @@ export async function POST(req: Request) {
     const userId = String(auth.user.id || '').trim()
 
     const ip = getRequestIp(req)
-    const rl = checkRateLimit(`ai:vip-coach:${userId}:${ip}`, 30, 60_000)
+    const rl = await checkRateLimit(`ai:vip-coach:${userId}:${ip}`, 30, 60_000)
     if (!rl.allowed) {
       return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     }
@@ -70,8 +72,6 @@ export async function POST(req: Request) {
 
     const prompt = [system, '', modeHint, '', 'Mensagem do usuário:', message].join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL })
     const result = await model.generateContent([{ text: prompt }] as any)
     const answer = String((await result?.response?.text()) || '').trim()
     if (!answer) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })

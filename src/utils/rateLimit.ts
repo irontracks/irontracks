@@ -1,3 +1,5 @@
+import { createAdminClient } from '@/utils/supabase/admin'
+
 export type RateLimitResult = {
   allowed: boolean
   remaining: number
@@ -5,14 +7,7 @@ export type RateLimitResult = {
   retryAfterSeconds: number
 }
 
-type Entry = { count: number; resetAt: number }
-
-const getStore = (): Map<string, Entry> => {
-  const g = globalThis as unknown as { __irontracksRateLimitStore?: Map<string, Entry> }
-  if (!g.__irontracksRateLimitStore) g.__irontracksRateLimitStore = new Map()
-  return g.__irontracksRateLimitStore as Map<string, Entry>
-}
-
+// Helper para pegar IP (mantido como estava)
 export const getRequestIp = (req: Request) => {
   try {
     const xff = String(req.headers.get('x-forwarded-for') || '').trim()
@@ -25,24 +20,44 @@ export const getRequestIp = (req: Request) => {
   return ''
 }
 
-export const checkRateLimit = (key: string, max: number, windowMs: number): RateLimitResult => {
-  const now = Date.now()
-  const store = getStore()
-  const prev = store.get(key)
+export const checkRateLimit = async (key: string, max: number, windowMs: number): Promise<RateLimitResult> => {
+  const admin = createAdminClient()
+  
+  try {
+    const { data, error } = await admin.rpc('check_rate_limit', {
+      p_key: key,
+      p_max: max,
+      p_window_ms: windowMs
+    })
 
-  if (!prev || prev.resetAt <= now) {
-    const resetAt = now + Math.max(1, windowMs)
-    store.set(key, { count: 1, resetAt })
-    return { allowed: true, remaining: Math.max(0, max - 1), resetAt, retryAfterSeconds: Math.ceil((resetAt - now) / 1000) }
-  }
+    if (error) {
+      console.error('Rate limit error:', error)
+      // Fail open (allow request if rate limit fails) or closed depending on requirements
+      // Here we fail open to not block users on system error, but log it
+      return { 
+        allowed: true, 
+        remaining: 1, 
+        resetAt: Date.now() + windowMs, 
+        retryAfterSeconds: 0 
+      }
+    }
 
-  const nextCount = prev.count + 1
-  const allowed = nextCount <= max
-  store.set(key, { count: nextCount, resetAt: prev.resetAt })
-  return {
-    allowed,
-    remaining: Math.max(0, max - nextCount),
-    resetAt: prev.resetAt,
-    retryAfterSeconds: Math.ceil((prev.resetAt - now) / 1000),
+    // O retorno da RPC é JSONB, precisamos garantir a tipagem
+    const result = data as any
+    
+    return {
+      allowed: !!result.allowed,
+      remaining: Number(result.remaining) || 0,
+      resetAt: Number(result.reset_at) || (Date.now() + windowMs),
+      retryAfterSeconds: Number(result.retry_after_seconds) || 0
+    }
+  } catch (err) {
+    console.error('Rate limit exception:', err)
+    return { 
+      allowed: true, 
+      remaining: 1, 
+      resetAt: Date.now() + windowMs, 
+      retryAfterSeconds: 0 
+    }
   }
 }

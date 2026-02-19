@@ -9,8 +9,9 @@ export type RouteAuthFail = { ok: false; response: NextResponse<{ ok: false; err
 export type RouteAuthOk = { ok: true; supabase: SupabaseClient; user: User; role: IrontracksRole; response?: undefined }
 
 const getAdminEmail = () => {
-  const envEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
-  return envEmail || 'djmkapple@gmail.com'
+  const envEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || '').trim().toLowerCase()
+  if (!envEmail) throw new Error('IRONTRACKS_ADMIN_EMAIL não configurado')
+  return envEmail
 }
 
 export const jsonError = (status: number, error: string) => {

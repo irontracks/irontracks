@@ -239,31 +239,7 @@ export async function incrementVipUsage(
   feature: 'chat' | 'wizard' | 'insights'
 ) {
   const today = new Date().toISOString().split('T')[0]
-  
-  // Upsert usage
-  // We can't use .rpc() unless we have a specific function, so we'll try insert/update
-  // Or better, use upsert with on conflict
-  
-  const { data: existing } = await supabase
-    .from('vip_usage_daily')
-    .select('usage_count')
-    .eq('user_id', userId)
-    .eq('feature_key', feature)
-    .eq('day', today)
-    .maybeSingle()
-
-  const nextCount = (existing?.usage_count || 0) + 1
-
-  const { error } = await supabase
-    .from('vip_usage_daily')
-    .upsert({
-      user_id: userId,
-      feature_key: feature,
-      day: today,
-      usage_count: nextCount,
-      last_used_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id, feature_key, day' })
-    
-  if (error) console.error('Error incrementing VIP usage:', error)
+  await supabase.rpc('increment_vip_usage', {
+    p_user_id: userId, p_feature_key: feature, p_day: today
+  })
 }

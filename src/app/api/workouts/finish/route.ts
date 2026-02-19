@@ -111,6 +111,8 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    
+    const admin = createAdminClient()
 
     const parsedBody = await parseJsonBody(request, BodySchema)
     if (parsedBody.response) return parsedBody.response
@@ -128,7 +130,6 @@ export async function POST(request: Request) {
       })()
 
     try {
-      const admin = createAdminClient()
       await admin.from('user_activity_events').insert({
         user_id: user.id,
         event_name: 'workout_finish_api',
@@ -199,7 +200,6 @@ export async function POST(request: Request) {
     } catch {}
 
     try {
-      const admin = createAdminClient()
       const { data: me } = await admin.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
       const name = String(me?.display_name || '').trim() || 'Seu amigo'
 
@@ -382,7 +382,6 @@ export async function POST(request: Request) {
     } catch {}
 
     try {
-      const admin = createAdminClient()
       await admin.from('user_activity_events').insert({
         user_id: user.id,
         event_name: 'workout_finish_api',

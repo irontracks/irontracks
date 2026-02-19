@@ -83,7 +83,7 @@ export async function POST(req: Request) {
     const userId = String(auth.user.id || '').trim()
 
     const ip = getRequestIp(req)
-    const rl = checkRateLimit(`ai:workout-wizard:${userId}:${ip}`, 10, 60_000)
+    const rl = await checkRateLimit(`ai:workout-wizard:${userId}:${ip}`, 10, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const access = await checkVipFeatureAccess(supabase, userId, 'wizard_weekly')
