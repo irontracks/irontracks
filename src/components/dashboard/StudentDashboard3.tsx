@@ -490,8 +490,8 @@ export default function StudentDashboard(props: Props) {
           reps: s.reps,
           rpe: s.rpe,
           weight: s.weight,
-          is_warmup: !!s.is_warmup,
-          advanced_config: s.advanced_config ?? null,
+          isWarmup: !!s.is_warmup,
+          advancedConfig: s.advanced_config ?? null,
         }))
         const nonEmptyReps = setDetails.map((s) => s.reps).filter((r): r is string => typeof r === 'string' && r.trim() !== '')
         const defaultReps = isCardio ? '20' : '10'
