@@ -40,20 +40,34 @@ const BASE_ACTIVITY_FACTOR = 1.2;
 const TEF_FACTOR = 0.1;
 const MAX_SESSION_SECONDS = 4 * 60 * 60;
 
-const toPositiveNumberOrNull = (value: any): number | null => {
+interface AssessmentRow {
+  id?: string
+  weight?: number | string | null
+  bf?: number | string | null
+  waist?: number | string | null
+  arm?: number | string | null
+  sum7?: number | string | null
+  date?: string | null
+  notes?: string | null
+  [key: string]: unknown
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const toPositiveNumberOrNull = (value: unknown): number | null => {
   const num = typeof value === 'string' ? Number(value.replace(',', '.')) : Number(value);
   return Number.isFinite(num) && num > 0 ? num : null;
 };
 
-const getWeightKg = (assessment: any): number | null => {
+const getWeightKg = (assessment: AssessmentRow): number | null => {
   return toPositiveNumberOrNull(assessment?.weight);
 };
 
-const getBodyFatPercent = (assessment: any): number | null => {
+const getBodyFatPercent = (assessment: AssessmentRow): number | null => {
   return toPositiveNumberOrNull(assessment?.body_fat_percentage ?? assessment?.bf);
 };
 
-const getFatMassKg = (assessment: any): number | null => {
+const getFatMassKg = (assessment: AssessmentRow): number | null => {
   const stored = toPositiveNumberOrNull(assessment?.fat_mass);
   if (stored) return stored;
   const weight = getWeightKg(assessment);
@@ -63,7 +77,7 @@ const getFatMassKg = (assessment: any): number | null => {
   return Number.isFinite(computed) && computed > 0 ? computed : null;
 };
 
-const getLeanMassKg = (assessment: any): number | null => {
+const getLeanMassKg = (assessment: AssessmentRow): number | null => {
   const weight = getWeightKg(assessment);
   const bf = getBodyFatPercent(assessment);
   const fatMass = getFatMassKg(assessment);
@@ -84,13 +98,14 @@ const getLeanMassKg = (assessment: any): number | null => {
   return Number.isFinite(computed) && computed > 0 && computed < weight ? computed : null;
 };
 
-const getBmrKcal = (assessment: any): number | null => {
+const getBmrKcal = (assessment: AssessmentRow): number | null => {
   return toPositiveNumberOrNull(assessment?.bmr);
 };
 
-const getMeasurementCm = (assessment: any, key: string): number | null => {
+const getMeasurementCm = (assessment: AssessmentRow, key: string): number | null => {
   // Tenta buscar no objeto aninhado antigo
-  const nested = toPositiveNumberOrNull(assessment?.measurements?.[key]);
+  const measurements = isRecord(assessment?.measurements) ? (assessment.measurements as Record<string, unknown>) : null
+  const nested = toPositiveNumberOrNull(measurements?.[key]);
   if (nested) return nested;
 
   // Tenta mapear para as colunas planas novas
@@ -111,9 +126,10 @@ const getMeasurementCm = (assessment: any, key: string): number | null => {
   return null;
 };
 
-const getSkinfoldMm = (assessment: any, key: string): number | null => {
+const getSkinfoldMm = (assessment: AssessmentRow, key: string): number | null => {
   // Tenta buscar no objeto aninhado antigo
-  const nested = toPositiveNumberOrNull(assessment?.skinfolds?.[key]);
+  const skinfolds = isRecord(assessment?.skinfolds) ? (assessment.skinfolds as Record<string, unknown>) : null
+  const nested = toPositiveNumberOrNull(skinfolds?.[key]);
   if (nested) return nested;
 
   // Tenta mapear para as colunas planas novas
@@ -135,9 +151,10 @@ const getSkinfoldMm = (assessment: any, key: string): number | null => {
   return null;
 };
 
-const getSum7Mm = (assessment: any): number | null => {
+const getSum7Mm = (assessment: AssessmentRow): number | null => {
   // Tenta buscar valor pronto antigo
-  const stored = toPositiveNumberOrNull(assessment?.sum7 ?? assessment?.measurements?.sum7);
+  const measurements = isRecord(assessment?.measurements) ? (assessment.measurements as Record<string, unknown>) : null
+  const stored = toPositiveNumberOrNull(assessment?.sum7 ?? measurements?.sum7);
   if (stored) return stored;
 
   // Calcula somatório das colunas planas
@@ -153,25 +170,29 @@ const getSum7Mm = (assessment: any): number | null => {
   return sum > 0 ? sum : null;
 };
 
-const safeJsonParse = (raw: any): any | null => {
+const safeJsonParse = (raw: unknown): Record<string, unknown> | null => {
   try {
     if (!raw) return null;
-    if (typeof raw === 'object') return raw;
+    if (isRecord(raw)) return raw;
     if (typeof raw !== 'string') return null;
-    return JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    return isRecord(parsed) ? parsed : null;
   } catch {
     return null;
   }
 };
 
-const safeDateMs = (raw: any): number | null => {
+const safeDateMs = (raw: unknown): number | null => {
   if (!raw) return null;
-  const d = new Date(raw);
+  const obj = isRecord(raw) ? raw : null
+  const toDate = obj && typeof obj.toDate === 'function' ? (obj.toDate as () => unknown) : null
+  const d = toDate ? toDate() : new Date(typeof raw === 'string' || typeof raw === 'number' || raw instanceof Date ? raw : String(raw))
+  if (!(d instanceof Date)) return null
   const t = d.getTime();
   return Number.isFinite(t) ? t : null;
 };
 
-const safeDateMsStartOfDay = (raw: any): number | null => {
+const safeDateMsStartOfDay = (raw: unknown): number | null => {
   if (!raw) return null;
   if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
     const d = new Date(`${raw.trim()}T00:00:00.000`);
@@ -181,7 +202,7 @@ const safeDateMsStartOfDay = (raw: any): number | null => {
   return safeDateMs(raw);
 };
 
-const safeDateMsEndOfDay = (raw: any): number | null => {
+const safeDateMsEndOfDay = (raw: unknown): number | null => {
   if (!raw) return null;
   if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
     const d = new Date(`${raw.trim()}T23:59:59.999`);
@@ -191,14 +212,14 @@ const safeDateMsEndOfDay = (raw: any): number | null => {
   return safeDateMs(raw);
 };
 
-const countSessionSets = (session: any): number => {
-  const logs = session?.logs;
+const countSessionSets = (session: Record<string, unknown>): number => {
+  const logs = session?.logs
   if (logs && typeof logs === 'object') {
     try {
-      const values = Object.values(logs);
+      const values: unknown[] = Object.values(logs as Record<string, unknown>);
       if (Array.isArray(values)) {
-        const doneCount = values.reduce((acc: number, v: any) => {
-          if (v && typeof v === 'object' && v.done === true) return acc + 1;
+        const doneCount = values.reduce<number>((acc: number, v: unknown) => {
+          if (isRecord(v) && v.done === true) return acc + 1;
           return acc;
         }, 0);
         if (doneCount > 0) return doneCount;
@@ -211,8 +232,9 @@ const countSessionSets = (session: any): number => {
 
   const exercises = Array.isArray(session?.exercises) ? session.exercises : [];
   let total = 0;
-  for (const ex of exercises) {
-    const setsArr = Array.isArray(ex?.sets) ? ex.sets : null;
+  for (const exRaw of exercises) {
+    const ex = isRecord(exRaw) ? exRaw : {}
+    const setsArr = Array.isArray(ex?.sets) ? (ex.sets as unknown[]) : null;
     if (setsArr) {
       total += setsArr.length;
       continue;
@@ -235,7 +257,7 @@ const estimateStrengthTrainingMet = (seconds: number, setsCount: number): number
   return 5.9;
 };
 
-const uniqueStrings = (values: any[]): string[] => {
+const uniqueStrings = (values: unknown[]): string[] => {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const v of values) {
@@ -250,14 +272,15 @@ const uniqueStrings = (values: any[]): string[] => {
 
 interface AssessmentHistoryProps {
   studentId?: string;
+  onClose?: () => void;
 }
 
-export default function AssessmentHistory({ studentId: propStudentId }: AssessmentHistoryProps) {
+export default function AssessmentHistory({ studentId: propStudentId, onClose }: AssessmentHistoryProps) {
   const studentId = propStudentId;
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const { getStudentAssessments } = useAssessment();
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
   const [loading, setLoading] = useState(!!studentId);
   const [error, setError] = useState<string | null>(null);
   const [workoutSessions, setWorkoutSessions] = useState<{ dateMs: number; metHours: number }[]>([]);
@@ -266,15 +289,26 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   const [showHistory, setShowHistory] = useState(false);
   const [studentName, setStudentName] = useState<string>('Aluno');
   const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
-  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, { loading: boolean; error: string | null; plan: any | null; usedAi: boolean; reason?: string }>>({});
+  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<
+    Record<
+      string,
+      {
+        loading: boolean
+        error: string | null
+        plan: Record<string, unknown> | null
+        usedAi: boolean
+        reason?: string
+      }
+    >
+  >({});
   const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [planModalAssessment, setPlanModalAssessment] = useState<any | null>(null);
+  const [planModalAssessment, setPlanModalAssessment] = useState<AssessmentRow | null>(null);
   const [importing, setImporting] = useState(false);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
   const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const mergeImportedFormData = (base: any, incoming: any) => {
-    const out: any = { ...(base && typeof base === 'object' ? base : {}) };
+  const mergeImportedFormData = (base: Record<string, unknown>, incoming: Record<string, unknown>) => {
+    const out: Record<string, unknown> = { ...(base && typeof base === 'object' ? base : {}) };
     const keys = [
       'assessment_date',
       'weight',
@@ -322,7 +356,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
 
       setImporting(true);
 
-      let mergedFormData: any = {};
+      let mergedFormData: Record<string, unknown> = {};
 
       for (const file of files) {
         const form = new FormData();
@@ -333,14 +367,14 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           body: form,
         });
 
-        const data = await res.json().catch(() => null);
+        const data = await res.json().catch((): any => null);
         if (!data || !data.ok) {
           const msg = String(data?.error || 'Falha ao processar arquivo');
           if (typeof window !== 'undefined') window.alert(msg);
           return;
         }
 
-        const nextForm = data?.formData && typeof data.formData === 'object' ? data.formData : null;
+        const nextForm = data?.formData && typeof data.formData === 'object' ? (data.formData as Record<string, unknown>) : null;
         if (nextForm) mergedFormData = mergeImportedFormData(mergedFormData, nextForm);
       }
 
@@ -412,13 +446,14 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           setError(null);
           setLoading(true);
         }
-        const list = await getStudentAssessments(studentId!);
+        const listRaw = await getStudentAssessments(studentId!);
+        const list = Array.isArray(listRaw) ? (listRaw as unknown as AssessmentRow[]) : [];
         if (mounted) setAssessments(list);
         if (mounted) {
           setError(null);
           const latest = list?.[0];
           if (latest?.student_name) {
-            setStudentName(latest.student_name);
+            setStudentName(String(latest.student_name || 'Aluno'));
           } else {
             let resolvedName = 'Aluno';
             try {
@@ -458,7 +493,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     };
   }, [studentId, getStudentAssessments, supabase]);
 
-  const handleGenerateAssessmentPlan = async (assessment: any, opts?: { openDetails?: boolean }) => {
+  const handleGenerateAssessmentPlan = async (assessment: AssessmentRow, opts?: { openDetails?: boolean }) => {
     try {
       const id = String(assessment?.id || '');
       if (!id) return;
@@ -478,8 +513,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
       const res = await generateAssessmentPlanAi({
         assessment,
         studentName,
-        trainerName: assessment?.trainer_name || '',
-        goal: assessment?.goal || assessment?.observations || '',
+        trainerName: String(assessment?.trainer_name ?? ''),
+        goal: String(assessment?.goal ?? assessment?.observations ?? ''),
       });
 
       if (!res || !res.ok) {
@@ -511,14 +546,14 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           planAnchorRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch {}
       }, 50);
-    } catch (e: any) {
+    } catch (e) {
       const id = String(assessment?.id || '');
       if (!id) return;
       setAiPlanByAssessmentId((prev) => ({
         ...prev,
         [id]: {
           loading: false,
-          error: e?.message ? String(e.message) : 'Erro inesperado ao gerar plano tático',
+          error: (e as Record<string, unknown>)?.message ? String((e as Record<string, unknown>).message) : 'Erro inesperado ao gerar plano tático',
           plan: prev[id]?.plan ?? null,
           usedAi: false,
           reason: 'ai_failed',
@@ -527,7 +562,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     }
   };
 
-  const handleOpenAssessmentPlanModal = async (assessment: any) => {
+  const handleOpenAssessmentPlanModal = async (assessment: AssessmentRow) => {
     try {
       const id = String(assessment?.id || '');
       if (!id) return;
@@ -538,8 +573,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   };
 
   const sortedAssessments = useMemo(() => {
-    const safeTime = (raw: any) => {
-      const date = new Date(raw);
+    const safeTime = (raw: unknown): number => {
+      const date = new Date(typeof raw === 'string' || typeof raw === 'number' || raw instanceof Date ? raw : String(raw ?? ''));
       const time = date.getTime();
       return Number.isFinite(time) ? time : 0;
     };
@@ -627,7 +662,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
         const fromDay = typeof fromIso === 'string' ? fromIso.split('T')[0] : null;
         const toDay = typeof toIso === 'string' ? toIso.split('T')[0] : null;
 
-        const rows: any[] = [];
+        const rows: AssessmentRow[] = [];
         try {
           const { data, error: wErr } = await supabase
             .from('workouts')
@@ -678,7 +713,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           } catch {}
         }
 
-        const byId = new Map<string, any>();
+        const byId = new Map<string, AssessmentRow>();
         for (const r of rows) {
           if (r?.id) byId.set(String(r.id), r);
         }
@@ -694,10 +729,10 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           if (!rawSeconds) {
             try {
               const exerciseDurations = Array.isArray(parsed?.exerciseDurations)
-                ? parsed.exerciseDurations
-                : (Array.isArray(parsed?.exercisesDurations) ? parsed.exercisesDurations : null);
+                ? (parsed.exerciseDurations as unknown[])
+                : (Array.isArray(parsed?.exercisesDurations) ? (parsed.exercisesDurations as unknown[]) : null);
               if (exerciseDurations && exerciseDurations.length > 0) {
-                const sum = exerciseDurations.reduce((acc: number, v: any) => acc + (Number(v) || 0), 0);
+                const sum = exerciseDurations.reduce<number>((acc: number, v: unknown) => acc + (Number(v) || 0), 0);
                 if (Number.isFinite(sum) && sum > 0) rawSeconds = sum;
               }
             } catch {}
@@ -705,7 +740,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           if (!rawSeconds) return;
           const seconds = Math.min(rawSeconds, MAX_SESSION_SECONDS);
           if (!Number.isFinite(seconds) || seconds <= 0) return;
-          const setsCount = countSessionSets(parsed);
+          const setsCount = countSessionSets(parsed || {});
           const met = estimateStrengthTrainingMet(seconds, setsCount);
           const metHours = (met * seconds) / 3600;
           if (!Number.isFinite(metHours) || metHours <= 0) return;
@@ -794,29 +829,29 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
     return out;
   }, [sortedAssessments, workoutSessions]);
 
-  const formatDate = (rawDate: any, options?: Intl.DateTimeFormatOptions) => {
+  const formatDate = (rawDate: unknown, options?: Intl.DateTimeFormatOptions) => {
     if (!rawDate) return '-';
-    const date = new Date(rawDate);
+    const date = new Date(typeof rawDate === 'string' || typeof rawDate === 'number' || rawDate instanceof Date ? rawDate : String(rawDate));
     if (Number.isNaN(date.getTime())) return '-';
     return date.toLocaleDateString('pt-BR', options);
   };
 
-  const formatDateCompact = (rawDate: any) => {
+  const formatDateCompact = (rawDate: unknown) => {
     return formatDate(rawDate, { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  const formatWeekdayCompact = (rawDate: any) => {
+  const formatWeekdayCompact = (rawDate: unknown) => {
     return formatDate(rawDate, { weekday: 'long' });
   };
 
-  const safeGender = (raw: any) => {
+  const safeGender = (raw: unknown) => {
     return raw === 'F' || raw === 'M' ? raw : 'M';
   };
 
   const chartData = useMemo(() => {
     const labels = sortedAssessments.map(assessment => {
       const rawDate = assessment?.date ?? assessment?.assessment_date;
-      const date = new Date(rawDate);
+      const date = new Date(typeof rawDate === 'string' || typeof rawDate === 'number' || rawDate instanceof Date ? rawDate : String(rawDate ?? ''));
       return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR');
     });
 
@@ -907,12 +942,12 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   }, [sortedAssessments]);
 
   const chartHasData = useMemo(() => {
-    const hasNumber = (data: any): boolean => {
-      return Array.isArray(data) && data.some(v => typeof v === 'number' && Number.isFinite(v));
+    const hasNumber = (data: unknown): boolean => {
+      return Array.isArray(data) && data.some((v: unknown) => typeof v === 'number' && Number.isFinite(v));
     };
 
-    const hasDatasetNumbers = (datasets: any): boolean => {
-      return Array.isArray(datasets) && datasets.some(ds => hasNumber(ds?.data));
+    const hasDatasetNumbers = (datasets: unknown): boolean => {
+      return Array.isArray(datasets) && datasets.some((ds: unknown) => hasNumber(isRecord(ds) ? ds.data : null));
     };
 
     return {
@@ -944,7 +979,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
   const latestAssessment = sortedAssessments[sortedAssessments.length - 1];
   const previousAssessment = sortedAssessments[sortedAssessments.length - 2];
 
-  const getProgress = (currentRaw: any, previousRaw: any) => {
+  const getProgress = (currentRaw: unknown, previousRaw: unknown) => {
     if (currentRaw === null || currentRaw === undefined) return null;
     if (previousRaw === null || previousRaw === undefined) return null;
     const current = Number(currentRaw);
@@ -1083,14 +1118,16 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                 </span>
               </button>
             </div>
-            <button
-              onClick={() => { if (typeof window !== 'undefined') window.history.back(); }}
-              className="shrink-0 w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition-all duration-300 active:scale-95 flex items-center justify-center"
-              title="Fechar"
-              type="button"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            {!onClose ? (
+              <button
+                onClick={() => { if (typeof window !== 'undefined') window.history.back(); }}
+                className="shrink-0 w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition-all duration-300 active:scale-95 flex items-center justify-center"
+                title="Fechar"
+                type="button"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            ) : null}
             <input
               ref={scanInputRef}
               type="file"
@@ -1234,8 +1271,12 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
           </h3>
         </div>
         <div id="assessments-history" className="divide-y divide-neutral-700">
-          {sortedAssessments.map((assessment) => (
-            <div key={assessment.id} className="p-6 hover:bg-neutral-900 transition-colors">
+          {sortedAssessments.map((assessment, idx) => {
+            const assessmentId = String(assessment?.id ?? idx)
+            const photos = Array.isArray(assessment?.photos) ? assessment.photos : []
+            const ageLabel = String(assessment?.age ?? '-')
+            return (
+            <div key={assessmentId} className="p-6 hover:bg-neutral-900 transition-colors">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-3">
@@ -1249,9 +1290,9 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                     </div>
                     <div className="shrink-0 flex items-center gap-2">
                       <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
-                        {assessment.age ?? '-'} anos
+                        {ageLabel} anos
                       </span>
-                      {assessment.photos && assessment.photos.length > 0 && (
+                      {photos.length > 0 && (
                         <span className="px-2.5 py-1 bg-green-500/15 text-green-400 text-xs rounded-full border border-green-500/20 font-bold">
                           Com fotos
                         </span>
@@ -1301,15 +1342,15 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
 
                 <div className="flex flex-row flex-wrap items-center gap-2 md:justify-end">
                   <button
-                    onClick={() => setSelectedAssessment(selectedAssessment === assessment.id ? null : assessment.id)}
+                    onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
                     className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
                     type="button"
                   >
-                    {selectedAssessment === assessment.id ? 'Ocultar' : 'Detalhes'}
+                    {selectedAssessment === assessmentId ? 'Ocultar' : 'Detalhes'}
                   </button>
                   <AssessmentPDFGenerator
                     formData={{
-                      assessment_date: String(assessment.assessment_date || ''),
+                      assessment_date: String(assessment.assessment_date ?? ''),
                       weight: String(assessment.weight || ''),
                       height: String(assessment.height || ''),
                       age: String(assessment.age || ''),
@@ -1329,9 +1370,13 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                       calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
                       observations: ''
                     }}
-                    studentName={assessment.student_name}
-                    trainerName={assessment.trainer_name}
-                    assessmentDate={new Date(assessment.assessment_date || Date.now())}
+                    studentName={String(assessment.student_name ?? '')}
+                    trainerName={String(assessment.trainer_name ?? '')}
+                    assessmentDate={new Date(
+                      typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
+                        ? assessment.assessment_date
+                        : String(assessment.assessment_date ?? Date.now()),
+                    )}
                   />
                   <button
                     type="button"
@@ -1343,7 +1388,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                   </button>
                 </div>
               </div>
-              {selectedAssessment === assessment.id && (
+              {selectedAssessment === assessmentId && (
                 <div className="mt-4 pt-4 border-t border-neutral-700">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -1413,56 +1458,78 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                             <div className="text-sm text-red-400">{s.error}</div>
                           ) : plan ? (
                             <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                              {Array.isArray(plan.summary) && plan.summary.length > 0
-                                ? plan.summary.map((item: any, idx: number) => (
-                                    <li key={idx}>{String(item || '')}</li>
-                                  ))
-                                : null}
+                              {(() => {
+                                const raw = plan.summary
+                                const items = Array.isArray(raw) ? raw : []
+                                return items.length
+                                  ? items.map((item: unknown, idx: number) => <li key={idx}>{String(item ?? '')}</li>)
+                                  : null
+                              })()}
                             </ul>
                           ) : null}
                         </div>
                         {plan ? (
                           <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
-                            {Array.isArray(plan.training) && plan.training.length > 0 && (
+                            {(() => {
+                              const raw = plan.training
+                              const items = Array.isArray(raw) ? raw : []
+                              if (!items.length) return null
+                              return (
                               <div>
                                 <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
                                 <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                  {plan.training.map((item: any, idx: number) => (
-                                    <li key={idx}>{String(item || '')}</li>
+                                  {items.map((item: unknown, idx: number) => (
+                                    <li key={idx}>{String(item ?? '')}</li>
                                   ))}
                                 </ul>
                               </div>
-                            )}
-                            {Array.isArray(plan.nutrition) && plan.nutrition.length > 0 && (
+                              )
+                            })()}
+                            {(() => {
+                              const raw = plan.nutrition
+                              const items = Array.isArray(raw) ? raw : []
+                              if (!items.length) return null
+                              return (
                               <div>
                                 <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
                                 <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                  {plan.nutrition.map((item: any, idx: number) => (
-                                    <li key={idx}>{String(item || '')}</li>
+                                  {items.map((item: unknown, idx: number) => (
+                                    <li key={idx}>{String(item ?? '')}</li>
                                   ))}
                                 </ul>
                               </div>
-                            )}
-                            {Array.isArray(plan.habits) && plan.habits.length > 0 && (
+                              )
+                            })()}
+                            {(() => {
+                              const raw = plan.habits
+                              const items = Array.isArray(raw) ? raw : []
+                              if (!items.length) return null
+                              return (
                               <div>
                                 <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
                                 <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                  {plan.habits.map((item: any, idx: number) => (
-                                    <li key={idx}>{String(item || '')}</li>
+                                  {items.map((item: unknown, idx: number) => (
+                                    <li key={idx}>{String(item ?? '')}</li>
                                   ))}
                                 </ul>
                               </div>
-                            )}
-                            {Array.isArray(plan.warnings) && plan.warnings.length > 0 && (
+                              )
+                            })()}
+                            {(() => {
+                              const raw = plan.warnings
+                              const items = Array.isArray(raw) ? raw : []
+                              if (!items.length) return null
+                              return (
                               <div>
                                 <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
                                 <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
-                                  {plan.warnings.map((item: any, idx: number) => (
-                                    <li key={idx}>{String(item || '')}</li>
+                                  {items.map((item: unknown, idx: number) => (
+                                    <li key={idx}>{String(item ?? '')}</li>
                                   ))}
                                 </ul>
                               </div>
-                            )}
+                              )
+                            })()}
                           </div>
                         ) : null}
                       </div>
@@ -1471,7 +1538,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                 </div>
               )}
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -1527,54 +1595,76 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
                           <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                            {Array.isArray(plan.summary) && plan.summary.length > 0
-                              ? plan.summary.map((item: any, idx: number) => (
-                                  <li key={idx}>{String(item || '')}</li>
-                                ))
-                              : null}
+                            {(() => {
+                              const raw = plan.summary
+                              const items = Array.isArray(raw) ? raw : []
+                              return items.length
+                                ? items.map((item: unknown, idx: number) => <li key={idx}>{String(item ?? '')}</li>)
+                                : null
+                            })()}
                           </ul>
                         </div>
                         <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
-                          {Array.isArray(plan.training) && plan.training.length > 0 && (
+                          {(() => {
+                            const raw = plan.training
+                            const items = Array.isArray(raw) ? raw : []
+                            if (!items.length) return null
+                            return (
                             <div>
                               <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
                               <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                {plan.training.map((item: any, idx: number) => (
-                                  <li key={idx}>{String(item || '')}</li>
+                                {items.map((item: unknown, idx: number) => (
+                                  <li key={idx}>{String(item ?? '')}</li>
                                 ))}
                               </ul>
                             </div>
-                          )}
-                          {Array.isArray(plan.nutrition) && plan.nutrition.length > 0 && (
+                            )
+                          })()}
+                          {(() => {
+                            const raw = plan.nutrition
+                            const items = Array.isArray(raw) ? raw : []
+                            if (!items.length) return null
+                            return (
                             <div>
                               <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
                               <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                {plan.nutrition.map((item: any, idx: number) => (
-                                  <li key={idx}>{String(item || '')}</li>
+                                {items.map((item: unknown, idx: number) => (
+                                  <li key={idx}>{String(item ?? '')}</li>
                                 ))}
                               </ul>
                             </div>
-                          )}
-                          {Array.isArray(plan.habits) && plan.habits.length > 0 && (
+                            )
+                          })()}
+                          {(() => {
+                            const raw = plan.habits
+                            const items = Array.isArray(raw) ? raw : []
+                            if (!items.length) return null
+                            return (
                             <div>
                               <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
                               <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                {plan.habits.map((item: any, idx: number) => (
-                                  <li key={idx}>{String(item || '')}</li>
+                                {items.map((item: unknown, idx: number) => (
+                                  <li key={idx}>{String(item ?? '')}</li>
                                 ))}
                               </ul>
                             </div>
-                          )}
-                          {Array.isArray(plan.warnings) && plan.warnings.length > 0 && (
+                            )
+                          })()}
+                          {(() => {
+                            const raw = plan.warnings
+                            const items = Array.isArray(raw) ? raw : []
+                            if (!items.length) return null
+                            return (
                             <div>
                               <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
                               <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
-                                {plan.warnings.map((item: any, idx: number) => (
-                                  <li key={idx}>{String(item || '')}</li>
+                                {items.map((item: unknown, idx: number) => (
+                                  <li key={idx}>{String(item ?? '')}</li>
                                 ))}
                               </ul>
                             </div>
-                          )}
+                            )
+                          })()}
                         </div>
                       </div>
                     ) : (
@@ -1638,8 +1728,10 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
               <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-neutral-800 rounded-full"><X className="w-5 h-5 text-neutral-400"/></button>
             </div>
             <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
-              {sortedAssessments.map(a => (
-                <div key={a.id} className="bg-neutral-800 p-3 rounded-xl border border-neutral-700">
+              {sortedAssessments.map((a, idx) => {
+                const assessmentId = String(a?.id ?? idx)
+                return (
+                <div key={assessmentId} className="bg-neutral-800 p-3 rounded-xl border border-neutral-700">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                     <div>
                       <div className="font-black text-white">{formatDateCompact(a.date || a.assessment_date)}</div>
@@ -1653,7 +1745,7 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() => setSelectedAssessment(selectedAssessment === a.id ? null : a.id)}
+                        onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
                         className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
                         type="button"
                       >
@@ -1682,12 +1774,16 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                           observations: ''
                         }}
                         studentName={studentName}
-                        trainerName={a.trainer_name}
-                        assessmentDate={new Date(a.assessment_date || Date.now())}
+                        trainerName={String(a.trainer_name ?? '')}
+                        assessmentDate={new Date(
+                          typeof a.assessment_date === 'string' || typeof a.assessment_date === 'number' || a.assessment_date instanceof Date
+                            ? a.assessment_date
+                            : String(a.assessment_date ?? Date.now()),
+                        )}
                       />
                     </div>
                   </div>
-                  {selectedAssessment === a.id && (
+                  {selectedAssessment === assessmentId && (
                     <div className="mt-3 pt-3 border-t border-neutral-700">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div>
@@ -1722,7 +1818,8 @@ export default function AssessmentHistory({ studentId: propStudentId }: Assessme
                     </div>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>

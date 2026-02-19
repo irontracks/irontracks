@@ -23,7 +23,7 @@ const normalizeText = (v: string) =>
 
 const pick = <T,>(arr: T[], idx: number, seed: number) => {
   const list = Array.isArray(arr) ? arr : []
-  if (!list.length) return undefined as any
+  if (!list.length) return undefined
   const safeSeed = Number.isFinite(seed) ? Math.max(0, Math.floor(seed)) : 0
   const safeIdx = Number.isFinite(idx) ? Math.max(0, Math.floor(idx)) : 0
   const pos = (safeIdx + safeSeed) % list.length
@@ -129,9 +129,9 @@ export function generateWorkoutFromWizard(answers: WorkoutWizardAnswers, seed: n
   const pickHinge = (i: number) => pick(baseCatalog.hinge, i, seed)
   const pickCore = (i: number) => pick(baseCatalog.core, i, seed)
 
-  const exercises: any[] = []
+  const exercises: unknown[] = []
 
-  const add = (name: string, overrides?: Partial<RepScheme>) => {
+  const add = (name: string | undefined, overrides?: Partial<RepScheme>) => {
     const n = String(name || '').trim()
     if (!n) return
     const used = overrides ? { ...scheme, ...overrides } : scheme
@@ -148,7 +148,7 @@ export function generateWorkoutFromWizard(answers: WorkoutWizardAnswers, seed: n
     })
   }
 
-  const addAccessory = (name: string) => add(name, { sets: Math.max(2, Math.min(3, scheme.sets)), restTime: Math.max(45, Math.min(90, scheme.restTime)) })
+  const addAccessory = (name: string | undefined) => add(name, { sets: Math.max(2, Math.min(3, scheme.sets)), restTime: Math.max(45, Math.min(90, scheme.restTime)) })
 
   if (pattern === 'push') {
     add(pickPush(0))
@@ -197,7 +197,8 @@ export function generateWorkoutFromWizard(answers: WorkoutWizardAnswers, seed: n
   }
 
   if (answers.goal === 'conditioning') {
-    for (const ex of exercises) {
+    for (const rawEx of exercises) {
+      const ex = rawEx as { restTime?: number | string; reps?: string; rpe?: string | number }
       ex.restTime = Math.min(60, Math.max(30, Number(ex.restTime) || 45))
       ex.reps = ex.reps || '12-20'
       ex.rpe = ex.rpe || '6-8'

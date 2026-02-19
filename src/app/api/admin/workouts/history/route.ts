@@ -1,19 +1,31 @@
 import { NextResponse } from 'next/server'
-import { requireRole } from '@/utils/auth/route'
+import { z } from 'zod'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
 const looksLikeUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 
+const QuerySchema = z.object({
+  id: z.string().uuid().optional(),
+  email: z.string().email().optional(),
+})
+
 export async function GET(req: Request) {
   try {
-    const auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin', 'teacher'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      if (!auth.ok) return auth.response
+    }
 
-    const url = new URL(req.url)
-    const id = url.searchParams.get('id') || undefined
-    const email = url.searchParams.get('email') || undefined
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+    if (!q) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
+
+    const { id, email } = q
 
     const supabase = auth.supabase
 
@@ -40,12 +52,13 @@ export async function GET(req: Request) {
     if (!looksLikeUuid(targetUserId)) return NextResponse.json({ ok: false, error: 'invalid target' }, { status: 400 })
 
     if (auth.role === 'teacher') {
-      const { data: link } = await supabase
+      const { data: links } = await supabase
         .from('students')
         .select('id')
         .eq('user_id', targetUserId)
         .eq('teacher_id', auth.user.id)
-        .maybeSingle()
+        .limit(1)
+      const link = Array.isArray(links) ? links[0] : null
       if (!link?.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
@@ -60,6 +73,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, rows: rows || [] })
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const message = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }

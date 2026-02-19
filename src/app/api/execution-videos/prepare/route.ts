@@ -1,9 +1,23 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    exercise_name: z.string().optional(),
+    notes: z.string().optional(),
+    exercise_library_id: z.string().optional(),
+    workout_id: z.string().optional(),
+    exercise_id: z.string().optional(),
+    file_name: z.string().optional(),
+    content_type: z.string().optional(),
+  })
+  .passthrough()
 
 const isEnabled = () => String(process.env.ENABLE_EXECUTION_VIDEO || '').trim().toLowerCase() === 'true'
 
@@ -25,7 +39,9 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response
 
   try {
-    const body: any = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const userId = String(auth.user.id)
     const admin = createAdminClient()
 
@@ -63,11 +79,11 @@ export async function POST(req: Request) {
 
     try {
       const { data: existing } = await admin.storage.getBucket(bucketId)
-      const LIMIT = 200 * 1024 * 1024 // 200MB
+      const LIMIT = 200 * 1024 * 1024
       if (!existing?.id) {
-          await admin.storage.createBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
+        await admin.storage.createBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
       } else if (existing.file_size_limit !== LIMIT) {
-          await admin.storage.updateBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
+        await admin.storage.updateBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
       }
     } catch {}
 

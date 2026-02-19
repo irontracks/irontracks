@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+const PostBodySchema = z
+  .object({
+    storyId: z.string().optional(),
+    story_id: z.string().optional(),
+    signedSeconds: z.coerce.number().optional(),
+  })
+  .passthrough()
 
 const guessContentTypeFromPath = (path: string) => {
   const p = String(path || '').toLowerCase()
@@ -40,7 +50,7 @@ export async function GET(req: Request) {
     if (story?.is_deleted) return new Response('not_found', { status: 404 })
     if (story?.expires_at && new Date(String(story.expires_at)).getTime() <= Date.now()) return new Response('not_found', { status: 404 })
 
-    const authorId = String((story as any)?.author_id || '').trim()
+    const authorId = String((story as Record<string, unknown>)?.author_id || '').trim()
     if (!authorId) return new Response('not_found', { status: 404 })
     if (authorId !== userId) {
       const { data: follow, error: fErr } = await admin
@@ -72,7 +82,9 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, PostBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const storyId = String(body?.storyId || body?.story_id || '').trim()
     const signedSeconds = Math.min(3600, Math.max(60, Number(body?.signedSeconds || 600) || 600))
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })

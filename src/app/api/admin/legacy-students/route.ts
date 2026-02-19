@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
-
     const admin = createAdminClient()
+    const auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+      if (!token) return auth.response
+      const { data, error } = await admin.auth.getUser(token)
+      const user = data?.user ?? null
+      if (error || !user?.id) return auth.response
+      const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
+      if (role !== 'admin') return jsonError(403, 'forbidden')
+    }
 
     // Get all distinct user_ids from workouts (fallback when athlete_uuid column is not available)
     const { data: workouts, error: wError } = await admin
@@ -41,14 +48,15 @@ export async function GET() {
     const tEmails = new Set((teachers || []).map(t => (t.email || '').toLowerCase()))
     const students = (profiles || [])
       .filter(p => (p.role !== 'teacher') && (!p.email || !tEmails.has(p.email.toLowerCase())))
-      .map(p => ({
-        id: p.id,
-        name: p.display_name,
-        email: p.email,
-        teacher_id: null,
-        user_id: p.id,
-        is_legacy: true
+      .map((p: any) => ({
+        id: String(p?.id || '').trim(),
+        name: p?.display_name != null ? String(p.display_name) : null,
+        email: p?.email != null ? String(p.email) : null,
+        teacher_id: null as string | null,
+        user_id: String(p?.id || '').trim(),
+        is_legacy: true as const,
       }))
+      .filter((s) => Boolean(s.id))
 
     return NextResponse.json({ ok: true, students })
   } catch (e: any) {

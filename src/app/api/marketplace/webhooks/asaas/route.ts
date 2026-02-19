@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,6 +13,22 @@ const mapSubscriptionStatusFromPayment = (status: string) => {
   return 'pending'
 }
 
+const BodySchema = z
+  .object({
+    event: z.string().optional(),
+    type: z.string().optional(),
+    eventType: z.string().optional(),
+    id: z.string().optional(),
+    eventId: z.string().optional(),
+    payment: z.any().optional(),
+    data: z
+      .object({
+        payment: z.any().optional(),
+      })
+      .optional(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   const secret = (process.env.ASAAS_WEBHOOK_SECRET || '').trim()
   const provided = (req.headers.get('x-webhook-secret') || '').trim()
@@ -21,7 +39,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json().catch(() => ({}))
+  const parsedBody = await parseJsonBody(req, BodySchema)
+  if (parsedBody.response) return parsedBody.response
+  const body = parsedBody.data!
 
   const eventType = (body?.event || body?.type || body?.eventType || '') as string
   const eventId = (body?.id || body?.eventId || null) as string | null
@@ -45,7 +65,7 @@ export async function POST(req: Request) {
       .single()
 
     if (insertErr) {
-      const code = (insertErr as any)?.code as string | undefined
+      const code = (insertErr as unknown as { code?: string })?.code
       const msg = insertErr.message || ''
       if (code === '23505' || msg.toLowerCase().includes('duplicate')) {
         return NextResponse.json({ ok: true, deduped: true })
@@ -117,6 +137,38 @@ export async function POST(req: Request) {
         .from('app_subscriptions')
         .update({ status: subStatus, updated_at: new Date().toISOString() })
         .eq('id', appPayRow.subscription_id)
+    }
+
+    if (subTargetId) {
+      try {
+        const { data: subRow } = await admin
+          .from('app_subscriptions')
+          .select('user_id, plan_id, status, asaas_subscription_id, asaas_customer_id, current_period_start, current_period_end')
+          .eq('asaas_subscription_id', subTargetId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (subRow?.user_id) {
+          await admin
+            .from('user_entitlements')
+            .upsert(
+              {
+                user_id: subRow.user_id,
+                plan_id: subRow.plan_id,
+                status: subStatus,
+                provider: 'asaas',
+                provider_customer_id: subRow.asaas_customer_id || null,
+                provider_subscription_id: subRow.asaas_subscription_id || subTargetId,
+                current_period_start: subRow.current_period_start || null,
+                current_period_end: subRow.current_period_end || null,
+                valid_from: subRow.current_period_start || new Date().toISOString(),
+                valid_until: subRow.current_period_end || null,
+                metadata: { updated_by: 'asaas_webhook', asaas_event_id: eventId || null, asaas_payment_id: paymentId || null },
+              },
+              { onConflict: 'provider,provider_subscription_id' },
+            )
+        }
+      } catch {}
     }
 
     await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)

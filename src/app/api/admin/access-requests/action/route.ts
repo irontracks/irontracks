@@ -1,18 +1,66 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole } from '@/utils/auth/route'
+import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
+const ZodBodySchema = z
+  .object({
+    requestId: z.string().min(1),
+    action: z.enum(['accept', 'reject']),
+  })
+  .passthrough()
+
+const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlreadyCreated: boolean) => {
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim()
+  const from = String(process.env.RESEND_FROM || '').trim()
+  const to = String(toEmail || '').trim()
+  if (!apiKey || !from || !to) return
+
+  const name = String(fullName || '').trim() || 'Atleta'
+  const subject = 'Seu acesso ao IronTracks foi aprovado'
+  const action = accountAlreadyCreated ? 'Você já pode entrar com seu e-mail e senha.' : 'Seu acesso foi aprovado. Agora você já pode criar sua conta e definir sua senha.'
+  const html = `
+    <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;line-height:1.5">
+      <h2>Olá, ${name}!</h2>
+      <p>${action}</p>
+      <p><a href="https://irontracks.com.br" target="_blank" rel="noreferrer">Abrir IronTracks</a></p>
+      <p style="opacity:.7;font-size:12px">Se você não solicitou acesso, ignore este e-mail.</p>
+    </div>
+  `
+
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      html,
+    }),
+  }).catch((): any => null)
+}
+
 export async function POST(req: Request) {
   try {
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) return auth.response
+    let auth = await requireRole(['admin'])
+    if (!auth.ok) {
+      auth = await requireRoleWithBearer(req, ['admin'])
+      if (!auth.ok) return auth.response
+    }
 
-    const body = await req.json()
-    const { requestId, action } = body
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
+    const requestId = String(body?.requestId || '').trim()
+    const action = String(body?.action || '').trim()
 
-    if (!requestId || !['accept', 'reject'].includes(action)) {
+    if (!requestId || (action !== 'accept' && action !== 'reject')) {
       return NextResponse.json({ ok: false, error: 'Dados inválidos.' }, { status: 400 })
     }
 
@@ -34,85 +82,51 @@ export async function POST(req: Request) {
     }
 
     if (action === 'reject') {
-      // Reject logic
-      const { error: updateError } = await admin
-        .from('access_requests')
-        .update({ status: 'rejected', updated_at: new Date().toISOString() })
-        .eq('id', requestId)
+      const email = String(request.email || '').trim()
 
-      if (updateError) throw updateError
+      await admin.from('audit_events').insert({
+        actor_id: auth.user.id,
+        actor_email: String(auth.user.email || '').trim() || null,
+        actor_role: auth.role,
+        action: 'access_request_reject',
+        entity_type: 'access_request',
+        entity_id: requestId,
+        metadata: { email },
+      })
 
-      // Mock Email
-      console.log(`[EMAIL] To: ${request.email} | Subject: Solicitação Recusada | Body: Infelizmente seu pedido foi negado.`)
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('id, role, is_approved')
+        .ilike('email', email)
+        .maybeSingle()
 
-      return NextResponse.json({ ok: true, message: 'Solicitação recusada.' })
+      if (profile?.id && profile.is_approved !== true) {
+        const role = String(profile.role || '').toLowerCase()
+        const isStaff = role === 'admin' || role === 'teacher'
+        if (!isStaff) {
+          await admin.from('audit_events').insert({
+            actor_id: auth.user.id,
+            actor_email: String(auth.user.email || '').trim() || null,
+            actor_role: auth.role,
+            action: 'access_request_reject_cleanup_user',
+            entity_type: 'profile',
+            entity_id: profile.id,
+            metadata: { email, role },
+          })
+
+          await admin.from('profiles').delete().eq('id', profile.id)
+          await admin.auth.admin.deleteUser(profile.id)
+          await admin.from('students').update({ user_id: null }).ilike('email', email)
+        }
+      }
+
+      const { error: deleteError } = await admin.from('access_requests').delete().eq('id', requestId)
+      if (deleteError) throw deleteError
+
+      return NextResponse.json({ ok: true, message: 'Solicitação recusada e removida.' })
     }
 
     if (action === 'accept') {
-      // Accept logic
-      // 1. Create Auth User
-      // We use a temp password or generate one. Usually we send a magic link or password reset.
-      // Since I can't send real emails easily, I'll generate a password and "log it" (simulation).
-      // Or better, create user with email_confirm: true and let them reset password?
-      // "enviar um e-mail de boas-vindas com instruções de acesso"
-      
-      const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!'
-      
-      const { data: authUser, error: authError } = await admin.auth.admin.createUser({
-        email: request.email,
-        password: tempPassword,
-        email_confirm: true,
-        user_metadata: {
-            full_name: request.full_name,
-            phone: request.phone,
-            birth_date: request.birth_date
-        }
-      })
-
-      if (authError) {
-        // If user already exists, we might want to just link profile or fail
-        if (authError.message.includes('already registered')) {
-            // Check if profile exists
-             const { data: existingProfile } = await admin.from('profiles').select('id').eq('email', request.email).maybeSingle()
-             if (existingProfile) {
-                 return NextResponse.json({ ok: false, error: 'Usuário já existe no sistema.' }, { status: 400 })
-             }
-             // If auth exists but no profile, we can proceed to create profile (edge case)
-             // But for now return error to be safe
-             return NextResponse.json({ ok: false, error: 'E-mail já cadastrado na autenticação.' }, { status: 400 })
-        }
-        throw authError
-      }
-
-      const userId = authUser.user.id
-
-      // 2. Create Profile
-      const { error: profileError } = await admin
-        .from('profiles')
-        .insert({
-            id: userId,
-            email: request.email,
-            display_name: request.full_name,
-            role: 'student',
-        })
-
-      if (profileError) {
-          const code = profileError && (profileError as any).code ? String((profileError as any).code) : ''
-          if (code === '23505') {
-              console.warn('Profile already exists for user, treating as success:', {
-                userId,
-                email: request.email,
-              })
-          } else {
-              console.error('Profile creation failed:', profileError)
-              try {
-                  await admin.auth.admin.deleteUser(userId)
-              } catch {}
-              throw profileError
-          }
-      }
-
-      // 3. Update Request
       const { error: updateError } = await admin
         .from('access_requests')
         .update({ status: 'accepted', updated_at: new Date().toISOString() })
@@ -120,10 +134,71 @@ export async function POST(req: Request) {
 
       if (updateError) throw updateError
 
-      // Mock Email
-      console.log(`[EMAIL] To: ${request.email} | Subject: Bem-vindo ao IronTracks! | Body: Sua conta foi criada. Senha temporária: ${tempPassword}`)
+      const email = String(request.email || '').trim()
+      const fullName = String(request.full_name || '').trim()
+      const roleRequested = String(request.role_requested || 'student').trim()
+      const cref = String(request.cref || '').trim()
 
-      return NextResponse.json({ ok: true, message: 'Conta criada e acesso liberado.' })
+      const { data: profile } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
+      const userId = profile?.id ? String(profile.id) : ''
+
+      // If approved and requested to be teacher, promote
+      if (roleRequested === 'teacher') {
+        // 1. Create Teacher record if not exists
+        const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', email).maybeSingle()
+        if (!existingTeacher) {
+            await admin.from('teachers').insert({
+                email,
+                name: fullName || email.split('@')[0],
+                phone: request.phone || null,
+                user_id: userId || null,
+                status: 'active'
+            })
+        }
+        
+        // 2. Update Profile role if exists
+        if (userId) {
+            await admin.from('profiles').update({
+              role: 'teacher',
+              is_approved: true,
+              approval_status: 'approved',
+              approved_at: new Date().toISOString(),
+              approved_by: auth.user.id,
+            }).eq('id', userId)
+        }
+      }
+
+      if (userId) {
+        // If not teacher (or fallback), ensure approved
+        if (roleRequested !== 'teacher') {
+            const { error: approveError } = await admin.from('profiles').update({
+              is_approved: true,
+              approval_status: 'approved',
+              approved_at: new Date().toISOString(),
+              approved_by: auth.user.id,
+            }).eq('id', userId)
+            if (approveError) throw approveError
+        }
+
+        const { data: existingStudent } = await admin.from('students').select('id').ilike('email', email).maybeSingle()
+        if (!existingStudent?.id) {
+          const payload: any = { email }
+          if (fullName) payload.name = fullName
+          payload.user_id = userId
+          await admin.from('students').insert(payload)
+        } else {
+          await admin.from('students').update({ user_id: userId }).eq('id', existingStudent.id)
+        }
+      }
+
+      try {
+        await sendApprovalEmail(email, fullName, !!userId)
+      } catch {}
+
+      return NextResponse.json({
+        ok: true,
+        message: userId ? 'Acesso liberado e e-mail enviado.' : 'Solicitação aprovada. Usuário já pode criar a conta.',
+      })
     }
 
   } catch (e: any) {

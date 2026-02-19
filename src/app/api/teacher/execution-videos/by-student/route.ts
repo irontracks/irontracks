@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
+import { parseSearchParams } from '@/utils/zod'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const isEnabled = () => String(process.env.ENABLE_EXECUTION_VIDEO || '').trim().toLowerCase() === 'true'
+
+const QuerySchema = z.object({
+  student_id: z.string().uuid('student_id inválido'),
+})
 
 export async function GET(req: Request) {
   if (!isEnabled()) return jsonError(404, 'disabled')
@@ -14,8 +20,10 @@ export async function GET(req: Request) {
   if (!auth.ok) return auth.response
 
   try {
-    const url = new URL(req.url)
-    const studentUserId = String(url.searchParams.get('student_user_id') || '').trim()
+    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    if (response) return response
+
+    const studentUserId = String(q?.student_id || '').trim()
     if (!studentUserId) return jsonError(400, 'student_user_id_required')
 
     const admin = createAdminClient()
@@ -40,4 +48,3 @@ export async function GET(req: Request) {
     return jsonError(500, e?.message ?? String(e))
   }
 }
-

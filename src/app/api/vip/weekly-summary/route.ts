@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { requireUser, resolveRoleByUser } from '@/utils/auth/route'
+import { requireUser } from '@/utils/auth/route'
+import { getVipPlanLimits } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,11 +23,11 @@ const normalizeText = (v: unknown) => {
     .replace(/\s+/g, ' ')
 }
 
-const extractLogsStatsByExercise = (session: any) => {
+const extractLogsStatsByExercise = (session: unknown) => {
   try {
-    const s = session && typeof session === 'object' ? session : {}
-    const logs = s?.logs && typeof s.logs === 'object' ? s.logs : {}
-    const exercises = Array.isArray(s?.exercises) ? s.exercises : []
+    const s = session && typeof session === 'object' ? (session as Record<string, unknown>) : {}
+    const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
+    const exercises = Array.isArray(s?.exercises) ? (s.exercises as Record<string, unknown>[]) : []
     const byKey = new Map<string, { exercise: string; weight: number; reps: number; volume: number }>()
 
     Object.entries(logs).forEach(([k, v]) => {
@@ -39,8 +40,8 @@ const extractLogsStatsByExercise = (session: any) => {
       if (!exName) return
       const key = normalizeText(exName)
       if (!key) return
-      const w = Number(String((log as any)?.weight ?? '').replace(',', '.'))
-      const r = Number(String((log as any)?.reps ?? '').replace(',', '.'))
+      const w = Number(String((log as Record<string, unknown>)?.weight ?? '').replace(',', '.'))
+      const r = Number(String((log as Record<string, unknown>)?.reps ?? '').replace(',', '.'))
       if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return
       const volume = w * r
       const cur = byKey.get(key) || { exercise: exName, weight: 0, reps: 0, volume: 0 }
@@ -57,7 +58,7 @@ const extractLogsStatsByExercise = (session: any) => {
   }
 }
 
-const computePrs = (latestNotes: any, prevNotesList: any[]) => {
+const computePrs = (latestNotes: unknown, prevNotesList: unknown[]) => {
   const currentMap = extractLogsStatsByExercise(latestNotes)
   const prevBest = new Map<string, { weight: number; reps: number; volume: number }>()
 
@@ -66,14 +67,14 @@ const computePrs = (latestNotes: any, prevNotesList: any[]) => {
     for (const [k, st] of Array.from(m.entries())) {
       const cur = prevBest.get(k) || { weight: 0, reps: 0, volume: 0 }
       prevBest.set(k, {
-        weight: Math.max(cur.weight, st.weight || 0),
-        reps: Math.max(cur.reps, st.reps || 0),
-        volume: Math.max(cur.volume, st.volume || 0),
+        weight: Math.max(cur.weight, (st as any).weight || 0),
+        reps: Math.max(cur.reps, (st as any).reps || 0),
+        volume: Math.max(cur.volume, (st as any).volume || 0),
       })
     }
   }
 
-  const prs: any[] = []
+  const prs: Record<string, unknown>[] = []
   for (const [k, st] of Array.from(currentMap.entries())) {
     const base = prevBest.get(k) || { weight: 0, reps: 0, volume: 0 }
     const improved = {
@@ -85,41 +86,14 @@ const computePrs = (latestNotes: any, prevNotesList: any[]) => {
     prs.push({ ...st, improved })
   }
 
-  prs.sort((a, b) => (b.volume || 0) - (a.volume || 0))
+  prs.sort((a, b) => ((b as any).volume || 0) - ((a as any).volume || 0))
   return prs.slice(0, 6)
 }
 
-const avg = (rows: any[], key: string) => {
+const avg = (rows: Record<string, unknown>[], key: string) => {
   const vals = rows.map((r) => Number(r?.[key])).filter((n) => Number.isFinite(n))
   if (!vals.length) return null
   return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10
-}
-
-const computeVipAccess = async (supabase: any, user: any) => {
-  const { role } = await resolveRoleByUser({ id: user?.id, email: user?.email })
-  if (role === 'admin' || role === 'teacher') return { ok: true as const, role, hasVip: true }
-  try {
-    const { data: appSub } = await supabase
-      .from('app_subscriptions')
-      .select('id, status')
-      .eq('user_id', user.id)
-      .in('status', ['active', 'past_due'])
-      .limit(1)
-    if (Array.isArray(appSub) && appSub.length > 0) {
-      return { ok: true as const, role, hasVip: true }
-    }
-
-    const { data } = await supabase
-      .from('marketplace_subscriptions')
-      .select('id, status')
-      .eq('student_user_id', user.id)
-      .in('status', ['active', 'past_due'])
-      .limit(1)
-    const hasVip = Array.isArray(data) && data.length > 0
-    return { ok: true as const, role, hasVip }
-  } catch {
-    return { ok: true as const, role, hasVip: false }
-  }
 }
 
 export async function GET() {
@@ -128,8 +102,8 @@ export async function GET() {
   const supabase = auth.supabase
   const user = auth.user
 
-  const access = await computeVipAccess(supabase, user)
-  if (!access.hasVip) return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
+  const entitlement = await getVipPlanLimits(supabase, user.id)
+  if (entitlement.tier === 'free') return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
   try {
     const now = Date.now()
@@ -173,7 +147,7 @@ export async function GET() {
       .limit(1)
       .maybeSingle()
 
-    let prs: any[] = []
+    let prs: unknown[] = []
     if (latest?.id) {
       const { data: prevRows } = await supabase
         .from('workouts')
@@ -209,7 +183,7 @@ export async function GET() {
     if (prs.length) {
       const prTxt = prs
         .slice(0, 3)
-        .map((p) => `${String(p?.exercise || '').trim()} (${p?.weight || 0}kg x ${p?.reps || 0})`)
+        .map((p) => `${String((p as any)?.exercise || '').trim()} (${(p as any)?.weight || 0}kg x ${(p as any)?.reps || 0})`)
         .filter(Boolean)
         .join(', ')
       if (prTxt) lines.push(`- PRs recentes: ${prTxt}`)
@@ -219,6 +193,6 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText })
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
   }
 }

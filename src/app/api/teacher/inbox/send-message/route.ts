@@ -1,20 +1,28 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
+import { z } from 'zod'
+import { parseJsonBody } from '@/utils/zod'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z
+  .object({
+    student_user_id: z.string().min(1),
+    content: z.string().min(1),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   const auth = await requireRole(['admin', 'teacher'])
   if (!auth.ok) return auth.response
 
   try {
-    const body: any = await req.json().catch(() => ({}))
-    const studentUserId = String(body?.student_user_id || '').trim()
-    const content = String(body?.content || '').trim()
-    if (!studentUserId) return jsonError(400, 'student_user_id_required')
-    if (!content) return jsonError(400, 'content_required')
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const studentUserId = parsedBody.data!.student_user_id.trim()
+    const content = parsedBody.data!.content.trim()
 
     const requesterId = String(auth.user.id)
     const admin = createAdminClient()
@@ -46,4 +54,3 @@ export async function POST(req: Request) {
     return jsonError(500, e?.message ?? String(e))
   }
 }
-

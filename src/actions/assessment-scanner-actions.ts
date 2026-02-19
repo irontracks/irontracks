@@ -145,7 +145,7 @@ export async function processAssessmentDocument(formData: FormData): Promise<Ass
     const arrayBuffer = await blob.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64 = buffer.toString("base64");
-    const mimeType = (blob as any).type || "application/octet-stream";
+    const mimeType = blob.type || "application/octet-stream";
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: ASSESSMENT_SCANNER_MODEL });
@@ -237,8 +237,8 @@ export async function processAssessmentDocument(formData: FormData): Promise<Ass
     if (!hasAny) return { ok: false, error: "Nenhum dado válido de avaliação encontrado" };
 
     return { ok: true, formData: formOut };
-  } catch (e: any) {
-    const raw = e?.message ? String(e.message) : String(e);
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
     let msg = raw || "Erro inesperado ao processar avaliação";
     const upper = msg.toUpperCase();
     if (upper.includes("NOT_FOUND") && upper.includes("MODEL")) {
@@ -248,4 +248,3 @@ export async function processAssessmentDocument(formData: FormData): Promise<Ass
     return { ok: false, error: msg };
   }
 }
-

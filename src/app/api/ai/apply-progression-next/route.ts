@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 
 export const dynamic = 'force-dynamic'
 
-const normalizeKey = (v: any) =>
+const ZodBodySchema = z
+  .object({
+    session: z.unknown(),
+    progression: z.array(z.unknown()).min(1),
+    historyId: z.string().optional(),
+    history_id: z.string().optional(),
+  })
+  .passthrough()
+
+const normalizeKey = (v: unknown) =>
   String(v || '')
     .trim()
     .toLowerCase()
@@ -12,16 +23,20 @@ const normalizeKey = (v: any) =>
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
 
-const safeArray = <T,>(v: any): T[] => (Array.isArray(v) ? (v as T[]) : [])
+const safeArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
+
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
-    const session = body?.session && typeof body.session === 'object' ? body.session : null
-    const progression = safeArray<any>(body?.progression).filter((x) => x && typeof x === 'object')
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data as Record<string, unknown>
+    const session = body?.session && typeof body.session === 'object' ? (body.session as Record<string, unknown>) : null
+    const progression = safeArray<unknown>(body?.progression).filter(isRecord)
     const historyId = String(body?.historyId || body?.history_id || '').trim() || null
 
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
@@ -42,7 +57,7 @@ export async function POST(req: Request) {
       .limit(1000)
     if (tErr) return NextResponse.json({ ok: false, error: tErr.message }, { status: 400 })
 
-    const templates = safeArray<any>(templatesRaw)
+    const templates = safeArray<unknown>(templatesRaw).filter(isRecord)
     const curIdx = templates.findIndex((w) => String(w?.id || '').trim() === originWorkoutId)
     if (curIdx === -1) return NextResponse.json({ ok: false, error: 'origin_template_not_found' }, { status: 404 })
 
@@ -68,8 +83,9 @@ export async function POST(req: Request) {
     if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 400 })
     if (!workoutRow?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
-    const exs = safeArray<any>(workoutRow.exercises)
-    const exerciseByKey = new Map<string, any>()
+    const rowObj: Record<string, unknown> = isRecord(workoutRow) ? workoutRow : {}
+    const exs = safeArray<unknown>(rowObj.exercises).filter(isRecord)
+    const exerciseByKey = new Map<string, Record<string, unknown>>()
     for (const ex of exs) {
       const key = normalizeKey(ex?.name)
       if (!key) continue
@@ -92,12 +108,15 @@ export async function POST(req: Request) {
       }
       if (!suggestion.recommendation) continue
 
-      const sets = safeArray<any>(ex.sets).slice().sort((a, b) => (Number(a?.set_number) || 0) - (Number(b?.set_number) || 0))
+      const sets = safeArray<unknown>(ex.sets)
+        .filter(isRecord)
+        .slice()
+        .sort((a, b) => (Number(a?.set_number) || 0) - (Number(b?.set_number) || 0))
       const first = sets[0] || null
 
       if (first?.id) {
-        const baseCfg = first?.advanced_config && typeof first.advanced_config === 'object' ? first.advanced_config : null
-        const nextCfg = { ...(baseCfg || {}), ai_suggestion: suggestion }
+        const baseCfg = first?.advanced_config && typeof first.advanced_config === 'object' ? (first.advanced_config as Record<string, unknown>) : null
+        const nextCfg: Record<string, unknown> = { ...(baseCfg || {}), ai_suggestion: suggestion }
         const { error } = await admin
           .from('sets')
           .update({ advanced_config: nextCfg })
@@ -122,7 +141,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, templateId: targetWorkoutId, applied })
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
 }
-

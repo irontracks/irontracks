@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { X, Type, Smile, Scissors, Sparkles, Send, Loader2, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { VideoCompositor } from '@/lib/video/VideoCompositor';
 
 const FILTERS = [
   { name: 'Normal', class: '' },
@@ -17,6 +18,16 @@ const FILTERS = [
 
 const EMOJIS = ['🔥', '💪', '🏋️', '💯', '🥵', '🚀', '😤', '💧', '🥗', '🥩', '🍗', '🛑', '✅', '❌', '⚠️', '💤', '❤️', '👏'];
 const COLORS = ['#FFFFFF', '#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+
+const MAX_VIDEO_SECONDS = 60;
+const PHOTO_SECONDS = 15;
+const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+const MIN_TRIM_SECONDS = 0.5;
+const COMPRESS_MAX_WIDTH = 720;
+const COMPRESS_MAX_HEIGHT = 1280;
+const COMPRESS_VIDEO_BPS = 2_500_000;
+const COMPRESS_AUDIO_BPS = 96_000;
 
 type StoryMediaType = 'image' | 'video';
 type StoryStep = 'picker' | 'editor';
@@ -51,6 +62,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
   const [videoDuration, setVideoDuration] = useState(0);
   const [trimRange, setTrimRange] = useState({ start: 0, end: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
+  const [compressionRunning, setCompressionRunning] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState(0);
+  const [compressionError, setCompressionError] = useState('');
   
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -71,16 +85,15 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
       return;
     }
 
-    if (isImage && file.size > 12 * 1024 * 1024) {
+    if (isImage && file.size > MAX_IMAGE_BYTES) {
       try { e.target.value = ''; } catch {}
       alert(`Imagem muito grande (máx 12MB). Atual: ${(file.size / (1024 * 1024)).toFixed(1)}MB`);
       return;
     }
 
-    if (isVideo && file.size > 200 * 1024 * 1024) {
-      try { e.target.value = ''; } catch {}
-      alert(`Vídeo muito grande (máx 200MB). Atual: ${(file.size / (1024 * 1024)).toFixed(1)}MB`);
-      return;
+    if (isVideo && file.size > MAX_VIDEO_BYTES) {
+      try { e.target.value = e.target.value; } catch {}
+      alert(`Vídeo acima de 200MB. Vamos comprimir antes de publicar. Atual: ${(file.size / (1024 * 1024)).toFixed(1)}MB`);
     }
 
     const url = URL.createObjectURL(file);
@@ -88,6 +101,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
     setPreviewUrl(url);
     setMediaType(file.type.startsWith('video') ? 'video' : 'image');
     setStep('editor');
+    setCompressionError('');
+    setCompressionRunning(false);
+    setCompressionProgress(0);
     
     // Reset state
     setFilter(FILTERS[0]);
@@ -101,6 +117,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
       setMedia(null);
       setPreviewUrl(null);
       setOverlays([]);
+      setCompressionRunning(false);
+      setCompressionProgress(0);
+      setCompressionError('');
     }
   }, [isOpen]);
 
@@ -109,17 +128,22 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
         if (videoRef.current) {
             const dur = videoRef.current.duration;
             if (Number.isFinite(dur)) {
-                setVideoDuration(dur);
-                setTrimRange({ start: 0, end: dur });
+                const safeDur = Math.max(0, dur);
+                setVideoDuration(safeDur);
+                const end = Math.min(safeDur, MAX_VIDEO_SECONDS);
+                setTrimRange({ start: 0, end });
+                try { videoRef.current.currentTime = 0; } catch {}
             }
         }
     };
 
     const handleTimeUpdate = () => {
         if (videoRef.current && mediaType === 'video') {
-            if (videoRef.current.currentTime >= trimRange.end) {
+            const start = Math.max(0, trimRange.start);
+            const maxEnd = Math.min(trimRange.end, start + MAX_VIDEO_SECONDS);
+            if (videoRef.current.currentTime >= maxEnd) {
                 videoRef.current.pause();
-                videoRef.current.currentTime = trimRange.start;
+                try { videoRef.current.currentTime = start; } catch {}
                 setIsPlaying(false);
             }
         }
@@ -215,9 +239,14 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
     try {
       if (!previewUrl) throw new Error('preview_unavailable');
       let fileToUpload = media;
+      setCompressionError('');
       let metadata: any = {
         filter: filter.class ? filter.class : undefined,
-        trim: mediaType === 'video' ? trimRange : undefined,
+        trim: mediaType === 'video' ? {
+          start: Math.max(0, trimRange.start),
+          end: Math.max(Math.min(trimRange.end, trimRange.start + MAX_VIDEO_SECONDS), trimRange.start + MIN_TRIM_SECONDS)
+        } : undefined,
+        durationSec: mediaType === 'image' ? PHOTO_SECONDS : Math.min(MAX_VIDEO_SECONDS, Math.max(MIN_TRIM_SECONDS, trimRange.end - trimRange.start)),
         // Only send necessary overlay data
         overlays: overlays.map(o => ({ 
             type: o.type, 
@@ -291,22 +320,73 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
         metadata.processed = true; // Flag to skip server processing if any
       }
 
+      if (mediaType === 'video' && fileToUpload.size > MAX_VIDEO_BYTES) {
+        setCompressionRunning(true);
+        setCompressionProgress(0);
+        const v = videoRef.current;
+        if (!v) throw new Error('video_not_ready');
+        const ensureReady = () => new Promise<void>((resolve, reject) => {
+          try {
+            if (Number.isFinite(v.duration) && v.duration > 0) return resolve();
+          } catch {}
+          const onLoaded = () => {
+            try { v.removeEventListener('loadedmetadata', onLoaded); } catch {}
+            resolve();
+          };
+          try { v.addEventListener('loadedmetadata', onLoaded); } catch {}
+          setTimeout(() => reject(new Error('video_metadata_timeout')), 4000);
+        });
+        await ensureReady();
+        const start = Math.max(0, trimRange.start);
+        const maxEnd = Math.min(trimRange.end, start + MAX_VIDEO_SECONDS);
+        const end = Math.max(start + MIN_TRIM_SECONDS, maxEnd);
+        const srcW = Number(v.videoWidth || COMPRESS_MAX_WIDTH);
+        const srcH = Number(v.videoHeight || COMPRESS_MAX_HEIGHT);
+        const scale = Math.min(1, COMPRESS_MAX_WIDTH / srcW, COMPRESS_MAX_HEIGHT / srcH);
+        const outW = Math.max(2, Math.round(srcW * scale));
+        const outH = Math.max(2, Math.round(srcH * scale));
+        const compositor = new VideoCompositor();
+        const result = await compositor.render({
+          videoElement: v,
+          trimRange: [start, end],
+          onDrawFrame: (ctx, video) => {
+            try { ctx.drawImage(video, 0, 0, ctx.canvas.width, ctx.canvas.height); } catch {}
+          },
+          outputWidth: outW,
+          outputHeight: outH,
+          fps: 30,
+          videoBitsPerSecond: COMPRESS_VIDEO_BPS,
+          audioBitsPerSecond: COMPRESS_AUDIO_BPS,
+          onProgress: (p) => {
+            try { setCompressionProgress(Math.max(0, Math.min(1, Number(p || 0)))); } catch {}
+          }
+        });
+        fileToUpload = new File([result.blob], result.filename, { type: result.mime || 'video/mp4' });
+        metadata.processed = true;
+      }
+
       await onPost(fileToUpload, metadata);
       onClose();
     } catch (err) {
       console.error(err);
+      if (String((err as Record<string, unknown>)?.message || '').includes('video_metadata_timeout')) {
+        setCompressionError('Não foi possível carregar o vídeo para compressão. Tente novamente.');
+      } else if (mediaType === 'video' && media?.size > MAX_VIDEO_BYTES) {
+        setCompressionError('Falha ao comprimir o vídeo. Reduza duração ou resolução e tente novamente.');
+      }
       alert('Erro ao processar story');
     } finally {
       setPosting(false);
+      setCompressionRunning(false);
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col safe-area-inset-bottom">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col pb-safe">
       {/* Top Bar */}
-      <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
+      <div className="absolute top-0 left-0 right-0 z-50 p-4 pt-safe flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
         <button onClick={onClose} className="p-2 bg-black/20 rounded-full backdrop-blur-md">
             <X className="text-white" />
         </button>
@@ -358,7 +438,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                 {/* Media Preview */}
                 <div className={`relative w-full h-full max-h-[80vh] flex items-center justify-center overflow-hidden transition-all duration-300 ${filter.class}`} id="preview-img">
                     {mediaType === 'image' ? (
-                        <img src={previewUrl || ''} className="w-full h-full object-contain" alt="Preview" />
+                        previewUrl ? (
+                          <Image src={previewUrl} alt="Preview" fill sizes="100vw" className="object-contain" unoptimized />
+                        ) : null
                     ) : (
                         <video 
                             ref={videoRef}
@@ -367,7 +449,8 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                             playsInline 
                             loop 
                             autoPlay
-                            muted={false}
+                            muted={true}
+                            preload="metadata"
                             onLoadedMetadata={handleVideoLoad}
                             onTimeUpdate={handleTimeUpdate}
                             onClick={togglePlay}
@@ -465,8 +548,10 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     className="flex flex-col items-center gap-2 shrink-0 snap-center"
                                 >
                                     <div className={`w-16 h-16 rounded-lg overflow-hidden border-2 ${filter.name === f.name ? 'border-yellow-500' : 'border-transparent'}`}>
-                                        <div className={`w-full h-full bg-neutral-800 ${f.class}`}>
-                                            {mediaType === 'image' && <img src={previewUrl || ''} className="w-full h-full object-cover" />}
+                                        <div className={`relative w-full h-full bg-neutral-800 ${f.class}`}>
+                                            {mediaType === 'image' && previewUrl ? (
+                                              <Image src={previewUrl} alt="" fill sizes="64px" className="object-cover" unoptimized />
+                                            ) : null}
                                             {mediaType === 'video' && <div className="w-full h-full bg-neutral-700" />}
                                         </div>
                                     </div>
@@ -488,6 +573,47 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                 <div className="text-center">
                                     <span className="block text-[10px] uppercase text-red-500">Fim</span>
                                     <span className="text-white font-bold text-lg">{trimRange.end.toFixed(1)}s</span>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 mb-3">
+                                <div className="flex-1">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={videoDuration}
+                                        step={0.1}
+                                        value={trimRange.start}
+                                        onChange={e => {
+                                            const val = Math.max(0, Number(e.target.value || 0));
+                                            const end = Math.max(val + MIN_TRIM_SECONDS, Math.min(trimRange.end, val + MAX_VIDEO_SECONDS, videoDuration));
+                                            setTrimRange({ start: val, end });
+                                            if (videoRef.current) {
+                                                try { videoRef.current.currentTime = val; } catch {}
+                                                safePause();
+                                            }
+                                        }}
+                                        className="w-full bg-black/40 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-white"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={videoDuration}
+                                        step={0.1}
+                                        value={trimRange.end}
+                                        onChange={e => {
+                                            const val = Math.max(0, Number(e.target.value || 0));
+                                            const start = Math.min(trimRange.start, Math.max(0, val - MAX_VIDEO_SECONDS));
+                                            const end = Math.max(start + MIN_TRIM_SECONDS, Math.min(val, start + MAX_VIDEO_SECONDS, videoDuration));
+                                            setTrimRange({ start, end });
+                                            if (videoRef.current) {
+                                                try { videoRef.current.currentTime = end; } catch {}
+                                                safePause();
+                                            }
+                                        }}
+                                        className="w-full bg-black/40 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-white"
+                                    />
                                 </div>
                             </div>
                             
@@ -512,8 +638,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     value={trimRange.start}
                                     onChange={e => {
                                         const val = Number(e.target.value);
-                                        if (val < trimRange.end - 0.5) { // Minimum 0.5s duration
-                                            setTrimRange(prev => ({ ...prev, start: val }));
+                                        if (val < trimRange.end - MIN_TRIM_SECONDS) {
+                                            const end = Math.min(trimRange.end, val + MAX_VIDEO_SECONDS, videoDuration);
+                                            setTrimRange({ start: val, end });
                                             if (videoRef.current) {
                                                 videoRef.current.currentTime = val;
                                                 // Avoid rapid play/pause calls during drag
@@ -534,8 +661,10 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     value={trimRange.end}
                                     onChange={e => {
                                         const val = Number(e.target.value);
-                                        if (val > trimRange.start + 0.5) {
-                                            setTrimRange(prev => ({ ...prev, end: val }));
+                                        if (val > trimRange.start + MIN_TRIM_SECONDS) {
+                                            const start = Math.max(0, Math.min(trimRange.start, val - MAX_VIDEO_SECONDS));
+                                            const end = Math.min(val, start + MAX_VIDEO_SECONDS, videoDuration);
+                                            setTrimRange({ start, end });
                                             if (videoRef.current) {
                                                 videoRef.current.currentTime = val;
                                                 safePause();
@@ -562,7 +691,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                             </div>
                             
                             <div className="flex justify-between mt-4">
-                                <p className="text-[10px] text-neutral-500">Duração: {(trimRange.end - trimRange.start).toFixed(1)}s</p>
+                                <p className="text-[10px] text-neutral-500">Duração: {(trimRange.end - trimRange.start).toFixed(1)}s (máx {MAX_VIDEO_SECONDS}s)</p>
                                 <button onClick={() => {
                                      if(videoRef.current) {
                                          videoRef.current.currentTime = trimRange.start;
@@ -585,13 +714,16 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
             <button onClick={() => setStep('picker')} className="text-white text-sm font-medium">
                 Cancelar
             </button>
+            {compressionError ? (
+                <div className="text-xs text-red-400 font-semibold text-center px-3">{compressionError}</div>
+            ) : null}
             <button 
                 onClick={handlePost}
-                disabled={posting}
+                disabled={posting || compressionRunning}
                 className="bg-yellow-500 text-black font-bold py-3 px-6 rounded-full flex items-center gap-2 hover:bg-yellow-400 active:scale-95 disabled:opacity-50"
             >
-                {posting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-                <span>Seu Story</span>
+                {posting || compressionRunning ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                <span>{compressionRunning ? `Comprimindo ${Math.round(compressionProgress * 100)}%` : 'Seu Story'}</span>
             </button>
           </div>
       )}
