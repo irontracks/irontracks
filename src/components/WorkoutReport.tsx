@@ -1575,7 +1575,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
                                         if (!log || typeof log !== 'object') return null;
                                         const logObj = log as AnyObj;
-                                        if (!logObj.weight && !logObj.reps) return null;
+                                        if (!logObj.weight && !logObj.reps) return <React.Fragment key={key} />;
 
                                             let progressionText = "-";
                                             let rowClass = "";
@@ -1614,8 +1614,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                             }
 
                                             return (
-                                                <>
-                                                    <tr key={sIdx} className="border-b border-neutral-800">
+                                                <React.Fragment key={key}>
+                                                    <tr className="border-b border-neutral-800">
                                                         <td className="py-2 font-mono text-neutral-400 text-xs">#{sIdx + 1}</td>
                                                         <td className="py-2 text-center font-semibold text-sm">{logObj.weight != null && String(logObj.weight) !== '' ? String(logObj.weight) : '-'}</td>
                                                         <td className="py-2 text-center font-mono text-sm">{logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '-'}</td>
@@ -1634,7 +1634,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                                             </tr>
                                                         );
                                                     })()}
-                                                </>
+                                                </React.Fragment>
                                             );
                                         })}
                                     </tbody>

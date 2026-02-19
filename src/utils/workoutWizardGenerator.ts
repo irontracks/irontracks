@@ -90,10 +90,32 @@ const catalog = (equipment: WorkoutWizardEquipment) => {
   }
 }
 
-const resolvePrimaryPattern = (split: WorkoutWizardSplit, focus: WorkoutWizardFocus) => {
+const resolvePrimaryPattern = (split: WorkoutWizardSplit, focus: WorkoutWizardFocus, seed: number) => {
   if (split === 'full_body') return 'full'
-  if (split === 'upper_lower') return focus === 'lower' ? 'lower' : 'upper'
-  if (split === 'ppl') return focus === 'pull' ? 'pull' : focus === 'legs' ? 'legs' : 'push'
+  
+  if (split === 'upper_lower') {
+    // Rotaciona entre Upper e Lower
+    // Se o foco for pernas/lower, começa com Lower (offset 1)
+    let offset = 0
+    if (focus === 'lower' || focus === 'legs') offset = 1
+    
+    const remainder = (seed + offset) % 2
+    return remainder === 0 ? 'upper' : 'lower'
+  }
+  
+  if (split === 'ppl') {
+    // Rotaciona: Push -> Pull -> Legs
+    // Ajusta o início baseado no foco
+    let offset = 0
+    if (focus === 'pull') offset = 1
+    if (focus === 'legs' || focus === 'lower') offset = 2
+    
+    const remainder = (seed + offset) % 3
+    if (remainder === 0) return 'push'
+    if (remainder === 1) return 'pull'
+    return 'legs'
+  }
+  
   return 'full'
 }
 
@@ -121,13 +143,30 @@ export function generateWorkoutFromWizard(answers: WorkoutWizardAnswers, seed: n
   const baseCatalog = catalog(answers.equipment)
   const kneeSensitive = isKneeSensitive(answers.constraints)
   const shoulderSensitive = isShoulderSensitive(answers.constraints)
-  const pattern = resolvePrimaryPattern(answers.split, answers.focus)
+  const pattern = resolvePrimaryPattern(answers.split, answers.focus, seed)
 
-  const pickPush = (i: number) => pick(baseCatalog.push, i, seed)
-  const pickPull = (i: number) => pick(baseCatalog.pull, i, seed)
-  const pickLegs = (i: number) => pick(baseCatalog.legs, i, seed)
-  const pickHinge = (i: number) => pick(baseCatalog.hinge, i, seed)
-  const pickCore = (i: number) => pick(baseCatalog.core, i, seed)
+  const usedNames = new Set<string>()
+
+  // Tenta encontrar um exercício que ainda não foi usado
+  const getUnique = (list: string[], idx: number, seed: number) => {
+    for (let i = 0; i < list.length; i++) {
+      const val = pick(list, idx + i, seed)
+      if (val && !usedNames.has(val)) {
+        usedNames.add(val)
+        return val
+      }
+    }
+    // Fallback: se todos já foram usados, repete o original
+    const fallback = pick(list, idx, seed)
+    if (fallback) usedNames.add(fallback)
+    return fallback
+  }
+
+  const pickPush = (i: number) => getUnique(baseCatalog.push, i, seed)
+  const pickPull = (i: number) => getUnique(baseCatalog.pull, i, seed)
+  const pickLegs = (i: number) => getUnique(baseCatalog.legs, i, seed)
+  const pickHinge = (i: number) => getUnique(baseCatalog.hinge, i, seed)
+  const pickCore = (i: number) => getUnique(baseCatalog.core, i, seed)
 
   const exercises: unknown[] = []
 
