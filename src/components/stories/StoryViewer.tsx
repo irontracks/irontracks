@@ -215,7 +215,7 @@ export default function StoryViewer({
       if (!url) continue
       const a = new AbortController()
       preloadRef.current.aborts.push(a)
-      fetch(url, { headers: { Range: 'bytes=0-0' }, signal: a.signal }).catch(() => {})
+      fetch(url, { headers: { Range: 'bytes=0-262143' }, signal: a.signal }).catch(() => {})
     }
   }, [idx, stories])
 
@@ -297,10 +297,38 @@ export default function StoryViewer({
     if (!storyId || !isVideo) return
     const v = videoRef.current
     if (!v) return
+
     const paused = holding || commentsOpen || viewersOpen || hidden || deleting
-    if (paused) v.pause()
-    else v.play().catch(() => {})
-  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
+
+    if (paused) {
+      v.pause()
+    } else {
+      // Garante que o vídeo está no tempo correto antes de tocar
+      const start = Math.max(0, Number(trimRange?.start ?? 0))
+      const ct = Number(v.currentTime || 0)
+      
+      // Se estiver muito longe do início (e ainda não começou), faz seek
+      if (ct < start && !v.seeking) {
+         try { v.currentTime = start } catch {}
+      }
+
+      // Função segura de play
+      const attemptPlay = () => {
+         // Se estiver buscando, espera terminar
+         if (v.seeking) {
+            const onSeeked = () => {
+               v.removeEventListener('seeked', onSeeked)
+               v.play().catch(() => {})
+            }
+            v.addEventListener('seeked', onSeeked, { once: true })
+         } else {
+            v.play().catch(() => {})
+         }
+      }
+
+      attemptPlay()
+    }
+  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen, trimRange])
 
   useEffect(() => {
     if (!storyId || !isVideo) return
@@ -332,13 +360,15 @@ export default function StoryViewer({
             setVideoError('Este vídeo não carregou no seu dispositivo.')
             return
           }
-          try {
-            v.load()
-          } catch {}
-          try {
-            const p = v.play()
-            if (p) p.catch(() => {})
-          } catch {}
+          
+          if (stallRef.current.attempts === 1) {
+             // Primeira tentativa: micro-seek para destravar
+             try { v.currentTime = v.currentTime + 0.001 } catch {}
+          } else {
+             // Segunda tentativa: reload completo
+             try { v.load() } catch {}
+             try { v.play().catch(() => {}) } catch {}
+          }
         }
       } else {
         stallRef.current.lastTime = current
@@ -517,8 +547,7 @@ export default function StoryViewer({
                         className="w-full h-full object-contain"
                         playsInline
                         muted={muted}
-                        autoPlay
-                        preload="metadata"
+                        preload="auto"
                         onLoadedMetadata={(e) => {
                           const d = Number((e.currentTarget as any)?.duration || 0)
                           const start = Math.max(0, Number(trimRange?.start ?? 0))
@@ -536,7 +565,6 @@ export default function StoryViewer({
                           }
                         }}
                         onError={() => setVideoError('Não foi possível reproduzir este vídeo.')}
-                        onStalled={() => setVideoError('Este vídeo não carregou no seu dispositivo.')}
                       />
                     ) : (
                       <div className="px-6 text-center">

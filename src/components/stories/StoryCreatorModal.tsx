@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { X, Type, Smile, Scissors, Sparkles, Send, Loader2, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { VideoCompositor } from '@/lib/video/VideoCompositor';
 
 const FILTERS = [
@@ -70,7 +70,38 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const trackWidthRef = useRef(0);
+  const compositorRef = useRef<VideoCompositor | null>(null);
   const [posting, setPosting] = useState(false);
+
+  const startX = useMotionValue(0);
+  const endX = useMotionValue(0);
+  const selectedWidth = useTransform([startX, endX], ([s, e]) => Math.max(0, (e as number) - (s as number)));
+
+  // Update track width and thumb positions
+  useEffect(() => {
+    if (activeTool !== 'trim') return;
+    
+    const update = () => {
+        if (!trackRef.current) return;
+        const w = trackRef.current.getBoundingClientRect().width;
+        trackWidthRef.current = w;
+        
+        if (videoDuration > 0) {
+            startX.set((trimRange.start / videoDuration) * w);
+            endX.set((trimRange.end / videoDuration) * w);
+        }
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    // Also update after a short delay to ensure modal animation finished
+    setTimeout(update, 100);
+    setTimeout(update, 300);
+    
+    return () => window.removeEventListener('resize', update);
+  }, [activeTool, videoDuration, trimRange.start, trimRange.end]);
 
   // --- File Handling ---
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
@@ -211,20 +242,19 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
   const handleDragEnd = (id: number, info: any) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    
-    // Calculate new position as percentage
-    // info.point.x/y are page coordinates
-    // We need relative to container
-    const x = ((info.point.x - rect.left) / rect.width) * 100;
-    const y = ((info.point.y - rect.top) / rect.height) * 100;
-    
-    // Clamp to 0-100 to keep inside
-    const clampedX = Math.max(0, Math.min(100, x));
-    const clampedY = Math.max(0, Math.min(100, y));
+    const dx = Number(info?.offset?.x || 0);
+    const dy = Number(info?.offset?.y || 0);
+    const dxPct = rect.width > 0 ? (dx / rect.width) * 100 : 0;
+    const dyPct = rect.height > 0 ? (dy / rect.height) * 100 : 0;
 
-    setOverlays(prev => prev.map(o => 
-        o.id === id ? { ...o, x: clampedX, y: clampedY } : o
-    ));
+    setOverlays(prev =>
+      prev.map(o => {
+        if (o.id !== id) return o;
+        const newX = Math.max(0, Math.min(100, o.x + dxPct));
+        const newY = Math.max(0, Math.min(100, o.y + dyPct));
+        return { ...o, x: newX, y: newY };
+      })
+    );
   };
 
   const removeOverlay = (id: number) => {
@@ -346,11 +376,38 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
         const outW = Math.max(2, Math.round(srcW * scale));
         const outH = Math.max(2, Math.round(srcH * scale));
         const compositor = new VideoCompositor();
+        compositorRef.current = compositor;
+        const previewEl = document.querySelector('#preview-img') as HTMLElement | null;
+        const cssFilter = previewEl ? getComputedStyle(previewEl).filter : 'none';
         const result = await compositor.render({
           videoElement: v,
           trimRange: [start, end],
+          cssFilter,
           onDrawFrame: (ctx, video) => {
             try { ctx.drawImage(video, 0, 0, ctx.canvas.width, ctx.canvas.height); } catch {}
+            // Render overlays on video frames
+            overlays.forEach(ov => {
+                ctx.save();
+                const x = (ov.x / 100) * ctx.canvas.width;
+                const y = (ov.y / 100) * ctx.canvas.height;
+                ctx.translate(x, y);
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                if (ov.type === 'text') {
+                    const fontSize = ctx.canvas.width * 0.08 * ov.scale;
+                    ctx.font = `bold ${fontSize}px sans-serif`;
+                    ctx.fillStyle = ov.color;
+                    ctx.strokeStyle = 'black';
+                    ctx.lineWidth = fontSize * 0.05;
+                    ctx.strokeText(ov.content, 0, 0);
+                    ctx.fillText(ov.content, 0, 0);
+                } else {
+                    const fontSize = ctx.canvas.width * 0.15 * ov.scale;
+                    ctx.font = `${fontSize}px serif`;
+                    ctx.fillText(ov.content, 0, 0);
+                }
+                ctx.restore();
+            });
           },
           outputWidth: outW,
           outputHeight: outH,
@@ -369,15 +426,21 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
       onClose();
     } catch (err) {
       console.error(err);
-      if (String((err as Record<string, unknown>)?.message || '').includes('video_metadata_timeout')) {
+      const errMsg = String((err as Record<string, unknown>)?.message || '').toLowerCase();
+      if (errMsg.includes('video_metadata_timeout')) {
         setCompressionError('Não foi possível carregar o vídeo para compressão. Tente novamente.');
+      } else if (errMsg.includes('cancel')) {
+        // Silently handled
       } else if (mediaType === 'video' && media?.size > MAX_VIDEO_BYTES) {
         setCompressionError('Falha ao comprimir o vídeo. Reduza duração ou resolução e tente novamente.');
       }
-      alert('Erro ao processar story');
+      if (!errMsg.includes('cancel')) {
+         alert('Erro ao processar story');
+      }
     } finally {
       setPosting(false);
       setCompressionRunning(false);
+      compositorRef.current = null;
     }
   };
 
@@ -409,6 +472,36 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
             </div>
         )}
       </div>
+
+      {/* Compression Overlay */}
+      {compressionRunning && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center p-6">
+            <Loader2 className="w-12 h-12 text-yellow-500 animate-spin mb-4" />
+            <h3 className="text-white font-bold text-xl mb-6">Processando vídeo...</h3>
+            
+            <div className="w-full max-w-xs h-2 bg-neutral-700 rounded-full overflow-hidden mb-2">
+                <div 
+                    className="h-full bg-yellow-500 transition-all duration-300 ease-out"
+                    style={{ width: `${Math.min(100, Math.max(0, compressionProgress * 100))}%` }}
+                />
+            </div>
+            
+            <span className="text-yellow-500 font-mono font-bold text-lg mb-1">{(compressionProgress * 100).toFixed(0)}%</span>
+            <p className="text-neutral-400 text-xs mb-8">Isso pode levar alguns segundos</p>
+            
+            <button 
+                onClick={() => {
+                    if (compositorRef.current) {
+                        compositorRef.current.cancel();
+                        setCompressionError('Compressão cancelada.');
+                    }
+                }}
+                className="text-white/50 hover:text-white text-sm font-medium transition-colors border border-white/10 px-4 py-2 rounded-lg hover:bg-white/5"
+            >
+                Cancelar
+            </button>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1 relative flex items-center justify-center bg-neutral-900 overflow-hidden" ref={containerRef}>
@@ -482,8 +575,9 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                         >
                             {ov.content}
                             <button 
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); removeOverlay(ov.id); }}
-                                className="absolute -top-4 -right-4 bg-red-500 text-white rounded-full p-1 opacity-0 hover:opacity-100 transition-opacity"
+                                className="absolute -top-4 -right-4 bg-red-500 text-white rounded-full p-1 opacity-0 hover:opacity-100 transition-opacity pointer-events-auto"
                             >
                                 <X size={12} />
                             </button>
@@ -575,119 +669,94 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     <span className="text-white font-bold text-lg">{trimRange.end.toFixed(1)}s</span>
                                 </div>
                             </div>
-                            <div className="flex gap-3 mb-3">
-                                <div className="flex-1">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        max={videoDuration}
-                                        step={0.1}
-                                        value={trimRange.start}
-                                        onChange={e => {
-                                            const val = Math.max(0, Number(e.target.value || 0));
-                                            const end = Math.max(val + MIN_TRIM_SECONDS, Math.min(trimRange.end, val + MAX_VIDEO_SECONDS, videoDuration));
-                                            setTrimRange({ start: val, end });
-                                            if (videoRef.current) {
-                                                try { videoRef.current.currentTime = val; } catch {}
-                                                safePause();
-                                            }
-                                        }}
-                                        className="w-full bg-black/40 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-white"
-                                    />
-                                </div>
-                                <div className="flex-1">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        max={videoDuration}
-                                        step={0.1}
-                                        value={trimRange.end}
-                                        onChange={e => {
-                                            const val = Math.max(0, Number(e.target.value || 0));
-                                            const start = Math.min(trimRange.start, Math.max(0, val - MAX_VIDEO_SECONDS));
-                                            const end = Math.max(start + MIN_TRIM_SECONDS, Math.min(val, start + MAX_VIDEO_SECONDS, videoDuration));
-                                            setTrimRange({ start, end });
-                                            if (videoRef.current) {
-                                                try { videoRef.current.currentTime = end; } catch {}
-                                                safePause();
-                                            }
-                                        }}
-                                        className="w-full bg-black/40 border border-neutral-700 rounded-xl px-3 py-2 text-xs text-white"
-                                    />
-                                </div>
-                            </div>
-                            
-                            <div className="relative h-12 bg-neutral-800 rounded-lg overflow-hidden mb-2">
-                                {/* Visual representation of the track */}
-                                <div className="absolute inset-0 bg-neutral-700 opacity-50"></div>
+
+                            {/* Framer Motion Slider */}
+                            <div 
+                                className="relative h-12 bg-neutral-800 rounded-lg mb-6 touch-none"
+                                ref={trackRef}
+                            >
+                                {/* Track Background */}
+                                <div className="absolute inset-0 bg-neutral-700/50 rounded-lg pointer-events-none" />
+
                                 {/* Selected Range Highlight */}
-                                <div 
-                                    className="absolute top-0 bottom-0 bg-yellow-500/20 border-l-2 border-r-2 border-yellow-500"
-                                    style={{
-                                        left: `${(trimRange.start / videoDuration) * 100}%`,
-                                        width: `${((trimRange.end - trimRange.start) / videoDuration) * 100}%`
-                                    }}
-                                ></div>
-
-                                {/* Start Slider (Invisible but clickable) */}
-                                <input 
-                                    type="range"
-                                    min={0}
-                                    max={videoDuration}
-                                    step={0.1}
-                                    value={trimRange.start}
-                                    onChange={e => {
-                                        const val = Number(e.target.value);
-                                        if (val < trimRange.end - MIN_TRIM_SECONDS) {
-                                            const end = Math.min(trimRange.end, val + MAX_VIDEO_SECONDS, videoDuration);
-                                            setTrimRange({ start: val, end });
-                                            if (videoRef.current) {
-                                                videoRef.current.currentTime = val;
-                                                // Avoid rapid play/pause calls during drag
-                                                safePause();
-                                            }
-                                        }
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                    style={{ pointerEvents: trimRange.start > videoDuration / 2 ? 'none' : 'auto' }} // Hack to prevent overlap blocking
-                                />
-                                
-                                {/* End Slider (Invisible but clickable) */}
-                                <input 
-                                    type="range"
-                                    min={0}
-                                    max={videoDuration}
-                                    step={0.1}
-                                    value={trimRange.end}
-                                    onChange={e => {
-                                        const val = Number(e.target.value);
-                                        if (val > trimRange.start + MIN_TRIM_SECONDS) {
-                                            const start = Math.max(0, Math.min(trimRange.start, val - MAX_VIDEO_SECONDS));
-                                            const end = Math.min(val, start + MAX_VIDEO_SECONDS, videoDuration);
-                                            setTrimRange({ start, end });
-                                            if (videoRef.current) {
-                                                videoRef.current.currentTime = val;
-                                                safePause();
-                                            }
-                                        }
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                    style={{ pointerEvents: trimRange.end < videoDuration / 2 ? 'none' : 'auto' }}
+                                <motion.div 
+                                    className="absolute top-0 bottom-0 bg-yellow-500/30 border-l-2 border-r-2 border-yellow-500 pointer-events-none z-10"
+                                    style={{ left: startX, width: selectedWidth }}
                                 />
 
-                                {/* Thumbs Visuals (since inputs are hidden) */}
-                                <div 
-                                    className="absolute top-0 bottom-0 w-4 bg-yellow-500 flex items-center justify-center pointer-events-none z-10 rounded-l-md"
-                                    style={{ left: `${(trimRange.start / videoDuration) * 100}%`, transform: 'translateX(-50%)' }}
+                                {/* Thumb Start */}
+                                <motion.div
+                                    className="absolute top-1/2 w-5 h-8 bg-yellow-500 rounded-md cursor-grab active:cursor-grabbing z-20 flex items-center justify-center shadow-lg"
+                                    style={{ x: startX, y: '-50%' }}
+                                    drag="x"
+                                    dragMomentum={false}
+                                    dragElastic={0}
+                                    dragConstraints={trackRef}
+                                    onDrag={(e, info) => {
+                                        if (!trackRef.current) return;
+                                        const rect = trackRef.current.getBoundingClientRect();
+                                        const w = rect.width;
+                                        const x = info.point.x - rect.left;
+                                        
+                                        const rawStart = (x / w) * videoDuration;
+                                        const maxStart = trimRange.end - MIN_TRIM_SECONDS;
+                                        
+                                        let newStart = Math.max(0, Math.min(rawStart, maxStart));
+                                        
+                                        // Update state
+                                        setTrimRange(prev => ({ ...prev, start: newStart }));
+                                        
+                                        // Force limits on visual thumb if needed
+                                        if (rawStart > maxStart) {
+                                            startX.set((maxStart / videoDuration) * w);
+                                        } else if (rawStart < 0) {
+                                            startX.set(0);
+                                        }
+
+                                        // Update video preview
+                                        if (videoRef.current) {
+                                            videoRef.current.currentTime = newStart;
+                                        }
+                                    }}
                                 >
                                     <ChevronRight size={12} className="text-black" />
-                                </div>
-                                <div 
-                                    className="absolute top-0 bottom-0 w-4 bg-yellow-500 flex items-center justify-center pointer-events-none z-10 rounded-r-md"
-                                    style={{ left: `${(trimRange.end / videoDuration) * 100}%`, transform: 'translateX(-50%)' }}
+                                </motion.div>
+
+                                {/* Thumb End */}
+                                <motion.div
+                                    className="absolute top-1/2 w-5 h-8 bg-yellow-500 rounded-md cursor-grab active:cursor-grabbing z-20 flex items-center justify-center shadow-lg"
+                                    style={{ x: endX, y: '-50%' }}
+                                    drag="x"
+                                    dragMomentum={false}
+                                    dragElastic={0}
+                                    dragConstraints={trackRef}
+                                    onDrag={(e, info) => {
+                                        if (!trackRef.current) return;
+                                        const rect = trackRef.current.getBoundingClientRect();
+                                        const w = rect.width;
+                                        const x = info.point.x - rect.left;
+                                        
+                                        const rawEnd = (x / w) * videoDuration;
+                                        const minEnd = trimRange.start + MIN_TRIM_SECONDS;
+                                        const maxEnd = Math.min(videoDuration, trimRange.start + MAX_VIDEO_SECONDS);
+                                        
+                                        let newEnd = Math.max(minEnd, Math.min(rawEnd, maxEnd));
+                                        
+                                        setTrimRange(prev => ({ ...prev, end: newEnd }));
+
+                                        if (rawEnd < minEnd) {
+                                            endX.set((minEnd / videoDuration) * w);
+                                        } else if (rawEnd > maxEnd) {
+                                            endX.set((maxEnd / videoDuration) * w);
+                                        }
+
+                                        if (videoRef.current) {
+                                            videoRef.current.currentTime = newEnd;
+                                        }
+                                    }}
                                 >
                                     <ChevronLeft size={12} className="text-black" />
-                                </div>
+                                </motion.div>
                             </div>
                             
                             <div className="flex justify-between mt-4">

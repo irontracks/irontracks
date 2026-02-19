@@ -8,6 +8,23 @@ CREATE TABLE IF NOT EXISTS rate_limit_counters (
 -- Habilitar RLS (opcional, mas boa prática)
 ALTER TABLE rate_limit_counters ENABLE ROW LEVEL SECURITY;
 
+-- Apenas service role (admin) pode operar essa tabela
+-- Usuários normais não têm acesso direto
+CREATE POLICY "service role full access on rate_limit_counters"
+  ON rate_limit_counters
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Bloquear explicitamente acesso anônimo e autenticado
+CREATE POLICY "deny public access on rate_limit_counters"
+  ON rate_limit_counters
+  FOR ALL
+  TO anon, authenticated
+  USING (false)
+  WITH CHECK (false);
+
 -- Função atômica para checar rate limit
 CREATE OR REPLACE FUNCTION check_rate_limit(
     p_key TEXT,

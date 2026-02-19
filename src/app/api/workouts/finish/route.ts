@@ -293,42 +293,50 @@ export async function POST(request: Request) {
         if (!throttlePr) {
           const currentBest = buildBestByExerciseFromSession(sessionObj)
           if (currentBest.size) {
-            const onlyNames = new Set(Array.from(currentBest.keys()))
-            const { data: history } = await admin
-              .from('workouts')
-              .select('id, notes')
-              .eq('user_id', user.id)
-              .eq('is_template', false)
-              .order('created_at', { ascending: false })
-              .limit(160)
-            const rows = Array.isArray(history) ? history : []
-            const historyBest = new Map<string, { weight: number; reps: number; volume: number }>()
-            for (const row of rows) {
-              try {
-                if (row?.id && data?.id && String(row.id) === String(data.id)) continue
-                let sess: Record<string, unknown> | null = null
-                if (typeof row?.notes === 'string') sess = JSON.parse(row.notes)
-                else if (row?.notes && typeof row.notes === 'object') sess = row.notes
-                if (!sess || typeof sess !== 'object') continue
-                const best = buildBestByExerciseFromSession(sess, onlyNames)
-                best.forEach((v, exName) => {
-                  const prev = historyBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
-                  historyBest.set(exName, {
-                    weight: Math.max(prev.weight, v.weight),
-                    reps: Math.max(prev.reps, v.reps),
-                    volume: Math.max(prev.volume, v.volume),
+            const exerciseNames = Array.from(currentBest.keys())
+            const prevBest = new Map<string, { weight: number; reps: number; volume: number }>()
+            try {
+              const { data: existing } = await admin
+                .from('exercise_personal_records')
+                .select('exercise_name, best_weight, best_reps, best_volume')
+                .eq('user_id', user.id)
+                .in('exercise_name', exerciseNames)
+              const existingRows = Array.isArray(existing) ? existing : []
+              for (const row of existingRows) {
+                try {
+                  const r = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}
+                  const exerciseName = String(r.exercise_name || '').trim()
+                  if (!exerciseName) continue
+                  prevBest.set(exerciseName, {
+                    weight: Number(r.best_weight ?? 0),
+                    reps: Number(r.best_reps ?? 0),
+                    volume: Number(r.best_volume ?? 0),
                   })
-                })
-              } catch {}
-            }
+                } catch {}
+              }
+            } catch {}
 
+            const nowIso = new Date().toISOString()
+            const upsertRows: Array<Record<string, unknown>> = []
             const prs: { exercise: string; label: string; value: string; score: number }[] = []
             currentBest.forEach((cur, exName) => {
-              const hist = historyBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
+              const hist = prevBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
               const volumePr = cur.volume > 0 && cur.volume > hist.volume
               const weightPr = cur.weight > 0 && cur.weight > hist.weight
               const repsPr = cur.reps > 0 && cur.reps > hist.reps
               if (!volumePr && !weightPr && !repsPr) return
+
+              upsertRows.push({
+                user_id: user.id,
+                exercise_name: exName,
+                best_weight: Math.max(hist.weight, cur.weight),
+                best_reps: Math.max(hist.reps, cur.reps),
+                best_volume: Math.max(hist.volume, cur.volume),
+                workout_id: saved?.id ?? null,
+                achieved_at: nowIso,
+                updated_at: nowIso,
+              })
+
               if (volumePr) {
                 prs.push({
                   exercise: exName,
@@ -354,6 +362,15 @@ export async function POST(request: Request) {
                 score: cur.reps,
               })
             })
+
+            if (upsertRows.length) {
+              try {
+                await admin.from('exercise_personal_records').upsert(upsertRows, {
+                  onConflict: 'user_id, exercise_name',
+                  ignoreDuplicates: false,
+                })
+              } catch {}
+            }
 
             prs.sort((a, b) => b.score - a.score)
             const top = prs.slice(0, 3)

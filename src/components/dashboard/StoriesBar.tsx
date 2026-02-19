@@ -133,6 +133,12 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     return [mine, ...arr.filter((g) => g.authorId !== myId)]
   }, [groups, myId])
 
+  const mineGroup = useMemo(() => {
+    if (!myId) return null
+    const arr = Array.isArray(groups) ? groups : []
+    return arr.find((g) => g.authorId === myId) || null
+  }, [groups, myId])
+
   const currentGroup = useMemo(() => ordered.find((g) => g.authorId === openAuthorId) || null, [ordered, openAuthorId])
   const closeViewer = useCallback(() => setOpen(false), [])
   const handleStoryUpdated = useCallback(
@@ -208,7 +214,48 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
             </div>
           </>
         ) : null}
-        {ordered.map((g) => {
+        {myId ? (
+          <div key="__my_fixed" className="shrink-0 w-[72px] relative">
+            <button
+              type="button"
+              onClick={() => {
+                const hasStories = Array.isArray(mineGroup?.stories) && mineGroup!.stories.length > 0
+                if (hasStories) {
+                  setOpenAuthorId(myId)
+                  setOpen(true)
+                } else {
+                  setIsCreatorOpen(true)
+                }
+              }}
+              className="w-[72px] focus:outline-none"
+              aria-label="Meu Story"
+            >
+              <div className={`w-16 h-16 rounded-full border-2 border-yellow-500 p-1 mx-auto relative`}>
+                <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+                  {mineGroup?.photoUrl ? (
+                    <Image src={mineGroup.photoUrl} alt="Você" width={64} height={64} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-yellow-500 font-black">{initials('Você')}</span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-1 text-[11px] text-neutral-300 font-bold truncate text-center">Você</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (uploading) return
+                setIsCreatorOpen(true)
+              }}
+              className="absolute left-[calc(50%+18px)] top-[44px] w-6 h-6 rounded-full bg-yellow-500 border-2 border-black flex items-center justify-center"
+              aria-label="Adicionar story (foto ou vídeo)"
+              disabled={uploading}
+            >
+              <Plus size={14} className="text-black" />
+            </button>
+          </div>
+        ) : null}
+        {ordered.filter(g => g.authorId !== myId).map((g) => {
           const hasStories = Array.isArray(g.stories) && g.stories.length > 0
           const hasUnseen = !!g.hasUnseen
           const ringCls = !hasStories

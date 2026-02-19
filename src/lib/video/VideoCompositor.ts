@@ -5,6 +5,7 @@ interface RenderOptions {
     onProgress?: (progress: number) => void;
     outputWidth?: number; outputHeight?: number; fps?: number; mimeTypeOverride?: string;
     videoBitsPerSecond?: number; audioBitsPerSecond?: number;
+    cssFilter?: string;
 }
 
 interface ExportResult {
@@ -142,7 +143,8 @@ export class VideoCompositor {
         fps = 30,
         mimeTypeOverride,
         videoBitsPerSecond: userVideoBps,
-        audioBitsPerSecond: userAudioBps
+        audioBitsPerSecond: userAudioBps,
+        cssFilter
     }: RenderOptions): Promise<ExportResult> {
         this.isCancelled = false;
         
@@ -275,7 +277,11 @@ export class VideoCompositor {
             }
 
             if (this.ctx) {
+                if (cssFilter && typeof cssFilter === 'string' && cssFilter.trim() !== '') {
+                    this.ctx.filter = cssFilter;
+                }
                 onDrawFrame(this.ctx, videoElement);
+                this.ctx.filter = 'none';
             }
 
             // Sinalizar ao MediaRecorder que um novo frame está pronto

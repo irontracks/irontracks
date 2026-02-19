@@ -11,8 +11,11 @@ assert.ok(payloadText.includes('buildFinishWorkoutPayload'), 'buildFinishWorkout
 
 const activeWorkoutPath = path.join(repoRoot, 'src', 'components', 'ActiveWorkout.tsx')
 assert.ok(fs.existsSync(activeWorkoutPath), 'ActiveWorkout.tsx missing')
-const activeText = fs.readFileSync(activeWorkoutPath, 'utf8')
-assert.ok(activeText.includes('buildFinishWorkoutPayload'), 'ActiveWorkout must call buildFinishWorkoutPayload')
+
+const controllerPath = path.join(repoRoot, 'src', 'components', 'workout', 'useActiveWorkoutController.ts')
+assert.ok(fs.existsSync(controllerPath), 'useActiveWorkoutController.ts missing')
+const controllerText = fs.readFileSync(controllerPath, 'utf8')
+assert.ok(controllerText.includes('buildFinishWorkoutPayload'), 'useActiveWorkoutController must call buildFinishWorkoutPayload')
 
 const reportHtmlPath = path.join(repoRoot, 'src', 'utils', 'report', 'buildHtml.ts')
 assert.ok(fs.existsSync(reportHtmlPath), 'buildHtml.ts missing')
