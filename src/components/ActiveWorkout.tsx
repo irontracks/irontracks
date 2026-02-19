@@ -8,6 +8,9 @@ import { Header } from './active-workout/Header';
 import { ExerciseList } from './active-workout/ExerciseList';
 import { Modals } from './active-workout/Modals';
 import { UnknownRecord } from './active-workout/types';
+import { z } from 'zod';
+
+const UnknownRecordSchema: z.ZodType<UnknownRecord> = z.record(z.unknown());
 
 export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
@@ -61,7 +64,11 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           onToggleCollapse={toggleCollapse}
           onAddSet={addExtraSetToExercise}
           onOpenEdit={openEditExercise}
-          onOpenDeload={(ex, idx) => openDeloadModal(ex as UnknownRecord, idx)}
+          onOpenDeload={(ex, idx) => {
+            const parsed = UnknownRecordSchema.safeParse(ex);
+            if (!parsed.success) return;
+            openDeloadModal(parsed.data, idx);
+          }}
           onOpenVideo={(url) => {
              if (typeof window !== 'undefined' && url) {
                  window.open(url, '_blank', 'noopener,noreferrer');

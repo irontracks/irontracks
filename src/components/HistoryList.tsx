@@ -11,12 +11,85 @@ import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
 import { PeriodStats } from '@/types/workout';
+import { z } from 'zod';
+import { ExerciseSchema, SetSchema, WorkoutSchema } from '@/schemas/database';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const PERIOD_SESSIONS_LIMIT = 30;
 const TOP_EXERCISES_LIMIT = 5;
+
+type UnknownRecord = Record<string, unknown>;
+
+const WorkoutLogSchema = z
+    .object({
+        weight: z.union([z.string(), z.number()]).nullable().optional(),
+        reps: z.union([z.string(), z.number()]).nullable().optional(),
+        done: z.boolean().optional(),
+    })
+    .passthrough();
+
+const RawSessionObjectSchema = z
+    .object({
+        id: z.string().optional(),
+        user_id: z.string().optional(),
+        student_id: z.string().optional(),
+        workoutTitle: z.string().optional(),
+        date: z.string().optional(),
+        totalTime: z.number().optional(),
+        logs: z.record(WorkoutLogSchema).optional(),
+        exercises: z.array(z.unknown()).optional(),
+        notes: z.string().optional(),
+    })
+    .passthrough();
+
+const RawSessionJsonSchema = z
+    .string()
+    .transform((raw, ctx) => {
+        try {
+            const parse = JSON['parse'] as unknown as (s: string) => unknown;
+            return parse(raw);
+        } catch {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'invalid_json' });
+            return z.NEVER;
+        }
+    })
+    .pipe(RawSessionObjectSchema);
+
+const WorkoutIdNameSchema = z
+    .object({
+        id: WorkoutSchema.shape.id,
+        name: WorkoutSchema.shape.name,
+    })
+    .passthrough();
+
+const ExerciseIdSchema = z
+    .object({
+        id: ExerciseSchema.shape.id,
+    })
+    .passthrough();
+
+const SetLiteSchema = z
+    .object({
+        exercise_id: SetSchema.shape.exercise_id,
+        set_number: SetSchema.shape.set_number,
+        reps: SetSchema.shape.reps,
+        rpe: SetSchema.shape.rpe,
+        weight: SetSchema.shape.weight,
+    })
+    .passthrough();
+
+const parseRawSession = (value: unknown): z.infer<typeof RawSessionObjectSchema> | null => {
+    if (typeof value === 'string') {
+        const s = String(value || '').trim();
+        if (!s.startsWith('{') && !s.startsWith('[')) return null;
+        const parsed = RawSessionJsonSchema.safeParse(s);
+        return parsed.success ? parsed.data : null;
+    }
+    const parsed = RawSessionObjectSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+};
 
 interface WorkoutLog {
     weight?: string | number | null;
@@ -302,9 +375,10 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             const exerciseMap = new Map<string, { name: string; sets: number; reps: number; volumeKg: number; sessions: Set<string> }>();
             const sessionSummaries: Array<{ date: unknown; minutes: number; volumeKg: number }> = [];
             list.forEach((item) => {
-                const raw = isRecord(item?.rawSession) ? (item.rawSession as Record<string, unknown>) : null;
-                const logs: Record<string, unknown> = raw && isRecord(raw?.logs) ? (raw.logs as Record<string, unknown>) : {};
-                const exercises: unknown[] = raw && Array.isArray(raw?.exercises) ? (raw.exercises as unknown[]) : [];
+                const rawParsed = RawSessionObjectSchema.safeParse(item?.rawSession);
+                const raw = rawParsed.success ? rawParsed.data : null;
+                const logs = raw?.logs ?? {};
+                const exercises: unknown[] = Array.isArray(raw?.exercises) ? raw.exercises : [];
                 const v = calculateTotalVolumeFromLogs(logs);
                 const safeVolume = Number.isFinite(v) && v > 0 ? v : 0;
                 if (safeVolume > 0) totalVolumeKg += safeVolume;
@@ -373,10 +447,10 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     };
 
     const buildShareText = (report: PeriodReport | null) => {
-        const data = report && typeof report === 'object' ? report : null;
+        const data = report;
         if (!data) return '';
         const label = data.type === 'week' ? 'semanal' : data.type === 'month' ? 'mensal' : 'período';
-        const stats = (data.stats && typeof data.stats === 'object' ? data.stats : {}) as PeriodStats;
+        const stats = data.stats;
         const count = Number(stats.count) || 0;
         const totalMinutes = Number(stats.totalMinutes) || 0;
         const avgMinutes = Number(stats.avgMinutes) || 0;
@@ -402,8 +476,9 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     };
 
     const openSession = (session: WorkoutSummary) => {
-        const rawSession = session?.rawSession && typeof session.rawSession === 'object' ? session.rawSession : null;
-        const sessionRecord = session && typeof session === 'object' ? (session as Record<string, unknown>) : {};
+        const rawSessionParsed = RawSessionObjectSchema.safeParse(session?.rawSession);
+        const rawSession = rawSessionParsed.success ? rawSessionParsed.data : null;
+        const sessionRecord: UnknownRecord = isRecord(session) ? session : {};
         const payload = rawSession
             ? {
                 ...rawSession,
@@ -418,7 +493,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                 return;
             } catch { }
         }
-        setSelectedSession(payload as Record<string, unknown>);
+        setSelectedSession(isRecord(payload) ? payload : null);
     };
 
     useEffect(() => {
@@ -463,14 +538,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                 }
 
                 const formatted = (data || []).map(w => {
-                    let raw = null;
-                    try {
-                        if (typeof w.notes === 'string') raw = JSON.parse(w.notes);
-                        else if (typeof w.notes === 'object' && w.notes) raw = w.notes;
-                    } catch (err) {
-                        console.error('Erro ao processar item:', w, err);
-                        raw = null;
-                    }
+                    const raw = parseRawSession(w.notes);
                     const dateMs = toDateMs(raw?.date) ?? toDateMs(w?.date) ?? toDateMs(w?.completed_at) ?? toDateMs(w?.created_at) ?? null;
                     const dateIso = dateMs ? new Date(dateMs).toISOString() : null;
                     return {
@@ -500,20 +568,26 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         try {
             if (!selectedTemplate) throw new Error('Selecione um treino');
             const sourceExercises = Array.isArray(selectedTemplate.exercises) ? selectedTemplate.exercises : [];
-            const exIds = sourceExercises.map(e => String((e as Record<string, unknown>)?.id ?? '')).filter(Boolean);
-            const setsMap: Record<string, Array<Record<string, unknown>>> = {};
+            const exIds = sourceExercises
+                .map((e) => {
+                    const parsed = ExerciseIdSchema.safeParse(e);
+                    return parsed.success ? String(parsed.data.id || '').trim() : '';
+                })
+                .filter(Boolean);
+            const setsMap: Record<string, Array<z.infer<typeof SetLiteSchema>>> = {};
             if (exIds.length > 0) {
                 const { data: setsData } = await supabase
                     .from('sets')
                     .select('exercise_id, set_number, reps, rpe, weight')
                     .in('exercise_id', exIds)
                     .order('set_number');
-                (setsData || []).forEach((s) => {
-                    const row = isRecord(s) ? (s as Record<string, unknown>) : null;
-                    const exId = String(row?.exercise_id ?? '');
+                (Array.isArray(setsData) ? setsData : []).forEach((s) => {
+                    const parsed = SetLiteSchema.safeParse(s);
+                    if (!parsed.success) return;
+                    const exId = String(parsed.data.exercise_id || '').trim();
                     if (!exId) return;
                     const arr = setsMap[exId] || (setsMap[exId] = []);
-                    if (row) arr.push(row);
+                    arr.push(parsed.data);
                 });
             }
             const exercises: ManualExercise[] = manualExercises.length
@@ -635,20 +709,26 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         const buildManualFromTemplate = async () => {
             if (!selectedTemplate) { setManualExercises([]); return; }
             const sourceExercises = Array.isArray(selectedTemplate?.exercises) ? selectedTemplate.exercises : [];
-            const exIds = sourceExercises.map(e => String((e as Record<string, unknown>)?.id ?? '')).filter(Boolean);
-            const setsMap: Record<string, Array<Record<string, unknown>>> = {};
+            const exIds = sourceExercises
+                .map((e) => {
+                    const parsed = ExerciseIdSchema.safeParse(e);
+                    return parsed.success ? String(parsed.data.id || '').trim() : '';
+                })
+                .filter(Boolean);
+            const setsMap: Record<string, Array<z.infer<typeof SetLiteSchema>>> = {};
             if (exIds.length > 0) {
                 const { data: setsData } = await supabase
                     .from('sets')
                     .select('exercise_id, set_number, reps, rpe, weight')
                     .in('exercise_id', exIds)
                     .order('set_number');
-                (setsData || []).forEach((s) => {
-                    const row = isRecord(s) ? (s as Record<string, unknown>) : null;
-                    const exId = String(row?.exercise_id ?? '');
+                (Array.isArray(setsData) ? setsData : []).forEach((s) => {
+                    const parsed = SetLiteSchema.safeParse(s);
+                    if (!parsed.success) return;
+                    const exId = String(parsed.data.exercise_id || '').trim();
                     if (!exId) return;
                     const arr = setsMap[exId] || (setsMap[exId] = []);
-                    if (row) arr.push(row);
+                    arr.push(parsed.data);
                 });
             }
             const exs: ManualExercise[] = sourceExercises.map((e) => {
@@ -662,8 +742,8 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                     restTime: Number(row.rest_time) || Number(row.restTime) || 0,
                     cadence: String(row.cadence ?? ''),
                     notes: String(row.notes ?? ''),
-                    weights: setRows.map(s => String(s.weight ?? '')),
-                    repsPerSet: setRows.map(s => String(s.reps ?? ''))
+                    weights: setRows.map((s) => String(s.weight ?? '')),
+                    repsPerSet: setRows.map((s) => String(s.reps ?? ''))
                 };
             });
             setManualExercises(exs);
@@ -722,7 +802,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     };
 
     const openEdit = (session: WorkoutSummary) => {
-        const raw = session.rawSession || (typeof session.notes === 'string' && session.notes?.startsWith('{') ? (() => { try { return JSON.parse(session.notes); } catch { return null; } })() : null);
+        const raw = parseRawSession(session.rawSession ?? session.notes);
         setEditId(session.id);
         setEditTitle(session.workoutTitle || raw?.workoutTitle || 'Treino');
         const d = raw?.date ? new Date(raw.date) : (session.date ? new Date(session.date) : new Date());
@@ -732,7 +812,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         const exs: ManualExercise[] = (raw?.exercises || []).map((ex, exIdx: number) => {
             const exRecord = isRecord(ex) ? ex : {};
             const count = Number(exRecord.sets ?? 0) || 0;
-            const logs = raw && isRecord(raw.logs) ? (raw.logs as Record<string, unknown>) : {};
+            const logs = raw?.logs ?? {};
             const weights = Array.from({ length: count }, (_, sIdx) => {
                 const key = `${exIdx}-${sIdx}`;
                 const entry = logs[key];
