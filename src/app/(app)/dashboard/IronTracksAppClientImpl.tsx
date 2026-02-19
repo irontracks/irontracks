@@ -38,7 +38,7 @@ import CommunityClient from '@/app/(app)/community/CommunityClient';
 import StudentEvolution from '@/components/StudentEvolution';
 import WorkoutReport from '@/components/WorkoutReport';
 import ActiveWorkout from '@/components/ActiveWorkout';
-import RestTimerOverlay from '@/components/RestTimerOverlay';
+import RestTimerOverlay from '@/components/workout/RestTimerOverlay';
 import LoadingScreen from '@/components/LoadingScreen';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import IncomingInviteModal from '@/components/IncomingInviteModal';
