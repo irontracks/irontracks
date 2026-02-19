@@ -694,15 +694,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const storedTabRaw = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
             const storedTab = validTabs.has(storedTabRaw) ? storedTabRaw : '';
 
+            // Só abre se tiver 'open=1' explícito (vindo de navegação interna)
+            // OU se tiver tab na URL (link direto)
             const shouldOpen = open === '1' || !!urlTab;
-            if (!shouldOpen) return;
+            
+            // Se não deve abrir, garante que está fechado
+            if (!shouldOpen) {
+                setShowAdminPanel(false);
+                return;
+            }
 
             const tab = urlTab || storedTab || 'dashboard';
-            try {
-                sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
-                sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, tab);
-            } catch { }
-            if (!urlTab && tab) setUrlTabParam(tab);
+            // Se veio pela URL, atualiza o storage
+            if (urlTab) {
+                try {
+                    sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
+                    sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, tab);
+                } catch { }
+            }
+            
             setShowAdminPanel(true);
         } catch { }
     }, [setUrlTabParam, user?.role]);
