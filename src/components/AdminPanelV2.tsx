@@ -4602,7 +4602,9 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                                                 const json = await res.json();
                                                                                 if (json.ok) {
                                                                                     const nextTid = json.teacher_user_id || teacherUserId || null;
-                                                                                    setSelectedStudent(prev => ({ ...prev, teacher_id: nextTid }));
+                                                                                    if (selectedStudent) {
+                                                                                        setSelectedStudent({ ...selectedStudent, teacher_id: nextTid });
+                                                                                    }
                                                                                     setUsersList(prev => prev.map(x => (
                                                                                         (x.id === selectedStudent.id)
                                                                                         || (x.user_id === selectedStudent.user_id)
