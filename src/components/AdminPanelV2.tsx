@@ -34,6 +34,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         setSelectedStudent
     } = controller;
 
+    if (!user) return null;
+
     const tabs = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
         { id: 'students', label: 'Alunos', icon: Users, adminOnly: false },
@@ -48,6 +50,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     ];
 
     const activeTabs = tabs.filter(t => !t.adminOnly || isAdmin);
+
+    if (!user) return null;
 
     return (
         <AdminPanelProvider value={controller}>
@@ -118,7 +122,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-3 px-3 py-1.5 bg-neutral-900 rounded-full border border-neutral-800">
                                 <div className="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center text-black font-black text-xs">
-                                    {user.name?.charAt(0).toUpperCase() || 'A'}
+                                    {(user.name?.charAt(0) || 'A').toUpperCase()}
                                 </div>
                                 <div className="hidden sm:block pr-2">
                                     <div className="text-xs font-bold text-white leading-none">{user.name}</div>
