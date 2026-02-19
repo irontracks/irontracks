@@ -7,7 +7,7 @@ import { parseSearchParams } from '@/utils/zod'
 export const dynamic = 'force-dynamic'
 
 const QuerySchema = z.object({
-  status: z.enum(['pending', 'approved', 'rejected', 'all']).optional(),
+  status: z.enum(['pending', 'accepted', 'approved', 'rejected', 'all']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(200).default(50),
 })
@@ -31,10 +31,14 @@ export async function GET(req: Request) {
       .from('access_requests')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
+      .range(offset, offset + q.limit - 1)
 
     if (q.status && q.status !== 'all') {
-      query = query.eq('status', q.status)
+      if (q.status === 'approved') {
+        query = query.in('status', ['approved', 'accepted'])
+      } else {
+        query = query.eq('status', q.status)
+      }
     }
 
     const { data, error, count } = await query

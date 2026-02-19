@@ -26,16 +26,16 @@ export async function GET(req: Request) {
       if (!auth.ok) return auth.response
     }
 
-    const { data: q, response } = parseSearchParams(req, QuerySchema)
+    const { data: params, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const teacherId = (q.teacher_id ?? q.teacher_user_id)?.trim()
+    const teacherId = (params.teacher_id ?? params.teacher_user_id)?.trim()
     if (!teacherId) {
       return NextResponse.json({ ok: false, error: 'missing teacher_id' }, { status: 400 })
     }
 
-    const limit = clamp(q.limit, 1, 200)
-    const cursor = String(q.cursor ?? '').trim()
+    const limit = clamp(params.limit, 1, 200)
+    const cursor = String(params.cursor ?? '').trim()
 
     const admin = createAdminClient()
     const { data: students, error: stErr } = await admin
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
       if (nm) studentNameById.set(uid, nm)
     }
 
-    let q = admin
+    let query = admin
       .from('workouts')
       .select('id, user_id, name, date, created_at, updated_at, is_template')
       .in('user_id', studentUserIds)
@@ -64,9 +64,9 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(limit)
 
-    if (cursor) q = q.lt('created_at', cursor)
+    if (cursor) query = query.lt('created_at', cursor)
 
-    const { data: rows, error } = await q
+    const { data: rows, error } = await query
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     const enriched = (rows || []).map((w: any) => ({
