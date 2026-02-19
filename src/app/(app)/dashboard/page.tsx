@@ -97,7 +97,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     photo_url: profile?.photo_url ?? null,
   }
 
-  let baseWorkouts: any[] = []
+  let baseWorkouts: unknown[] = []
   try {
     const { data } = await supabase
       .from('workouts')

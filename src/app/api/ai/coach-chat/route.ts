@@ -1,151 +1,101 @@
-import { NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { requireUser } from '@/utils/auth/route';
+import { NextResponse } from 'next/server'
+import { GoogleGenerativeAI } from '@google/generative-ai'
+import { z } from 'zod'
+import { requireUser } from '@/utils/auth/route'
+import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
+import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { parseJsonBody } from '@/utils/zod'
 
-export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic'
 
-const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.0-flash-exp';
+const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const formatSession = (session: any): string => {
-    if (!session) return 'Nenhum dado disponível.';
-    
-    let summary = `Título: ${session.workoutTitle || 'Treino sem nome'}\n`;
-    summary += `Data: ${new Date(session.date || Date.now()).toLocaleDateString('pt-BR')}\n`;
-    summary += `Duração: ${Math.round((session.totalTime || 0) / 60)} min\n`;
-    
-    const exercises = Array.isArray(session.exercises) ? session.exercises : [];
-    const logs = session.logs || {};
-    
-    summary += 'Exercícios:\n';
-    exercises.forEach((ex: any, idx: number) => {
-        summary += `${idx + 1}. ${ex.name} (${ex.sets} séries, Método: ${ex.method || 'Normal'}, RPE: ${ex.rpe || '-'}, Descanso: ${ex.restTime || '-'}s)\n`;
-        // Add logs detail
-        for (let s = 0; s < (ex.sets || 0); s++) {
-            const key = `${idx}-${s}`;
-            const log = logs[key];
-            if (log) {
-                summary += `   - Série ${s + 1}: ${log.weight}kg x ${log.reps} reps\n`;
-            }
-        }
-    });
-    
-    return summary;
-};
+const safeArray = <T,>(v: any): T[] => (Array.isArray(v) ? (v as T[]) : [])
+
+const normalizeMessages = (messages: any) => {
+  return safeArray<any>(messages)
+    .map((m) => {
+      const role = String(m?.role || '').trim()
+      const content = String(m?.content || '').trim()
+      if (!role || !content) return null
+      if (!['user', 'assistant', 'system'].includes(role)) return null
+      return { role, content }
+    })
+    .filter(Boolean)
+}
+
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().min(1),
+})
+
+const BodySchema = z
+  .object({
+    messages: z.array(MessageSchema).default([]),
+    context: z.record(z.unknown()).nullable().optional(),
+  })
+  .strict()
 
 export async function POST(req: Request) {
-    try {
-        const user = await requireUser();
-        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  try {
+    const auth = await requireUser()
+    if (!auth.ok) return auth.response
+    const supabase = auth.supabase
+    const userId = String(auth.user.id || '').trim()
 
-        const body = await req.json();
-        const { messages, context } = body;
+    const ip = getRequestIp(req)
+    const rl = checkRateLimit(`ai:coach-chat:${userId}:${ip}`, 30, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-        if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-            return NextResponse.json({ error: 'API Key missing' }, { status: 500 });
-        }
-
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: MODEL_ID });
-
-        const currentWorkout = formatSession(context?.session);
-        const previousWorkout = formatSession(context?.previousSession);
-
-        const isGeneralMode = !context?.session && !context?.previousSession;
-
-        const systemPrompt = `
-Você é o Iron Coach, um treinador de força e condicionamento físico de elite e especialista em biomecânica.
-Sua missão é analisar os dados do treino do usuário e responder perguntas, fornecer feedbacks técnicos e motivar.
-
-${isGeneralMode ? `
-MODO GERAL (SEM TREINO ESPECÍFICO):
-O usuário está na área VIP e quer tirar dúvidas gerais sobre treino, nutrição ou estratégia.
-Use seu conhecimento para guiar o usuário. Se ele perguntar sobre um treino específico, peça para ele abrir o relatório daquele treino.
-` : `
-DADOS DO TREINO ATUAL (ACABOU DE FINALIZAR):
-${currentWorkout}
-
-DADOS DO TREINO ANTERIOR (REFERÊNCIA):
-${previousWorkout}
-`}
-
-DIRETRIZES DE PERSONALIDADE:
-1. Fale como um treinador experiente: direto, técnico mas acessível, e focado em resultados.
-2. Use Português do Brasil.
-3. Seja conciso. Evite textos longos e genéricos. Vá direto ao ponto.
-4. Use emojis ocasionalmente para manter o tom leve (💪, 🔥, 🚀).
-
-REGRAS DE ANÁLISE:
-1. Se o usuário perguntar sobre um grupo muscular ou exercício, analise os números (carga, reps). Compare com o treino anterior se disponível.
-2. Se houve queda de rendimento, pergunte a causa (dor, sono, estresse) e valide a decisão de reduzir carga para priorizar técnica.
-3. Se houve progresso, parabenize especificamente (ex: "Aumentou 2kg no Supino, excelente!").
-4. Se o usuário falar sobre dor ou desconforto, sugira ajustes de execução ou descanso, mas lembre que não é médico.
-
-RESUMO DA CONVERSA ATÉ AGORA:
-(O usuário e você já trocaram as mensagens abaixo. Continue a conversa naturalmente.)
-`;
-
-        // Convert messages to Gemini format
-        // Gemini expects: { role: 'user' | 'model', parts: [{ text: ... }] }
-        // Our messages: { role: 'user' | 'assistant', content: ... }
-        const history = (messages || []).map((m: any) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }]
-        }));
-
-        // We use generateContent with system instruction if supported, or prepend it.
-        // gemini-1.5-pro supports systemInstruction. 
-        // For broad compatibility, we'll prepend the context to the first message or use a chat session.
-        
-        const chat = model.startChat({
-            history: [
-                {
-                    role: 'user',
-                    parts: [{ text: systemPrompt + "\n\nEntendi o contexto. Estou pronto para analisar o treino." }]
-                },
-                {
-                    role: 'model',
-                    parts: [{ text: "Ótimo. Estou com os dados do seu treino em mãos. O que gostaria de saber ou discutir sobre sua performance de hoje?" }]
-                },
-                ...history
-            ]
-        });
-
-        // The last message is usually the trigger, but in 'chat' mode we just send the last user input?
-        // Actually, the `messages` array includes the latest user message.
-        // So we should pop it to send it as `sendMessage`.
-        
-        const lastMsg = history.length > 0 && history[history.length - 1].role === 'user' 
-            ? history.pop() 
-            : { parts: [{ text: "Pode fazer uma análise geral?" }] };
-
-        // Re-initialize chat with history excluding the last message
-        const finalChat = model.startChat({
-            history: [
-                {
-                    role: 'user',
-                    parts: [{ text: systemPrompt + "\n\nEntendi o contexto. Estou pronto." }]
-                },
-                {
-                    role: 'model',
-                    parts: [{ text: "Certo. Vamos lá." }]
-                },
-                ...history
-            ]
-        });
-
-        const result = await finalChat.sendMessage(lastMsg.parts[0].text);
-        const responseText = result.response.text();
-
-        return NextResponse.json({ 
-            role: 'assistant', 
-            content: responseText 
-        });
-
-    } catch (error: any) {
-        console.error('Coach Chat Error:', error);
-        return NextResponse.json({ 
-            error: 'Failed to process chat', 
-            details: error?.message ?? String(error) 
-        }, { status: 500 });
+    const access = await checkVipFeatureAccess(supabase, userId, 'chat_daily')
+    if (!access.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de mensagens atingido. Faça upgrade para continuar.' },
+        { status: 403 },
+      )
     }
+
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
+    const messages = normalizeMessages(body.messages)
+    const context = body.context ?? null
+
+    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'API de IA não configurada. Configure GOOGLE_GENERATIVE_AI_API_KEY na Vercel (Environment Variables → Preview/Production) e faça Redeploy.',
+        },
+        { status: 500 },
+      )
+    }
+
+    const prompt = [
+      'Você é um coach de musculação do app IronTracks.',
+      'Responda sempre em pt-BR, de forma objetiva e prática.',
+      'Não invente números; use apenas o que o usuário forneceu.',
+      '',
+      'Contexto (pode ser null):',
+      JSON.stringify(context),
+      '',
+      'Conversa:',
+      JSON.stringify(messages),
+      '',
+      'Responda apenas com o texto final do coach (sem JSON e sem markdown).',
+    ].join('\n')
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: MODEL })
+    const result = await model.generateContent([{ text: prompt }] as any)
+    const text = String((await result?.response?.text()) || '').trim()
+    if (!text) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
+
+    await incrementVipUsage(supabase, userId, 'chat')
+    return NextResponse.json({ ok: true, content: text })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  }
 }

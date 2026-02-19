@@ -23,13 +23,13 @@ const MAX_QUEUE = 200
 const STORAGE_KEY = 'irontracks.userActivity.queue.v1'
 
 let queue: QueuedEvent[] = []
-let flushTimer: any = null
+let flushTimer: ReturnType<typeof setTimeout> | null = null
 let flushing = false
 let lastByKey = new Map<string, number>()
 
 const now = () => Date.now()
 
-const safeObj = (v: any) => {
+const safeObj = (v: unknown) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
   return v as Record<string, any>
 }
@@ -46,7 +46,7 @@ const readStored = () => {
   }
 }
 
-const writeStored = (items: any[]) => {
+const writeStored = (items: unknown[]) => {
   try {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(-MAX_QUEUE)))
@@ -65,7 +65,7 @@ const scheduleFlush = () => {
   flushTimer = window.setTimeout(() => {
     flushTimer = null
     flush({ preferBeacon: false })
-  }, 2000)
+  }, 2000) as unknown as ReturnType<typeof setTimeout>
 }
 
 const shouldDrop = (key: string, ms: number) => {

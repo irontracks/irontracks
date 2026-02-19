@@ -103,7 +103,7 @@ export default function AuthRecoveryClient() {
 
         setReady(true)
       } catch (e) {
-        setError((e as any)?.message || 'Não foi possível validar seu login.')
+        setError(String((e as Record<string, unknown>)?.message || '') || 'Não foi possível validar seu login.')
       }
     }
 
@@ -136,7 +136,7 @@ export default function AuthRecoveryClient() {
       }
       router.replace(nextPath)
     } catch (e) {
-      setError((e as any)?.message || 'Não foi possível atualizar sua senha.')
+      setError(String((e as Record<string, unknown>)?.message || '') || 'Não foi possível atualizar sua senha.')
     } finally {
       setSaving(false)
     }

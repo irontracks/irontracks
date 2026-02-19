@@ -1,32 +1,40 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
+import { parseJsonBody } from '@/utils/zod'
 
-const parseTrainingNumberOrZero = (v: any) => {
+const parseTrainingNumberOrZero = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(String(v || '').replace(',', '.'))
   return Number.isFinite(n) ? n : 0
 }
 
-const getExercisePlannedSetsCount = (ex: any) => {
+const getExercisePlannedSetsCount = (ex: unknown) => {
   try {
-    const bySets = Math.max(0, Number(ex?.sets) || 0)
-    const byDetails = Array.isArray(ex?.setDetails) ? ex.setDetails.length : Array.isArray(ex?.set_details) ? ex.set_details.length : 0
+    const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : {}
+    const bySets = Math.max(0, Number(exObj?.sets) || 0)
+    const byDetails = Array.isArray(exObj?.setDetails)
+      ? (exObj.setDetails as unknown[]).length
+      : Array.isArray(exObj?.set_details)
+        ? (exObj.set_details as unknown[]).length
+        : 0
     return Math.max(bySets, byDetails)
   } catch {
     return 0
   }
 }
 
-const buildBestByExerciseFromSession = (session: any, onlyNames?: Set<string>) => {
+const buildBestByExerciseFromSession = (session: Record<string, unknown>, onlyNames?: Set<string>) => {
   const base = session && typeof session === 'object' ? session : null
-  const logs = base?.logs && typeof base.logs === 'object' ? base.logs : {}
-  const exercises = Array.isArray(base?.exercises) ? base.exercises : []
+  const logs = base?.logs && typeof base.logs === 'object' ? (base.logs as Record<string, unknown>) : {}
+  const exercises = Array.isArray(base?.exercises) ? (base.exercises as unknown[]) : []
   const out = new Map<string, { weight: number; reps: number; volume: number }>()
 
-  exercises.forEach((ex: any, exIdx: number) => {
-    const name = String(ex?.name || '').trim()
+  exercises.forEach((ex: unknown, exIdx: number) => {
+    const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : {}
+    const name = String(exObj?.name || '').trim()
     if (!name) return
     if (onlyNames && !onlyNames.has(name)) return
 
@@ -37,11 +45,12 @@ const buildBestByExerciseFromSession = (session: any, onlyNames?: Set<string>) =
 
     for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
       const key = `${exIdx}-${setIdx}`
-      const log = (logs as any)?.[key]
+      const log = (logs as Record<string, unknown>)?.[key]
       if (!log || typeof log !== 'object') continue
-      if (!log?.done) continue
-      const weight = parseTrainingNumberOrZero(log?.weight)
-      const reps = parseTrainingNumberOrZero(log?.reps)
+      const logObj = log as Record<string, unknown>
+      if (!Boolean(logObj?.done)) continue
+      const weight = parseTrainingNumberOrZero(logObj?.weight)
+      const reps = parseTrainingNumberOrZero(logObj?.reps)
       if (Number.isFinite(weight) && weight > bestWeight) bestWeight = weight
       if (Number.isFinite(reps) && reps > bestReps) bestReps = reps
       const vol = weight * reps
@@ -59,12 +68,13 @@ const buildBestByExerciseFromSession = (session: any, onlyNames?: Set<string>) =
   return out
 }
 
-const computeWorkoutStreak = (dateRows: any[]) => {
+const computeWorkoutStreak = (dateRows: unknown[]) => {
   const rows = Array.isArray(dateRows) ? dateRows : []
   const daySet = new Set<string>()
   rows.forEach((r) => {
     try {
-      const d = r?.date ? new Date(r.date) : null
+      const row = r && typeof r === 'object' ? (r as Record<string, unknown>) : {}
+      const d = row?.date ? new Date(String(row.date)) : null
       if (!d || Number.isNaN(d.getTime())) return
       const day = d.toISOString().slice(0, 10)
       daySet.add(day)
@@ -86,6 +96,13 @@ const computeWorkoutStreak = (dateRows: any[]) => {
   return streak
 }
 
+const BodySchema = z
+  .object({
+    session: z.unknown(),
+    idempotencyKey: z.string().optional(),
+  })
+  .passthrough()
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -95,10 +112,13 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await request.json()
-    const session = body?.session
+    const parsedBody = await parseJsonBody(request, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data as Record<string, unknown>
+    const session = (body as Record<string, unknown>)?.session
     if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
-    const idempotencyKey = String(body?.idempotencyKey || session?.idempotencyKey || session?.finishIdempotencyKey || '').trim()
+    const sessionObj = session && typeof session === 'object' ? (session as Record<string, unknown>) : ({} as Record<string, unknown>)
+    const idempotencyKey = String((body as Record<string, unknown>)?.idempotencyKey || sessionObj?.idempotencyKey || sessionObj?.finishIdempotencyKey || '').trim()
     const reqId =
       (() => {
         try {
@@ -118,9 +138,9 @@ export async function POST(request: Request) {
           stage: 'start',
           reqId,
           idempotencyKey: idempotencyKey || null,
-          exercisesCount: Array.isArray(session?.exercises) ? session.exercises.length : null,
+          exercisesCount: Array.isArray(sessionObj?.exercises) ? (sessionObj.exercises as unknown[]).length : null,
         },
-        client_ts: session?.date ? new Date(session.date).toISOString() : null,
+        client_ts: sessionObj?.date ? new Date(String(sessionObj.date)).toISOString() : null,
         user_agent: request.headers.get('user-agent') || null,
       })
     } catch {}
@@ -128,14 +148,14 @@ export async function POST(request: Request) {
     const baseInsert = {
       user_id: user.id,
       created_by: user.id,
-      name: normalizeWorkoutTitle(session.workoutTitle || 'Treino Realizado'),
-      date: new Date(session?.date ?? new Date()),
+      name: normalizeWorkoutTitle(String(sessionObj.workoutTitle || 'Treino Realizado')),
+      date: new Date(String(sessionObj?.date ?? new Date().toISOString())),
       completed_at: new Date().toISOString(),
       is_template: false,
       notes: JSON.stringify(session),
-    } as any
+    } as Record<string, unknown>
 
-    let saved = null as any
+    let saved: { id: string; [key: string]: unknown } | null = null
     let idempotent = false
 
     const tryInsert = async (withIdempotencyKey: boolean) => {
@@ -145,7 +165,7 @@ export async function POST(request: Request) {
 
     let insertRes = await tryInsert(true)
     if (insertRes?.error) {
-      const code = String((insertRes.error as any)?.code || '')
+      const code = String(((insertRes.error as unknown) as Record<string, unknown>)?.code ?? '')
       const msg = String(insertRes.error.message || '')
       if (code === '23505' && idempotencyKey) {
         try {
@@ -159,9 +179,9 @@ export async function POST(request: Request) {
             .limit(1)
             .maybeSingle()
           if (existing?.id) {
-            saved = existing
+            saved = existing as { id: string; [key: string]: unknown }
             idempotent = true
-            insertRes = { data: existing, error: null } as any
+            insertRes = { data: existing, error: null } as unknown as typeof insertRes
           }
         } catch {}
       } else if (msg.toLowerCase().includes('finish_idempotency_key') && msg.toLowerCase().includes('does not exist')) {
@@ -169,8 +189,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const { data, error } = insertRes as any
-    saved = saved || data
+    const { data, error } = insertRes
+    saved = saved || (data as { id: string; [key: string]: unknown } | null)
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
@@ -184,7 +204,7 @@ export async function POST(request: Request) {
       const name = String(me?.display_name || '').trim() || 'Seu amigo'
 
       const followerIds = await listFollowerIdsOf(user.id)
-      const workoutTitle = normalizeWorkoutTitle(session.workoutTitle || 'Treino')
+      const workoutTitle = normalizeWorkoutTitle(String(sessionObj.workoutTitle || 'Treino'))
 
       const workoutRecipients = await filterRecipientsByPreference(followerIds, 'notifyFriendWorkoutEvents')
       if (workoutRecipients.length) {
@@ -271,7 +291,7 @@ export async function POST(request: Request) {
       try {
         const throttlePr = await shouldThrottleBySenderType(user.id, 'friend_pr', 60)
         if (!throttlePr) {
-          const currentBest = buildBestByExerciseFromSession(session)
+          const currentBest = buildBestByExerciseFromSession(sessionObj)
           if (currentBest.size) {
             const onlyNames = new Set(Array.from(currentBest.keys()))
             const { data: history } = await admin
@@ -286,7 +306,7 @@ export async function POST(request: Request) {
             for (const row of rows) {
               try {
                 if (row?.id && data?.id && String(row.id) === String(data.id)) continue
-                let sess: any = null
+                let sess: Record<string, unknown> | null = null
                 if (typeof row?.notes === 'string') sess = JSON.parse(row.notes)
                 else if (row?.notes && typeof row.notes === 'object') sess = row.notes
                 if (!sess || typeof sess !== 'object') continue
@@ -380,7 +400,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, saved, idempotent })
   } catch (e: any) {
-    const msg = e?.message ? String(e.message) : 'unknown_error'
-    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+    const msg = (e as Record<string, unknown>)?.message
+    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : 'unknown_error' }, { status: 500 })
   }
 }

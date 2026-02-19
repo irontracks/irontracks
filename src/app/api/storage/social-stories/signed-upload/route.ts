@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isSafeStoragePath, requireUser } from '@/utils/auth/route'
+import { z } from 'zod'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z
+  .object({
+    path: z.string().min(1),
+  })
+  .passthrough()
 
 const isAllowedStoryPath = (userId: string, path: string) => {
   const uid = String(userId || '').trim()
@@ -20,8 +28,9 @@ export async function POST(request: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await request.json().catch(() => ({}))
-    const { path } = body || {}
+    const parsedBody = await parseJsonBody(request, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { path } = parsedBody.data!
     const bucket = 'social-stories'
 
     const safe = isSafeStoragePath(path)
@@ -29,7 +38,7 @@ export async function POST(request: Request) {
     if (!isAllowedStoryPath(auth.user.id, safe.path)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
     const admin = createAdminClient()
-    const LIMIT = 200 * 1024 * 1024 // 200MB
+    const LIMIT = 200 * 1024 * 1024
     const b = await admin.storage.getBucket(bucket)
     if (!b?.data) {
       const created = await admin.storage.createBucket(bucket, { public: false, fileSizeLimit: LIMIT })

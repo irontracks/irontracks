@@ -12,7 +12,7 @@ function parseHashParams(hash: string) {
   }
 }
 
-export default function RecoveryBridgeClient() {
+export default function RecoveryBridgeClient(): null {
   useEffect(() => {
     try {
       const hashParams = parseHashParams(window.location.hash)
@@ -44,4 +44,3 @@ export default function RecoveryBridgeClient() {
 
   return null
 }
-

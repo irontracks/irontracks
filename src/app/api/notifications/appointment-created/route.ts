@@ -1,9 +1,20 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    studentId: z.string().min(1),
+    title: z.string().min(1),
+    message: z.string().min(1),
+    type: z.string().optional().default('appointment'),
+  })
+  .passthrough()
 
 export async function POST(req: Request) {
   try {
@@ -12,11 +23,13 @@ export async function POST(req: Request) {
     const supabase = auth.supabase
     const user = auth.user
 
-    const body = await req.json().catch(() => ({}))
-    const studentId = body?.studentId as string | undefined
-    const title = (body?.title || '') as string
-    const message = (body?.message || '') as string
-    const type = (body?.type || 'appointment') as string
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
+    const studentId = body.studentId as string | undefined
+    const title = body.title as string
+    const message = body.message as string
+    const type = body.type as string
 
     if (!studentId || !title || !message) {
       return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })

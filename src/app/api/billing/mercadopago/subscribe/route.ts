@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,15 +15,21 @@ const resolveBaseUrl = (req: Request) => {
   return 'http://localhost:3000'
 }
 
+const BodySchema = z
+  .object({
+    planId: z.string().min(1),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await req.json().catch(() => ({}))
-    const planId = (body?.planId || '').trim() as string
-    if (!planId) return NextResponse.json({ ok: false, error: 'missing_plan' }, { status: 400 })
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const planId = parsedBody.data!.planId.trim()
 
     const admin = createAdminClient()
     const { data: plan, error: planErr } = await admin
@@ -42,7 +50,10 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (anyActive?.id && String(anyActive.status || '') === 'pending') {
       const ageMs = Date.now() - new Date(String(anyActive.created_at || '')).getTime()
-      const initPoint = String((anyActive as any)?.metadata?.mercadopago?.init_point || '').trim()
+      const meta = (anyActive as Record<string, unknown>)?.metadata
+      const metaObj = meta && typeof meta === 'object' ? (meta as Record<string, unknown>) : ({} as Record<string, unknown>)
+      const mp = metaObj?.mercadopago && typeof metaObj.mercadopago === 'object' ? (metaObj.mercadopago as Record<string, unknown>) : ({} as Record<string, unknown>)
+      const initPoint = String(mp?.init_point || '').trim()
       if (String(anyActive.plan_id || '') === planId && String(anyActive.provider || '') === 'mercadopago' && initPoint) {
         return NextResponse.json({ ok: true, subscription: { id: anyActive.id, status: anyActive.status }, redirect_url: initPoint, resumed: true })
       }

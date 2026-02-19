@@ -1,21 +1,27 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isAllowedStoryPath, validateStoryPayload } from '@/lib/social/storyValidation'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z.object({}).passthrough()
 
 export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const validation = validateStoryPayload(body)
-    
+
     if (!validation.ok || !validation.data) {
-        return NextResponse.json({ ok: false, error: validation.error || 'invalid_payload' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: validation.error || 'invalid_payload' }, { status: 400 })
     }
 
     const { mediaPath, caption, meta } = validation.data
@@ -59,7 +65,7 @@ export async function POST(req: Request) {
           )
         }
       }
-    } catch {}
+    } catch { }
     return NextResponse.json({ ok: true, data })
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })

@@ -1,9 +1,21 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    planId: z.string().min(1),
+    billingType: z.string().optional(),
+    cpfCnpj: z.string().min(1),
+    mobilePhone: z.string().min(1),
+    name: z.string().optional(),
+  })
+  .passthrough()
 
 const DEFAULT_PLATFORM_FEE_PERCENT = 15
 
@@ -28,7 +40,9 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body: any = parsedBody.data!
     const planId = (body?.planId || '').trim() as string
     const billingType = ((body?.billingType || 'PIX') as string).trim().toUpperCase()
     const cpfCnpj = (body?.cpfCnpj || '').replace(/\D/g, '') as string

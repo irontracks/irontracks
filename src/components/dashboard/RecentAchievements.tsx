@@ -45,8 +45,10 @@ export default function RecentAchievements({ userId, badges, showBadges = false,
       try {
         const res = await getLatestWorkoutPrs()
         if (cancelled) return
-        const dateIso = res?.workout?.date
-        const title = res?.workout?.title
+        const resObj = res && typeof res === 'object' ? (res as Record<string, unknown>) : null
+        const workoutObj = resObj?.workout && typeof resObj.workout === 'object' ? (resObj.workout as Record<string, unknown>) : null
+        const dateIso = workoutObj?.date
+        const title = workoutObj?.title
         if (dateIso) setWorkoutDateIso(String(dateIso))
         else setWorkoutDateIso('')
         setWorkoutTitle(title ? String(title) : 'Sem treinos recentes')

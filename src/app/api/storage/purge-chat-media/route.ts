@@ -28,7 +28,7 @@ export async function POST(req: Request) {
           allPaths.push(...paths)
         } else {
           // It was a file at root (or empty folder), add it directly if has id
-          if ((item as any).id) {
+          if ((item as unknown as { id?: string | null })?.id) {
              allPaths.push(item.name)
           }
         }

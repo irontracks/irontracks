@@ -1,44 +1,32 @@
-/**
- * VideoCompositor.ts
- * Motor universal de composição e exportação de vídeo para o IronTracks.
- * Garante sincronia frame-a-frame, áudio mixado via Web Audio API e compatibilidade cross-platform.
- */
-
 interface RenderOptions {
     videoElement: HTMLVideoElement;
     trimRange: [number, number];
     onDrawFrame: (ctx: CanvasRenderingContext2D, video: HTMLVideoElement) => void;
     onProgress?: (progress: number) => void;
-    outputWidth?: number;
-    outputHeight?: number;
-    fps?: number;
-    mimeTypeOverride?: string;
-    videoBitsPerSecond?: number;
-    audioBitsPerSecond?: number;
+    outputWidth?: number; outputHeight?: number; fps?: number; mimeTypeOverride?: string;
+    videoBitsPerSecond?: number; audioBitsPerSecond?: number;
 }
 
 interface ExportResult {
-    blob: Blob;
-    filename: string;
-    mime: string;
-    duration: number;
+    blob: Blob; filename: string; mime: string; duration: number;
 }
 
+type VideoElementWithCapture = HTMLVideoElement & {
+    captureStream?: () => MediaStream;
+    mozCaptureStream?: () => MediaStream;
+    requestVideoFrameCallback?: (cb: () => void) => number;
+};
+
 export class VideoCompositor {
-    private ctx: CanvasRenderingContext2D | null = null;
-    private canvas: HTMLCanvasElement | null = null;
-    private audioCtx: AudioContext | null = null;
-    private destNode: MediaStreamAudioDestinationNode | null = null;
-    private sourceNode: MediaElementAudioSourceNode | null = null;
-    private recorder: MediaRecorder | null = null;
-    private isCancelled = false;
-    private manualTimer: number | null = null;
+    private ctx: CanvasRenderingContext2D | null = null; private canvas: HTMLCanvasElement | null = null;
+    private audioCtx: AudioContext | null = null; private destNode: MediaStreamAudioDestinationNode | null = null;
+    private sourceNode: MediaElementAudioSourceNode | null = null; private recorder: MediaRecorder | null = null;
+    private isCancelled = false; private manualTimer: number | null = null;
 
     constructor() {
         if (typeof window !== 'undefined') {
             this.canvas = document.createElement('canvas');
-            // Desynchronized pode melhorar performance, alpha: false remove transparência desnecessária
-            this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: true });
+            this.ctx = this.canvas.getContext('2d', { alpha: false, desynchronized: false });
         }
     }
 
@@ -48,7 +36,7 @@ export class VideoCompositor {
     }
 
     private cleanup() {
-        if (this.manualTimer) {
+        if (this.manualTimer !== null) {
             try { clearTimeout(this.manualTimer); } catch {}
         }
         this.manualTimer = null;
@@ -115,42 +103,35 @@ export class VideoCompositor {
         }
     }
 
-    /**
-     * Detecta o melhor formato suportado pelo navegador
-     */
     private getBestMimeType(): string {
-        const ua = navigator.userAgent;
-        const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
-
-        // Ordem de preferência: H.264 (MP4) > VP9 (WebM) > VP8 (WebM)
-        const candidates = [
-            'video/mp4;codecs="avc1.42E01E,mp4a.40.2"', // H.264 Main Profile
+        const mp4Candidates = [
+            'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
             'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-            'video/mp4',
+            'video/mp4'
+        ];
+
+        for (const type of mp4Candidates) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+
+        const webmCandidates = [
             'video/webm;codecs=vp9,opus',
             'video/webm;codecs=vp8,opus',
             'video/webm'
         ];
 
-        // No iOS/Safari, forçamos a verificação estrita de MP4 primeiro
-        if (isIOS || isSafari) {
-            const mp4 = candidates.find(c => MediaRecorder.isTypeSupported(c));
-            if (mp4) return mp4;
-        }
-
-        for (const type of candidates) {
+        for (const type of webmCandidates) {
             if (MediaRecorder.isTypeSupported(type)) {
+                console.warn('MP4 não suportado, usando WebM. Compatibilidade pode ser limitada.');
                 return type;
             }
         }
-        
+
         throw new Error('Nenhum formato de vídeo suportado encontrado neste navegador.');
     }
 
-    /**
-     * Renderiza o vídeo frame a frame garantindo sincronia
-     */
     public async render({
         videoElement,
         trimRange,
@@ -167,44 +148,37 @@ export class VideoCompositor {
         
         if (!this.canvas || !this.ctx) throw new Error('Canvas context not initialized');
         
-        // 1. Setup Canvas
         this.canvas.width = outputWidth;
         this.canvas.height = outputHeight;
 
-        // 2. Setup Audio (Web Audio API para mixagem robusta)
-        // Necessário user gesture prévio para AudioContext em alguns browsers, mas aqui já estamos num fluxo iniciado pelo user
-        this.audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
+        const AudioCtxCtor = w.AudioContext || w.webkitAudioContext
+        if (!AudioCtxCtor) throw new Error('AudioContext not available')
+        this.audioCtx = new AudioCtxCtor();
         this.destNode = this.audioCtx.createMediaStreamDestination();
         
-        // Conecta o vídeo ao destino de gravação
         try {
             this.sourceNode = this.audioCtx.createMediaElementSource(videoElement);
             this.sourceNode.connect(this.destNode);
-            // Também conecta ao destino padrão (speakers) se quisermos ouvir durante o processo? 
-            // Melhor não, para não dar eco. O vídeo será mutado visualmente mas processado internamente.
         } catch (e) {
             console.warn('Falha ao conectar áudio via Web Audio API, tentando fallback simples', e);
-            // Fallback: tentar capturar stream direto do vídeo se possível, ou prosseguir mudo
         }
 
-        // 3. Preparar Stream de Saída
-        const canvasStream = this.canvas.captureStream(fps);
+        const canvasStream = this.canvas.captureStream(0); // 0 = modo manual
         if (this.destNode) {
             const audioTracks = this.destNode.stream.getAudioTracks();
             if (audioTracks.length > 0) {
                 canvasStream.addTrack(audioTracks[0]);
             }
         } else {
-            // Tenta pegar direto do vídeo se Web Audio falhou
-            // @ts-ignore
-            const vidStream = videoElement.captureStream ? videoElement.captureStream() : videoElement.mozCaptureStream ? videoElement.mozCaptureStream() : null;
+            const v = videoElement as VideoElementWithCapture;
+            const vidStream = v.captureStream ? v.captureStream() : v.mozCaptureStream ? v.mozCaptureStream() : null;
             if (vidStream) {
                 const audioTracks = vidStream.getAudioTracks();
                 if (audioTracks.length > 0) canvasStream.addTrack(audioTracks[0]);
             }
         }
 
-        // 4. Setup Gravador
         let mimeType = this.getBestMimeType();
         if (mimeTypeOverride) {
             try {
@@ -232,7 +206,6 @@ export class VideoCompositor {
             if (e.data && e.data.size > 0) chunks.push(e.data);
         };
 
-        // Promise que resolve quando a gravação termina
         const recordingPromise = new Promise<ExportResult>((resolve, reject) => {
             if (!this.recorder) return reject(new Error('Recorder not initialized'));
 
@@ -257,35 +230,29 @@ export class VideoCompositor {
             this.recorder.onerror = (e) => reject(e);
         });
 
-        // 5. Loop de Renderização Síncrona
-        // Salvar estado original do vídeo
         const originalMuted = videoElement.muted;
         const originalCurrentTime = videoElement.currentTime;
         const originalVolume = videoElement.volume;
         const originalLoop = videoElement.loop;
 
-        // Preparar vídeo
-        videoElement.muted = false; // Necessário para o AudioContext capturar (mas não sai som se não conectar ao destination)
+        videoElement.muted = false;
         videoElement.volume = 1.0;
         videoElement.loop = false;
         videoElement.currentTime = trimRange[0];
 
-        // Aguardar seek
         await new Promise<void>(resolve => {
             const onSeek = () => {
                 videoElement.removeEventListener('seeked', onSeek);
                 resolve();
             };
             videoElement.addEventListener('seeked', onSeek);
-            // Fallback se já estiver pronto
             if (videoElement.readyState >= 2 && !videoElement.seeking) {
                 videoElement.removeEventListener('seeked', onSeek);
                 resolve();
             }
         });
 
-        // Iniciar gravação com timeslice para melhor gerenciamento de memória
-        this.recorder.start(1000); // 1 segundo chunks
+        this.recorder.start(1000);
         try {
             await videoElement.play();
         } catch (e) {
@@ -295,48 +262,11 @@ export class VideoCompositor {
             throw e;
         }
 
-        // Loop principal
         const duration = trimRange[1] - trimRange[0];
         
-        const useManualFps = false;
-        const frameIntervalMs = fps > 0 ? (1000 / fps) : 33.3333333333;
-        let lastManualTs = 0;
-
         const processFrame = () => {
             if (this.isCancelled) return;
 
-            // Checar fim
-            if (videoElement.ended || videoElement.currentTime >= trimRange[1]) {
-                if (this.recorder && this.recorder.state === 'recording') {
-                    this.recorder.stop();
-                }
-                return;
-            }
-
-            // Desenhar frame
-            if (this.ctx) {
-                onDrawFrame(this.ctx, videoElement);
-            }
-
-            // Atualizar progresso
-            if (onProgress) {
-                const current = Math.max(0, videoElement.currentTime - trimRange[0]);
-                onProgress(Math.min(1, current / duration));
-            }
-
-            // Próximo frame
-            // @ts-ignore
-            if (videoElement.requestVideoFrameCallback) {
-                // @ts-ignore
-                videoElement.requestVideoFrameCallback(processFrame);
-            } else {
-                requestAnimationFrame(processFrame);
-            }
-        };
-
-        const processFrameManual = () => {
-            if (this.isCancelled) return;
-
             if (videoElement.ended || videoElement.currentTime >= trimRange[1]) {
                 if (this.recorder && this.recorder.state === 'recording') {
                     this.recorder.stop();
@@ -348,46 +278,45 @@ export class VideoCompositor {
                 onDrawFrame(this.ctx, videoElement);
             }
 
+            // Sinalizar ao MediaRecorder que um novo frame está pronto
+            const videoTrack = canvasStream.getVideoTracks()[0] as MediaStreamTrack & {
+                requestFrame?: () => void
+            }
+            if (typeof videoTrack?.requestFrame === 'function') {
+                videoTrack.requestFrame()
+            }
+
             if (onProgress) {
                 const current = Math.max(0, videoElement.currentTime - trimRange[0]);
                 onProgress(Math.min(1, current / duration));
             }
 
-            const now = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
-            const elapsed = lastManualTs ? (now - lastManualTs) : 0;
-            const delay = Math.max(0, frameIntervalMs - elapsed);
-            lastManualTs = now;
-            try {
-                this.manualTimer = setTimeout(processFrameManual, delay) as unknown as number;
-            } catch {
-                this.manualTimer = null;
+            const v = videoElement as VideoElementWithCapture;
+            if (typeof v.requestVideoFrameCallback === 'function') {
+                v.requestVideoFrameCallback(() => processFrame())
+            } else {
+                // requestAnimationFrame é 60fps — metade dos frames seriam duplicatas para 30fps
+                // setTimeout garante o intervalo correto
+                this.manualTimer = setTimeout(processFrame, 1000 / fps) as unknown as number
             }
         };
 
-        // Iniciar loop
-        if (useManualFps) {
-            processFrameManual();
-        }
-        if (!useManualFps) {
-            // @ts-ignore
-            if (videoElement.requestVideoFrameCallback) {
-                // @ts-ignore
-                videoElement.requestVideoFrameCallback(processFrame);
-            } else {
-                requestAnimationFrame(processFrame);
-            }
+        const v = videoElement as VideoElementWithCapture;
+        if (typeof v.requestVideoFrameCallback === 'function') {
+            v.requestVideoFrameCallback(() => processFrame())
+        } else {
+            // requestAnimationFrame é 60fps — metade dos frames seriam duplicatas para 30fps
+            // setTimeout garante o intervalo correto
+            this.manualTimer = setTimeout(processFrame, 1000 / fps) as unknown as number
         }
 
-        // Aguardar fim
         try {
             const result = await recordingPromise;
             return result;
         } finally {
-            // Restaurar estado
             videoElement.muted = originalMuted;
             videoElement.volume = originalVolume;
             videoElement.loop = originalLoop;
-            // Não restauramos currentTime aqui para não travar a UI, deixamos onde parou ou voltamos pro início
             this.cleanup();
         }
     }

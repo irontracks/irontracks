@@ -3,10 +3,16 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { Heart, MessageCircle, X, ChevronLeft, ChevronRight, Eye, Trash2, Loader2, Volume2, VolumeX } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useDialog } from '@/contexts/DialogContext'
 import { Story, StoryGroup } from '@/types/social'
 import { mediaKindFromUrl } from '@/utils/mediaUtils'
+
+const MAX_VIDEO_SECONDS = 60
+const PHOTO_SECONDS = 15
+const MIN_VIDEO_SECONDS = 3
+const STALL_THRESHOLD_MS = 2500
+const STALL_CHECK_MS = 1200
 
 const initials = (name: string) => {
   const n = String(name || '').trim()
@@ -53,7 +59,7 @@ export default function StoryViewer({
   onStoryDeleted,
 }: StoryViewerProps) {
   const { confirm, alert } = useDialog()
-  const stories = Array.isArray(group.stories) ? group.stories : []
+  const stories = useMemo(() => (Array.isArray(group.stories) ? group.stories : []), [group.stories])
   const [idx, setIdx] = useState(0)
   const story = stories[idx] || null
   
@@ -85,40 +91,65 @@ export default function StoryViewer({
   const closeRequestedRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const preloadRef = useRef<{ aborts: AbortController[] }>({ aborts: [] })
+  const stallRef = useRef<{ lastTime: number; lastTs: number; attempts: number }>({ lastTime: 0, lastTs: 0, attempts: 0 })
+  const advanceLockRef = useRef<string>('')
 
   const name = String(group.displayName || '').trim() || (group.authorId === myId ? 'Você' : 'Amigo')
   const isMine = String(group.authorId || '').trim() === String(myId || '').trim()
+  const storyId = story?.id
+  const storyViewed = Boolean(story?.viewed)
+  const storyMediaUrl = story?.mediaUrl || ''
+  const storyObj = story && typeof story === 'object' ? (story as Record<string, unknown>) : ({} as Record<string, unknown>)
+  const storyMediaKind = storyObj?.mediaKind
+  const storyMeta = storyObj?.meta && typeof storyObj.meta === 'object' ? (storyObj.meta as Record<string, unknown>) : null
+  const storyTrimRaw = storyMeta?.trim ?? storyObj?.trim
   const mediaKind = useMemo(() => {
-    const k = (story as any)?.mediaKind
+    const k = storyMediaKind
     if (k === 'video' || k === 'image') return k
-    return mediaKindFromUrl(story?.mediaUrl || null)
-  }, [story?.mediaUrl, (story as any)?.mediaKind])
+    return mediaKindFromUrl(storyMediaUrl || null)
+  }, [storyMediaKind, storyMediaUrl])
   const isVideo = mediaKind === 'video'
   
   const videoSrc = useMemo(() => {
-    const sid = String(story?.id || '').trim()
-    const direct = String(story?.mediaUrl || '').trim()
+    const sid = String(storyId || '').trim()
+    const direct = String(storyMediaUrl || '').trim()
     if (direct) return direct
     if (!sid) return ''
     return `/api/social/stories/media?storyId=${encodeURIComponent(sid)}`
-  }, [story?.id, story?.mediaUrl])
+  }, [storyId, storyMediaUrl])
+  const imageSrc = useMemo(() => {
+    const sid = String(storyId || '').trim()
+    const direct = String(storyMediaUrl || '').trim()
+    if (direct) return direct
+    if (!sid) return ''
+    return `/api/social/stories/media?storyId=${encodeURIComponent(sid)}`
+  }, [storyId, storyMediaUrl])
   const isIOS = useMemo(() => {
     const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
     return isIOSUserAgent(ua)
   }, [])
   const isWebm = useMemo(() => String(videoSrc || '').toLowerCase().includes('.webm'), [videoSrc])
   const needsVideoFallback = isVideo && ((isIOS && isWebm) || !!videoError)
+  const trimRange = useMemo(() => {
+    const raw = storyTrimRaw
+    const rawObj = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null
+    const rawArr = Array.isArray(raw) ? raw : null
+    const start = Number(rawObj?.start ?? rawArr?.[0] ?? 0)
+    const end = Number(rawObj?.end ?? rawArr?.[1] ?? 0)
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return null
+    return { start, end }
+  }, [storyTrimRaw])
 
   // Marcar como visto
   useEffect(() => {
-    if (!story?.id || story.viewed) return
-    onStoryUpdated(story.id, { viewed: true })
+    if (!storyId || storyViewed) return
+    onStoryUpdated(storyId, { viewed: true })
     fetch('/api/social/stories/view', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ storyId: story.id }),
+      body: JSON.stringify({ storyId }),
     }).catch(() => {})
-  }, [story?.id, story?.viewed, onStoryUpdated])
+  }, [storyId, storyViewed, onStoryUpdated])
 
   // Navegação e Timer
   const goNext = useCallback(() => {
@@ -146,7 +177,9 @@ export default function StoryViewer({
     setViewersError('')
     setViewers([])
     viewersStoryIdRef.current = ''
-  }, [story?.id])
+    stallRef.current = { lastTime: 0, lastTs: 0, attempts: 0 }
+    advanceLockRef.current = ''
+  }, [storyId])
 
   const toggleMuted = useCallback(() => {
     setMuted((prev) => {
@@ -156,7 +189,7 @@ export default function StoryViewer({
         el.muted = next
         if (!next) {
           const p = el.play()
-          if (p && typeof (p as any).catch === 'function') (p as any).catch(() => {})
+          if (p) p.catch(() => {})
         }
       }
       return next
@@ -165,8 +198,8 @@ export default function StoryViewer({
 
   useEffect(() => {
     closeRequestedRef.current = false
-    setDurationMs(isVideo ? (needsVideoFallback ? 5000 : 60000) : 5000)
-  }, [isVideo, needsVideoFallback, story?.id])
+    setDurationMs(isVideo ? (needsVideoFallback ? PHOTO_SECONDS * 1000 : MAX_VIDEO_SECONDS * 1000) : PHOTO_SECONDS * 1000)
+  }, [isVideo, needsVideoFallback, storyId])
 
   useEffect(() => {
     for (const a of preloadRef.current.aborts) {
@@ -195,7 +228,7 @@ export default function StoryViewer({
 
   // Loop de Animação
   useEffect(() => {
-    if (!story?.id) return
+    if (!storyId) return
     if (isVideo && !needsVideoFallback) return
     const tick = (ts: number) => {
       rafRef.current = requestAnimationFrame(tick)
@@ -221,17 +254,34 @@ export default function StoryViewer({
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, story?.id, viewersOpen, needsVideoFallback])
+  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, storyId, viewersOpen, needsVideoFallback])
 
   useEffect(() => {
-    if (!story?.id || !isVideo) return
+    if (!storyId || !isVideo) return
     const v = videoRef.current
     if (!v) return
     const update = () => {
       const d = Number(v.duration || 0)
       if (!Number.isFinite(d) || d <= 0) return
-      const next = Math.max(0, Math.min(1, Number(v.currentTime || 0) / d))
+      const start = Math.max(0, Number(trimRange?.start ?? 0))
+      const rawEnd = Number(trimRange?.end ?? d)
+      const maxEnd = Math.min(rawEnd, start + MAX_VIDEO_SECONDS)
+      const end = Math.max(start + MIN_VIDEO_SECONDS, Math.min(d, maxEnd))
+      const ct = Number(v.currentTime || 0)
+      if (Number.isFinite(start) && ct < start) {
+        try { v.currentTime = start } catch {}
+      }
+      const effective = Math.max(0.1, end - start)
+      const clamped = Math.min(end, Math.max(start, ct))
+      const next = Math.max(0, Math.min(1, (clamped - start) / effective))
       setProgress((prev) => (Math.abs(prev - next) < 0.01 ? prev : next))
+      if (clamped >= end - 0.05) {
+        if (advanceLockRef.current !== String(storyId || '')) {
+          advanceLockRef.current = String(storyId || '')
+          setProgress(0)
+          goNext()
+        }
+      }
     }
     v.addEventListener('timeupdate', update)
     v.addEventListener('durationchange', update)
@@ -240,17 +290,66 @@ export default function StoryViewer({
       v.removeEventListener('timeupdate', update)
       v.removeEventListener('durationchange', update)
     }
-  }, [isVideo, story?.id])
+  }, [isVideo, storyId, goNext, trimRange?.start, trimRange?.end])
 
   // Controle de Video Play/Pause
   useEffect(() => {
-    if (!story?.id || !isVideo) return
+    if (!storyId || !isVideo) return
     const v = videoRef.current
     if (!v) return
     const paused = holding || commentsOpen || viewersOpen || hidden || deleting
     if (paused) v.pause()
     else v.play().catch(() => {})
-  }, [commentsOpen, deleting, hidden, holding, isVideo, story?.id, viewersOpen])
+  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
+
+  useEffect(() => {
+    if (!storyId || !isVideo) return
+    const v = videoRef.current
+    if (!v) return
+    let mounted = true
+    const timer = window.setInterval(() => {
+      if (!mounted) return
+      const paused = holding || commentsOpen || viewersOpen || hidden || deleting
+      if (paused) {
+        stallRef.current.lastTime = Number(v.currentTime || 0)
+        stallRef.current.lastTs = Date.now()
+        return
+      }
+      const now = Date.now()
+      const current = Number(v.currentTime || 0)
+      const last = stallRef.current.lastTime
+      const lastTs = stallRef.current.lastTs
+      if (!lastTs) {
+        stallRef.current.lastTime = current
+        stallRef.current.lastTs = now
+        return
+      }
+      if (Math.abs(current - last) < 0.01) {
+        if (now - lastTs >= STALL_THRESHOLD_MS) {
+          stallRef.current.lastTs = now
+          stallRef.current.attempts += 1
+          if (stallRef.current.attempts >= 2) {
+            setVideoError('Este vídeo não carregou no seu dispositivo.')
+            return
+          }
+          try {
+            v.load()
+          } catch {}
+          try {
+            const p = v.play()
+            if (p) p.catch(() => {})
+          } catch {}
+        }
+      } else {
+        stallRef.current.lastTime = current
+        stallRef.current.lastTs = now
+      }
+    }, STALL_CHECK_MS)
+    return () => {
+      mounted = false
+      try { window.clearInterval(timer) } catch {}
+    }
+  }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
 
   // Carregar Dados
   const loadComments = async (storyId: string) => {
@@ -320,7 +419,7 @@ export default function StoryViewer({
 
   const handleDelete = async () => {
     if (!story?.id || deleting) return
-    const ok = await confirm('Tem certeza que deseja deletar este story?', 'Deletar story', { confirmText: 'Deletar', cancelText: 'Cancelar' })
+    const ok = await confirm('Tem certeza que deseja deletar este story?\nEssa ação é irreversível.', 'Deletar story', { confirmText: 'Deletar', cancelText: 'Cancelar' })
     if (!ok) return
     setDeleting(true)
     try {
@@ -398,49 +497,71 @@ export default function StoryViewer({
           </div>
         </div>
 
-        {/* Mídia Principal */}
         <div className="absolute inset-0 flex items-center justify-center bg-black">
-          {story.mediaUrl ? (
-            isVideo ? (
-              <>
-                {!((isIOS && isWebm) || videoError) ? (
-                  <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    className="w-full h-full object-contain"
-                    playsInline
-                    muted={muted}
-                    autoPlay
-                    onLoadedMetadata={(e) => {
-                      const d = Number((e.currentTarget as any)?.duration || 0)
-                      if (d > 0) setDurationMs(Math.max(3000, Math.min(60000, d * 1000)))
-                    }}
-                    onEnded={() => { setProgress(0); goNext(); }}
-                    onError={() => setVideoError('Não foi possível reproduzir este vídeo.')}
-                    onStalled={() => setVideoError('Este vídeo não carregou no seu dispositivo.')}
-                  />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={String(story.id || idx)}
+              initial={{ opacity: 0.2 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0.2 }}
+              transition={{ duration: 0.25 }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              {story.mediaUrl ? (
+                isVideo ? (
+                  <>
+                    {!((isIOS && isWebm) || videoError) ? (
+                      <video
+                        ref={videoRef}
+                        src={videoSrc}
+                        className="w-full h-full object-contain"
+                        playsInline
+                        muted={muted}
+                        autoPlay
+                        preload="metadata"
+                        onLoadedMetadata={(e) => {
+                          const d = Number((e.currentTarget as any)?.duration || 0)
+                          const start = Math.max(0, Number(trimRange?.start ?? 0))
+                          const rawEnd = Number(trimRange?.end ?? d)
+                          const maxEnd = Math.min(rawEnd, start + MAX_VIDEO_SECONDS)
+                          const end = Math.max(start + MIN_VIDEO_SECONDS, Math.min(d, maxEnd))
+                          if (d > 0) setDurationMs(Math.max(MIN_VIDEO_SECONDS * 1000, Math.min(MAX_VIDEO_SECONDS * 1000, (end - start) * 1000)))
+                          try { if (Number.isFinite(start) && start > 0) e.currentTarget.currentTime = start } catch {}
+                        }}
+                        onEnded={() => {
+                          if (advanceLockRef.current !== String(story?.id || '')) {
+                            advanceLockRef.current = String(story?.id || '')
+                            setProgress(0)
+                            goNext()
+                          }
+                        }}
+                        onError={() => setVideoError('Não foi possível reproduzir este vídeo.')}
+                        onStalled={() => setVideoError('Este vídeo não carregou no seu dispositivo.')}
+                      />
+                    ) : (
+                      <div className="px-6 text-center">
+                        <div className="text-white font-black text-lg">Story indisponível</div>
+                        <div className="mt-2 text-sm text-neutral-300 font-semibold">
+                          {videoError || (isIOS && isWebm ? 'Este story foi publicado em WEBM e pode não funcionar no iPhone.' : 'Não foi possível carregar o vídeo.')}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setProgress(0); goNext(); }}
+                          className="mt-4 min-h-[44px] px-5 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest"
+                        >
+                          Próximo
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <div className="px-6 text-center">
-                    <div className="text-white font-black text-lg">Story indisponível</div>
-                    <div className="mt-2 text-sm text-neutral-300 font-semibold">
-                      {videoError || (isIOS && isWebm ? 'Este story foi publicado em WEBM e pode não funcionar no iPhone.' : 'Não foi possível carregar o vídeo.')}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setProgress(0); goNext(); }}
-                      className="mt-4 min-h-[44px] px-5 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest"
-                    >
-                      Próximo
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <Image src={story.mediaUrl} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" priority />
-            )
-          ) : (
-            <div className="text-neutral-500 font-bold">Mídia indisponível</div>
-          )}
+                  <Image src={imageSrc} alt="Story" fill className="object-contain" sizes="(max-width: 768px) 100vw, 420px" priority unoptimized />
+                )
+              ) : (
+                <div className="text-neutral-500 font-bold">Mídia indisponível</div>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Áreas de Toque para Navegação */}

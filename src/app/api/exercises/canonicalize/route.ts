@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 import { requireUser } from '@/utils/auth/route'
@@ -7,6 +9,14 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+const ZodBodySchema = z
+  .object({
+    mode: z.string().optional(),
+    names: z.unknown().optional(),
+    name: z.unknown().optional(),
+  })
+  .passthrough()
 
 const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -39,9 +49,9 @@ const extractJson = (raw: string) => {
 const isMissingTable = (error: any) => {
   try {
     if (!error) return false
-    const status = Number((error as any)?.status)
-    const code = (error as any)?.code ? String((error as any).code) : ''
-    const msg = (error as any)?.message ? String((error as any).message) : ''
+    const status = Number((error as Record<string, unknown>)?.status)
+    const code = (error as Record<string, unknown>)?.code ? String((error as Record<string, unknown>).code) : ''
+    const msg = (error as Record<string, unknown>)?.message ? String((error as Record<string, unknown>).message) : ''
     return status === 404 || code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg)
   } catch {
     return false
@@ -103,7 +113,7 @@ async function resolveWithGemini(payload: Array<{ alias: string; normalized: str
   const result = await model.generateContent(prompt)
   const text = (await result?.response?.text()) || ''
   const parsed = extractJson(text)
-  const items = parsed && typeof parsed === 'object' ? (parsed as any).items : null
+  const items = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>).items : null
   return Array.isArray(items) ? items : []
 }
 
@@ -112,7 +122,9 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response
 
   try {
-    const body: any = await req.json().catch(() => ({}))
+    const parsedBody = await parseJsonBody(req, ZodBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
     const mode = String(body?.mode || '').trim().toLowerCase()
     const asyncPrefetch = mode === 'prefetch' || mode === 'async'
     const raw = body?.names ?? body?.name ?? []
@@ -143,8 +155,8 @@ export async function POST(req: Request) {
     const aliasArr = Array.isArray(aliasRows) ? aliasRows : []
     const byAlias = new Map<string, string>()
     for (const r of aliasArr) {
-      const a = String((r as any)?.normalized_alias || '').trim()
-      const cid = String((r as any)?.canonical_id || '').trim()
+      const a = String((r as Record<string, unknown>)?.normalized_alias || '').trim()
+      const cid = String((r as Record<string, unknown>)?.canonical_id || '').trim()
       if (a && cid) byAlias.set(a, cid)
     }
 
@@ -260,7 +272,7 @@ export async function POST(req: Request) {
         .select('id, display_name, normalized_name, usage_count')
         .maybeSingle()
 
-      const canonicalId = String((upCanon as any)?.id || '').trim()
+      const canonicalId = String((upCanon as Record<string, unknown>)?.id || '').trim()
       if (!canonicalId) continue
 
       await admin
@@ -280,7 +292,7 @@ export async function POST(req: Request) {
 
       await admin
         .from('exercise_canonical')
-        .update({ usage_count: (upCanon as any)?.usage_count != null ? (Number((upCanon as any).usage_count) || 0) + 1 : 1 })
+        .update({ usage_count: (upCanon as Record<string, unknown>)?.usage_count != null ? (Number((upCanon as Record<string, unknown>).usage_count) || 0) + 1 : 1 })
         .eq('user_id', userId)
         .eq('id', canonicalId)
 

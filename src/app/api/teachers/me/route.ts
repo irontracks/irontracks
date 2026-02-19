@@ -13,7 +13,7 @@ export async function GET() {
     const normalizedEmail = String(user.email || '').toLowerCase().trim()
     const escapedEmailForLike = normalizedEmail.replace(/([%_\\])/g, '\\$1')
 
-    const normalizeTeacherStatus = (value: any) => {
+    const normalizeTeacherStatus = (value: unknown) => {
       const s = String(value || '').toLowerCase().trim()
       if (!s) return 'pending'
       if (['pago', 'paid', 'paid_out', 'paidout'].includes(s)) return 'active'
@@ -26,8 +26,8 @@ export async function GET() {
 
     const selectFull = 'status, payment_status, email, id, name, phone, birth_date, user_id, created_at'
     const selectFallback = 'status, payment_status, email, id, name, phone, user_id, created_at'
-    const shouldFallback = (err: any) => {
-      const msg = String(err?.message || '').toLowerCase()
+    const shouldFallback = (err: unknown) => {
+      const msg = String((err as Record<string, unknown>)?.message || '').toLowerCase()
       return msg.includes('birth_date') || msg.includes("could not find the 'birth_date' column")
     }
 
@@ -51,10 +51,10 @@ export async function GET() {
         .maybeSingle()
     }
 
-    let data: any | null = null
+    let data: Record<string, unknown> | null = null
     let byUser = await fetchByUserId(selectFull)
     if (byUser?.error && shouldFallback(byUser.error)) byUser = await fetchByUserId(selectFallback)
-    data = byUser?.data || null
+    data = (byUser?.data as unknown as Record<string, unknown>) || null
     if (data && normalizedEmail) {
       const rowEmail = String(data?.email || '').toLowerCase().trim()
       if (rowEmail && rowEmail !== normalizedEmail) {
@@ -65,7 +65,7 @@ export async function GET() {
     if (!data && normalizedEmail) {
       let byEmail = await fetchByEmail(selectFull)
       if (byEmail?.error && shouldFallback(byEmail.error)) byEmail = await fetchByEmail(selectFallback)
-      data = byEmail?.data || null
+      data = (byEmail?.data as unknown as Record<string, unknown>) || null
     }
 
     if (data?.id && !data?.user_id) {

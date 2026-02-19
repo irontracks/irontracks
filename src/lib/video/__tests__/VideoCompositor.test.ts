@@ -88,8 +88,7 @@ describe('VideoCompositor', () => {
     });
 
     it('deve selecionar codec H.264 para iOS (UserAgent simulado)', async () => {
-        // @ts-ignore
-        const mime = compositor['getBestMimeType']();
+        const mime = (compositor as any).getBestMimeType();
         expect(mime).toContain('video/mp4');
     });
 

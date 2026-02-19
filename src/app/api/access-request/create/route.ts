@@ -1,16 +1,35 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
+const BodySchema = z
+  .object({
+    email: z.string().min(1),
+    phone: z.string().optional().nullable(),
+    full_name: z.string().min(1),
+    birth_date: z.string().optional().nullable(),
+    role_requested: z.string().optional().nullable(),
+    cref: z.string().optional().nullable(),
+  })
+  .passthrough()
+
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const { email, phone, full_name, birth_date } = body
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { email, phone, full_name, birth_date, role_requested, cref } = parsedBody.data!
 
     // 1. Validation
-    if (!email || !phone || !full_name || !birth_date) {
-      return NextResponse.json({ ok: false, error: 'Todos os campos são obrigatórios.' }, { status: 400 })
+    if (!email || !full_name) {
+      return NextResponse.json({ ok: false, error: 'Nome e e-mail são obrigatórios.' }, { status: 400 })
+    }
+
+    // Teacher specific validation
+    if (role_requested === 'teacher' && !cref) {
+      return NextResponse.json({ ok: false, error: 'CREF é obrigatório para cadastro de professor.' }, { status: 400 })
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -29,12 +48,12 @@ export async function POST(req: Request) {
 
     if (existingRequest) {
       if (existingRequest.status === 'pending') {
-        return NextResponse.json({ ok: false, error: 'Já existe uma solicitação pendente para este e-mail.' }, { status: 400 })
+        return NextResponse.json({ ok: true, message: 'Solicitação já está pendente.', id: existingRequest.id })
       }
       if (existingRequest.status === 'accepted') {
-        return NextResponse.json({ ok: false, error: 'Este e-mail já possui acesso liberado. Faça login.' }, { status: 400 })
+        return NextResponse.json({ ok: true, message: 'Solicitação já foi aprovada.', id: existingRequest.id })
       }
-      // If rejected, we allow a new request (maybe they fixed the info)
+      // If rejected, allow re-request by updating the same row (email is unique)
     }
 
     // 3. Check if user already exists in Auth (Optional, but good UX)
@@ -50,25 +69,51 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'Usuário já cadastrado. Faça login.' }, { status: 400 })
     }
 
-    // 4. Create Request
-    const { error: insertError } = await supabaseAdmin
+    // 4. Create / Reset Request
+    if (existingRequest?.id && existingRequest.status === 'rejected') {
+      const { error: updateError } = await supabaseAdmin
+        .from('access_requests')
+        .update({
+          full_name,
+          phone: phone ?? null,
+          birth_date: birth_date ?? null,
+          role_requested: role_requested || 'student',
+          cref: cref || null,
+          status: 'pending',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingRequest.id)
+
+      if (updateError) {
+        console.error('Error updating access request:', updateError)
+        return NextResponse.json({ ok: false, error: 'Erro ao atualizar solicitação.' }, { status: 500 })
+      }
+
+      return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: existingRequest.id })
+    }
+
+    const { data: inserted, error: insertError } = await supabaseAdmin
       .from('access_requests')
       .insert({
         email,
-        phone,
+        phone: phone ?? null,
         full_name,
-        birth_date,
-        status: 'pending'
+        birth_date: birth_date ?? null,
+        role_requested: role_requested || 'student',
+        cref: cref || null,
+        status: 'pending',
       })
+      .select('id')
+      .single()
 
     if (insertError) {
-        console.error('Error inserting access request:', insertError)
-        return NextResponse.json({ ok: false, error: 'Erro ao salvar solicitação.' }, { status: 500 })
+      console.error('Error inserting access request:', insertError)
+      return NextResponse.json({ ok: false, error: 'Erro ao salvar solicitação.' }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!' })
+    return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: inserted?.id ?? null })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Access Request Error:', error)
     return NextResponse.json({ ok: false, error: 'Erro interno do servidor.' }, { status: 500 })
   }

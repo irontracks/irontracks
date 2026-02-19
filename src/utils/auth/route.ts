@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 
 export type IrontracksRole = 'admin' | 'teacher' | 'user'
+export type RouteAuthFail = { ok: false; response: NextResponse<{ ok: false; error: string }>; supabase?: undefined; user?: undefined; role?: undefined }
+export type RouteAuthOk = { ok: true; supabase: SupabaseClient; user: User; role: IrontracksRole; response?: undefined }
 
 const getAdminEmail = () => {
   const envEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
@@ -10,7 +14,7 @@ const getAdminEmail = () => {
 }
 
 export const jsonError = (status: number, error: string) => {
-  return NextResponse.json({ ok: false, error }, { status })
+  return NextResponse.json({ ok: false as const, error }, { status })
 }
 
 export const getInternalSecret = () => {
@@ -67,9 +71,9 @@ export async function resolveRoleByUser(user: { id?: string | null; email?: stri
   return { role: 'user' as IrontracksRole }
 }
 
-export async function requireRole(allowed: IrontracksRole[]) {
+export async function requireRole(allowed: IrontracksRole[]): Promise<RouteAuthFail | RouteAuthOk> {
   const auth = await requireUser()
-  if (!auth.ok) return auth
+  if (!auth.ok) return auth as RouteAuthFail
 
   const { role } = await resolveRoleByUser({ id: auth.user.id, email: auth.user.email })
   const allowedSet = new Set((Array.isArray(allowed) ? allowed : []).filter(Boolean))
@@ -78,6 +82,30 @@ export async function requireRole(allowed: IrontracksRole[]) {
   }
 
   return { ok: true as const, supabase: auth.supabase, user: auth.user, role }
+}
+
+export async function requireRoleWithBearer(req: Request, allowed: IrontracksRole[]): Promise<RouteAuthFail | RouteAuthOk> {
+  try {
+    const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    if (!token) return { ok: false as const, response: jsonError(401, 'unauthorized') }
+
+    const admin = createAdminClient()
+    const { data, error } = await admin.auth.getUser(token)
+    const user = data?.user ?? null
+    if (error || !user?.id) {
+      return { ok: false as const, response: jsonError(401, 'unauthorized') }
+    }
+
+    const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
+    const allowedSet = new Set((Array.isArray(allowed) ? allowed : []).filter(Boolean))
+    if (!allowedSet.has(role)) {
+      return { ok: false as const, response: jsonError(403, 'forbidden') }
+    }
+
+    return { ok: true as const, supabase: admin, user, role }
+  } catch {
+    return { ok: false as const, response: jsonError(401, 'unauthorized') }
+  }
 }
 
 export const isSafeStoragePath = (path: unknown) => {

@@ -2,46 +2,54 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
+const resolvePublicOrigin = (request: Request) => {
+  const isLocalEnv = process.env.NODE_ENV === 'development'
+  const envOriginRaw = String(
+    process.env.IRONTRACKS_PUBLIC_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || '',
+  ).trim()
+  if (envOriginRaw) {
+    try {
+      return new URL(envOriginRaw).origin
+    } catch {}
+  }
+
+  const host = String(request.headers.get('x-forwarded-host') || request.headers.get('host') || '').trim()
+  const proto = String(request.headers.get('x-forwarded-proto') || (isLocalEnv ? 'http' : 'https')).trim()
+  if (host) {
+    const base = `${proto}://${host}`
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+  }
+
+  try {
+    const base = new URL(request.url).origin
+    return isLocalEnv && base.includes('0.0.0.0') ? base.replace('0.0.0.0', 'localhost') : base
+  } catch {
+    return isLocalEnv ? 'http://localhost:3000' : 'https://localhost'
+  }
+}
+
+const QuerySchema = z
+  .object({
+    next: z
+      .preprocess((v) => (typeof v === 'string' ? v : ''), z.string())
+      .optional(),
+    provider: z
+      .preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.enum(['google', 'apple']).catch('google')),
+  })
+  .passthrough()
+
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const sp = url.searchParams
-  const next = sp.get('next') ?? '/dashboard'
-  const nextCookieName = 'it.auth.next'
-  const nextCookieMaxAgeSeconds = 60 * 5
+  const q = QuerySchema.parse(Object.fromEntries(url.searchParams.entries()))
+  const next = q.next ?? '/dashboard'; const provider = q.provider
+  const nextCookieName = 'it.auth.next'; const nextCookieMaxAgeSeconds = 60 * 5
+  const safeOrigin = resolvePublicOrigin(request)
 
-  const originFromUrl = url.origin
-  const hostHeader = (request.headers.get('host') || '').trim()
-  const forwardedHost = (request.headers.get('x-forwarded-host') || '').trim()
-  const forwardedProto = (request.headers.get('x-forwarded-proto') || '').trim()
-  const isLocalEnv = process.env.NODE_ENV === 'development'
-  const protoFromUrl = url.protocol ? url.protocol.replace(':', '') : ''
-  const effectiveProto = forwardedProto || protoFromUrl || (isLocalEnv ? 'http' : 'https')
-  const baseOrigin =
-    isLocalEnv && (hostHeader || url.host)
-      ? `${effectiveProto}://${hostHeader || url.host}`
-      : forwardedHost && !isLocalEnv
-        ? `${effectiveProto}://${forwardedHost}`
-        : originFromUrl
-  let safeOrigin = isLocalEnv && baseOrigin.includes('0.0.0.0') ? baseOrigin.replace('0.0.0.0', 'localhost') : baseOrigin
-  const configuredOriginRaw = (process.env.IRONTRACKS_PUBLIC_ORIGIN || '').trim()
-  if (configuredOriginRaw) {
-    try {
-      safeOrigin = new URL(configuredOriginRaw).origin
-    } catch {}
-  }
-  if (!isLocalEnv) {
-    try {
-      const u = new URL(safeOrigin)
-      u.protocol = 'https:'
-      safeOrigin = u.origin
-    } catch {}
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL; const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.redirect(new URL('/auth/error?error=missing_env', safeOrigin))
   }
@@ -52,41 +60,22 @@ export async function GET(request: Request) {
   const baseCookieOptions = getSupabaseCookieOptions()
   const nextCookieExpires = new Date(Date.now() + nextCookieMaxAgeSeconds * 1000)
 
-  let cookiesToApply: Array<{ name: string; value: string; options?: any }> = []
-  const cookieStore = await cookies()
+  let cookiesToApply: Array<{ name: string; value: string; options?: any }> = []; const cookieStore = await cookies()
 
-  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-    cookieOptions: getSupabaseCookieOptions(),
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        cookiesToApply = cookiesToSet.map((c) => ({
-          name: c.name,
-          value: c.value,
-          options: c.options ? { ...c.options } : undefined,
-        }))
-      },
-    },
-  })
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, { cookieOptions: getSupabaseCookieOptions(), cookies: { getAll() { return cookieStore.getAll() }, setAll(cookiesToSet) { cookiesToApply = cookiesToSet.map((c) => ({ name: c.name, value: c.value, options: c.options ? { ...c.options } : undefined })) } } })
 
   let oauthUrl: string | null = null
   try {
     const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider,
       options: { redirectTo },
     })
     if (error) {
-      return NextResponse.redirect(
-        new URL(`/auth/error?error=${encodeURIComponent(error.message || 'oauth_failed')}`, safeOrigin),
-      )
+      return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'oauth_failed')}`, safeOrigin))
     }
     oauthUrl = data?.url || null
   } catch (e: any) {
-    return NextResponse.redirect(
-      new URL(`/auth/error?error=${encodeURIComponent(e?.message || 'oauth_failed')}`, safeOrigin),
-    )
+    return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(e?.message || 'oauth_failed')}`, safeOrigin))
   }
 
   if (!oauthUrl) {
@@ -94,26 +83,13 @@ export async function GET(request: Request) {
   }
 
   const redirectResp = NextResponse.redirect(oauthUrl)
-  cookiesToApply.forEach(({ name, value, options }) => {
-    try {
-      redirectResp.cookies.set(name, value, { ...(options || {}) })
-    } catch {
-      try {
-        redirectResp.cookies.set(name, value)
-      } catch {}
-    }
-  })
-  try {
-    redirectResp.cookies.set(nextCookieName, safeNext, {
-      ...(baseCookieOptions || {}),
-      expires: nextCookieExpires,
-      maxAge: nextCookieMaxAgeSeconds,
-    })
-  } catch {
-    try {
-      redirectResp.cookies.set(nextCookieName, safeNext)
-    } catch {}
-  }
+  cookiesToApply.forEach(({ name, value, options }) => { try { redirectResp.cookies.set(name, value, { ...(options || {}) }) } catch { try { redirectResp.cookies.set(name, value) } catch {} } })
+  try { redirectResp.cookies.set(nextCookieName, safeNext, { ...(baseCookieOptions || {}), expires: nextCookieExpires, maxAge: nextCookieMaxAgeSeconds }) } catch { try { redirectResp.cookies.set(nextCookieName, safeNext) } catch {} }
 
   return redirectResp
+}
+
+export async function POST() {
+  // Nota: login de email/senha acontece client-side em LoginScreen.tsx
+  return NextResponse.json({ ok: false, error: 'use_client_side_login' }, { status: 400, headers: { 'cache-control': 'no-store, max-age=0' } })
 }

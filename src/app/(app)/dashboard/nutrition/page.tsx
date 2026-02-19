@@ -1,7 +1,9 @@
 import Link from 'next/link'
 
 import NutritionMixer from '@/components/dashboard/nutrition/NutritionMixer'
+import NutritionConsoleShell from '@/components/dashboard/nutrition/NutritionConsoleShell'
 import { createClient } from '@/utils/supabase/server'
+import { checkVipFeatureAccess } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +52,7 @@ export default async function NutritionPage() {
 
   if (!authUserId) {
     return (
-      <div className="min-h-screen bg-neutral-900 text-white p-6 md:p-10">
+      <div className="min-h-screen bg-neutral-900 text-white p-6 md:p-10 pt-safe">
         <div className="mx-auto w-full max-w-lg">
           <div className="rounded-xl bg-neutral-800 p-6 border border-neutral-700">
             <h1 className="text-2xl font-black text-white">Acesso restrito</h1>
@@ -67,7 +69,14 @@ export default async function NutritionPage() {
     )
   }
 
-  const dateKey = new Date().toISOString().slice(0, 10)
+  const dateKey = (() => {
+    try {
+      const tz = 'America/Sao_Paulo'
+      return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    } catch {
+      return new Date().toISOString().slice(0, 10)
+    }
+  })()
 
   let initialTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
   let schemaMissing = false
@@ -85,7 +94,7 @@ export default async function NutritionPage() {
       carbs: safeNumber(row?.carbs),
       fat: safeNumber(row?.fat),
     }
-  } catch (e: any) {
+  } catch (e) {
     schemaMissing = schemaMissing || isSchemaMissingError(e)
     initialTotals = { calories: 0, protein: 0, carbs: 0, fat: 0 }
   }
@@ -101,10 +110,30 @@ export default async function NutritionPage() {
       .maybeSingle()
     if (error) throw error
     goals = row ? normalizeGoalRow(row) : DEFAULT_GOALS
-  } catch (e: any) {
+  } catch (e) {
     schemaMissing = schemaMissing || isSchemaMissingError(e)
     goals = DEFAULT_GOALS
   }
 
-  return <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} />
+  // Check VIP Access for Macros
+  let canViewMacros = false
+  try {
+    const access = await checkVipFeatureAccess(supabase, authUserId, 'nutrition_macros')
+    canViewMacros = !!access.allowed
+  } catch {
+    canViewMacros = false
+  }
+
+  try {
+    const { error } = await supabase.from('nutrition_meal_entries').select('id').limit(1)
+    if (error) throw error
+  } catch (e) {
+    schemaMissing = schemaMissing || isSchemaMissingError(e)
+  }
+
+  return (
+    <NutritionConsoleShell title="Nutrition Console" subtitle={`Hoje · ${dateKey}`}>
+      <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} />
+    </NutritionConsoleShell>
+  )
 }

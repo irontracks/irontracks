@@ -223,7 +223,7 @@ export default function SchedulePage() {
           type: 'appointment',
         }),
       })
-    } catch (e) {
+    } catch (e: any) {
       console.error('Erro ao enviar notificação de agendamento:', e)
     }
   }
