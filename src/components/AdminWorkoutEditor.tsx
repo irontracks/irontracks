@@ -2,29 +2,9 @@
 
 import React, { useState } from 'react';
 import { Trash2, Plus, Megaphone } from 'lucide-react';
+import type { AdminExercise, AdminWorkout } from '@/types/admin';
 
-export interface AdminExercise {
-    name: string;
-    sets: number | string;
-    reps: string;
-    rpe: string;
-    cadence: string;
-    restTime: number | string;
-    rest_time?: number | string; // Compatibility
-    method: string;
-    videoUrl: string;
-    video_url?: string; // Compatibility
-    notes: string;
-    coachNotes?: string;
-    [key: string]: any;
-}
-
-export interface AdminWorkout {
-    id: string | null;
-    title: string;
-    exercises: AdminExercise[];
-    [key: string]: any;
-}
+export type { AdminExercise, AdminWorkout } from '@/types/admin';
 
 interface AdminWorkoutEditorProps {
     initialData?: Partial<AdminWorkout> | null;
@@ -49,18 +29,17 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
         ? workout.exercises
         : [];
 
-    const updateExercise = (idx: number, field: keyof AdminExercise | 'duplicate', val: string | number | boolean) => {
+    const duplicateExercise = (idx: number) => {
         const newExs = [...safeExercises];
+        if (!newExs[idx]) return;
+        newExs.splice(idx + 1, 0, { ...newExs[idx] });
+        setWorkout((prev) => ({ ...prev, exercises: newExs }));
+    };
 
-        if (field === 'duplicate') {
-            if (!newExs[idx]) return;
-            // Deep copy do exercício para evitar referência
-            newExs.splice(idx + 1, 0, { ...newExs[idx] });
-        } else {
-            // Type assertion seguro aqui pois sabemos que o campo existe na interface
-            // e o valor corresponde (runtime check seria ideal, mas TS check ajuda)
-            newExs[idx] = { ...newExs[idx], [field]: val };
-        }
+    const updateExercise = <K extends keyof AdminExercise>(idx: number, field: K, val: AdminExercise[K]) => {
+        const newExs = [...safeExercises];
+        if (!newExs[idx]) return;
+        newExs[idx] = { ...newExs[idx], [field]: val } as AdminExercise;
 
         setWorkout((prev) => ({ ...prev, exercises: newExs }));
     };
@@ -72,10 +51,10 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                 name: '',
                 sets: 4,
                 reps: '10',
-                rpe: '8', // Default RPE
+                rpe: '8',
                 cadence: '2020',
                 restTime: 60,
-                method: 'Normal', // Default Method
+                method: 'Normal',
                 videoUrl: '',
                 notes: '',
                 coachNotes: ''
@@ -137,7 +116,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                             className="w-full bg-neutral-900 rounded p-2 text-center outline-none text-sm text-white"
                                         />
                                         <button
-                                            onClick={() => updateExercise(idx, 'duplicate', true)}
+                                            onClick={() => duplicateExercise(idx)}
                                             className="h-[20px] w-[20px] bg-white rounded-full flex items-center justify-center shadow-lg active:scale-90 flex-shrink-0"
                                             title="Duplicar Exercício"
                                         >
@@ -148,7 +127,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                 <div className="col-span-1">
                                     <label className="text-[10px] text-neutral-500 block">Reps</label>
                                     <input
-                                        value={ex.reps}
+                                        value={ex.reps ?? ''}
                                         onChange={e => updateExercise(idx, 'reps', e.target.value)}
                                         className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
                                     />
@@ -157,7 +136,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     <label className="text-[10px] text-yellow-500 font-bold block">RPE</label>
                                     <input
                                         type="number"
-                                        value={ex.rpe}
+                                        value={ex.rpe ?? ''}
                                         onChange={e => updateExercise(idx, 'rpe', e.target.value)}
                                         className="w-full bg-neutral-900 border border-yellow-500/30 rounded p-2 text-center text-sm text-yellow-500 font-bold outline-none"
                                         placeholder="1-10"
@@ -167,7 +146,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     <label className="text-[10px] text-neutral-500 block">Rest(s)</label>
                                     <input
                                         type="number"
-                                        value={ex.restTime}
+                                        value={ex.restTime ?? ''}
                                         onChange={e => updateExercise(idx, 'restTime', e.target.value)}
                                         className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
                                     />
@@ -175,7 +154,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                 <div className="col-span-1">
                                     <label className="text-[10px] text-neutral-500 block">Cad</label>
                                     <input
-                                        value={ex.cadence}
+                                        value={ex.cadence ?? ''}
                                         onChange={e => updateExercise(idx, 'cadence', e.target.value)}
                                         className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
                                     />

@@ -331,7 +331,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     try {
                         const raw = w.date || w.completed_at || w.created_at;
                         if (!raw) return;
-                        const d = (raw as any)?.toDate ? (raw as any).toDate() : new Date(raw);
+                        const rawObj: UnknownRecord | null = raw && typeof raw === 'object' ? (raw as UnknownRecord) : null;
+                        const d = rawObj && typeof rawObj.toDate === 'function' ? (rawObj.toDate as () => Date)() : new Date(String(raw));
                         const t = d?.getTime ? d.getTime() : NaN;
                         if (!Number.isFinite(t)) return;
                         if (t > lastWorkoutMs) lastWorkoutMs = t;
@@ -910,7 +911,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     const resLegacy = await fetch('/api/workouts/list');
                     const jsonLegacy = await resLegacy.json();
                     if (jsonLegacy.ok) {
-                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as any[] }));
+                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as unknown[] }));
                         list = [...list, ...legacy];
                     }
                 } catch { }
@@ -1389,7 +1390,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         for (const r of (jsonLegacy.rows || [])) {
                             const key = workoutTitleKey(r.name);
                             const prev = tMap.get(key);
-                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as any[] };
+                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as unknown[] };
                             const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                             if (!prev || prevExs.length < 1) tMap.set(key, candidate);
                         }
@@ -3302,7 +3303,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                         const raw = (r as UnknownRecord)?.created_at ?? (r as UnknownRecord)?.createdAt;
                                                         if (!raw) return '';
                                                         const rawObj: UnknownRecord | null = raw && typeof raw === 'object' ? (raw as UnknownRecord) : null;
-                                                        const d = rawObj && typeof rawObj.toDate === 'function' ? (rawObj.toDate as () => Date)() : new Date(raw as any);
+                                                        const d = rawObj && typeof rawObj.toDate === 'function' ? (rawObj.toDate as () => Date)() : new Date(String(raw));
                                                         const t = d && typeof (d as Date).toLocaleString === 'function' ? (d as Date).toLocaleString('pt-BR') : String(raw);
                                                         return t || '';
                                                     } catch {

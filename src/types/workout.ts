@@ -29,14 +29,14 @@ export interface DashboardWorkout {
 export interface WorkoutExercise {
     id: string
     name: string
-    notes?: string
-    videoUrl?: string
-    restTime?: number
-    cadence?: string
-    method?: string
-    sets?: number
-    reps?: string
-    rpe?: number
+    notes?: string | null
+    videoUrl?: string | null
+    restTime?: number | string | null
+    cadence?: string | null
+    method?: string | null
+    sets?: number | string
+    reps?: string | number | null
+    rpe?: number | string | null
     setDetails?: WorkoutSet[]
     order?: number
     [key: string]: unknown

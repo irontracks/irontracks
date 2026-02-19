@@ -86,3 +86,17 @@ export interface AdminWorkoutTemplate {
   difficulty?: string;
   [key: string]: unknown;
 }
+
+export type AdminExercise = Exercise & {
+  coachNotes?: string | null;
+  rest_time?: number | string | null;
+  video_url?: string | null;
+};
+
+export interface AdminWorkout {
+  id: string | null;
+  title: string;
+  exercises: AdminExercise[];
+  notes?: string | null;
+  [key: string]: unknown;
+}
