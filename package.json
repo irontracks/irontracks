@@ -65,7 +65,6 @@
     "eslint-config-next": "16.0.10",
     "jsdom": "^28.1.0",
     "puppeteer": "^24.15.0",
-    "//": "usado apenas em scripts e geração de PDF",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3",
