@@ -6,7 +6,7 @@ import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, 
 import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { z } from 'zod'
-import { ExerciseSchema, SetSchema, WorkoutSchema } from '@/schemas/database'
+import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database'
 import BadgesGallery from './BadgesGallery'
 import RecentAchievements from './RecentAchievements'
 import WorkoutCalendarModal from './WorkoutCalendarModal'
@@ -44,11 +44,11 @@ const PeriodizationActiveResponseSchema = z
 
 const WorkoutListRowSchema = z
   .object({
-    id: WorkoutSchema.shape.id,
-    user_id: WorkoutSchema.shape.user_id,
+    id: WorkoutRowSchema.shape.id,
+    user_id: WorkoutRowSchema.shape.user_id,
     created_by: z.string().uuid().nullable().optional(),
-    name: WorkoutSchema.shape.name,
-    notes: WorkoutSchema.shape.notes,
+    name: WorkoutRowSchema.shape.name,
+    notes: WorkoutRowSchema.shape.notes,
     archived_at: z.string().nullable().optional(),
     sort_order: z.number().nullable().optional(),
     created_at: z.string().nullable().optional(),
@@ -57,38 +57,38 @@ const WorkoutListRowSchema = z
 
 const WorkoutSetRowSchema = z
   .object({
-    id: SetSchema.shape.id,
-    set_number: SetSchema.shape.set_number,
-    weight: SetSchema.shape.weight,
-    reps: SetSchema.shape.reps,
-    rpe: SetSchema.shape.rpe,
-    completed: SetSchema.shape.completed,
-    is_warmup: SetSchema.shape.is_warmup,
-    advanced_config: SetSchema.shape.advanced_config,
+    id: SetRowSchema.shape.id,
+    set_number: SetRowSchema.shape.set_number,
+    weight: SetRowSchema.shape.weight,
+    reps: SetRowSchema.shape.reps,
+    rpe: SetRowSchema.shape.rpe,
+    completed: SetRowSchema.shape.completed,
+    is_warmup: SetRowSchema.shape.is_warmup,
+    advanced_config: SetRowSchema.shape.advanced_config,
   })
   .passthrough()
 
 const WorkoutExerciseRowSchema = z
   .object({
-    id: ExerciseSchema.shape.id,
-    name: ExerciseSchema.shape.name,
-    notes: ExerciseSchema.shape.notes,
-    video_url: ExerciseSchema.shape.video_url,
-    rest_time: ExerciseSchema.shape.rest_time,
-    cadence: ExerciseSchema.shape.cadence,
-    method: ExerciseSchema.shape.method,
-    order: ExerciseSchema.shape.order,
+    id: ExerciseRowSchema.shape.id,
+    name: ExerciseRowSchema.shape.name,
+    notes: ExerciseRowSchema.shape.notes,
+    video_url: ExerciseRowSchema.shape.video_url,
+    rest_time: ExerciseRowSchema.shape.rest_time,
+    cadence: ExerciseRowSchema.shape.cadence,
+    method: ExerciseRowSchema.shape.method,
+    order: ExerciseRowSchema.shape.order,
     sets: z.array(WorkoutSetRowSchema).optional(),
   })
   .passthrough()
 
 const WorkoutFullRowSchema = z
   .object({
-    id: WorkoutSchema.shape.id,
-    user_id: WorkoutSchema.shape.user_id,
+    id: WorkoutRowSchema.shape.id,
+    user_id: WorkoutRowSchema.shape.user_id,
     created_by: z.string().uuid().nullable().optional(),
-    name: WorkoutSchema.shape.name,
-    notes: WorkoutSchema.shape.notes,
+    name: WorkoutRowSchema.shape.name,
+    notes: WorkoutRowSchema.shape.notes,
     archived_at: z.string().nullable().optional(),
     sort_order: z.number().nullable().optional(),
     created_at: z.string().nullable().optional(),
