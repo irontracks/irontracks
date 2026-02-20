@@ -6,9 +6,9 @@
     "node": ">=20 <23"
   },
   "scripts": {
-    "predev": "tsx scripts/ensure-next-compiled-commander.ts",
-    "prebuild": "tsx scripts/ensure-next-compiled-commander.ts && tsx scripts/clean-next.ts",
-    "prestart": "tsx scripts/ensure-next-compiled-commander.ts",
+    "predev": "node scripts/ensure-next-compiled-commander.mjs",
+    "prebuild": "node scripts/ensure-next-compiled-commander.mjs",
+    "prestart": "node scripts/ensure-next-compiled-commander.mjs",
     "dev": "next dev --webpack --hostname localhost --port 3000",
     "build": "next build --webpack",
     "start": "next start",
