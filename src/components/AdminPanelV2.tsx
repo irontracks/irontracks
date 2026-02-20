@@ -343,7 +343,10 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     try {
                         const raw = w.date || w.completed_at || w.created_at;
                         if (!raw) return;
-                        const d = raw?.toDate ? raw.toDate() : new Date(raw);
+                        const rawUnknown = raw as unknown;
+                        const d = rawUnknown && typeof rawUnknown === 'object' && typeof (rawUnknown as { toDate?: unknown }).toDate === 'function'
+                            ? (rawUnknown as { toDate: () => Date }).toDate()
+                            : new Date(raw);
                         const t = d?.getTime ? d.getTime() : NaN;
                         if (!Number.isFinite(t)) return;
                         if (t > lastWorkoutMs) lastWorkoutMs = t;
@@ -3314,7 +3317,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                         const raw = (r as UnknownRecord)?.created_at ?? (r as UnknownRecord)?.createdAt;
                                                         if (!raw) return '';
                                                         const rawObj: UnknownRecord | null = raw && typeof raw === 'object' ? (raw as UnknownRecord) : null;
-                                                        const d = rawObj && typeof rawObj.toDate === 'function' ? (rawObj.toDate as () => Date)() : new Date(raw as any);
+                                                        const d = rawObj && typeof rawObj.toDate === 'function' ? (rawObj.toDate as () => Date)() : new Date(String(raw));
                                                         const t = d && typeof (d as Date).toLocaleString === 'function' ? (d as Date).toLocaleString('pt-BR') : String(raw);
                                                         return t || '';
                                                     } catch {
