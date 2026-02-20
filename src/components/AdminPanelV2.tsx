@@ -1,3 +1,15 @@
+// ============================================================
+// ⚠️  NÃO ALTERAR O LAYOUT DESTE COMPONENTE  ⚠️
+// ------------------------------------------------------------
+// Layout CORRETO: menu horizontal SUPERIOR (sticky top-0)
+//   → flex flex-col + sticky top-0 border-b + tabs no topo
+//
+// Layout ERRADO (não usar):
+//   → aside sidebar lateral (w-20 lg:w-64)
+//
+// O Trae IDE tende a substituir por sidebar lateral.
+// Se isso acontecer, restaurar do commit: 054d9aa
+// ============================================================
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
