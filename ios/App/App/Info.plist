@@ -47,5 +47,13 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>O IronTracks precisa acessar sua câmera para registrar vídeos de execução dos exercícios e fotos de avaliação física.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>O IronTracks precisa acessar o microfone para gravar o áudio dos vídeos de execução dos exercícios.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O IronTracks precisa acessar sua biblioteca de fotos para selecionar imagens de avaliação e vídeos de exercícios.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>O IronTracks precisa salvar fotos e vídeos na sua biblioteca.</string>
 </dict>
 </plist>

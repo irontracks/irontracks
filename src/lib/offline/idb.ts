@@ -53,7 +53,7 @@ export const kvGet = async (key: unknown): Promise<unknown | null> => {
     req.onsuccess = () => resolve(req.result ?? null)
     req.onerror = () => resolve(null)
   })
-  await txDone(tx).catch((): any => null)
+  await txDone(tx).catch((): null => null)
   return val
 }
 
@@ -71,7 +71,7 @@ export const kvSet = async (key: unknown, value: unknown): Promise<boolean> => {
   const db = await openDb()
   const tx = db.transaction(STORE_KV, 'readwrite')
   tx.objectStore(STORE_KV).put(value ?? null, k)
-  await txDone(tx).catch((): any => null)
+  await txDone(tx).catch((): null => null)
   return true
 }
 
@@ -83,7 +83,7 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
       const list = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []
-      const next = list.filter((x: any) => String(x?.id || '') !== id)
+      const next = list.filter((x: Record<string, unknown>) => String(x?.id || '') !== id)
       next.push(j)
       window.localStorage.setItem('it.queue.v1', JSON.stringify(next))
       return true
@@ -94,7 +94,7 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
   const db = await openDb()
   const tx = db.transaction(STORE_QUEUE, 'readwrite')
   tx.objectStore(STORE_QUEUE).put(j)
-  await txDone(tx).catch((): any => null)
+  await txDone(tx).catch((): null => null)
   return true
 }
 
@@ -105,7 +105,7 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
       const list = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []
-      const next = list.filter((x: any) => String(x?.id || '') !== key)
+      const next = list.filter((x: Record<string, unknown>) => String(x?.id || '') !== key)
       window.localStorage.setItem('it.queue.v1', JSON.stringify(next))
       return true
     } catch {
@@ -115,7 +115,7 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
   const db = await openDb()
   const tx = db.transaction(STORE_QUEUE, 'readwrite')
   tx.objectStore(STORE_QUEUE).delete(key)
-  await txDone(tx).catch((): any => null)
+  await txDone(tx).catch((): null => null)
   return true
 }
 
@@ -137,6 +137,6 @@ export const queueGetAll = async (): Promise<unknown[]> => {
     req.onsuccess = () => resolve(Array.isArray(req.result) ? (req.result as unknown[]) : [])
     req.onerror = () => resolve([])
   })
-  await txDone(tx).catch((): any => null)
+  await txDone(tx).catch((): null => null)
   return list
 }

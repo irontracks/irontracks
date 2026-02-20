@@ -110,10 +110,10 @@ const LoginScreen = () => {
             const href = getOAuthHref('google');
             console.log('Navegando para:', href);
             window.location.assign(href);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Login Error:", error);
             setIsLoading(false);
-            const msg = (error && error.message) ? error.message : 'Falha ao fazer login.';
+            const msg = error instanceof Error ? error.message : 'Falha ao fazer login.';
             setErrorMsg(msg);
         }
     };
@@ -126,7 +126,7 @@ const LoginScreen = () => {
             const isIOS = Capacitor.getPlatform() === 'ios';
             if (isIOS && SignInWithApple) {
                 const result = await SignInWithApple.authorize({
-                    clientId: 'br.com.irontracks.app',
+                    clientId: 'com.irontracks.app',
                     scopes: 'name email',
                 });
 
@@ -144,10 +144,10 @@ const LoginScreen = () => {
 
             const href = getOAuthHref('apple');
             window.location.assign(href);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Login Error:", error);
             setIsLoading(false);
-            const msg = (error && error.message) ? error.message : 'Falha ao fazer login.';
+            const msg = error instanceof Error ? error.message : 'Falha ao fazer login.';
             setErrorMsg(msg);
         }
     };
@@ -222,8 +222,9 @@ const LoginScreen = () => {
                     if (!res.ok || !json?.ok) {
                         throw new Error(json?.error || 'Não foi possível enviar sua solicitação.');
                     }
-                } catch (e: any) {
-                    throw new Error(e?.message || 'Não foi possível enviar sua solicitação.');
+                } catch (e: unknown) {
+                    const eMsg = e instanceof Error ? e.message : 'Não foi possível enviar sua solicitação.'
+                    throw new Error(eMsg);
                 }
 
                 const { error } = await supabase.auth.signUp({
@@ -284,9 +285,9 @@ const LoginScreen = () => {
                 router.replace('/dashboard');
                 try { router.refresh(); } catch {}
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Auth Error:", err);
-            let msg = err.message || 'Erro na autenticação';
+            let msg = err instanceof Error ? err.message : 'Erro na autenticação';
             if (msg.includes('Invalid login')) msg = 'E-mail ou senha incorretos.';
             if (msg.includes('User already registered')) msg = 'E-mail já cadastrado. Tente entrar ou recuperar senha.';
             if (msg.toLowerCase().includes('email rate limit')) msg = 'Limite de e-mails excedido. Aguarde alguns minutos e tente novamente.';
@@ -343,8 +344,8 @@ const LoginScreen = () => {
             }
             
             setReqSuccess(true);
-        } catch (err: any) {
-            setReqError(err.message || 'Erro de conexão.');
+        } catch (err: unknown) {
+            setReqError(err instanceof Error ? err.message : 'Erro de conexão.');
         } finally {
             setReqLoading(false);
         }

@@ -81,18 +81,20 @@ export async function searchYouTubeCandidates(query: string, maxResults = 5) {
     const text = await resp.text().catch(() => '')
     throw new Error(text || `youtube_error_${resp.status}`)
   }
+  type YouTubeItem = { id?: { videoId?: string }; snippet?: { title?: string; channelTitle?: string } }
+  type YouTubeResponse = { items?: YouTubeItem[] }
   const json: unknown = await resp.json().catch((): unknown => null)
-  const items = Array.isArray((json as any)?.items) ? (json as any).items : []
+  const response = json as YouTubeResponse | null
+  const items = Array.isArray(response?.items) ? response.items : []
   return items
-    .map((it: unknown) => {
-      const item = it as Record<string, any>
-      const videoId = String(item?.id?.videoId || '').trim()
+    .map((it: YouTubeItem) => {
+      const videoId = String(it?.id?.videoId || '').trim()
       if (!videoId) return null
       return {
         videoId,
         url: `https://www.youtube.com/watch?v=${videoId}`,
-        title: String(item?.snippet?.title || '').trim(),
-        channelTitle: String(item?.snippet?.channelTitle || '').trim(),
+        title: String(it?.snippet?.title || '').trim(),
+        channelTitle: String(it?.snippet?.channelTitle || '').trim(),
       }
     })
     .filter(Boolean)

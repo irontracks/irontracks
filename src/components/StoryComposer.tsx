@@ -952,7 +952,28 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
   const renderVideo = async (): Promise<{ blob: Blob; filename: string; mime: string }> => {
     if (!videoRef.current) throw new Error('Vídeo não disponível')
-    
+
+    // Safari iOS não suporta canvas.captureStream() — exportar como imagem estática do frame atual
+    if (!VideoCompositor.isSupported()) {
+      const canvas = document.createElement('canvas')
+      canvas.width = CANVAS_W
+      canvas.height = CANVAS_H
+      const ctx = canvas.getContext('2d')
+      if (!ctx) throw new Error('canvas_error')
+      const vid = videoRef.current
+      const vw = vid.videoWidth || CANVAS_W
+      const vh = vid.videoHeight || CANVAS_H
+      const scale = Math.max(CANVAS_W / vw, CANVAS_H / vh)
+      const dw = vw * scale
+      const dh = vh * scale
+      ctx.drawImage(vid, (CANVAS_W - dw) / 2, (CANVAS_H - dh) / 2, dw, dh)
+      drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: null, metrics, layout, livePositions, transparentBg: true, skipClear: true })
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((b) => b ? resolve(b) : reject(new Error('blob_failed')), 'image/jpeg', 0.92)
+      )
+      return { blob, filename: `irontracks-story-${Date.now()}.jpg`, mime: 'image/jpeg' }
+    }
+
     // Initialize compositor
     compositorRef.current = new VideoCompositor()
     setIsExporting(true)
