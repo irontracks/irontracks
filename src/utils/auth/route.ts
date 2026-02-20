@@ -10,7 +10,7 @@ export type RouteAuthOk = { ok: true; supabase: SupabaseClient; user: User; role
 
 const getAdminEmail = () => {
   const envEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
-  return envEmail || 'djmkapple@gmail.com'
+  return envEmail || ''
 }
 
 export const jsonError = (status: number, error: string) => {
