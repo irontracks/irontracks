@@ -96,7 +96,7 @@ export const estimate1Rm = (weight: unknown, reps: unknown): number | null => {
 export const computeWeeks = (weeks: VipPeriodizationWeeks, model: VipPeriodizationModel): VipPeriodizationWeek[] => {
   const deloadWeeksByPlan: Record<number, number[]> = { 4: [3], 6: [4, 6], 8: [4, 6] }
   const testWeek = weeks
-  const deloadWeeks = new Set<number>((deloadWeeksByPlan as any)[weeks] || [])
+  const deloadWeeks = new Set<number>(deloadWeeksByPlan[weeks] ?? [])
   const list: VipPeriodizationWeek[] = []
 
   for (let w = 1; w <= weeks; w += 1) {

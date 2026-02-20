@@ -30,13 +30,14 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
     let idempotencyKey = String(options.idempotencyKey || '').trim()
     if (!idempotencyKey) {
       try {
-        const maybe = (globalThis as any)?.crypto?.randomUUID
+        const cryptoGlobal = globalThis as typeof globalThis & { crypto?: { randomUUID?: () => string } }
+        const maybe = cryptoGlobal?.crypto?.randomUUID
         if (typeof maybe === 'function') idempotencyKey = String(maybe()).trim()
       } catch {}
     }
     if (!idempotencyKey) {
       try {
-        const mod: any = await import('crypto')
+        const mod = await import('crypto') as { randomUUID?: () => string }
         const maybe = mod?.randomUUID
         if (typeof maybe === 'function') idempotencyKey = String(maybe()).trim()
       } catch {}

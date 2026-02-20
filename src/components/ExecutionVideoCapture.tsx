@@ -26,13 +26,13 @@ interface ExecutionVideoCaptureProps {
     variant?: 'icon' | 'compact' | 'wide' | 'normal';
     label?: string;
     onUploaded?: (data: { submissionId: string }) => void;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps) {
   const { alert } = useDialog();
   const supabase = useRef(createClient()).current;
-  const inputRef = useRef<any>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -53,8 +53,8 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
 
   const runIdle = (fn: () => void) => {
     try {
-      const w = typeof window !== 'undefined' ? (window as any) : null;
-      const idle = w && w.requestIdleCallback;
+      const w = typeof window !== 'undefined' ? (window as Window & { requestIdleCallback?: (cb: () => void) => void }) : null;
+      const idle = w?.requestIdleCallback;
       if (typeof idle === 'function') {
         idle(() => {
           try {
@@ -129,6 +129,11 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
 
       const duration = Number(videoEl.duration) || 0;
       if (!Number.isFinite(duration) || duration <= 0) {
+        return file;
+      }
+
+      // Safari iOS não suporta canvas.captureStream() — retorna o arquivo original
+      if (!VideoCompositor.isSupported()) {
         return file;
       }
 
@@ -256,10 +261,10 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
     } catch {}
   };
 
-  const onChange = async (e: any) => {
+  const onChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e?.target?.files?.[0] || null;
     try {
-      if (e?.target) e.target.value = '';
+      if (e?.target) (e.target as HTMLInputElement).value = '';
     } catch {}
     if (!file) return;
 
@@ -283,7 +288,7 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
           content_type: String(fileToUpload?.type || file?.type || ''),
         }),
       });
-      const json = await res.json().catch((): any => null);
+      const json = await res.json().catch((): null => null);
       if (!res.ok || !json?.ok) {
         const msg = String(json?.error || `Falha ao preparar upload (${res.status})`);
         await alert(msg, 'Vídeo');
@@ -323,8 +328,9 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
         } catch {}
       }
       await alert('Vídeo enviado para o professor.', 'Vídeo');
-    } catch (err: any) {
-      await alert('Erro: ' + (err?.message ?? String(err)), 'Vídeo');
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      await alert('Erro: ' + errMsg, 'Vídeo');
     } finally {
       setUploading(false);
       setProcessing(false);

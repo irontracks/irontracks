@@ -103,6 +103,19 @@ export class VideoCompositor {
         }
     }
 
+    public static isSupported(): boolean {
+        try {
+            if (typeof window === 'undefined') return false
+            const canvas = document.createElement('canvas')
+            const canvasWithCapture = canvas as HTMLCanvasElement & { captureStream?: () => MediaStream }
+            if (typeof canvasWithCapture.captureStream !== 'function') return false
+            if (typeof MediaRecorder === 'undefined') return false
+            return true
+        } catch {
+            return false
+        }
+    }
+
     private getBestMimeType(): string {
         const mp4Candidates = [
             'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
