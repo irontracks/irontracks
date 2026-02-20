@@ -12,7 +12,7 @@ const ZodBodySchema = z
   .object({
     planId: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

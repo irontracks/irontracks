@@ -10,7 +10,7 @@ const BodySchema = z
   .object({
     path: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 const isAllowedStoryPath = (userId: string, path: string) => {
   const uid = String(userId || '').trim()

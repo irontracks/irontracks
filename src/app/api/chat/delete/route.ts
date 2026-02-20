@@ -12,7 +12,7 @@ const ZodBodySchema = z
     message_id: z.string().optional(),
     scope: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
   const url = String(publicUrl || '').trim()

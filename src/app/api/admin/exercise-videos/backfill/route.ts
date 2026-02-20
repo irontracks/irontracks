@@ -11,7 +11,7 @@ const ZodBodySchema = z
   .object({
     limit: z.coerce.number().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

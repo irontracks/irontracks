@@ -10,7 +10,7 @@ const BodySchema = z
   .object({
     confirm: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 const isMissingTable = (error: any) => {
   const status = Number(error?.status)

@@ -12,7 +12,7 @@ const BodySchema = z
     student_user_id: z.string().min(1),
     content: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   const auth = await requireRole(['admin', 'teacher'])

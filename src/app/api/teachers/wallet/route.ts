@@ -12,7 +12,7 @@ const ZodBodySchema = z
     walletId: z.string().optional(),
     asaas_wallet_id: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 const isMissingColumn = (err: unknown, column: string): boolean => {
   const msg = String((err as any)?.message || '').toLowerCase()

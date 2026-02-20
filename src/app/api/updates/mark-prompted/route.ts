@@ -10,7 +10,7 @@ const ZodBodySchema = z
     updateId: z.string().optional(),
     update_id: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

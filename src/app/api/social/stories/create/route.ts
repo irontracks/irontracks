@@ -8,7 +8,7 @@ import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
-const BodySchema = z.object({}).passthrough()
+const BodySchema = z.object({}).strip()
 
 export async function POST(req: Request) {
   try {

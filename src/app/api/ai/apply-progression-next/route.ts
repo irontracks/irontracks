@@ -13,7 +13,7 @@ const ZodBodySchema = z
     historyId: z.string().optional(),
     history_id: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 const normalizeKey = (v: unknown) =>
   String(v || '')

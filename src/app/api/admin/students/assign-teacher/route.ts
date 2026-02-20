@@ -13,7 +13,7 @@ const ZodBodySchema = z
     teacher_email: z.string().optional(),
     email: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

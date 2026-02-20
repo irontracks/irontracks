@@ -11,7 +11,7 @@ const ZodBodySchema = z
   .object({
     submission_id: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 const isEnabled = () => String(process.env.ENABLE_EXECUTION_VIDEO || '').trim().toLowerCase() === 'true'
 

@@ -101,7 +101,7 @@ const BodySchema = z
     session: z.unknown(),
     idempotencyKey: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(request: Request) {
   try {

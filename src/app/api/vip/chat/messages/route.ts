@@ -12,7 +12,7 @@ const PostBodySchema = z
     role: z.enum(['user', 'assistant', 'system']),
     content: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 export async function GET(req: Request) {
   const auth = await requireUser()

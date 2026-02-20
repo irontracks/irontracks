@@ -16,7 +16,7 @@ const ZodBodySchema = z
     days: z.coerce.number().optional(),
     maxAi: z.coerce.number().optional(),
   })
-  .passthrough()
+  .strip()
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 

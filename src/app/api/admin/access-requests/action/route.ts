@@ -11,7 +11,7 @@ const ZodBodySchema = z
     requestId: z.string().min(1),
     action: z.enum(['accept', 'reject']),
   })
-  .passthrough()
+  .strip()
 
 const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlreadyCreated: boolean) => {
   const apiKey = String(process.env.RESEND_API_KEY || '').trim()

@@ -19,7 +19,7 @@ const ZodBodySchema = z
     maxAi: z.coerce.number().optional(),
     batchLimit: z.coerce.number().optional(),
   })
-  .passthrough()
+  .strip()
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -38,7 +38,7 @@ const AiExerciseMuscleMapSchema = z
       })
     ),
   })
-  .passthrough()
+  .strip()
 
 type AiExerciseMuscleMap = z.infer<typeof AiExerciseMuscleMapSchema>
 

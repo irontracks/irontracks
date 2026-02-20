@@ -16,10 +16,10 @@ const IncomingEventSchema = z
     clientTs: z.unknown().optional(),
     appVersion: z.unknown().optional(),
   })
-  .passthrough()
+  .strip()
 
 const ZodBodySchema = z.union([
-  z.object({ events: z.array(IncomingEventSchema).max(50) }).passthrough(),
+  z.object({ events: z.array(IncomingEventSchema).max(50) }).strip(),
   z.array(IncomingEventSchema).max(50),
   IncomingEventSchema,
 ])

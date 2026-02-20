@@ -13,7 +13,7 @@ const PostBodySchema = z
     story_id: z.string().optional(),
     signedSeconds: z.coerce.number().optional(),
   })
-  .passthrough()
+  .strip()
 
 const guessContentTypeFromPath = (path: string) => {
   const p = String(path || '').toLowerCase()

@@ -12,7 +12,7 @@ const ZodBodySchema = z
     id: z.union([z.string(), z.number()]).optional(),
     workoutId: z.union([z.string(), z.number()]).optional(),
   })
-  .passthrough()
+  .strip()
 
 const buildExercisesPayload = (workout: any) => {
   const w = workout && typeof workout === 'object' ? workout : {}

@@ -36,7 +36,7 @@ const BodySchema = z
     mobilePhone: z.preprocess((v) => onlyDigits(v), z.string().min(1)),
     name: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().optional().default('')),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

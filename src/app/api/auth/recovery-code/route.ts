@@ -12,7 +12,7 @@ const BodySchema = z
     code: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().min(1)),
     password: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().min(6)),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(request: Request) {
   try {

@@ -11,7 +11,7 @@ const ZodBodySchema = z
     confirm: z.boolean(),
     reason: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

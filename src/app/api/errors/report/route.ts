@@ -16,7 +16,7 @@ const ZodBodySchema = z
     source: z.string().optional(),
     meta: z.record(z.unknown()).optional(),
   })
-  .passthrough()
+  .strip()
 
 const trimLen = (v: any, max: number) => {
   const s = String(v ?? '')

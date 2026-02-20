@@ -15,7 +15,7 @@ const ZodBodySchema = z
     mobilePhone: z.string().min(1),
     name: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 const DEFAULT_PLATFORM_FEE_PERCENT = 15
 

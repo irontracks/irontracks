@@ -13,7 +13,7 @@ const PutBodySchema = z
     constraints: z.string().optional(),
     preferences: z.record(z.unknown()).optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function GET() {
   const auth = await requireUser()

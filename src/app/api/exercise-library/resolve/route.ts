@@ -10,7 +10,7 @@ const ZodBodySchema = z
     names: z.unknown().optional(),
     name: z.unknown().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   const auth = await requireUser()

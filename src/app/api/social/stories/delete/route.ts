@@ -11,7 +11,7 @@ const BodySchema = z
     storyId: z.string().optional(),
     story_id: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

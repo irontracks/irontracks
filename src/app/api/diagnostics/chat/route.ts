@@ -9,7 +9,7 @@ const ZodBodySchema = z
     channelId: z.string().min(1),
     content: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function GET() {
   try {

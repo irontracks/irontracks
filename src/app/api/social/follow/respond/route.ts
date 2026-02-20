@@ -13,7 +13,7 @@ const BodySchema = z
     follower_id: z.string().optional(),
     decision: z.enum(['accept', 'deny']),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

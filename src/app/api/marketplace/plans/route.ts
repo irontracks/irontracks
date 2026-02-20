@@ -15,7 +15,7 @@ const ZodBodySchema = z
     interval: z.enum(['month', 'year']).optional(),
     status: z.enum(['active', 'inactive']).optional(),
   })
-  .passthrough()
+  .strip()
 
 const getRole = async (admin: ReturnType<typeof createAdminClient>, userId: string) => {
   const { data } = await admin.from('profiles').select('role, email').eq('id', userId).maybeSingle()
