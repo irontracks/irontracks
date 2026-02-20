@@ -334,7 +334,8 @@ export default function VipPeriodizationPanel({
               setCreateOpen(true)
               setError('')
             }}
-            className="inline-flex items-center gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/25 px-3 py-2 text-yellow-400 font-black hover:bg-yellow-500/15"
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/25 px-3 py-2 text-yellow-400 font-black hover:bg-yellow-500/15 disabled:opacity-60"
           >
             <CalendarDays size={16} />
             {program?.id ? 'Refazer' : 'Criar'}

@@ -352,26 +352,11 @@ export default function MuscleMapCard(props: Props) {
               <span>
                 {state.data ? `${state.data.workoutsCount} treino(s) ${period === 'day' ? 'no dia' : 'na semana'}` : 'Análise por músculo'}
               </span>
-              <span className="text-neutral-600">•</span>
-              <span>{aiLabel}</span>
-              <span className="text-neutral-600">•</span>
-              <span className="inline-flex items-center gap-1 text-neutral-500">
-                {autoSync.status === 'loading' ? <Loader2 size={12} className="animate-spin" /> : null}
-                {autoSync.status === 'error' ? 'Sync falhou' : 'Sync ativo'}
-              </span>
               {autoSync.lastAt ? (
                 <>
                   <span className="text-neutral-600">•</span>
                   <span className="text-neutral-500">
                     Atualizado {new Date(autoSync.lastAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </>
-              ) : null}
-              {weakMuscles.length ? (
-                <>
-                  <span className="text-neutral-600">•</span>
-                  <span className="text-neutral-500">
-                    Mais baixos: {weakMuscles.map((m) => m.label).join(', ')}
                   </span>
                 </>
               ) : null}
