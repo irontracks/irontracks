@@ -310,22 +310,24 @@ export default function VipPeriodizationPanel({
 
   return (
     <div className="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3">
+        {/* Título */}
         <div className="flex items-center gap-3">
-          <Sparkles className="text-yellow-500" />
+          <Sparkles className="text-yellow-500 shrink-0" />
           <div>
             <div className="font-black text-white">Periodização VIP</div>
             <div className="text-xs text-neutral-400">Planos estruturados de 4, 6 ou 8 semanas</div>
           </div>
         </div>
+        {/* Botões — linha própria, cada um com flex-1 */}
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={cleanupOld}
             disabled={cleaning}
-            className="inline-flex items-center gap-2 rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-neutral-200 font-black hover:bg-neutral-700 disabled:opacity-60"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-neutral-200 font-black text-sm hover:bg-neutral-700 disabled:opacity-60"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={15} />
             {cleaning ? 'Limpando...' : 'Limpar antigos'}
           </button>
           <button
@@ -335,9 +337,9 @@ export default function VipPeriodizationPanel({
               setError('')
             }}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/25 px-3 py-2 text-yellow-400 font-black hover:bg-yellow-500/15 disabled:opacity-60"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-yellow-500/10 border border-yellow-500/25 px-3 py-2 text-yellow-400 font-black text-sm hover:bg-yellow-500/15 disabled:opacity-60"
           >
-            <CalendarDays size={16} />
+            <CalendarDays size={15} />
             {program?.id ? 'Refazer' : 'Criar'}
           </button>
         </div>
