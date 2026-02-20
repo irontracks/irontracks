@@ -2,12 +2,12 @@
   "originHash" : "d88541d2072e489d05b8a4b36c42bc22dfbcba3647ef30df33654a49f336fdee",
   "pins" : [
     {
-      "identity" : "capacitor-swift-pm",
+      "identity" : "purchases-ios-spm",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ionic-team/capacitor-swift-pm.git",
+      "location" : "https://github.com/RevenueCat/purchases-ios-spm",
       "state" : {
-        "revision" : "13a39179b3df796f3bb2e70c47ccdd92593f34d2",
-        "version" : "8.0.2"
+        "revision" : "eb593f3a7e977fe1a3b80d1f50ea0c90e94719cd",
+        "version" : "5.57.2"
       }
     }
   ],

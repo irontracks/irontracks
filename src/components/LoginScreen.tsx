@@ -8,9 +8,12 @@ import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
 import { isPwaStandalone } from '@/utils/platform';
+import { SignInWithApple } from '@capacitor-community/apple-sign-in';
+import { Capacitor } from '@capacitor/core';
 
 const LoginScreen = () => {
     const router = useRouter();
+    const appVersionLabel = useMemo(() => (Capacitor.getPlatform() === 'ios' ? 'v1.0' : APP_VERSION), []);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0);
@@ -109,6 +112,25 @@ const LoginScreen = () => {
         setErrorMsg('');
 
         try {
+            const isIOS = Capacitor.getPlatform() === 'ios';
+            if (isIOS) {
+                const result = await SignInWithApple.authorize({
+                    clientId: 'br.com.irontracks.app',
+                    scopes: 'name email',
+                });
+
+                const token = result?.response?.identityToken;
+                if (!token) throw new Error('Falha ao obter token da Apple.');
+
+                const supabase = createClient();
+                const { error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token });
+                if (error) throw error;
+
+                router.replace('/dashboard');
+                try { router.refresh(); } catch {}
+                return;
+            }
+
             const href = getOAuthHref('apple');
             window.location.assign(href);
         } catch (error: any) {
@@ -343,7 +365,7 @@ const LoginScreen = () => {
                 </h1>
                 
                 <p className="text-zinc-500 mb-8 text-center text-[10px] uppercase tracking-[0.3em] font-bold">
-                    Sistema de Alta Performance • {APP_VERSION}
+                    Sistema de Alta Performance • {appVersionLabel}
                 </p>
                 
                 {authMode === 'menu' && (
