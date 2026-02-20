@@ -8,8 +8,19 @@ import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
 import { isPwaStandalone } from '@/utils/platform';
-import { SignInWithApple } from '@capacitor-community/apple-sign-in';
-import { Capacitor } from '@capacitor/core';
+// Capacitor imports dinâmicos — evita quebrar o build web/Vercel
+let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' };
+let SignInWithApple: { authorize: (opts: { clientId: string; scopes: string }) => Promise<{ response: { identityToken: string } }> } | null = null;
+if (typeof window !== 'undefined') {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const cap = require('@capacitor/core');
+        if (cap?.Capacitor) Capacitor = cap.Capacitor;
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const appleSignIn = require('@capacitor-community/apple-sign-in');
+        if (appleSignIn?.SignInWithApple) SignInWithApple = appleSignIn.SignInWithApple;
+    } catch {}
+}
 
 const LoginScreen = () => {
     const router = useRouter();
@@ -113,7 +124,7 @@ const LoginScreen = () => {
 
         try {
             const isIOS = Capacitor.getPlatform() === 'ios';
-            if (isIOS) {
+            if (isIOS && SignInWithApple) {
                 const result = await SignInWithApple.authorize({
                     clientId: 'br.com.irontracks.app',
                     scopes: 'name email',
