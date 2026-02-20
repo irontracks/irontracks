@@ -43,7 +43,7 @@ const ZodBodySchema = z
     incomeValue: z.union([z.string(), z.number()]).optional(),
     income_value: z.union([z.string(), z.number()]).optional(),
   })
-  .passthrough()
+  .strip()
 
 const parseNumber = (value: unknown) => {
   if (typeof value === 'number' && Number.isFinite(value)) return value

@@ -18,7 +18,7 @@ const ZodBodySchema = z
     refreshAi: z.boolean().optional(),
     weekStart: z.union([z.string(), z.number(), z.date()]).optional(),
   })
-  .passthrough()
+  .strip()
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
@@ -37,7 +37,7 @@ const AiExerciseMuscleMapSchema = z
       })
     ),
   })
-  .passthrough()
+  .strip()
 
 type AiExerciseMuscleMap = z.infer<typeof AiExerciseMuscleMapSchema>
 

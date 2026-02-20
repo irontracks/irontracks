@@ -17,7 +17,7 @@ const ZodBodySchema = z
     mode: z.string().optional(),
     template_ids: z.array(z.string()).optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

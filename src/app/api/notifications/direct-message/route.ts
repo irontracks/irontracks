@@ -12,7 +12,7 @@ const ZodBodySchema = z
     senderName: z.string().min(1),
     preview: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

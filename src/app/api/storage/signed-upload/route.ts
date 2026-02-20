@@ -9,7 +9,7 @@ const BodySchema = z
     bucket: z.string().default('chat-media'),
     path: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(request: Request) {
   try {

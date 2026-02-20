@@ -2,21 +2,26 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
+import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
 const BodySchema = z
   .object({
     channel_id: z.string().min(1),
-    content: z.string().min(1),
+    content: z.string().min(1).max(4000),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const ip = getRequestIp(req)
+    const rl = checkRateLimit(`chat:send:${user.id}:${ip}`, 30, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response

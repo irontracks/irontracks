@@ -18,7 +18,7 @@ const BodySchema = z
     workout_title: z.string().optional(),
     title: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

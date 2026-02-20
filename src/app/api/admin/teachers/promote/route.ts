@@ -10,7 +10,7 @@ const ZodBodySchema = z
   .object({
     email: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

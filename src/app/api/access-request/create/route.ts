@@ -14,7 +14,7 @@ const BodySchema = z
     role_requested: z.string().optional().nullable(),
     cref: z.string().optional().nullable(),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

@@ -14,7 +14,7 @@ const ZodBodySchema = z
     message: z.string().min(1),
     type: z.string().optional().default('appointment'),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

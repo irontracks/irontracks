@@ -9,7 +9,7 @@ const ZodBodySchema = z
     id: z.string().min(1),
     status: z.string().min(1),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   try {

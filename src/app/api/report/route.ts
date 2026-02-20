@@ -9,7 +9,7 @@ const ZodBodySchema = z
     html: z.string().min(1),
     fileName: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 const sanitizeHtml = (value: unknown): string => {
   try {

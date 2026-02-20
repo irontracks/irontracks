@@ -15,7 +15,7 @@ const ZodBodySchema = z
   .object({
     names: z.array(z.string().min(1)).min(1).max(60),
   })
-  .passthrough()
+  .strip()
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 

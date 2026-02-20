@@ -10,7 +10,7 @@ const ZodBodySchema = z
     session: z.unknown(),
     workoutId: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 const safeString = (v: unknown): string => {
   try {

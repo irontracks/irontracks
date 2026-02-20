@@ -16,7 +16,7 @@ const BodySchema = z
     action: z.enum(['done', 'open', 'snooze']),
     snooze_minutes: z.coerce.number().optional().default(0),
   })
-  .passthrough()
+  .strip()
 
 export async function POST(req: Request) {
   const auth = await requireRole(['admin', 'teacher'])

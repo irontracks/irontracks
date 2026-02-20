@@ -13,7 +13,7 @@ const PostBodySchema = z
     body: z.string().optional(),
     text: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 export async function GET(req: Request) {
   try {

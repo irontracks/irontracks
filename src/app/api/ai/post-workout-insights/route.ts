@@ -16,7 +16,7 @@ const ZodBodySchema = z
     id: z.string().optional(),
     session: z.unknown().optional(),
   })
-  .passthrough()
+  .strip()
 
 const POST_WORKOUT_MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 

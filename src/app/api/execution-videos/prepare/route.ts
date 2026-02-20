@@ -17,7 +17,7 @@ const ZodBodySchema = z
     file_name: z.string().optional(),
     content_type: z.string().optional(),
   })
-  .passthrough()
+  .strip()
 
 const isEnabled = () => String(process.env.ENABLE_EXECUTION_VIDEO || '').trim().toLowerCase() === 'true'
 
