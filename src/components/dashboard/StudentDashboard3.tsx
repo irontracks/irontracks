@@ -1021,8 +1021,9 @@ export default function StudentDashboard(props: Props) {
           </button>
 
           <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
-            <div className="flex items-center justify-between">
-              <div className="inline-flex items-center rounded-xl bg-neutral-900/40 border border-neutral-800 overflow-hidden">
+            {/* Linha 1: abas Meus Treinos / Periodizados */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 inline-flex items-center rounded-xl bg-neutral-900/40 border border-neutral-800 overflow-hidden">
                 <button
                   type="button"
                   onClick={() => {
@@ -1031,8 +1032,8 @@ export default function StudentDashboard(props: Props) {
                   }}
                   className={
                     workoutsTab === 'normal'
-                      ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
-                      : 'min-h-[44px] px-3 py-2 text-neutral-300 font-bold text-xs uppercase tracking-widest hover:bg-neutral-800'
+                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black font-black text-[11px] uppercase tracking-wider text-center'
+                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 text-center'
                   }
                 >
                   Meus Treinos
@@ -1048,55 +1049,58 @@ export default function StudentDashboard(props: Props) {
                   }}
                   className={
                     workoutsTab === 'periodized'
-                      ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black font-black text-xs uppercase tracking-widest'
-                      : 'min-h-[44px] px-3 py-2 text-neutral-300 font-bold text-xs uppercase tracking-widest hover:bg-neutral-800'
+                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black font-black text-[11px] uppercase tracking-wider text-center'
+                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 text-center'
                   }
                 >
-                  <span className="inline-flex items-center gap-1.5">
-                    <Crown size={12} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
-                    Treinos Periodizados
+                  <span className="inline-flex items-center justify-center gap-1">
+                    <Crown size={11} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
+                    Periodizados
                   </span>
                 </button>
               </div>
-              <div className="flex items-center gap-2">
-                {archivedCount > 0 ? (
-                  <button
-                    onClick={() => setShowArchived((v) => !v)}
-                    className={
-                      showArchived
-                        ? 'min-h-[44px] px-3 py-2 bg-yellow-500 text-black rounded-xl font-black text-xs uppercase'
-                        : 'min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700'
-                    }
-                  >
-                    {showArchived ? `Arquivados (${archivedCount})` : `Mostrar arquivados (${archivedCount})`}
-                  </button>
-                ) : null}
+            </div>
+
+            {/* Linha 2: botões de ação — Arquivados, Organizar, Ferramentas */}
+            <div className="flex items-center gap-2">
+              {archivedCount > 0 ? (
                 <button
-                  onClick={() => {
-                    try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch {}
-                    const items = visibleWorkouts
-                      .map((w, idx) => {
-                        const id = String(w?.id || '').trim()
-                        if (!id) return null
-                        return { id, title: String(w?.title || 'Treino'), sort_order: idx }
-                      })
-                      .filter(Boolean) as { id: string; title: string; sort_order: number }[]
-                    setEditListDraft(items)
-                    setEditListOpen(true)
-                    setToolsOpen(false)
-                  }}
-                  className="min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
+                  onClick={() => setShowArchived((v) => !v)}
+                  className={
+                    showArchived
+                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black rounded-xl font-black text-[11px] uppercase tracking-wider'
+                      : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700'
+                  }
                 >
-                  Organizar
+                  {showArchived ? `Arquivados (${archivedCount})` : `Arquivados (${archivedCount})`}
                 </button>
-                <div className="relative">
-                  <button
-                    onClick={() => setToolsOpen((v) => !v)}
-                    className="min-h-[44px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
-                    aria-expanded={toolsOpen}
-                  >
-                    Ferramentas
-                  </button>
+              ) : null}
+              <button
+                onClick={() => {
+                  try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch {}
+                  const items = visibleWorkouts
+                    .map((w, idx) => {
+                      const id = String(w?.id || '').trim()
+                      if (!id) return null
+                      return { id, title: String(w?.title || 'Treino'), sort_order: idx }
+                    })
+                    .filter(Boolean) as { id: string; title: string; sort_order: number }[]
+                  setEditListDraft(items)
+                  setEditListOpen(true)
+                  setToolsOpen(false)
+                }}
+                className="flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+              >
+                Organizar
+              </button>
+              <div className="relative flex-1">
+                <button
+                  onClick={() => setToolsOpen((v) => !v)}
+                  className="w-full min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+                  aria-expanded={toolsOpen}
+                >
+                  Ferramentas
+                </button>
                   {toolsOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
@@ -1236,7 +1240,6 @@ export default function StudentDashboard(props: Props) {
                     </>
                   )}
                 </div>
-              </div>
             </div>
 
             {visibleWorkouts.length === 0 && (
