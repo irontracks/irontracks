@@ -172,20 +172,10 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
               setCurrentExerciseIdx(exIdx);
               await openDeloadModal(ex, exIdx);
             }}
-            className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 group"
+            className="flex-1 flex flex-col items-center justify-center py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 min-w-[60px]"
           >
-            {isReportLoading ? <Loader2 size={14} className="animate-spin" /> : <ArrowDown size={14} />}
-            <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60 inline-flex items-center gap-1">
-              {isReportLoading ? 'Carregando' : 'Deload'}
-              {!isReportLoading ? (
-                <HelpHint
-                  title={HELP_TERMS.deload.title}
-                  text={HELP_TERMS.deload.text}
-                  tooltip={HELP_TERMS.deload.tooltip}
-                  className="h-4 w-4 text-[10px]"
-                />
-              ) : null}
-            </span>
+            {isReportLoading ? <Loader2 size={16} className="animate-spin mb-1" /> : <ArrowDown size={16} className="mb-1" />}
+            <span className="text-[10px] leading-none text-neutral-400 font-medium">Deload</span>
           </button>
           <button
             type="button"
