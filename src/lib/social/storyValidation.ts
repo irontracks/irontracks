@@ -21,13 +21,38 @@ export const isAllowedStoryPath = (userId: string, path: string) => {
   return true
 }
 
+const CAPTION_MAX_LENGTH = 500
+const META_MAX_KEYS = 20
+const META_MAX_VALUE_LENGTH = 512
+
 export const validateStoryPayload = (body: unknown) => {
-  const b = body && typeof body === 'object' ? body as Record<string, any> : {}
+  const b = body && typeof body === 'object' ? body as Record<string, unknown> : {}
   const mediaPath = String(b?.mediaPath || b?.media_path || '').trim()
-  const caption = b?.caption != null ? String(b.caption).trim() : null
-  const meta = b?.meta && typeof b.meta === 'object' ? b.meta : {}
+
+  let caption: string | null = null
+  if (b?.caption != null) {
+    const raw = String(b.caption).trim()
+    if (raw.length > CAPTION_MAX_LENGTH) {
+      return { ok: false, error: `caption too long (max ${CAPTION_MAX_LENGTH} chars)` }
+    }
+    caption = raw || null
+  }
+
+  let meta: Record<string, unknown> = {}
+  if (b?.meta && typeof b.meta === 'object' && !Array.isArray(b.meta)) {
+    const rawMeta = b.meta as Record<string, unknown>
+    const keys = Object.keys(rawMeta).slice(0, META_MAX_KEYS)
+    for (const key of keys) {
+      const val = rawMeta[key]
+      if (typeof val === 'string' && val.length > META_MAX_VALUE_LENGTH) {
+        meta[key] = val.slice(0, META_MAX_VALUE_LENGTH)
+      } else {
+        meta[key] = val
+      }
+    }
+  }
 
   if (!mediaPath) return { ok: false, error: 'media_path required' }
-  
+
   return { ok: true, data: { mediaPath, caption, meta } }
 }
