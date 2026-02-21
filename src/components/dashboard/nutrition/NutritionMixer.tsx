@@ -5,6 +5,7 @@ import { logMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { isIosNative } from '@/utils/platform'
 import { createClient } from '@/utils/supabase/client'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -192,7 +193,7 @@ export default function NutritionMixer({
         if (error) throw error
         const list = Array.isArray(data) ? data : []
         const mapped = list
-          .map((r: any) => ({
+          .map((r: Record<string, unknown>) => ({
             id: String(r?.id || '').trim(),
             created_at: String(r?.created_at || '').trim(),
             food_name: String(r?.food_name || '').trim(),
@@ -254,8 +255,8 @@ export default function NutritionMixer({
         fat: safeNumber(goalsDraft.fat),
       })
       setGoalsOpen(false)
-    } catch (e: any) {
-      setGoalsError(e?.message ? String(e.message) : 'Falha ao salvar metas.')
+    } catch (e: unknown) {
+      setGoalsError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao salvar metas.')
     } finally {
       setGoalsSaving(false)
     }
@@ -317,8 +318,8 @@ export default function NutritionMixer({
           if (typeof queueMicrotask === 'function') queueMicrotask(() => inputRef.current?.focus())
           else setTimeout(() => inputRef.current?.focus(), 0)
         } catch {}
-      } catch (e: any) {
-        setError(e?.message || 'Falha ao processar a refeição.')
+      } catch (e: unknown) {
+        setError(getErrorMessage(e) || 'Falha ao processar a refeição.')
       }
     })
   }
@@ -337,15 +338,15 @@ export default function NutritionMixer({
       const row = Array.isArray(data) ? data[0] : null
       if (row && typeof row === 'object') {
         setTotals({
-          calories: safeNumber((row as any)?.totals_calories),
-          protein: safeNumber((row as any)?.totals_protein),
-          carbs: safeNumber((row as any)?.totals_carbs),
-          fat: safeNumber((row as any)?.totals_fat),
+          calories: safeNumber((row as Record<string, unknown>)?.totals_calories),
+          protein: safeNumber((row as Record<string, unknown>)?.totals_protein),
+          carbs: safeNumber((row as Record<string, unknown>)?.totals_carbs),
+          fat: safeNumber((row as Record<string, unknown>)?.totals_fat),
         })
       }
       setEntries((prev) => (Array.isArray(prev) ? prev : []).filter((x) => x.id !== entryId))
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao remover lançamento.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao remover lançamento.')
     } finally {
       setEntryBusyId('')
     }
@@ -377,7 +378,7 @@ export default function NutritionMixer({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, dateKey }),
       })
-      const json = await res.json().catch((): any => null)
+      const json = await res.json().catch((): null => null)
       if (!json?.ok) {
         const needsUpgrade = !!json?.upgradeRequired || String(json?.error || '') === 'vip_required'
         setAiUpgrade(needsUpgrade)
@@ -407,8 +408,8 @@ export default function NutritionMixer({
       try {
         inputRef.current?.focus()
       } catch {}
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao estimar com IA.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao estimar com IA.')
     } finally {
       setAiBusy(false)
     }

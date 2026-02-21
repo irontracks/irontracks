@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Calendar, ArrowLeft, Clock, User, Plus, Pencil, Trash2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { InAppNotificationsProvider } from '@/contexts/InAppNotificationsContext'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type AppointmentRow = {
   id: string
@@ -146,9 +147,9 @@ export default function SchedulePage() {
           date: baseDate,
         }))
         await loadStudentsForCoach()
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!isMounted) return
-        setError(e?.message || 'Erro ao carregar agenda.')
+        setError(getErrorMessage(e) || 'Erro ao carregar agenda.')
       } finally {
         if (!isMounted) return
         setLoading(false)
@@ -170,9 +171,9 @@ export default function SchedulePage() {
       try {
         setLoading(true)
         await loadAppointmentsForDate(selectedDate)
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (isCancelled) return
-        setError(e?.message || 'Erro ao carregar agenda.')
+        setError(getErrorMessage(e) || 'Erro ao carregar agenda.')
       } finally {
         if (isCancelled) return
         setLoading(false)
@@ -223,7 +224,7 @@ export default function SchedulePage() {
           type: 'appointment',
         }),
       })
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Erro ao enviar notificação de agendamento:', e)
     }
   }
@@ -296,8 +297,8 @@ export default function SchedulePage() {
 
       setIsModalOpen(false)
       setEditingAppointment(null)
-    } catch (e: any) {
-      setError(e?.message || 'Erro ao salvar agendamento.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || 'Erro ao salvar agendamento.')
     } finally {
       setSaving(false)
     }
@@ -340,8 +341,8 @@ export default function SchedulePage() {
       if (deleteError) throw deleteError
       const targetDate = selectedDate || toDateInputValue(new Date())
       await loadAppointmentsForDate(targetDate)
-    } catch (e: any) {
-      setError(e?.message || 'Erro ao excluir agendamento.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || 'Erro ao excluir agendamento.')
     } finally {
       setSaving(false)
     }

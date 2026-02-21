@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const safeString = (v: any) => String(v ?? '').trim()
 
@@ -18,7 +19,7 @@ const buildExercisesPayload = (workout: any) => {
   const w = workout && typeof workout === 'object' ? workout : {}
   const exercises = Array.isArray(w.exercises) ? w.exercises : []
   return exercises
-    .filter((ex: any) => ex && typeof ex === 'object')
+    .filter((ex: Record<string, unknown>) => ex && typeof ex === 'object')
     .map((ex: any, idx: number) => {
       const setDetails =
         Array.isArray(ex.setDetails) ? ex.setDetails : Array.isArray(ex.set_details) ? ex.set_details : Array.isArray(ex.sets) ? ex.sets : null
@@ -79,7 +80,7 @@ export async function PATCH(request: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     return NextResponse.json({ ok: true, id: savedId || workoutId })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

@@ -8,6 +8,7 @@ import StoryViewer from '@/components/stories/StoryViewer'
 import StoryCreatorModal from '@/components/stories/StoryCreatorModal'
 import { Story, StoryGroup } from '@/types/social'
 import { parseExt, guessMediaKind, extFromMime } from '@/utils/mediaUtils'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const initials = (name: string) => {
   const n = String(name || '').trim()
@@ -30,12 +31,12 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     setError('')
     try {
       const res = await fetch('/api/social/stories/list', { method: 'GET' })
-      const json = await res.json().catch((): any => null)
+      const json = await res.json().catch((): null => null)
       if (!res.ok || !json?.ok) throw new Error(String(json?.error || 'Falha ao carregar stories'))
       const arr = Array.isArray(json?.data) ? (json.data as StoryGroup[]) : []
       setGroups(arr)
-    } catch (e: any) {
-      setError(String(e?.message || e))
+    } catch (e: unknown) {
+      setError(String(getErrorMessage(e) || e))
       setGroups([])
     } finally {
       setLoading(false)
@@ -68,7 +69,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ path }),
       })
-      const signJson = await signResp.json().catch((): any => null)
+      const signJson = await signResp.json().catch((): null => null)
       if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
 
       if (typeof signJson?.bucketLimitBytes === 'number' && Number.isFinite(signJson.bucketLimitBytes) && file.size > signJson.bucketLimitBytes) {
@@ -94,12 +95,12 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
           } 
         }),
       })
-      const createJson = await createResp.json().catch((): any => null)
+      const createJson = await createResp.json().catch((): null => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
 
       await reload()
-    } catch (e: any) {
-      const msg = String(e?.message || e)
+    } catch (e: unknown) {
+      const msg = String(getErrorMessage(e) || e)
       console.error('Story upload error:', e)
       const low = msg.toLowerCase()
       if (low.includes('exceeded') && low.includes('maximum') && low.includes('size')) {

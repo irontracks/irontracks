@@ -63,17 +63,17 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                             }
                         }
                         if (items && !cancelled) {
-                            const normalized = (Array.isArray(items) ? items : []).map((item: any) => {
+                            const normalized = (Array.isArray(items) ? items : []).map((item: Record<string, unknown>) => {
                                 const safe = item || {};
                                 const rawId = safe.id ?? safe.uid ?? safe.user_id ?? '';
                                 const id = rawId ? String(rawId) : '';
                                 return {
                                     id,
-                                    displayName: safe.displayName || safe.name || safe.email || 'Atleta',
-                                    photoURL: safe.photoURL || safe.photoUrl || null,
-                                    lastSeen: safe.lastSeen || null,
+                                    displayName: String(safe.displayName || safe.name || safe.email || 'Atleta'),
+                                    photoURL: safe.photoURL != null ? (String(safe.photoURL) || null) : (safe.photoUrl != null ? (String(safe.photoUrl) || null) : null),
+                                    lastSeen: safe.lastSeen != null ? (safe.lastSeen as string | number) : null,
                                 };
-                            }).filter((u: any) => u && typeof u.id === 'string' && u.id.length > 0);
+                            }).filter((u: Record<string, unknown>) => u && typeof u.id === 'string' && u.id.length > 0);
 
                             setUsers(normalized);
                         }
@@ -97,17 +97,17 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                 }
 
                 const list = Array.isArray(json.items) ? json.items : [];
-                const normalized = list.map((item: any) => {
+                const normalized = list.map((item: Record<string, unknown>) => {
                     const safe = item || {};
                     const rawId = safe.id ?? safe.uid ?? safe.user_id ?? '';
                     const id = rawId ? String(rawId) : '';
                     return {
                         id,
-                        displayName: safe.displayName || safe.name || safe.email || 'Atleta',
-                        photoURL: safe.photoURL || safe.photoUrl || null,
-                        lastSeen: safe.lastSeen || null,
+                        displayName: String(safe.displayName || safe.name || safe.email || 'Atleta'),
+                        photoURL: safe.photoURL != null ? (String(safe.photoURL) || null) : (safe.photoUrl != null ? (String(safe.photoUrl) || null) : null),
+                        lastSeen: safe.lastSeen != null ? (safe.lastSeen as string | number) : null,
                     };
-                }).filter((u: any) => u && typeof u.id === 'string' && u.id.length > 0);
+                }).filter((u: Record<string, unknown>) => u && typeof u.id === 'string' && u.id.length > 0);
 
                 setUsers(normalized);
 
@@ -155,17 +155,17 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                 }
 
                 const list = Array.isArray(json.items) ? json.items : [];
-                const normalized = list.map((item: any) => {
+                const normalized = list.map((item: Record<string, unknown>) => {
                     const safe = item || {};
                     const rawId = safe.id ?? safe.uid ?? safe.user_id ?? '';
                     const id = rawId ? String(rawId) : '';
                     return {
                         id,
-                        displayName: safe.displayName || safe.name || safe.email || 'Atleta',
-                        photoURL: safe.photoURL || safe.photoUrl || null,
-                        lastSeen: safe.lastSeen || null,
+                        displayName: String(safe.displayName || safe.name || safe.email || 'Atleta'),
+                        photoURL: safe.photoURL != null ? (String(safe.photoURL) || null) : (safe.photoUrl != null ? (String(safe.photoUrl) || null) : null),
+                        lastSeen: safe.lastSeen != null ? (safe.lastSeen as string | number) : null,
                     };
-                }).filter((u: any) => u && typeof u.id === 'string' && u.id.length > 0);
+                }).filter((u: Record<string, unknown>) => u && typeof u.id === 'string' && u.id.length > 0);
 
                 setUsers(normalized);
 

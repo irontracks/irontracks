@@ -5,6 +5,7 @@ import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 import { CalendarDays, Crown, RefreshCw, Sparkles, TrendingUp } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -112,7 +113,7 @@ export default function VipPeriodizationPanel({
     setError('')
     try {
       const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch((): any => null)) as ActiveProgramResponse | null
+      const json = (await res.json().catch((): null => null)) as ActiveProgramResponse | null
       if (!json?.ok) {
         setProgram(null)
         setSchedule([])
@@ -121,8 +122,8 @@ export default function VipPeriodizationPanel({
       }
       setProgram(json.program || null)
       setSchedule(Array.isArray(json.workouts) ? json.workouts : [])
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao carregar periodização.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar periodização.')
     } finally {
       setLoading(false)
     }
@@ -132,7 +133,7 @@ export default function VipPeriodizationPanel({
     if (isLocked) return
     try {
       const res = await fetch('/api/vip/periodization/stats', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch((): any => null)) as StatsResponse | null
+      const json = (await res.json().catch((): null => null)) as StatsResponse | null
       if (!json?.ok) return
       setStats(Array.isArray(json.weekly) ? json.weekly : [])
     } catch {}
@@ -178,7 +179,7 @@ export default function VipPeriodizationPanel({
         credentials: 'include',
         body: JSON.stringify(payload),
       })
-      const json = await res.json().catch((): any => null)
+      const json = await res.json().catch((): null => null)
       if (!json?.ok) {
         setError(friendlyCreateError(json?.error))
         return
@@ -187,8 +188,8 @@ export default function VipPeriodizationPanel({
       await loadStats()
       setCreateOpen(false)
       setSuccess('Programa criado! Os treinos já estão em Treinos Periodizados.')
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao criar periodização.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao criar periodização.')
     } finally {
       setLoading(false)
     }
@@ -202,15 +203,15 @@ export default function VipPeriodizationPanel({
     setSuccess('')
     try {
       const res = await fetch('/api/vip/periodization/cleanup', { method: 'POST', credentials: 'include', cache: 'no-store' })
-      const json = await res.json().catch((): any => null)
+      const json = await res.json().catch((): null => null)
       if (!json?.ok) {
         setError(friendlyCreateError(json?.error))
         return
       }
       const n = Number(json?.archived || 0)
       setSuccess(n > 0 ? `Treinos antigos arquivados: ${n}.` : 'Nenhum treino antigo para arquivar.')
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao limpar treinos antigos.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao limpar treinos antigos.')
     } finally {
       setCleaning(false)
     }

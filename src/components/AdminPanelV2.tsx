@@ -43,6 +43,7 @@ import HistoryList from '@/components/HistoryList';
 import { normalizeWorkoutTitle, workoutTitleKey } from '@/utils/workoutTitle';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
+import type { Exercise } from '@/types/app';
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
 const COACH_INBOX_DEFAULTS = {
@@ -508,14 +509,14 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         setExportOpen(false);
     };
 
-    const openEditWorkout = (e: React.MouseEvent, w: any) => {
+    const openEditWorkout = (e: React.MouseEvent, w: Record<string, unknown>) => {
         try {
             e?.stopPropagation?.();
         } catch { }
         setEditingStudentWorkout({
             id: w.id,
             title: w.name || w.title,
-            exercises: (Array.isArray(w.exercises) ? w.exercises : []).map((ex: any) => ({
+            exercises: (Array.isArray(w.exercises) ? w.exercises : []).map((ex: Record<string, unknown>) => ({
                 name: ex.name || '',
                 sets: getSetsCount(ex?.sets) || 4,
                 reps: ex.reps ?? '10',
@@ -923,7 +924,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     const resLegacy = await fetch('/api/workouts/list');
                     const jsonLegacy = await resLegacy.json();
                     if (jsonLegacy.ok) {
-                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as any[] }));
+                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as Exercise[] }));
                         list = [...list, ...legacy];
                     }
                 } catch { }
@@ -1169,7 +1170,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             setPrioritiesLoading(true);
             setPrioritiesError('');
             const res = await fetch('/api/teacher/inbox/feed?limit=80', { cache: 'no-store', credentials: 'include' });
-            const json = await res.json().catch((): any => null);
+            const json = await res.json().catch((): null => null);
             if (!res.ok || !json?.ok) {
                 setPrioritiesItems([]);
                 setPrioritiesError(String(json?.error || `Falha ao carregar (${res.status})`));
@@ -1402,7 +1403,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         for (const r of (jsonLegacy.rows || [])) {
                             const key = workoutTitleKey(r.name);
                             const prev = tMap.get(key);
-                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as any[] };
+                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as Exercise[] };
                             const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                             if (!prev || prevExs.length < 1) tMap.set(key, candidate);
                         }
@@ -1445,7 +1446,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             setExecutionVideosError('');
             try {
                 const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(studentUserId)}`, { cache: 'no-store', credentials: 'include' });
-                const json = await res.json().catch((): any => null);
+                const json = await res.json().catch((): null => null);
                 if (cancelled) return;
                 if (!res.ok || !json?.ok) {
                     setExecutionVideos([]);
@@ -1692,7 +1693,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             qs.set('limit', '200');
             const authHeaders = await getAdminAuthHeaders();
             const res = await fetch(`/api/admin/user-activity/users?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): any => null);
+            const json = await res.json().catch((): null => null);
             if (!res.ok || !json?.ok) {
                 setUserActivityUsers([]);
                 setUserActivityError(String(json?.error || `Falha ao carregar usuários (${res.status})`));
@@ -1718,7 +1719,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             const qs = new URLSearchParams({ user_id: uid, days: String(d) });
             const authHeaders = await getAdminAuthHeaders();
             const res = await fetch(`/api/admin/user-activity/summary?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): any => null);
+            const json = await res.json().catch((): null => null);
             if (!res.ok || !json?.ok) {
                 setUserActivitySummary(null);
                 return;
@@ -1741,7 +1742,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             if (before) qs.set('before', String(before));
             const authHeaders = await getAdminAuthHeaders();
             const res = await fetch(`/api/admin/user-activity/events?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): any => null);
+            const json = await res.json().catch((): null => null);
             if (!res.ok || !json?.ok) {
                 if (reset) setUserActivityEvents([]);
                 return;
@@ -2557,7 +2558,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                                                 headers: { 'content-type': 'application/json' },
                                                                                 body: JSON.stringify({ student_user_id: studentId, kind, action: 'snooze', snooze_minutes: minutes }),
                                                                             });
-                                                                            const json = await res.json().catch((): any => null);
+                                                                            const json = await res.json().catch((): null => null);
                                                                             if (!res.ok || !json?.ok) {
                                                                                 await alert(String(json?.error || `Falha ao sonecar (${res.status})`));
                                                                                 return;
@@ -2584,7 +2585,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                                                 headers: { 'content-type': 'application/json' },
                                                                                 body: JSON.stringify({ student_user_id: studentId, kind, action: 'done' }),
                                                                             });
-                                                                            const json = await res.json().catch((): any => null);
+                                                                            const json = await res.json().catch((): null => null);
                                                                             if (!res.ok || !json?.ok) {
                                                                                 await alert(String(json?.error || `Falha ao concluir (${res.status})`));
                                                                                 return;
@@ -3793,7 +3794,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                         headers: { 'content-type': 'application/json', ...authHeaders },
                                                         body: JSON.stringify({ limit: 30 }),
                                                     });
-                                                    const json = await res.json().catch((): any => null);
+                                                    const json = await res.json().catch((): null => null);
                                                     if (!res.ok || !json?.ok) {
                                                         const msg = String(json?.error || `Falha ao processar (${res.status})`);
                                                         setExerciseAliasesNotice(msg);
@@ -4975,7 +4976,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                             setExecutionVideosLoading(true);
                                                             setExecutionVideosError('');
                                                             const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(String(selectedStudent.user_id))}`, { cache: 'no-store', credentials: 'include' });
-                                                            const json = await res.json().catch((): any => null);
+                                                            const json = await res.json().catch((): null => null);
                                                             if (!res.ok || !json?.ok) {
                                                                 setExecutionVideos([]);
                                                                 setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
@@ -5054,7 +5055,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                                                             headers: { 'content-type': 'application/json' },
                                                                                             body: JSON.stringify({ submission_id: id }),
                                                                                         });
-                                                                                        const json = await res.json().catch((): any => null);
+                                                                                        const json = await res.json().catch((): null => null);
                                                                                         if (!res.ok || !json?.ok || !json?.url) {
                                                                                             await alert(String(json?.error || `Falha ao abrir (${res.status})`));
                                                                                             return;
@@ -5082,7 +5083,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                                                             headers: { 'content-type': 'application/json' },
                                                                                             body: JSON.stringify({ submission_id: id, status: 'approved', feedback, send_message: true }),
                                                                                         });
-                                                                                        const json = await res.json().catch((): any => null);
+                                                                                        const json = await res.json().catch((): null => null);
                                                                                         if (!res.ok || !json?.ok) {
                                                                                             await alert(String(json?.error || `Falha ao aprovar (${res.status})`));
                                                                                             return;
@@ -5108,7 +5109,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                                                             headers: { 'content-type': 'application/json' },
                                                                                             body: JSON.stringify({ submission_id: id, status: 'rejected', feedback, send_message: true }),
                                                                                         });
-                                                                                        const json = await res.json().catch((): any => null);
+                                                                                        const json = await res.json().catch((): null => null);
                                                                                         if (!res.ok || !json?.ok) {
                                                                                             await alert(String(json?.error || `Falha ao reprovar (${res.status})`));
                                                                                             return;
@@ -5453,7 +5454,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                         headers: { 'content-type': 'application/json' },
                                                         body: JSON.stringify({ student_user_id: studentId, content }),
                                                     });
-                                                    const json = await res.json().catch((): any => null);
+                                                    const json = await res.json().catch((): null => null);
                                                     if (!res.ok || !json?.ok) {
                                                         await alert(String(json?.error || `Falha ao enviar (${res.status})`));
                                                         return;

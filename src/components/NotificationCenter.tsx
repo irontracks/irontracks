@@ -6,6 +6,7 @@ import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 interface NotificationItem {
     id: string;
@@ -216,7 +217,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
             if (invite.workout && typeof onStartSession === 'function') onStartSession(invite.workout);
         } catch (e) {
             // @ts-ignore
-            const msg = e?.message ?? String(e);
+            const msg = getErrorMessage(e) ?? String(e);
             // @ts-ignore
             await confirm("Erro ao aceitar: " + msg); // Using confirm as alert is not available in props but used in original code from DialogContext? Actually useDialog has alert. 
             // The original code used `await alert(...)` but destructured `alert` from `useDialog`.

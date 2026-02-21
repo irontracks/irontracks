@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,13 +42,13 @@ export async function GET() {
 
     if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 400 })
 
-    const workoutIds = (Array.isArray(workouts) ? workouts : []).map((w: any) => String(w?.workout_id || '').trim()).filter(Boolean)
+    const workoutIds = (Array.isArray(workouts) ? workouts : []).map((w: Record<string, unknown>) => String(w?.workout_id || '').trim()).filter(Boolean)
     const { data: workoutRows } = workoutIds.length
       ? await admin.from('workouts').select('id, name').in('id', workoutIds).limit(workoutIds.length)
       : ({ data: [] } as any)
 
     const nameById = new Map<string, string>()
-    ;(Array.isArray(workoutRows) ? workoutRows : []).forEach((r: any) => {
+    ;(Array.isArray(workoutRows) ? workoutRows : []).forEach((r: Record<string, unknown>) => {
       const id = String(r?.id || '').trim()
       const name = String(r?.name || '').trim()
       if (id && name) nameById.set(id, name)
@@ -60,21 +61,21 @@ export async function GET() {
         .select('workout_id')
         .in('workout_id', workoutIds)
         .limit(5000)
-      ;(Array.isArray(exerciseRows) ? exerciseRows : []).forEach((r: any) => {
+      ;(Array.isArray(exerciseRows) ? exerciseRows : []).forEach((r: Record<string, unknown>) => {
         const wid = String(r?.workout_id || '').trim()
         if (!wid) return
         exerciseCountByWorkoutId.set(wid, (exerciseCountByWorkoutId.get(wid) || 0) + 1)
       })
     }
 
-    const enriched = (Array.isArray(workouts) ? workouts : []).map((w: any) => ({
+    const enriched = (Array.isArray(workouts) ? workouts : []).map((w: Record<string, unknown>) => ({
       ...w,
       workout_name: nameById.get(String(w?.workout_id || '').trim()) || null,
       exercise_count: exerciseCountByWorkoutId.get(String(w?.workout_id || '').trim()) || 0,
     }))
 
     return NextResponse.json({ ok: true, program, workouts: enriched })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

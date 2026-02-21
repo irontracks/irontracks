@@ -51,13 +51,14 @@ const inferRange = (stats: any) => {
   try {
     const list = Array.isArray(stats?.sessionSummaries) ? stats.sessionSummaries : []
     const ms = list
-      .map((s: any) => {
+      .map((s: Record<string, unknown>) => {
         const d = s?.date
-        const t = d?.toDate ? d.toDate() : new Date(d)
+        const dRec = d !== null && typeof d === 'object' ? (d as Record<string, unknown>) : null
+        const t = dRec && typeof dRec.toDate === 'function' ? (dRec.toDate as () => Date)() : new Date(d as string | number)
         const value = t instanceof Date ? t.getTime() : NaN
         return Number.isFinite(value) ? value : null
       })
-      .filter((x: any) => x != null)
+      .filter((x: Record<string, unknown>) => x != null)
     const days = safeNumber(stats?.days, 0)
     const now = Date.now()
     if (!ms.length) {
@@ -158,7 +159,7 @@ export function buildPeriodReportHtml(input: unknown) {
         const tb = new Date(b?.date || 0).getTime()
         return tb - ta
       })
-      .map((s: any) => {
+      .map((s: Record<string, unknown>) => {
         const date = escapeHtml(formatDate(s?.date) || '')
         const minutes = toLocaleInt(s?.minutes)
         const vol = toLocaleInt(s?.volumeKg)
