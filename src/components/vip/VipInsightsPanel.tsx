@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Sparkles, FileText, RefreshCw, ArrowRight } from 'lucide-react'
 import { generatePostWorkoutInsights } from '@/actions/workout-actions'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type Row = {
   id: string
@@ -51,7 +52,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
     setUpgradeCta(false)
     try {
       const res = await fetch('/api/workouts/history?limit=30', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = await res.json().catch((): any => null)
+      const json = await res.json().catch((): null => null)
       if (!json?.ok) {
         setRows([])
         setError(String(json?.error || 'Falha ao carregar histórico.'))
@@ -59,7 +60,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
       }
       const list = Array.isArray(json?.rows) ? json.rows : []
       const mapped = list
-        .map((r: any) => ({
+        .map((r: Record<string, unknown>) => ({
           id: String(r?.id || '').trim(),
           name: r?.name != null ? String(r.name) : null,
           date: r?.date != null ? String(r.date) : null,
@@ -68,9 +69,9 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
         }))
         .filter((r: Row) => Boolean(r.id))
       setRows(mapped)
-    } catch (e: any) {
+    } catch (e: unknown) {
       setRows([])
-      setError(e?.message ? String(e.message) : 'Falha ao carregar histórico.')
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar histórico.')
     } finally {
       inFlightRef.current = false
       setLoading(false)
@@ -85,7 +86,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
     const list = Array.isArray(rows) ? rows : []
     return list.slice(0, 8).map((r) => {
       const session = safeJsonParse(r.notes)
-      const hasAi = !!(session && typeof session === 'object' && (session as any)?.ai && typeof (session as any).ai === 'object')
+      const hasAi = !!(session && typeof session === 'object' && (session as Record<string, unknown>)?.ai && typeof (session as any).ai === 'object')
       const dateIso = String(r.date || r.created_at || '').slice(0, 10)
       return {
         ...r,
@@ -117,9 +118,9 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
     try {
       const res = await generatePostWorkoutInsights({ workoutId: id })
       if (!res?.ok) {
-        const needsUpgrade = !!(res as any)?.upgradeRequired || String((res as any)?.error || '').toLowerCase().includes('vip_required')
+        const needsUpgrade = !!(res as Record<string, unknown>)?.upgradeRequired || String((res as Record<string, unknown>)?.error || '').toLowerCase().includes('vip_required')
         setUpgradeCta(needsUpgrade)
-        const msg = needsUpgrade ? 'Disponível para assinantes VIP.' : String((res as any)?.error || 'Falha ao gerar insights.')
+        const msg = needsUpgrade ? 'Disponível para assinantes VIP.' : String((res as Record<string, unknown>)?.error || 'Falha ao gerar insights.')
         setError(msg)
         return
       }

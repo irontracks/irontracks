@@ -7,6 +7,7 @@ import { createClient } from '@/utils/supabase/client'
 import { ArrowLeft, Check, Copy, CreditCard, ExternalLink, QrCode, X, Zap, Crown, Star, AlertTriangle, ChevronRight, Sparkles, Calendar } from 'lucide-react'
 import { Purchases, CustomerInfo, PurchasesOfferings, PurchasesPackage } from '@revenuecat/purchases-capacitor'
 import { isIosNative as getIsIosNative } from '@/utils/platform'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type AppPlan = {
   id: string
@@ -208,9 +209,9 @@ export default function MarketplaceClient() {
           try {
             await Purchases.configure({ apiKey, appUserID: user.id })
             setIapConfigured(true)
-          } catch (e: any) {
+          } catch (e: unknown) {
             setIapConfigured(false)
-            setIapError(e?.message ? String(e.message) : 'Falha ao iniciar compra pela App Store.')
+            setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao iniciar compra pela App Store.')
           }
         } else {
           setIapConfigured(false)
@@ -273,8 +274,8 @@ export default function MarketplaceClient() {
       setIapOfferings(offerings)
       const { customerInfo } = await Purchases.getCustomerInfo()
       setIapCustomerInfo(customerInfo || null)
-    } catch (e: any) {
-      setIapError(e?.message ? String(e.message) : 'Falha ao carregar opções da App Store.')
+    } catch (e: unknown) {
+      setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar opções da App Store.')
     } finally {
       setIapLoading(false)
     }
@@ -305,8 +306,8 @@ export default function MarketplaceClient() {
         throw new Error(String(json?.error || 'Falha ao validar assinatura.'))
       }
       return true
-    } catch (e: any) {
-      setIapError(e?.message ? String(e.message) : 'Falha ao validar assinatura.')
+    } catch (e: unknown) {
+      setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao validar assinatura.')
       return false
     }
   }, [])
@@ -329,9 +330,10 @@ export default function MarketplaceClient() {
         window.alert('Assinatura ativada com sucesso.')
         closeCheckout()
       }
-    } catch (e: any) {
-      const msg = e?.message ? String(e.message) : String(e || '')
-      if (String(e?.userCancelled || '').toLowerCase() === 'true' || msg.toLowerCase().includes('cancel')) {
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e) ? String(getErrorMessage(e)) : String(e || '')
+      const eRec = e !== null && typeof e === 'object' ? (e as Record<string, unknown>) : {}
+      if (String(eRec.userCancelled || '').toLowerCase() === 'true' || msg.toLowerCase().includes('cancel')) {
         setIapError('Compra cancelada.')
       } else {
         setIapError(msg || 'Falha ao concluir compra.')
@@ -352,8 +354,8 @@ export default function MarketplaceClient() {
       setIapCustomerInfo(customerInfo || null)
       const ok = await syncIapToBackend()
       if (ok) window.alert('Compras restauradas.')
-    } catch (e: any) {
-      setIapError(e?.message ? String(e.message) : 'Falha ao restaurar compras.')
+    } catch (e: unknown) {
+      setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao restaurar compras.')
     } finally {
       setIapLoading(false)
     }
@@ -378,8 +380,8 @@ export default function MarketplaceClient() {
       })
       const json = (await res.json().catch(() => ({}))) as CheckoutResponse
       setCheckoutResult(json)
-    } catch (e: any) {
-      setCheckoutResult({ ok: false, error: e?.message || String(e) })
+    } catch (e: unknown) {
+      setCheckoutResult({ ok: false, error: getErrorMessage(e) || String(e) })
     } finally {
       setCheckingOut(false)
     }
@@ -407,8 +409,8 @@ export default function MarketplaceClient() {
         return
       }
       window.location.href = redirectUrl
-    } catch (e: any) {
-      setCheckoutResult({ ok: false, error: e?.message || String(e) })
+    } catch (e: unknown) {
+      setCheckoutResult({ ok: false, error: getErrorMessage(e) || String(e) })
     } finally {
       setCardRedirecting(false)
     }
@@ -429,8 +431,8 @@ export default function MarketplaceClient() {
       }
       setCheckoutResult(null)
       window.alert('Tentativa cancelada. Você pode tentar novamente.')
-    } catch (e: any) {
-      setCheckoutResult({ ok: false, error: e?.message || String(e) })
+    } catch (e: unknown) {
+      setCheckoutResult({ ok: false, error: getErrorMessage(e) || String(e) })
     }
   }, [selectedPlan])
 

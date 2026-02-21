@@ -7,6 +7,7 @@ import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 // --- Types ---
 
@@ -1104,10 +1105,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         downloadBlob(result.blob, result.filename)
         setInfo('Baixado com sucesso!')
       }
-    } catch (e: any) {
-      const name = String(e?.name || '').trim()
+    } catch (e: unknown) {
+      const name = String(e instanceof Error ? e.name : (e !== null && typeof e === 'object' ? (e as Record<string, unknown>).name : '')).trim()
       if (name === 'AbortError') return
-      const msg = String(e?.message || '').trim()
+      const msg = String(getErrorMessage(e) || '').trim()
       setError(msg || 'Não foi possível compartilhar.')
     } finally {
       setBusy(false)
@@ -1150,7 +1151,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ path }),
         })
-        const signJson = await signResp.json().catch((): any => null)
+        const signJson = await signResp.json().catch((): null => null)
         if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
         const { error: upErr } = await supabase.storage
           .from('social-stories')
@@ -1176,7 +1177,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ path }),
           })
-          const signJson = await signResp.json().catch((): any => null)
+          const signJson = await signResp.json().catch((): null => null)
           if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
           const { error: upErr } = await supabase.storage
             .from('social-stories')
@@ -1198,7 +1199,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ mediaPath: path, caption: String(metrics?.title || ''), meta }),
       })
-      const createJson = await createResp.json().catch((): any => null)
+      const createJson = await createResp.json().catch((): null => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
       
       setInfo('Publicado no IronTracks!')
@@ -1210,9 +1211,9 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         window.setTimeout(() => onClose?.(), 1000)
       } catch {}
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err)
-      const msg = String(err?.message || '').trim()
+      const msg = String(getErrorMessage(err) || '').trim()
       setError(msg || 'Falha ao publicar story.')
     } finally {
       setBusy(false)

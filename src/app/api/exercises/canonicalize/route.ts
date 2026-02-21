@@ -6,6 +6,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -169,7 +170,7 @@ export async function POST(req: Request) {
         .eq('user_id', userId)
         .in('id', canonicalIds)
         .limit(canonicalIds.length)
-      ;(Array.isArray(data) ? data : []).forEach((row: any) => {
+      ;(Array.isArray(data) ? data : []).forEach((row: Record<string, unknown>) => {
         const id = String(row?.id || '').trim()
         if (!id) return
         canonicalsById.set(id, {
@@ -195,11 +196,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, map }, { headers: { 'cache-control': 'no-store, max-age=0' } })
     }
 
-    const canonicals = (Array.isArray(canonicalTop) ? canonicalTop : []).map((row: any) => ({
+    const canonicals = (Array.isArray(canonicalTop) ? canonicalTop : []).map((row: Record<string, unknown>) => ({
       id: String(row?.id || '').trim(),
       display_name: String(row?.display_name || '').trim(),
       normalized_name: String(row?.normalized_name || '').trim(),
-    })).filter((r: any) => r.id && r.normalized_name)
+    })).filter((r: Record<string, unknown>) => r.id && r.normalized_name)
 
     const map: Record<string, string> = {}
     normalizedList.forEach((n) => {
@@ -235,7 +236,7 @@ export async function POST(req: Request) {
           return { alias: rawAlias, normalized: n, candidates: topCandidates }
         })
         const items = await resolveWithGemini(payload)
-        geminiResolved = (Array.isArray(items) ? items : []).map((it: any) => ({
+        geminiResolved = (Array.isArray(items) ? items : []).map((it: Record<string, unknown>) => ({
           normalized: String(it?.normalized || '').trim(),
           canonical: String(it?.canonical || '').trim(),
           confidence: Number(it?.confidence),
@@ -323,7 +324,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, map }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

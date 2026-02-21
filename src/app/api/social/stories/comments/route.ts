@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     const comments = Array.isArray(commentsRaw) ? commentsRaw : []
-    const userIds = Array.from(new Set(comments.map((c: any) => String(c?.user_id || '').trim()).filter(Boolean)))
+    const userIds = Array.from(new Set(comments.map((c: Record<string, unknown>) => String(c?.user_id || '').trim()).filter(Boolean)))
     const { data: profilesRaw } = userIds.length
       ? await admin.from('profiles').select('id, display_name, photo_url').in('id', userIds)
       : { data: [] as any[] }
@@ -48,7 +49,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      data: comments.map((c: any) => {
+      data: comments.map((c: Record<string, unknown>) => {
         const uid = String(c?.user_id || '').trim()
         const p = uid ? profileById.get(uid) : null
         return {
@@ -63,8 +64,8 @@ export async function GET(req: Request) {
         }
       }),
     })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }
 
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, data })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

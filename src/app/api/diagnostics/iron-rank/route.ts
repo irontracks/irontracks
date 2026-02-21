@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const safeJson = (v: any) => {
   try {
@@ -64,7 +65,7 @@ export async function GET() {
 
     const recent = Array.isArray(recentWorkoutsRes.data) ? recentWorkoutsRes.data : []
     const parsedRecent = recent
-      .map((w: any) => {
+      .map((w: Record<string, unknown>) => {
         const notes = parseJson(w?.notes)
         const logs = extractLogs(notes)
         const logsObj = logs && typeof logs === 'object' ? logs : null
@@ -111,9 +112,9 @@ export async function GET() {
         rpc_error_raw: rpcRes.error ? safeJson(rpcRes.error) : null,
       },
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     return NextResponse.json(
-      { ok: false, error: e?.message ? String(e.message) : String(e), where: 'api/diagnostics/iron-rank' },
+      { ok: false, error: getErrorMessage(e) ? String(getErrorMessage(e)) : String(e), where: 'api/diagnostics/iron-rank' },
       { status: 500 }
     )
   }

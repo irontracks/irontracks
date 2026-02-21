@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useDialog } from '@/contexts/DialogContext'
 import { Story, StoryGroup } from '@/types/social'
 import { mediaKindFromUrl } from '@/utils/mediaUtils'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const MAX_VIDEO_SECONDS = 60
 const PHOTO_SECONDS = 15
@@ -360,8 +361,8 @@ export default function StoryViewer({
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setComments(json.data || [])
-    } catch (e: any) {
-      setCommentsError(e.message)
+    } catch (e: unknown) {
+      setCommentsError(getErrorMessage(e))
     } finally {
       setCommentsLoading(false)
     }
@@ -376,8 +377,8 @@ export default function StoryViewer({
       if (!res.ok) throw new Error(json.error)
       setViewers(json.data || [])
       viewersStoryIdRef.current = storyId
-    } catch (e: any) {
-      setViewersError(e.message)
+    } catch (e: unknown) {
+      setViewersError(getErrorMessage(e))
     } finally {
       setViewersLoading(false)
     }
