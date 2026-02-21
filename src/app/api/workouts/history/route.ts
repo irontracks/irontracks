@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
 import { createClient } from '@/utils/supabase/server'
 import { getVipPlanLimits } from '@/utils/vip/limits'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,8 +46,7 @@ export async function GET(req: Request) {
       history_days: historyDays,
       rows: data || [],
     })
-  } catch (e: any) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

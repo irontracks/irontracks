@@ -76,7 +76,7 @@ export interface MealLog {
   fat: number
 }
 
-export async function trackMeal(userId: string, meal: MealLog, dateKey?: string): Promise<any> {
+export async function trackMeal(userId: string, meal: MealLog, dateKey?: string): Promise<Record<string, unknown> | null> {
   try {
     const safeUserId = typeof userId === 'string' ? userId.trim() : ''
     if (!safeUserId) throw new Error('nutrition_invalid_user_id')
@@ -114,7 +114,7 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
 
     if (error) throw new Error(error.message || 'nutrition_log_upsert_failed')
     const row = Array.isArray(data) ? data[0] : null
-    return row || null
+    return row && typeof row === 'object' ? (row as Record<string, unknown>) : null
   } catch (e: unknown) {
     throw new Error(getErrorMessage(e) || 'nutrition_track_meal_failed')
   }

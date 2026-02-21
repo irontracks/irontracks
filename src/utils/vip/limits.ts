@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { SupabaseClient } from '@supabase/supabase-js'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 export type VipTierLimits = {
   chat_daily: number
@@ -24,7 +25,7 @@ export type VipPlanResult = {
   tier: string
   limits: VipTierLimits
   source: VipEntitlementSource
-  debug?: Record<string, any>
+  debug?: Record<string, unknown>
 }
 
 export const FREE_LIMITS: VipTierLimits = {
@@ -103,7 +104,7 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
           debug: { entitlement_id: ent.id || null, entitlement_status: ent.status || null },
         }
       }
-      console.warn('vip_entitlement_missing_plan', {
+      logWarn('vip', 'vip_entitlement_missing_plan', {
         source: 'entitlement_table',
         entitlement_id: ent.id || null,
         plan_id: ent.plan_id,
@@ -140,7 +141,7 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
         debug: { app_subscription_id: appSub.id || null, app_subscription_status: appSub.status || null },
       }
     }
-    console.warn('vip_entitlement_missing_plan', {
+    logWarn('vip', 'vip_entitlement_missing_plan', {
       source: 'app_subscription',
       app_subscription_id: appSub.id || null,
       plan_id: appSub.plan_id,
@@ -265,5 +266,5 @@ export async function incrementVipUsage(
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id, feature_key, day' })
     
-  if (error) console.error('Error incrementing VIP usage:', error)
+  if (error) logError('error', 'Error incrementing VIP usage:', error)
 }

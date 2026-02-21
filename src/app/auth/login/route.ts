@@ -61,7 +61,7 @@ export async function GET(request: Request) {
   const baseCookieOptions = getSupabaseCookieOptions()
   const nextCookieExpires = new Date(Date.now() + nextCookieMaxAgeSeconds * 1000)
 
-  let cookiesToApply: Array<{ name: string; value: string; options?: any }> = []; const cookieStore = await cookies()
+  let cookiesToApply: Array<{ name: string; value: string; options?: Record<string, unknown> }> = []; const cookieStore = await cookies()
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, { cookieOptions: getSupabaseCookieOptions(), cookies: { getAll() { return cookieStore.getAll() }, setAll(cookiesToSet) { cookiesToApply = cookiesToSet.map((c) => ({ name: c.name, value: c.value, options: c.options ? { ...c.options } : undefined })) } } })
 

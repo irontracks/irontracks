@@ -612,9 +612,9 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
 
 export async function generatePeriodReportInsights(input: unknown) {
   try {
-    const body = input && typeof input === 'object' ? (input as Record<string, any>) : {}
+    const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
     const type = safeString(body?.type)
-    const stats = body?.stats && typeof body.stats === 'object' ? body.stats : null
+    const stats: Record<string, unknown> | null = body?.stats && typeof body.stats === 'object' ? (body.stats as Record<string, unknown>) : null
     if (!type || !stats) return { ok: false, error: 'missing input' }
 
     const count = Number(stats.count) || 0
@@ -671,8 +671,8 @@ export async function generatePeriodReportInsights(input: unknown) {
 }
 
 export async function generateAssessmentPlanAi(input: unknown) {
-  const payload = input && typeof input === 'object' ? (input as Record<string, any>) : {}
-  const assessment = payload?.assessment && typeof payload.assessment === 'object' ? payload.assessment : null
+  const payload = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+  const assessment: Record<string, unknown> | null = payload?.assessment && typeof payload.assessment === 'object' ? (payload.assessment as Record<string, unknown>) : null
   if (!assessment) return { ok: false, error: 'missing assessment' }
 
   const studentName = safeString(payload?.studentName || 'Aluno')

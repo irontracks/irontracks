@@ -21,7 +21,7 @@ export const getAdminAuthHeaders = async (supabase: SupabaseClient) => {
   }
 }
 
-export const adminFetchJson = async <T extends { ok?: boolean } = any>(
+export const adminFetchJson = async <T extends { ok?: boolean } = { ok?: boolean }>(
   supabase: SupabaseClient,
   url: string,
   init?: RequestInit,

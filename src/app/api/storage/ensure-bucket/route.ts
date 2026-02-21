@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const ZodBodySchema = z
   .object({
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient()
     const parsedBody = await parseJsonBody(request, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
+    const body = (parsedBody.data ?? {}) as z.infer<typeof ZodBodySchema>
     const name = body?.name || 'chat-media'
     if (name !== 'chat-media') return NextResponse.json({ ok: false, error: 'invalid bucket' }, { status: 400 })
 
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
       }
     }
     return NextResponse.json({ ok: true, name })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

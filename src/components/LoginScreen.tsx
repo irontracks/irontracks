@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
 import { isPwaStandalone } from '@/utils/platform';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 // Capacitor imports dinâmicos — evita quebrar o build web/Vercel
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' };
 let SignInWithApple: { authorize: (opts: { clientId: string; scopes: string }) => Promise<{ response: { identityToken: string } }> } | null = null;
@@ -109,7 +110,7 @@ const LoginScreen = () => {
             const href = getOAuthHref('google');
             window.location.assign(href);
         } catch (error: unknown) {
-            console.error("Login Error:", error);
+            logError('error', "Login Error:", error);
             setIsLoading(false);
             const msg = error instanceof Error ? error.message : 'Falha ao fazer login.';
             setErrorMsg(msg);
@@ -143,7 +144,7 @@ const LoginScreen = () => {
             const href = getOAuthHref('apple');
             window.location.assign(href);
         } catch (error: unknown) {
-            console.error("Login Error:", error);
+            logError('error', "Login Error:", error);
             setIsLoading(false);
             const msg = error instanceof Error ? error.message : 'Falha ao fazer login.';
             setErrorMsg(msg);
@@ -279,7 +280,7 @@ const LoginScreen = () => {
                 try { router.refresh(); } catch {}
             }
         } catch (err: unknown) {
-            console.error("Auth Error:", err);
+            logError('error', "Auth Error:", err);
             let msg = err instanceof Error ? err.message : 'Erro na autenticação';
             if (msg.includes('Invalid login')) msg = 'E-mail ou senha incorretos.';
             if (msg.includes('User already registered')) msg = 'E-mail já cadastrado. Tente entrar ou recuperar senha.';

@@ -11,10 +11,12 @@ const escapeHtml = (v: unknown) => {
   }
 }
 
-const formatDate = (v: any) => {
+const formatDate = (v: unknown) => {
   try {
     if (!v) return ''
-    const d = v?.toDate ? v.toDate() : new Date(v)
+    const rec = v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : null
+    const toDate = rec && typeof rec.toDate === 'function' ? (rec.toDate as () => Date) : null
+    const d = toDate ? toDate() : new Date(v as string | number)
     if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   } catch {
@@ -22,10 +24,12 @@ const formatDate = (v: any) => {
   }
 }
 
-const formatDateTime = (v: any) => {
+const formatDateTime = (v: unknown) => {
   try {
     if (!v) return ''
-    const d = v?.toDate ? v.toDate() : new Date(v)
+    const rec = v !== null && typeof v === 'object' ? (v as Record<string, unknown>) : null
+    const toDate = rec && typeof rec.toDate === 'function' ? (rec.toDate as () => Date) : null
+    const d = toDate ? toDate() : new Date(v as string | number)
     if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
     return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
   } catch {
@@ -47,9 +51,10 @@ const toPeriodLabel = (type: string) => (type === 'week' ? 'Relatório semanal' 
 
 const toPeriodSubtitle = (type: string) => (type === 'week' ? 'Últimos 7 dias' : type === 'month' ? 'Últimos 30 dias' : 'Período selecionado')
 
-const inferRange = (stats: any) => {
+const inferRange = (stats: unknown) => {
   try {
-    const list = Array.isArray(stats?.sessionSummaries) ? stats.sessionSummaries : []
+    const rec = stats && typeof stats === 'object' ? (stats as Record<string, unknown>) : {}
+    const list = Array.isArray(rec?.sessionSummaries) ? rec.sessionSummaries : []
     const ms = list
       .map((s: Record<string, unknown>) => {
         const d = s?.date
@@ -58,8 +63,8 @@ const inferRange = (stats: any) => {
         const value = t instanceof Date ? t.getTime() : NaN
         return Number.isFinite(value) ? value : null
       })
-      .filter((x: Record<string, unknown>) => x != null)
-    const days = safeNumber(stats?.days, 0)
+      .filter((x): x is number => x != null)
+    const days = safeNumber(rec?.days, 0)
     const now = Date.now()
     if (!ms.length) {
       const start = days > 0 ? new Date(now - days * 24 * 60 * 60 * 1000) : new Date(now)
@@ -75,10 +80,10 @@ const inferRange = (stats: any) => {
 }
 
 export function buildPeriodReportHtml(input: unknown) {
-  const data = input && typeof input === 'object' ? (input as Record<string, any>) : {}
+  const data = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
   const type = String(data.type || '').trim()
-  const stats = data.stats && typeof data.stats === 'object' ? data.stats : {}
-  const ai = data.ai && typeof data.ai === 'object' ? data.ai : null
+  const stats: Record<string, unknown> = data.stats && typeof data.stats === 'object' ? (data.stats as Record<string, unknown>) : {}
+  const ai: Record<string, unknown> | null = data.ai && typeof data.ai === 'object' ? (data.ai as Record<string, unknown>) : null
   const rawBaseUrl = String(data.baseUrl || '').trim()
   const baseUrl = /^https?:\/\//i.test(rawBaseUrl) ? rawBaseUrl : ''
   const userName = String(data.userName || '').trim()
@@ -132,7 +137,7 @@ export function buildPeriodReportHtml(input: unknown) {
     )
   }
 
-  const topExercisesTable = (label: string, rows: any[]) => {
+  const topExercisesTable = (label: string, rows: Array<Record<string, unknown>>) => {
     const list = Array.isArray(rows) ? rows : []
     if (!list.length) return ''
     const body = list
@@ -154,9 +159,13 @@ export function buildPeriodReportHtml(input: unknown) {
     if (!sessions.length) return ''
     const body = sessions
       .slice()
-      .sort((a: any, b: any) => {
-        const ta = new Date(a?.date || 0).getTime()
-        const tb = new Date(b?.date || 0).getTime()
+      .sort((a, b) => {
+        const ar = a && typeof a === 'object' ? (a as Record<string, unknown>) : {}
+        const br = b && typeof b === 'object' ? (b as Record<string, unknown>) : {}
+        const aDate = ar?.date
+        const bDate = br?.date
+        const ta = new Date(typeof aDate === 'string' || typeof aDate === 'number' || aDate instanceof Date ? aDate : 0).getTime()
+        const tb = new Date(typeof bDate === 'string' || typeof bDate === 'number' || bDate instanceof Date ? bDate : 0).getTime()
         return tb - ta
       })
       .map((s: Record<string, unknown>) => {

@@ -11,6 +11,7 @@ import {
   classifyBodyFat
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface AssessmentPDFGeneratorProps {
   formData: AssessmentFormData;
@@ -119,7 +120,7 @@ export default function AssessmentPDFGenerator({
 
       return { success: true };
     } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
+      logError('error', 'Erro ao gerar PDF:', error);
       return { success: false, error };
     } finally {
       setIsGenerating(false);

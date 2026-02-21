@@ -583,16 +583,17 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         let mounted = true;
         let channel = null;
 
-        const showAccepted = async (inviteRow: any) => {
+        const showAccepted = async (inviteRow: unknown) => {
             try {
                 if (!mounted) return;
-                const id = inviteRow?.id ? String(inviteRow.id) : '';
+                const row = inviteRow && typeof inviteRow === 'object' ? (inviteRow as Record<string, unknown>) : {};
+                const id = row?.id ? String(row.id) : '';
                 if (!id) return;
                 if (seenAcceptedInviteIdsRef.current.has(id)) return;
                 seenAcceptedInviteIdsRef.current.add(id);
 
-                const toUid = inviteRow?.to_uid ? String(inviteRow.to_uid) : '';
-                const teamSessionId = inviteRow?.team_session_id ? String(inviteRow.team_session_id) : '';
+                const toUid = row?.to_uid ? String(row.to_uid) : '';
+                const teamSessionId = row?.team_session_id ? String(row.team_session_id) : '';
 
                 let profile = null;
                 if (toUid) {

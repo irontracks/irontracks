@@ -24,6 +24,7 @@ import { MeasurementStep } from './MeasurementStep';
 import { SkinfoldStep } from './SkinfoldStep';
 import PhotoUploadStep from './PhotoUploadStep';
 import ResultsPreview from './ResultsPreview';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface AssessmentFormProps {
   studentId: string;
@@ -113,7 +114,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
 
       return merged;
     } catch (error) {
-      console.error('Erro ao aplicar dados de avaliação importados', error);
+      logError('error', 'Erro ao aplicar dados de avaliação importados', error);
       return base;
     }
   });
@@ -130,7 +131,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         window.sessionStorage.removeItem(storageKey);
       }
     } catch (error) {
-      console.error('Erro ao limpar dados de avaliação importados', error);
+      logError('error', 'Erro ao limpar dados de avaliação importados', error);
     }
   }, [studentId]);
 
@@ -257,7 +258,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         await alert(`Erro ao salvar: ${response.error || 'Tente novamente'}`,'Erro');
       }
     } catch (error) {
-      console.error('Erro ao salvar avaliação:', error);
+      logError('error', 'Erro ao salvar avaliação:', error);
       await alert('Erro ao salvar avaliação. Verifique os dados e tente novamente.','Erro');
     }
   };

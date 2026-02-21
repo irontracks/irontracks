@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export async function GET(req: Request) {
   const hasUrl = !!process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -35,9 +36,9 @@ export async function GET(req: Request) {
       })
     }
     return NextResponse.json({ ok: true, hasUrl, hasAnon })
-  } catch (e: any) {
+  } catch (e: unknown) {
     return NextResponse.json(
-      { ok: false, hasUrl, hasAnon, error: e?.message ?? String(e) },
+      { ok: false, hasUrl, hasAnon, error: getErrorMessage(e) },
       { status: 500 }
     )
   }

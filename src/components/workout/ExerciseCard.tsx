@@ -10,6 +10,7 @@ import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }) {
   const {
@@ -140,9 +141,9 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
                   if (!win || !videoUrl) throw new Error('URL do vídeo indisponível');
                   const opened = win.open(videoUrl, '_blank', 'noopener,noreferrer');
                   if (!opened) throw new Error('Popup bloqueado ao abrir vídeo');
-                  console.debug('[ActiveWorkout] video opened', { exIdx, videoUrl });
+                  logInfo('ExerciseCard', '[ActiveWorkout] video opened', { exIdx, videoUrl });
                 } catch (err) {
-                  console.error('[ActiveWorkout] video open failed', { exIdx, videoUrl, err });
+                  logError('ExerciseCard', '[ActiveWorkout] video open failed', { exIdx, videoUrl, err });
                   try {
                     await alert('Não foi possível abrir o vídeo agora. Verifique o link e tente novamente.');
                   } catch {}

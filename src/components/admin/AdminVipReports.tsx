@@ -15,6 +15,7 @@ import {
     Legend,
     ArcElement
 } from 'chart.js';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 ChartJS.register(
     CategoryScale,
@@ -76,7 +77,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
             if (error) throw error;
             setStats(data || []);
         } catch (err) {
-            console.error(err);
+            logError('error', err);
             setError('Falha ao carregar relatórios VIP.');
         } finally {
             setLoading(false);

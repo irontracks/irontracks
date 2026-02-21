@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,8 +26,7 @@ export async function GET() {
     }
     const rows: WorkoutRow[] = (data || []) as unknown as WorkoutRow[]
     return NextResponse.json({ ok: true, rows })
-  } catch (e: any) {
-    const message = e instanceof Error ? e.message : String(e)
-    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

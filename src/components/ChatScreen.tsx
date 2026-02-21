@@ -23,6 +23,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface ChannelRow { id: string; name?: string; [key: string]: unknown }
 interface InviteRow { to_uid: string; from_uid: string; [key: string]: unknown }
@@ -95,7 +96,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             const gid = await fetchGlobalId()
             setGlobalChannel(gid ? { id: gid } : null);
         } catch (e: unknown) {
-            console.error("Error loading chat data:", e);
+            logError('error', "Error loading chat data:", e);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -136,7 +137,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         let mounted = true;
 
         loadData();
-        ensureBucket().catch(err => console.warn('Bucket ensure failed', err));
+        ensureBucket().catch(err => logWarn('warn', 'Bucket ensure failed', err));
 
         return () => { mounted = false; };
     }, [ensureBucket, loadData]);
@@ -205,7 +206,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     json = await res.json();
                 } else {
                     const txt = await res.text();
-                    console.warn("Non-JSON response from messages endpoint", { status: res.status, body: txt.slice(0,200) });
+                    logWarn('ChatScreen', 'Non-JSON response from messages endpoint', { status: res.status, body: txt.slice(0,200) });
                     return;
                 }
                 
@@ -213,10 +214,10 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     const rows = Array.isArray(json.data) ? json.data : []
                     setMessages(rows.reverse().map((row: Record<string, unknown>) => formatMessage(isRecord(row) ? row : {})));
                 } else {
-                    console.error("API returned error or no data:", json);
+                    logError('error', "API returned error or no data:", json);
                 }
             } catch (e) {
-                console.error("Error loading messages:", e);
+                logError('error', "Error loading messages:", e);
             }
         };
         loadMessages();
@@ -240,7 +241,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                         }
                         setMessages((prev) => [...prev, formatMessage({ ...newMsg, profiles: profile } as Record<string, unknown>)]);
                     } catch (e) {
-                        console.error('Erro ao processar mensagem realtime:', e);
+                        logError('error', 'Erro ao processar mensagem realtime:', e);
                         return;
                     }
                 }
@@ -325,7 +326,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                 }
             }
         } catch (err) {
-            console.error(err);
+            logError('error', err);
             const msg = (err as Record<string, unknown>)?.message
             await alertRef.current('Falha ao enviar mídia: ' + (typeof msg === 'string' ? msg : String(err)))
         }
@@ -417,7 +418,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
 
             await loadData();
         } catch (e) {
-            console.error(e);
+            logError('error', e);
         }
     };
 

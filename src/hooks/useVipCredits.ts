@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface VipCredits {
     chat?: { used: number; limit: number }
@@ -24,7 +25,7 @@ export function useVipCredits() {
                 setError(data.error || 'Erro na API');
             }
         } catch (error) {
-            console.error('Failed to fetch VIP credits', error);
+            logError('error', 'Failed to fetch VIP credits', error);
             setError((error as Error).message);
         } finally {
             setLoading(false);

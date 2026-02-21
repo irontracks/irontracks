@@ -3,6 +3,7 @@ import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } fr
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { isIosNative } from '@/utils/platform';
 import type { Exercise } from '@/types/app';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface CoachChatModalProps {
     isOpen: boolean;
@@ -141,7 +142,7 @@ export default function CoachChatModal({
                 setMessages(prev => [...prev, { role: 'assistant', content: data.content || data.text || data.answer }]);
             }
         } catch (error) {
-            console.error(error);
+            logError('error', error);
             setMessages(prev => [...prev, { role: 'assistant', content: "Desculpe, tive um problema ao processar sua mensagem. Tente novamente." }]);
         } finally {
             setIsLoading(false);

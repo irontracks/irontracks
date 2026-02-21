@@ -5,7 +5,7 @@ export type UserActivityEvent = {
   type?: string
   screen?: string
   path?: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 type QueuedEvent = {
@@ -13,7 +13,7 @@ type QueuedEvent = {
   type?: string
   screen?: string
   path?: string
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
   clientTs?: string
   appVersion?: string
 }
@@ -31,7 +31,7 @@ const now = () => Date.now()
 
 const safeObj = (v: unknown) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
-  return v as Record<string, any>
+  return v as Record<string, unknown>
 }
 
 const readStored = () => {
@@ -119,7 +119,7 @@ export function trackUserEvent(eventName: string, data?: Omit<UserActivityEvent,
   } catch {}
 }
 
-export function trackScreen(screen: string, extra?: Record<string, any>) {
+export function trackScreen(screen: string, extra?: Record<string, unknown>) {
   trackUserEvent('open_screen', { type: 'nav', screen: String(screen || '').trim(), metadata: safeObj(extra) })
 }
 
@@ -184,4 +184,3 @@ if (typeof window !== 'undefined') {
     })
   } catch {}
 }
-

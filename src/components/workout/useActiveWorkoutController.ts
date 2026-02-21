@@ -66,6 +66,7 @@ import {
   DROPSET_STAGE_LIMIT
 } from './utils';
 import { HELP_TERMS } from '@/utils/help/terms';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const { alert, confirm } = useDialog();
@@ -1368,7 +1369,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
                 }
              } catch (fetchErr: unknown) {
                  if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
-                 console.warn('Online save failed, attempting offline queue', fetchErr);
+                 logWarn('warn', 'Online save failed, attempting offline queue', fetchErr);
              }
           }
 

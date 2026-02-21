@@ -1,6 +1,7 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import type { Part } from "@google/generative-ai";
 
 type AssessmentFormDataShape = {
   assessment_date?: string;
@@ -160,12 +161,13 @@ export async function processAssessmentDocument(formData: FormData): Promise<Ass
       "assessment_date deve ser YYYY-MM-DD (se vier em DD/MM/AAAA, converta). " +
       "Se algum campo não estiver presente, use string vazia. Retorne somente o JSON puro.";
 
-    const result = await model.generateContent([
+    const parts: Part[] = [
       {
         inlineData: { data: base64, mimeType },
-      } as any,
+      },
       { text: prompt },
-    ] as any);
+    ];
+    const result = await model.generateContent(parts);
 
     const response = result?.response;
     const text = (await response?.text()) || "";
@@ -181,7 +183,7 @@ export async function processAssessmentDocument(formData: FormData): Promise<Ass
       }
     }
 
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(jsonText);
     } catch {
@@ -204,25 +206,25 @@ export async function processAssessmentDocument(formData: FormData): Promise<Ass
 
     const formOut: AssessmentFormDataShape = {
       ...DEFAULT_FORM,
-      assessment_date: normalizeDate(parsed.assessment_date),
-      weight: normalizeWeight(parsed.weight),
-      height: normalizeHeight(parsed.height),
-      age: normalizeAge(parsed.age),
-      gender: normalizeGender(parsed.gender),
-      arm_circ: normalizeMeasure(parsed.arm_circ),
-      chest_circ: normalizeMeasure(parsed.chest_circ),
-      waist_circ: normalizeMeasure(parsed.waist_circ),
-      hip_circ: normalizeMeasure(parsed.hip_circ),
-      thigh_circ: normalizeMeasure(parsed.thigh_circ),
-      calf_circ: normalizeMeasure(parsed.calf_circ),
-      triceps_skinfold: normalizeMeasure(parsed.triceps_skinfold),
-      biceps_skinfold: normalizeMeasure(parsed.biceps_skinfold),
-      subscapular_skinfold: normalizeMeasure(parsed.subscapular_skinfold),
-      suprailiac_skinfold: normalizeMeasure(parsed.suprailiac_skinfold),
-      abdominal_skinfold: normalizeMeasure(parsed.abdominal_skinfold),
-      thigh_skinfold: normalizeMeasure(parsed.thigh_skinfold),
-      calf_skinfold: normalizeMeasure(parsed.calf_skinfold),
-      observations: normalizeNotes(parsed.observations),
+      assessment_date: normalizeDate((parsed as Record<string,unknown>).assessment_date),
+      weight: normalizeWeight((parsed as Record<string,unknown>).weight),
+      height: normalizeHeight((parsed as Record<string,unknown>).height),
+      age: normalizeAge((parsed as Record<string,unknown>).age),
+      gender: normalizeGender((parsed as Record<string,unknown>).gender),
+      arm_circ: normalizeMeasure((parsed as Record<string,unknown>).arm_circ),
+      chest_circ: normalizeMeasure((parsed as Record<string,unknown>).chest_circ),
+      waist_circ: normalizeMeasure((parsed as Record<string,unknown>).waist_circ),
+      hip_circ: normalizeMeasure((parsed as Record<string,unknown>).hip_circ),
+      thigh_circ: normalizeMeasure((parsed as Record<string,unknown>).thigh_circ),
+      calf_circ: normalizeMeasure((parsed as Record<string,unknown>).calf_circ),
+      triceps_skinfold: normalizeMeasure((parsed as Record<string,unknown>).triceps_skinfold),
+      biceps_skinfold: normalizeMeasure((parsed as Record<string,unknown>).biceps_skinfold),
+      subscapular_skinfold: normalizeMeasure((parsed as Record<string,unknown>).subscapular_skinfold),
+      suprailiac_skinfold: normalizeMeasure((parsed as Record<string,unknown>).suprailiac_skinfold),
+      abdominal_skinfold: normalizeMeasure((parsed as Record<string,unknown>).abdominal_skinfold),
+      thigh_skinfold: normalizeMeasure((parsed as Record<string,unknown>).thigh_skinfold),
+      calf_skinfold: normalizeMeasure((parsed as Record<string,unknown>).calf_skinfold),
+      observations: normalizeNotes((parsed as Record<string,unknown>).observations),
     };
 
     const hasAny =
