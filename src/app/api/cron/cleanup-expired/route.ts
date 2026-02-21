@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getInternalSecret, hasValidInternalSecret } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,7 @@ const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
 }
 
 export async function GET(req: Request) {
+  try {
   if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
@@ -159,4 +161,7 @@ export async function GET(req: Request) {
   })
 
   return NextResponse.json(result)
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+  }
 }
