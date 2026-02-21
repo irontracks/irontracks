@@ -29,22 +29,24 @@ import { createClient } from '@/utils/supabase/client';
 import { createWorkout, updateWorkout, deleteWorkout, importData, computeWorkoutStreakAndStats, setWorkoutArchived, setWorkoutSortOrder } from '@/actions/workout-actions';
 
 import LoginScreen from '@/components/LoginScreen';
-import AdminPanelV2 from '@/components/AdminPanelV2';
-import ChatScreen from '@/components/ChatScreen';
-import ChatListScreen from '@/components/ChatListScreen';
-import ChatDirectScreen from '@/components/ChatDirectScreen';
-import HistoryList from '@/components/HistoryList';
-import CommunityClient from '@/app/(app)/community/CommunityClient';
-import StudentEvolution from '@/components/StudentEvolution';
-import WorkoutReport from '@/components/WorkoutReport';
+import LoadingScreen from '@/components/LoadingScreen';
 import ActiveWorkout from '@/components/ActiveWorkout';
 import RestTimerOverlay from '@/components/workout/RestTimerOverlay';
-import LoadingScreen from '@/components/LoadingScreen';
-import ExerciseEditor from '@/components/ExerciseEditor';
 import IncomingInviteModal from '@/components/IncomingInviteModal';
 import InviteAcceptedModal from '@/components/InviteAcceptedModal';
 import NotificationCenter from '@/components/NotificationCenter';
 import HeaderActionsMenu from '@/components/HeaderActionsMenu';
+
+// Heavy components — loaded only when needed
+const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
+const ChatScreen = dynamic(() => import('@/components/ChatScreen'), { ssr: false });
+const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
+const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
+const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
+const CommunityClient = dynamic(() => import('@/app/(app)/community/CommunityClient'), { ssr: false });
+const StudentEvolution = dynamic(() => import('@/components/StudentEvolution'), { ssr: false });
+const WorkoutReport = dynamic(() => import('@/components/WorkoutReport'), { ssr: false });
+const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext';
 import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -58,9 +60,9 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { BackButton } from '@/components/ui/BackButton';
-import StudentDashboard from '@/components/dashboard/StudentDashboard'
-import WorkoutWizardModal from '@/components/dashboard/WorkoutWizardModal'
-import SettingsModal from '@/components/SettingsModal'
+const StudentDashboard = dynamic(() => import('@/components/dashboard/StudentDashboard'), { ssr: false });
+const WorkoutWizardModal = dynamic(() => import('@/components/dashboard/WorkoutWizardModal'), { ssr: false });
+const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 import { useUserSettings } from '@/hooks/useUserSettings'
 import WhatsNewModal from '@/components/WhatsNewModal'
 import WelcomeFloatingWindow from '@/components/WelcomeFloatingWindow'
