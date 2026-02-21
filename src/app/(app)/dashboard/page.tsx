@@ -5,12 +5,13 @@ import { resolveRoleByUser } from '@/utils/auth/route'
 
 type SP = Record<string, string | string[] | undefined>
 
-const hydrateWorkouts = async (supabase: any, rows: any[]) => {
-  const base = Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []
-  const workoutIds = base.map((w) => w?.id).filter(Boolean)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const hydrateWorkouts = async (supabase: Awaited<ReturnType<typeof import('@/utils/supabase/server').createClient>>, rows: unknown[]) => {
+  const base = (Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []) as Record<string, unknown>[]
+  const workoutIds = base.map((w) => (w as Record<string, unknown>)?.id).filter(Boolean)
   if (!workoutIds.length) return base.map((w) => ({ ...w, exercises: [] }))
 
-  let exercises: any[] = []
+  let exercises: Record<string, unknown>[] = []
   try {
     const { data } = await supabase
       .from('exercises')
@@ -18,13 +19,13 @@ const hydrateWorkouts = async (supabase: any, rows: any[]) => {
       .in('workout_id', workoutIds)
       .order('order', { ascending: true })
       .limit(5000)
-    exercises = Array.isArray(data) ? data : []
+    exercises = Array.isArray(data) ? (data as Record<string, unknown>[]) : []
   } catch {
     exercises = []
   }
 
-  const exerciseIds = exercises.map((e) => e?.id).filter(Boolean)
-  let sets: any[] = []
+  const exerciseIds = exercises.map((e) => e?.id as string | undefined).filter(Boolean)
+  let sets: Record<string, unknown>[] = []
   if (exerciseIds.length) {
     try {
       const { data } = await supabase
@@ -33,32 +34,32 @@ const hydrateWorkouts = async (supabase: any, rows: any[]) => {
         .in('exercise_id', exerciseIds)
         .order('set_number', { ascending: true })
         .limit(20000)
-      sets = Array.isArray(data) ? data : []
+      sets = Array.isArray(data) ? (data as Record<string, unknown>[]) : []
     } catch {
       sets = []
     }
   }
 
-  const setsByExercise = new Map<string, any[]>()
+  const setsByExercise = new Map<string, unknown[]>()
   for (const s of sets) {
-    const eid = s?.exercise_id
+    const eid = s?.exercise_id as string | undefined
     if (!eid) continue
     const list = setsByExercise.get(eid) || []
     list.push(s)
     setsByExercise.set(eid, list)
   }
 
-  const exByWorkout = new Map<string, any[]>()
+  const exByWorkout = new Map<string, unknown[]>()
   for (const ex of exercises) {
-    const wid = ex?.workout_id
+    const wid = ex?.workout_id as string | undefined
     if (!wid) continue
-    const exWithSets = { ...ex, sets: setsByExercise.get(ex.id) || [] }
+    const exWithSets = { ...ex, sets: setsByExercise.get(ex.id as string) || [] }
     const list = exByWorkout.get(wid) || []
     list.push(exWithSets)
     exByWorkout.set(wid, list)
   }
 
-  return base.map((w) => ({ ...w, exercises: exByWorkout.get(w.id) || [] }))
+  return base.map((w) => ({ ...w, exercises: exByWorkout.get((w as Record<string, unknown>).id as string) || [] }))
 }
 
 export default async function DashboardPage({ searchParams }: { searchParams?: Promise<SP> }) {

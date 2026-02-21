@@ -40,7 +40,7 @@ export async function POST(req: Request) {
           .maybeSingle()
         const type = String(notif?.type || '').toLowerCase()
         if (type === 'follow_request') {
-          const meta = notif?.metadata && typeof notif.metadata === 'object' ? (notif.metadata as any) : null
+          const meta = notif?.metadata && typeof notif.metadata === 'object' ? (notif.metadata as Record<string, unknown>) : null
           followerId = String(notif?.sender_id ?? meta?.follower_id ?? '').trim()
         }
       } catch {}
@@ -145,7 +145,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }

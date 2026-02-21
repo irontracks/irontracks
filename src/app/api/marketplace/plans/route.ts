@@ -58,12 +58,12 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
-    const name = (body?.name || '').trim()
-    const description = (body?.description || '').trim()
+    const body: Record<string, unknown> = parsedBody.data!
+    const name = String(body?.name || '').trim()
+    const description = String(body?.description || '').trim()
     const priceCents = Number(body?.priceCents)
-    const interval = (body?.interval || 'month') as string
-    const status = (body?.status || 'active') as string
+    const interval = String(body?.interval || 'month')
+    const status = String(body?.status || 'active')
 
     if (!name || !Number.isFinite(priceCents) || priceCents <= 0) {
       return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })

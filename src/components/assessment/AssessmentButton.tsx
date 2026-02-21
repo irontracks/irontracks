@@ -48,8 +48,8 @@ export default function AssessmentButton({
     scanInputRef.current.click();
   };
 
-  const mergeImportedFormData = (base: any, incoming: any) => {
-    const out: any = { ...(base && typeof base === 'object' ? base : {}) };
+  const mergeImportedFormData = (base: unknown, incoming: unknown) => {
+    const out: Record<string, unknown> = { ...(base && typeof base === 'object' ? (base as Record<string, unknown>) : {}) };
     const keys = [
       'assessment_date',
       'weight',
@@ -72,9 +72,9 @@ export default function AssessmentButton({
       'observations',
     ];
     keys.forEach((k) => {
-      const nextVal = incoming?.[k];
+      const nextVal = (incoming as Record<string, unknown>)?.[k];
       if (nextVal === undefined || nextVal === null || nextVal === '') return;
-      const prevVal = out?.[k];
+      const prevVal = (out as Record<string, unknown>)?.[k];
       if (prevVal === undefined || prevVal === null || prevVal === '') {
         out[k] = nextVal;
       }
@@ -160,7 +160,7 @@ export default function AssessmentButton({
 
       setImporting(true);
 
-      let mergedFormData: any = {};
+      let mergedFormData: Record<string, unknown> = {};
 
       for (const file of files) {
         const form = new FormData();

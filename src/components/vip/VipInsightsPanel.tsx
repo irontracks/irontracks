@@ -11,7 +11,7 @@ type Row = {
   name: string | null
   date: string | null
   created_at: string | null
-  notes: any
+  notes: unknown
 }
 
 const safeJsonParse = (raw: unknown) => {
@@ -86,7 +86,7 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
     const list = Array.isArray(rows) ? rows : []
     return list.slice(0, 8).map((r) => {
       const session = safeJsonParse(r.notes)
-      const hasAi = !!(session && typeof session === 'object' && (session as Record<string, unknown>)?.ai && typeof (session as any).ai === 'object')
+      const hasAi = !!(session && typeof session === 'object' && (session as Record<string, unknown>)?.ai && typeof (session as Record<string, unknown>).ai === 'object')
       const dateIso = String(r.date || r.created_at || '').slice(0, 10)
       return {
         ...r,

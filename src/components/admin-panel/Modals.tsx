@@ -43,7 +43,7 @@ export const Modals: React.FC = () => {
     } = useAdminPanel();
 
     // Placeholder functions for now (move to hook later)
-    const handleSaveTemplate = async (data: any) => {
+    const handleSaveTemplate = async (data: unknown) => {
          alert('Salvar template em implementação.');
     };
 
@@ -204,7 +204,7 @@ export const Modals: React.FC = () => {
                         </div>
                         <div className="p-4 max-h-[75vh] overflow-y-auto">
                             <AdminWorkoutEditor
-                                initialData={editingTemplate as any}
+                                initialData={editingTemplate as Record<string, unknown>}
                                 onSave={handleSaveTemplate}
                                 onCancel={() => setEditingTemplate(null)}
                             />

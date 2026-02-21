@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 export async function POST() {
   try {
-    const supabase: any = await createClient()
+    const supabase = await createClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -15,8 +15,8 @@ export async function POST() {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }
 

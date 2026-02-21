@@ -142,7 +142,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, notified })
-  } catch (e: any) {
+  } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

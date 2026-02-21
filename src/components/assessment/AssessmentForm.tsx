@@ -89,7 +89,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
       }
 
       const parsed = JSON.parse(raw);
-      const source: any = parsed?.formData && typeof parsed.formData === 'object'
+      const source: Record<string, unknown> = parsed?.formData && typeof parsed.formData === 'object'
         ? parsed.formData
         : parsed;
 
@@ -99,7 +99,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
 
       const merged: AssessmentFormData = { ...base };
       (Object.keys(base) as (keyof AssessmentFormData)[]).forEach((field) => {
-        const value = (source as any)[field];
+        const value = (source as Record<string, unknown>)[field];
         if (value !== undefined && value !== null && value !== '') {
           if (field === 'gender') {
             if (isValidGender(value)) {

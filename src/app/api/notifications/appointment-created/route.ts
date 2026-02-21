@@ -81,7 +81,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, notified: true })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }

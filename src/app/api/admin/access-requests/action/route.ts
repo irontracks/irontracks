@@ -58,7 +58,7 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
+    const body: Record<string, unknown> = parsedBody.data!
     const requestId = String(body?.requestId || '').trim()
     const action = String(body?.action || '').trim()
 
@@ -184,7 +184,7 @@ export async function POST(req: Request) {
 
         const { data: existingStudent } = await admin.from('students').select('id').ilike('email', email).maybeSingle()
         if (!existingStudent?.id) {
-          const payload: any = { email }
+          const payload: Record<string, unknown> = { email }
           if (fullName) payload.name = fullName
           payload.user_id = userId
           await admin.from('students').insert(payload)

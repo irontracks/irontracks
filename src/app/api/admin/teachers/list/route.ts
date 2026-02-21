@@ -52,7 +52,7 @@ export async function GET(req: Request) {
         if (p.email) idByEmail.set(p.email.toLowerCase(), p.id)
       }
     }
-    const normalizeKey = (t: any) => {
+    const normalizeKey = (t: Record<string, unknown>) => {
       const uid = String(t?.user_id || '').trim()
       if (uid) return `user:${uid}`
       const e = String(t?.email || '').toLowerCase().trim()
@@ -61,12 +61,12 @@ export async function GET(req: Request) {
       return n ? `name:${n}` : `id:${String(t?.id || '')}`
     }
 
-    const toComparableTime = (value: any) => {
+    const toComparableTime = (value: unknown) => {
       const ts = Date.parse(String(value || ''))
       return Number.isFinite(ts) ? ts : 0
     }
 
-    const scoreTeacher = (t: any) => {
+    const scoreTeacher = (t: Record<string, unknown>) => {
       const hasWallet = Boolean(String(t?.asaas_wallet_id || '').trim())
       const hasAccount = Boolean(String(t?.asaas_account_id || '').trim())
       const hasUser = Boolean(String(t?.user_id || '').trim())

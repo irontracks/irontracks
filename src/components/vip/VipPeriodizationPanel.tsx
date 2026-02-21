@@ -13,8 +13,8 @@ type WeeklyStat = { weekStart: string; volume: number; best1rm: number }
 
 type ActiveProgramResponse = {
   ok: boolean
-  program: any | null
-  workouts: Array<any>
+  program: Record<string, unknown> | null
+  workouts: Array<unknown>
 }
 
 type StatsResponse = { ok: boolean; weekly?: WeeklyStat[]; error?: string }
@@ -87,7 +87,7 @@ export default function VipPeriodizationPanel({
 
   const [loading, setLoading] = useState(false)
   const [program, setProgram] = useState<any | null>(null)
-  const [schedule, setSchedule] = useState<any[]>([])
+  const [schedule, setSchedule] = useState<unknown[]>([])
   const [stats, setStats] = useState<WeeklyStat[]>([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -248,7 +248,7 @@ export default function VipPeriodizationPanel({
           setError('Não foi possível carregar o treino. Tente novamente.')
           return
         }
-        const workoutObj: any = { ...data, title: data.name }
+        const workoutObj: Record<string, unknown> = { ...(data as Record<string, unknown>), title: (data as Record<string, unknown>).name }
         onStartSession(workoutObj)
       } catch {
         setError('Não foi possível iniciar o treino.')
@@ -404,7 +404,7 @@ export default function VipPeriodizationPanel({
 
         {program?.id && schedule.length && calendarOpen ? (
           <div className="mt-3 space-y-2">
-            {schedule.map((w) => {
+            {(schedule as Record<string, unknown>[]).map((w) => {
               const week = Number(w?.week_number || 0)
               const day = Number(w?.day_number || 0)
               const phase = safeString(w?.phase) || '-'

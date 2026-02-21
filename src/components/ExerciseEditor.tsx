@@ -82,7 +82,7 @@ interface Workout {
 
 interface ExerciseEditorProps {
     workout: Workout;
-    onSave?: (workout: Workout) => Promise<any>;
+    onSave?: (workout: Workout) => Promise<unknown>;
     onCancel?: () => void;
     onChange?: (workout: Workout) => void;
     onSaved?: () => void;
@@ -826,7 +826,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             const src = raw.workout || raw.session || raw;
             const title = src.title || src.workoutTitle || workout.title || 'Treino Importado';
             const exs = Array.isArray(src.exercises) ? src.exercises : [];
-            const mapped = exs.map((ex: any) => ({
+            const mapped = exs.map((ex: Record<string, unknown>) => ({
                 name: ex.name || '',
                 sets: Number(ex.sets) || (Array.isArray(ex?.setDetails) ? ex.setDetails.length : (Array.isArray(ex?.set_details) ? ex.set_details.length : (Array.isArray(ex?.sets) && ex.sets.length && typeof ex.sets[0] === 'object' ? ex.sets.length : 0))),
                 reps: String(ex.reps || ''),
@@ -846,8 +846,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             onChange?.(imported);
             if (await confirm('Importar e salvar este treino agora?', 'Salvar')) {
                 const res = await onSave?.(imported);
-                if (res && typeof res === 'object' && res.ok === false) {
-                    await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
+                if (res && typeof res === 'object' && (res as Record<string, unknown>).ok === false) {
+                    await alert(`Erro ao salvar: ${(res as Record<string, unknown>).error || 'Falha ao salvar treino'}`);
                 }
             }
         } catch (err: unknown) {
@@ -880,16 +880,16 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
             if (onSave) {
                 const res = await onSave({ ...workout, created_by: user.id, user_id: user.id });
-                if (res && typeof res === 'object' && res.ok === false) {
-                    await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
+                if (res && typeof res === 'object' && (res as Record<string, unknown>).ok === false) {
+                    await alert(`Erro ao salvar: ${(res as Record<string, unknown>).error || 'Falha ao salvar treino'}`);
                     return;
                 }
-                if (res && typeof res === 'object' && res.deferred === true) {
+                if (res && typeof res === 'object' && (res as Record<string, unknown>).deferred === true) {
                     await alert('Exercício adicionado ao treino ativo.\nAo finalizar o treino, você poderá escolher se deseja salvar essa mudança no modelo.', 'Exercício adicionado');
                     if (typeof onSaved === 'function') onSaved();
                     return;
                 }
-                const sync = res?.sync || null;
+                const sync = (res as Record<string, unknown>)?.sync as Record<string, unknown> | null || null;
                 if (sync) {
                     const created = Number(sync?.created || 0);
                     const updated = Number(sync?.updated || 0);

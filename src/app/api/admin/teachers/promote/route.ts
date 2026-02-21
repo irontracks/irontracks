@@ -23,7 +23,7 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
+    const body: Record<string, unknown> = parsedBody.data!
     const email = String(body?.email || '').toLowerCase().trim()
     if (!email) return NextResponse.json({ ok: false, error: 'missing email' }, { status: 400 })
 
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     // Update role to teacher
     await admin.from('profiles').update({ role: 'teacher' }).eq('id', profile.id)
 
-    let teacherRow: any | null = null
+    let teacherRow: Record<string, unknown> | null = null
     const { data: existingByUser } = await admin
       .from('teachers')
       .select('id')

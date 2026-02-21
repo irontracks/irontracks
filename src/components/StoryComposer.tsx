@@ -1089,8 +1089,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         try {
           await navigator.share({ files: [file], title: 'Story IronTracks' })
           shared = true
-        } catch (shareErr: any) {
-          const name = String(shareErr?.name || '').trim()
+        } catch (shareErr: unknown) {
+          const name = String((shareErr as { name?: string })?.name || '').trim()
           // If user cancelled, stop here
           if (name === 'AbortError') {
              setBusy(false)

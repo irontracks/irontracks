@@ -37,7 +37,7 @@ const isIOSUserAgent = (ua: string) => {
   const s = String(ua || '')
   if (/(iPad|iPhone|iPod)/i.test(s)) return true
   try {
-    const nav: any = typeof navigator !== 'undefined' ? navigator : null
+    const nav = typeof navigator !== 'undefined' ? navigator as unknown as Record<string, unknown> : null
     if (nav && nav.platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1) return true
   } catch {}
   return false
@@ -68,13 +68,13 @@ export default function StoryViewer({
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [commentsError, setCommentsError] = useState('')
-  const [comments, setComments] = useState<any[]>([])
+  const [comments, setComments] = useState<unknown[]>([])
   const [commentText, setCommentText] = useState('')
   
   const [viewersOpen, setViewersOpen] = useState(false)
   const [viewersLoading, setViewersLoading] = useState(false)
   const [viewersError, setViewersError] = useState('')
-  const [viewers, setViewers] = useState<any[]>([])
+  const [viewers, setViewers] = useState<unknown[]>([])
   const viewersStoryIdRef = useRef<string>('')
   
   const [deleting, setDeleting] = useState(false)
@@ -210,9 +210,9 @@ export default function StoryViewer({
     }
     preloadRef.current.aborts = []
 
-    const candidates = [stories[idx - 1] || null, stories[idx + 1] || null].filter(Boolean) as any[]
+    const candidates = [stories[idx - 1] || null, stories[idx + 1] || null].filter(Boolean) as unknown[]
     for (const s of candidates) {
-      const url = String(s?.mediaUrl || '').trim()
+      const url = String((s as Record<string, unknown>)?.mediaUrl || '').trim()
       if (!url) continue
       const a = new AbortController()
       preloadRef.current.aborts.push(a)
@@ -521,7 +521,7 @@ export default function StoryViewer({
                         autoPlay
                         preload="metadata"
                         onLoadedMetadata={(e) => {
-                          const d = Number((e.currentTarget as any)?.duration || 0)
+                          const d = Number((e.currentTarget as HTMLVideoElement)?.duration || 0)
                           const start = Math.max(0, Number(trimRange?.start ?? 0))
                           const rawEnd = Number(trimRange?.end ?? d)
                           const maxEnd = Math.min(rawEnd, start + MAX_VIDEO_SECONDS)
@@ -603,22 +603,22 @@ export default function StoryViewer({
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mt-3 bg-neutral-900/95 border border-neutral-800 rounded-2xl overflow-hidden backdrop-blur-sm">
               <div className="max-h-[30vh] overflow-y-auto custom-scrollbar p-3 space-y-3">
                 {viewersOpen && viewers.map((v) => (
-                   <div key={v.viewerId} className="flex items-center gap-3">
+                   <div key={String((v as Record<string, unknown>).viewerId ?? "")} className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden">
-                        {v.photoUrl ? <Image src={v.photoUrl} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(v.displayName)}</div>}
+                        {(v as Record<string, unknown>).photoUrl ? <Image src={String((v as Record<string, unknown>).photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(String((v as Record<string, unknown>).displayName || ""))}</div>}
                       </div>
-                      <span className="text-xs font-bold text-white flex-1">{v.displayName || 'Usuário'}</span>
-                      <span className="text-[10px] text-neutral-400">{formatAgo(v.viewedAt)}</span>
+                      <span className="text-xs font-bold text-white flex-1">{String((v as Record<string, unknown>).displayName || 'Usuário')}</span>
+                      <span className="text-[10px] text-neutral-400">{formatAgo((v as Record<string, unknown>).viewedAt as string)}</span>
                    </div>
                 ))}
                 {commentsOpen && comments.map((c) => (
-                  <div key={c.id} className="flex gap-3">
+                  <div key={String((c as Record<string, unknown>).id ?? "")} className="flex gap-3">
                     <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden shrink-0">
-                      {c.user?.photoUrl ? <Image src={c.user.photoUrl} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(c.user?.displayName || '')}</div>}
+                      {(c as Record<string, unknown>).user && typeof (c as Record<string, unknown>).user === 'object' && ((c as Record<string, Record<string, unknown>>).user?.photoUrl) ? <Image src={String((c as Record<string, Record<string, unknown>>).user.photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(String((c as Record<string, Record<string, unknown>>).user?.displayName || ''))}</div>}
                     </div>
                     <div>
-                      <div className="text-xs font-black text-white">{c.user?.displayName || 'Usuário'}</div>
-                      <div className="text-xs text-neutral-300">{c.body}</div>
+                      <div className="text-xs font-black text-white">{String((c as Record<string, Record<string, unknown>>).user?.displayName || 'Usuário')}</div>
+                      <div className="text-xs text-neutral-300">{String((c as Record<string, unknown>).body || '')}</div>
                     </div>
                   </div>
                 ))}

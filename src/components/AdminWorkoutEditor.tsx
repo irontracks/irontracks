@@ -16,14 +16,14 @@ export interface AdminExercise {
     video_url?: string; // Compatibility
     notes: string;
     coachNotes: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface AdminWorkout {
     id: string | null;
     title: string;
     exercises: AdminExercise[];
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 interface AdminWorkoutEditorProps {

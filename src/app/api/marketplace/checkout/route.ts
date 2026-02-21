@@ -43,12 +43,12 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
-    const planId = (body?.planId || '').trim() as string
-    const billingType = ((body?.billingType || 'PIX') as string).trim().toUpperCase()
-    const cpfCnpj = (body?.cpfCnpj || '').replace(/\D/g, '') as string
-    const mobilePhone = (body?.mobilePhone || '').replace(/\D/g, '') as string
-    const payerName = ((body?.name || '') as string).trim()
+    const body: Record<string, unknown> = parsedBody.data!
+    const planId = String(body?.planId || '').trim()
+    const billingType = String(body?.billingType || 'PIX').trim().toUpperCase()
+    const cpfCnpj = String(body?.cpfCnpj || '').replace(/\D/g, '')
+    const mobilePhone = String(body?.mobilePhone || '').replace(/\D/g, '')
+    const payerName = String(body?.name || '').trim()
 
     if (!planId) return NextResponse.json({ ok: false, error: 'missing_plan' }, { status: 400 })
     if (!['PIX'].includes(billingType)) return NextResponse.json({ ok: false, error: 'unsupported_billing_type' }, { status: 400 })
@@ -163,11 +163,11 @@ export async function POST(req: Request) {
 
     if (subErr || !subRow) return NextResponse.json({ ok: false, error: subErr?.message || 'failed_to_store_subscription' }, { status: 400 })
 
-    const payments = await asaasRequest<{ data?: any[] }>({
+    const payments = await asaasRequest<{ data?: unknown[] }>({
       method: 'GET',
       path: `/subscriptions/${encodeURIComponent(subscriptionId)}/payments`,
     })
-    const first = Array.isArray(payments?.data) && payments.data.length ? payments.data[0] : null
+    const first = (Array.isArray(payments?.data) && payments.data.length ? payments.data[0] : null) as Record<string, unknown> | null
     if (!first?.id) return NextResponse.json({ ok: true, subscription: subRow, payment: null })
 
     const amountCents = Number.isFinite(plan.price_cents) ? Number(plan.price_cents) : 0
@@ -188,8 +188,8 @@ export async function POST(req: Request) {
         paid_at: first?.paymentDate || null,
         asaas_payment_id: first.id,
         invoice_url: first?.invoiceUrl || null,
-        pix_qr_code: first?.pixQrCode?.encodedImage || null,
-        pix_payload: first?.pixQrCode?.payload || null,
+        pix_qr_code: (first?.pixQrCode as Record<string, unknown>)?.encodedImage || null,
+        pix_payload: (first?.pixQrCode as Record<string, unknown>)?.payload || null,
       })
       .select('id, status, due_date, asaas_payment_id, invoice_url, pix_qr_code, pix_payload')
       .single()

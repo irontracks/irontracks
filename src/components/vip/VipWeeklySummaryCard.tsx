@@ -10,11 +10,11 @@ type WeeklySummary = {
   dataUsed?: string[]
   trainedDays?: number
   checkins?: { energy: number | null; mood: number | null; soreness: number | null; sleep: number | null }
-  prs?: any[]
+  prs?: unknown[]
   error?: string
 }
 
-const safeArray = <T,>(v: any): T[] => (Array.isArray(v) ? (v as T[]) : [])
+const safeArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
 export default function VipWeeklySummaryCard() {
   const [loading, setLoading] = useState(false)

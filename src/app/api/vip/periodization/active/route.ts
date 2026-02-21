@@ -45,12 +45,12 @@ export async function GET() {
     const workoutIds = (Array.isArray(workouts) ? workouts : []).map((w: Record<string, unknown>) => String(w?.workout_id || '').trim()).filter(Boolean)
     const { data: workoutRows } = workoutIds.length
       ? await admin.from('workouts').select('id, name').in('id', workoutIds).limit(workoutIds.length)
-      : ({ data: [] } as any)
+      : ({ data: [] } as { data: unknown[] })
 
     const nameById = new Map<string, string>()
-    ;(Array.isArray(workoutRows) ? workoutRows : []).forEach((r: Record<string, unknown>) => {
-      const id = String(r?.id || '').trim()
-      const name = String(r?.name || '').trim()
+    ;(Array.isArray(workoutRows) ? workoutRows : []).forEach((r: unknown) => { const rr = r as Record<string, unknown>;
+      const id = String(rr?.id || '').trim()
+      const name = String(rr?.name || '').trim()
       if (id && name) nameById.set(id, name)
     })
 
@@ -61,8 +61,8 @@ export async function GET() {
         .select('workout_id')
         .in('workout_id', workoutIds)
         .limit(5000)
-      ;(Array.isArray(exerciseRows) ? exerciseRows : []).forEach((r: Record<string, unknown>) => {
-        const wid = String(r?.workout_id || '').trim()
+      ;(Array.isArray(exerciseRows) ? exerciseRows : []).forEach((r: unknown) => { const rr = r as Record<string, unknown>;
+        const wid = String(rr?.workout_id || '').trim()
         if (!wid) return
         exerciseCountByWorkoutId.set(wid, (exerciseCountByWorkoutId.get(wid) || 0) + 1)
       })

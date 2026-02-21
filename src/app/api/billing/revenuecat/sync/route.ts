@@ -17,7 +17,7 @@ const getRevenueCatSubscriber = async (appUserId: string) => {
     },
     cache: 'no-store',
   })
-  const json = await res.json().catch((): any => null)
+  const json = await res.json().catch((): null => null)
   if (!res.ok) {
     const msg = String(json?.message || json?.error || `revenuecat_http_${res.status}`)
     throw new Error(msg)
@@ -102,8 +102,8 @@ export async function POST() {
     }
 
     return NextResponse.json({ ok: true, planId: productId, expiresDate })
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : String(e || 'error')
+  } catch (e: unknown) {
+    const msg = (e as { message?: string })?.message ? String((e as { message?: string }).message) : String(e || 'error')
     return NextResponse.json({ ok: false, error: msg }, { status: 400 })
   }
 }

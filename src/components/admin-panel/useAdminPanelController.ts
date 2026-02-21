@@ -371,9 +371,9 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                 let lastWorkoutMs = 0;
                 nonTemplate.forEach((w) => {
                     try {
-                        const raw: any = (w as any).date || (w as any).completed_at || w.created_at;
+                        const raw: unknown = (w as Record<string, unknown>).date || (w as Record<string, unknown>).completed_at || (w as Record<string, unknown>).created_at;
                         if (!raw) return;
-                        const d = raw?.toDate ? raw.toDate() : new Date(raw);
+                        const rawR = raw as { toDate?: () => Date } | string | number | null; const d = rawR && typeof rawR === 'object' && 'toDate' in rawR && typeof rawR.toDate === 'function' ? rawR.toDate() : new Date(raw as string | number);
                         const t = d?.getTime ? d.getTime() : NaN;
                         if (!Number.isFinite(t)) return;
                         if (t > lastWorkoutMs) lastWorkoutMs = t;

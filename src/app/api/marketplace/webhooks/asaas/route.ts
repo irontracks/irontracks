@@ -45,7 +45,7 @@ export async function POST(req: Request) {
 
   const eventType = (body?.event || body?.type || body?.eventType || '') as string
   const eventId = (body?.id || body?.eventId || null) as string | null
-  const payment = (body?.payment || body?.data?.payment || null) as any
+  const payment = (body?.payment || body?.data?.payment || null) as Record<string, unknown> | null
   const paymentId = (payment?.id || null) as string | null
   const paymentStatus = (payment?.status || '') as string
   const subscriptionId = (payment?.subscription || null) as string | null
@@ -78,14 +78,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, processed: false })
     }
 
-    const updates: Record<string, any> = {
+    const updates: Record<string, unknown> = {
       status: paymentStatus || 'pending',
     }
     if (payment?.dueDate) updates.due_date = payment.dueDate
     if (payment?.invoiceUrl) updates.invoice_url = payment.invoiceUrl
     if (payment?.billingType) updates.billing_type = payment.billingType
-    if (payment?.pixQrCode?.encodedImage) updates.pix_qr_code = payment.pixQrCode.encodedImage
-    if (payment?.pixQrCode?.payload) updates.pix_payload = payment.pixQrCode.payload
+    if (payment && (payment.pixQrCode as Record<string, unknown>)?.encodedImage) updates.pix_qr_code = (payment.pixQrCode as Record<string, unknown>).encodedImage
+    if (payment && (payment.pixQrCode as Record<string, unknown>)?.payload) updates.pix_payload = (payment.pixQrCode as Record<string, unknown>).payload
     if (payment?.paymentDate) updates.paid_at = payment.paymentDate
     if (payment?.confirmedDate && !updates.paid_at) updates.paid_at = payment.confirmedDate
 
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     const { data: appPayRow } = payRow
-      ? { data: null as any }
+      ? { data: null as Record<string, unknown> | null }
       : await admin
           .from('app_payments')
           .update(updates)
@@ -132,11 +132,11 @@ export async function POST(req: Request) {
         .update({ status: subStatus, updated_at: new Date().toISOString() })
         .eq('provider', 'asaas')
         .eq('provider_subscription_id', subTargetId)
-    } else if (appPayRow?.subscription_id) {
+    } else if ((appPayRow as Record<string, unknown>)?.subscription_id) {
       await admin
         .from('app_subscriptions')
         .update({ status: subStatus, updated_at: new Date().toISOString() })
-        .eq('id', appPayRow.subscription_id)
+        .eq('id', (appPayRow as Record<string, unknown>)?.subscription_id)
     }
 
     if (subTargetId) {
@@ -173,7 +173,7 @@ export async function POST(req: Request) {
 
     await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
+  } catch (e: unknown) {
     try {
       await admin
         .from('asaas_webhook_events')
@@ -182,11 +182,11 @@ export async function POST(req: Request) {
           event_type: eventType || null,
           payment_id: paymentId,
           payload: body,
-          processing_error: e?.message ?? String(e),
+          processing_error: (e as { message?: string })?.message ?? String(e),
           processed_at: new Date().toISOString(),
         })
     } catch {}
 
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }

@@ -24,7 +24,7 @@ export type WorkoutWizardAnswers = {
 
 export type WorkoutDraft = {
   title: string
-  exercises: any[]
+  exercises: unknown[]
 }
 
 type MaybePromise<T> = T | Promise<T>
@@ -73,7 +73,8 @@ const titleFocus = (f: WorkoutWizardFocus) =>
 const titleEquipment = (e: WorkoutWizardEquipment) => (e === 'gym' ? 'Academia' : e === 'home' ? 'Casa' : 'Mínimo (halteres/elástico)')
 
 export default function WorkoutWizardModal(props: Props) {
-  const { credits, loading: creditsLoading, error: creditsError } = useVipCredits() as { credits: any; loading: boolean; error: string | null }
+  const { credits: creditsRaw, loading: creditsLoading, error: creditsError } = useVipCredits() as { credits: unknown; loading: boolean; error: string | null }
+  const credits = creditsRaw as Record<string, Record<string, number>> | null | undefined
   const isOpen = !!props.isOpen
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<GenerateMode>('single')
@@ -161,7 +162,7 @@ export default function WorkoutWizardModal(props: Props) {
         setDrafts(safe)
         setDraftIdx(0)
       } else {
-        const d = res as any
+        const d = res as Record<string, unknown>
         const title = String(d?.title || '').trim() || 'Treino'
         const exercises = Array.isArray(d?.exercises) ? d.exercises : []
         if (!exercises.length) {
@@ -528,7 +529,7 @@ export default function WorkoutWizardModal(props: Props) {
                     {(() => {
                       const d = drafts[Math.max(0, Math.min(drafts.length - 1, draftIdx))]
                       if (!d) return null
-                      const safeExercises = Array.isArray(d?.exercises) ? d.exercises : []
+                      const safeExercises = (Array.isArray(d?.exercises) ? d.exercises : []) as Record<string, unknown>[]
                       return (
                         <div className="mt-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
                           <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{d.title}</div>
@@ -553,7 +554,7 @@ export default function WorkoutWizardModal(props: Props) {
                   <div className="mt-3 rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{draft.title}</div>
                     <div className="mt-2 space-y-2">
-                      {(Array.isArray(draft?.exercises) ? draft.exercises : []).slice(0, 10).map((ex, idx) => (
+                      {(Array.isArray(draft?.exercises) ? draft.exercises as Record<string, unknown>[] : []).slice(0, 10).map((ex, idx) => (
                         <div key={String(ex?.name || idx)} className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-sm font-bold text-white truncate">{String(ex?.name || 'Exercício')}</div>

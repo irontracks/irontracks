@@ -24,10 +24,10 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
-    const receiverId = (body?.receiverId || '').trim() as string
-    const senderName = (body?.senderName || '').trim() as string
-    const preview = (body?.preview || '').trim() as string
+    const body: Record<string, unknown> = parsedBody.data!
+    const receiverId = String(body?.receiverId || '').trim()
+    const senderName = String(body?.senderName || '').trim()
+    const preview = String(body?.preview || '').trim()
 
     if (!receiverId || !senderName || !preview) {
       return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }

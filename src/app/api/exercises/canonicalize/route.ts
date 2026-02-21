@@ -47,7 +47,7 @@ const extractJson = (raw: string) => {
   }
 }
 
-const isMissingTable = (error: any) => {
+const isMissingTable = (error: unknown) => {
   try {
     if (!error) return false
     const status = Number((error as Record<string, unknown>)?.status)

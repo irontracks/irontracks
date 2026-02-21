@@ -19,8 +19,8 @@ export async function GET() {
 
     const report = await runChatDiagnostics(supabase, user.id)
     return NextResponse.json(report)
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     const parsedBody = await parseJsonBody(request, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
+    const body: Record<string, unknown> = parsedBody.data!
     const { channelId, content } = body
     if (!channelId) return NextResponse.json({ ok: false, error: 'channelId required' }, { status: 400 })
     const text = content || `diagnostic ping ${new Date().toISOString()}`
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       .single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, inserted })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }

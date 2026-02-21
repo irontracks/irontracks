@@ -47,7 +47,7 @@ export async function GET() {
           return { ok: false, error }
         }
         return { ok: true, rows: (Array.isArray(data) ? data : []).filter((r) => r && typeof r === 'object') as Array<Record<string, unknown>> }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (isMissingTable(e)) return { ok: true, rows: [], missing: true }
         return { ok: false, error: e }
       }
@@ -159,7 +159,7 @@ export async function GET() {
     outData.assessmentPhotos = photosRes.rows || []
 
     return NextResponse.json(out)
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }

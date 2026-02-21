@@ -1671,7 +1671,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     isOpen={showCoachChat}
                     onClose={() => setShowCoachChat(false)}
                     session={session}
-                    previousSession={effectivePreviousSession}
+                    previousSession={effectivePreviousSession ?? undefined}
                     isVip={isVip}
                     onUpgrade={onUpgrade}
                     onSaveToReport={(summary: unknown) => {

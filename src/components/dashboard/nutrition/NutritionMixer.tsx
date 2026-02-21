@@ -21,7 +21,7 @@ type MealEntry = {
 
 const PERCENT_SCALE = 100
 
-function safeNumber(value: any): number {
+function safeNumber(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
 }
@@ -276,32 +276,33 @@ export default function NutritionMixer({
         }
 
         const meal = (res as Record<string, unknown>).meal as MealLog | undefined
-        const entry = (res as Record<string, unknown>).entry as any
+        const entry = (res as Record<string, unknown>).entry as unknown
         if (!meal) {
           setError('Falha ao processar a refeição.')
           return
         }
 
         if (entry && typeof entry === 'object') {
+          const entryObj = entry as Record<string, unknown>
           const nextTotals = {
-            calories: safeNumber(entry?.totals_calories),
-            protein: safeNumber(entry?.totals_protein),
-            carbs: safeNumber(entry?.totals_carbs),
-            fat: safeNumber(entry?.totals_fat),
+            calories: safeNumber(entryObj?.totals_calories),
+            protein: safeNumber(entryObj?.totals_protein),
+            carbs: safeNumber(entryObj?.totals_carbs),
+            fat: safeNumber(entryObj?.totals_fat),
           }
           if (nextTotals.calories || nextTotals.protein || nextTotals.carbs || nextTotals.fat) setTotals(nextTotals)
 
-          const entryId = String(entry?.entry_id || entry?.id || '').trim()
-          const entryCreatedAt = String(entry?.created_at || new Date().toISOString()).trim()
-          const entryFoodName = String(entry?.food_name || meal.foodName || 'Refeição').trim()
+          const entryId = String(entryObj?.entry_id || entryObj?.id || '').trim()
+          const entryCreatedAt = String(entryObj?.created_at || new Date().toISOString()).trim()
+          const entryFoodName = String(entryObj?.food_name || meal.foodName || 'Refeição').trim()
           const nextEntry: MealEntry = {
             id: entryId || `${Date.now()}`,
             created_at: entryCreatedAt,
             food_name: entryFoodName,
-            calories: safeNumber(entry?.calories ?? meal.calories),
-            protein: safeNumber(entry?.protein ?? meal.protein),
-            carbs: safeNumber(entry?.carbs ?? meal.carbs),
-            fat: safeNumber(entry?.fat ?? meal.fat),
+            calories: safeNumber(entryObj?.calories ?? meal.calories),
+            protein: safeNumber(entryObj?.protein ?? meal.protein),
+            carbs: safeNumber(entryObj?.carbs ?? meal.carbs),
+            fat: safeNumber(entryObj?.fat ?? meal.fat),
           }
           setEntries((prev) => [nextEntry, ...(Array.isArray(prev) ? prev : [])].slice(0, 20))
         } else {
