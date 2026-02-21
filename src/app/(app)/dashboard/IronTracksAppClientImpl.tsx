@@ -81,6 +81,8 @@ import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
+import { useAdminPanelState } from '@/hooks/useAdminPanelState'
+import { useSignOut } from '@/hooks/useSignOut'
 
 import {
     DirectChatState,
@@ -302,7 +304,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [editActiveDraft, setEditActiveDraft] = useState<Record<string, unknown> | null>(null);
     const editActiveBaseRef = useRef<Record<string, unknown> | null>(null);
     const editActiveAddExerciseRef = useRef(false);
-    const [showAdminPanel, setShowAdminPanel] = useState(false);
     const userSettingsApi = useUserSettings(user?.id)
     // Offline sync state — extracted to useOfflineSync hook
     const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
@@ -316,8 +317,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const supabase = useRef(createClient()).current;
     const router = useRouter();
     const isFetching = useRef(false);
-
-    const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open';
 
     // refreshSyncState, runFlushQueue, syncState effects — handled by useOfflineSync hook above
 
@@ -377,89 +376,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     }, [authLoading, user, router]);
 
     // whatsNew useEffect + closeWhatsNew — handled by useWhatsNew hook above
-    const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
 
-    const setUrlTabParam = useCallback((nextTab: unknown) => {
-        try {
-            if (typeof window === 'undefined') return;
-            const tabValue = String(nextTab || '').trim();
-            if (!tabValue) return;
-            const url = new URL(window.location.href);
-            url.searchParams.set('tab', tabValue);
-            window.history.replaceState({}, '', url);
-        } catch { }
-    }, []);
-
-    const removeUrlTabParam = useCallback(() => {
-        try {
-            if (typeof window === 'undefined') return;
-            const url = new URL(window.location.href);
-            url.searchParams.delete('tab');
-            window.history.replaceState({}, '', url);
-        } catch { }
-    }, []);
-
-    const openAdminPanel = useCallback((tab: unknown) => {
-        setShowAdminPanel(true);
-        try {
-            if (typeof window !== 'undefined') {
-                sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
-                if (tab) sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, String(tab));
-                if (tab) setUrlTabParam(tab);
-            }
-        } catch { }
-    }, [setUrlTabParam]);
-
-    const closeAdminPanel = useCallback(() => {
-        setShowAdminPanel(false);
-        try {
-            if (typeof window !== 'undefined') {
-                sessionStorage.removeItem(ADMIN_PANEL_OPEN_KEY);
-                sessionStorage.removeItem(ADMIN_PANEL_TAB_KEY);
-            }
-        } catch { }
-        removeUrlTabParam();
-    }, [removeUrlTabParam]);
-
-    const restoreAdminPanelIfNeeded = useCallback(() => {
-        try {
-            if (typeof window === 'undefined') return;
-            const role = String(user?.role || '').toLowerCase();
-            const isPrivileged = role === 'admin' || role === 'teacher';
-            if (!isPrivileged) return;
-
-            const validTabs = new Set(['dashboard', 'students', 'teachers', 'templates', 'videos', 'broadcast', 'system']);
-            const url = new URL(window.location.href);
-            const urlTabRaw = String(url.searchParams.get('tab') || '').trim();
-            const urlTab = validTabs.has(urlTabRaw) ? urlTabRaw : '';
-
-            const open = sessionStorage.getItem(ADMIN_PANEL_OPEN_KEY);
-            const storedTabRaw = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
-            const storedTab = validTabs.has(storedTabRaw) ? storedTabRaw : '';
-
-            // Só abre se tiver 'open=1' explícito no storage E uma aba válida
-            // OU se tiver tab na URL
-            const shouldOpen = (open === '1' && !!storedTab) || !!urlTab;
-            
-            if (!shouldOpen) {
-                // Garante que fecha se não deve abrir
-                if (showAdminPanel) setShowAdminPanel(false);
-                return;
-            }
-
-            const tab = urlTab || storedTab || 'dashboard';
-            
-            // Sincroniza storage se veio pela URL
-            if (urlTab) {
-                try {
-                    sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1');
-                    sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, tab);
-                } catch { }
-            }
-            
-            setShowAdminPanel(true);
-        } catch { }
-    }, [setUrlTabParam, user?.role, showAdminPanel]);
+    // Admin panel open/close state — extracted to useAdminPanelState hook
+    const {
+        showAdminPanel,
+        setShowAdminPanel,
+        openAdminPanel,
+        closeAdminPanel,
+        restoreAdminPanelIfNeeded,
+    } = useAdminPanelState({ userRole: user?.role ? String(user.role) : null })
 
     const resolveExerciseVideos = useCallback(async (exercises: unknown): Promise<{ exercises: Array<Record<string, unknown>>; updates: Array<Record<string, unknown>> }> => {
         try {
@@ -521,7 +446,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         } catch { }
     }, [supabase]);
 
-    const signOutInFlightRef = useRef(false);
     const serverSessionSyncRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastKey: string }>({ timer: null, lastKey: '' });
     const serverSessionSyncWarnedRef = useRef(false);
 
@@ -637,70 +561,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     }, []);
 
-    const clearSupabaseCookiesBestEffort = useCallback(() => {
-        try {
-            if (typeof document === 'undefined') return;
-            const raw = String(document.cookie || '');
-            const cookieNames = raw
-                .split(';')
-                .map((p) => p.trim())
-                .map((p) => p.split('=')[0])
-                .filter(Boolean);
-            const targets = cookieNames.filter((n) => n.startsWith('sb-') || n.includes('supabase'));
-            targets.forEach((name) => {
-                try {
-                    document.cookie = `${name}=; Max-Age=0; path=/`;
-                    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
-                } catch { }
-            });
-        } catch { }
-    }, []);
-
-    const clearSupabaseStorageBestEffort = useCallback(() => {
-        try {
-            if (typeof window === 'undefined') return;
-            const ls = window.localStorage;
-            if (!ls) return;
-            const keys: string[] = [];
-            for (let i = 0; i < ls.length; i++) {
-                const k = ls.key(i);
-                if (!k) continue;
-                if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) keys.push(k);
-            }
-            keys.forEach((k) => {
-                try { ls.removeItem(k); } catch { }
-            });
-        } catch { }
-    }, []);
-
-    const clearClientSessionState = useCallback(() => {
-        try {
-            localStorage.removeItem('activeSession');
-            localStorage.removeItem('appView');
-            if (user?.id) {
-                localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`);
-                localStorage.removeItem(`irontracks.appView.v2.${user.id}`);
-            }
-        } catch { }
-        setActiveSession(null);
-        setView('dashboard');
-    }, [user?.id]);
-
-    const safeSignOut = useCallback(async (scope = 'local') => {
-        if (signOutInFlightRef.current) return;
-        signOutInFlightRef.current = true;
-        try {
-            clearSupabaseCookiesBestEffort();
-            clearSupabaseStorageBestEffort();
-        } catch (e) {
-            try {
-                clearSupabaseCookiesBestEffort();
-                clearSupabaseStorageBestEffort();
-            } catch { }
-        } finally {
-            signOutInFlightRef.current = false;
-        }
-    }, [clearSupabaseCookiesBestEffort, clearSupabaseStorageBestEffort]);
+    // Sign-out + session clear — extracted to useSignOut hook
+    const { safeSignOut, clearClientSessionState } = useSignOut({
+        userId: user?.id,
+        supabase,
+        onClear: () => {
+            setActiveSession(null)
+            setView('dashboard')
+        },
+    })
 
     useEffect(() => {
         let cancelled = false;
@@ -1036,7 +905,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         } catch {
             return
         }
-    }, [supabase, clearClientSessionState, clearSupabaseCookiesBestEffort, clearSupabaseStorageBestEffort])
+    }, [supabase, clearClientSessionState])
 
     useEffect(() => {
         restoreAdminPanelIfNeeded();
@@ -2468,7 +2337,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                 if (current) return current;
                                             } catch { }
                                             try {
-                                                const stored = String(sessionStorage.getItem(ADMIN_PANEL_TAB_KEY) || '').trim();
+                                                const stored = String(sessionStorage.getItem('irontracks_admin_panel_tab') || '').trim();
                                                 if (stored) return stored;
                                             } catch { }
                                             return 'dashboard';
