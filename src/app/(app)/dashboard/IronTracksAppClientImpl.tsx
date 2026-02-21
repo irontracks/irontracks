@@ -26,7 +26,7 @@ import {
     Crown
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { createWorkout, updateWorkout, deleteWorkout, importData, computeWorkoutStreakAndStats, setWorkoutArchived, setWorkoutSortOrder } from '@/actions/workout-actions';
+import { createWorkout, updateWorkout, deleteWorkout, importData, setWorkoutArchived, setWorkoutSortOrder } from '@/actions/workout-actions';
 
 import LoginScreen from '@/components/LoginScreen';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -70,8 +70,11 @@ import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { getLatestWhatsNew } from '@/content/whatsNew'
 import GuidedTour from '@/components/onboarding/GuidedTour'
 import { getTourSteps } from '@/utils/tourSteps'
-import { cacheGetWorkouts, cacheSetWorkouts, flushOfflineQueue, getOfflineQueueSummary, getPendingCount, isOnline } from '@/lib/offline/offlineSync'
+import { cacheGetWorkouts, cacheSetWorkouts } from '@/lib/offline/offlineSync'
 import OfflineSyncModal from '@/components/OfflineSyncModal'
+import { useOfflineSync } from '@/hooks/useOfflineSync'
+import { useVipAccess } from '@/hooks/useVipAccess'
+import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'
 
 import {
     DirectChatState,
@@ -79,9 +82,7 @@ import {
     ActiveSession,
     ActiveWorkoutSession,
     PendingUpdate,
-    VipStatus,
     TourState,
-    SyncState,
     DuplicateGroup,
     Workout,
     Exercise,
@@ -90,6 +91,7 @@ import {
 import type { AdminUser } from '@/types/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
@@ -214,7 +216,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     });
     const [stats, setStats] = useState({ workouts: 0, exercises: 0, activeStreak: 0 });
-    const [streakStats, setStreakStats] = useState<WorkoutStreak | null>(null);
+    // Streak stats — extracted to useWorkoutStreak hook (userId resolved after auth)
+    const { streakStats, setStreakStats } = useWorkoutStreak(user?.id);
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
     const [importCode, setImportCode] = useState('');
@@ -258,18 +261,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate | null>(null)
     const [isCoach, setIsCoach] = useState(false);
     const initialRole = String(initialProfileObj?.role || '').toLowerCase()
-    const [vipAccess, setVipAccess] = useState(() => ({
-        loaded: initialRole === 'admin' || initialRole === 'teacher',
-        hasVip: initialRole === 'admin' || initialRole === 'teacher',
-    }))
-    const [vipStatus, setVipStatus] = useState<VipStatus | null>(null)
-
-    useEffect(() => {
-        if (!user?.id) return
-        fetch('/api/vip/status').then(r => r.json()).then(d => {
-            if (d?.ok) setVipStatus(d)
-        }).catch(() => { })
-    }, [user?.id])
+    // VIP access & status — extracted to useVipAccess hook
+    const { vipAccess, setVipAccess, vipStatus, setVipStatus } = useVipAccess({
+        userId: user?.id,
+        initialRole,
+    })
 
     const [hasUnreadChat, setHasUnreadChat] = useState(false);
     const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
@@ -300,7 +296,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const TOUR_VERSION = 1
     const [tourOpen, setTourOpen] = useState(false)
     const [tourBoot, setTourBoot] = useState<TourState>({ loaded: false, completed: false, skipped: false })
-    const [syncState, setSyncState] = useState<SyncState>({ online: true, syncing: false, pending: 0, failed: 0, due: 0 })
+    // Offline sync state — extracted to useOfflineSync hook
+    const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
+        userId: user?.id,
+        settings: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+            ? (userSettingsApi.settings as Record<string, unknown>)
+            : null,
+    })
     const [offlineSyncOpen, setOfflineSyncOpen] = useState(false)
 
     // Local fallback to guarantee the tour doesn't re-open when DB upsert fails/offline.
@@ -399,73 +401,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open';
 
-    const refreshSyncState = useCallback(async () => {
-        try {
-            const online = isOnline()
-            const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
-            const offlineSyncV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true
-            if (offlineSyncV2Enabled) {
-                const sum = await getOfflineQueueSummary({ userId: user?.id })
-                if (sum?.ok) {
-                    setSyncState((prev) => ({
-                        ...prev,
-                        online: sum.online !== false,
-                        pending: Number(sum.pending || 0),
-                        failed: Number(sum.failed || 0),
-                        due: Number(sum.due || 0),
-                    }))
-                    return
-                }
-            }
-            const pending = await getPendingCount()
-            setSyncState((prev) => ({ ...prev, online, pending, failed: 0, due: 0 }))
-        } catch {
-            setSyncState((prev) => ({ ...prev, online: isOnline() }))
-        }
-    }, [user?.id, userSettingsApi?.settings])
-
-    const runFlushQueue = useCallback(async () => {
-        try {
-            if (!isOnline()) {
-                setSyncState((prev) => ({ ...prev, online: false }))
-                return
-            }
-            setSyncState((prev) => ({ ...prev, syncing: true, online: true }))
-            await flushOfflineQueue({ max: 8 })
-        } finally {
-            setSyncState((prev) => ({ ...prev, syncing: false }))
-            await refreshSyncState()
-        }
-    }, [refreshSyncState])
-
-    useEffect(() => {
-        refreshSyncState()
-        const onChanged = () => refreshSyncState()
-        const onOnline = () => runFlushQueue()
-        const onOffline = () => refreshSyncState()
-        try {
-            window.addEventListener('irontracks.offlineQueueChanged', onChanged)
-            window.addEventListener('online', onOnline)
-            window.addEventListener('offline', onOffline)
-        } catch { }
-        return () => {
-            try {
-                window.removeEventListener('irontracks.offlineQueueChanged', onChanged)
-                window.removeEventListener('online', onOnline)
-                window.removeEventListener('offline', onOffline)
-            } catch { }
-        }
-    }, [refreshSyncState, runFlushQueue])
-
-    useEffect(() => {
-        if (!user?.id) return
-        if (!isOnline()) return
-        if ((syncState?.pending || 0) <= 0) return
-        const t = setInterval(() => {
-            runFlushQueue()
-        }, 15000)
-        return () => clearInterval(t)
-    }, [runFlushQueue, syncState?.pending, user?.id])
+    // refreshSyncState, runFlushQueue, syncState effects — handled by useOfflineSync hook above
 
     const logTourEvent = useCallback(async (event: unknown, payload: unknown) => {
         try {
@@ -1433,26 +1369,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setIsCoach(role === 'teacher' || role === 'admin')
     }, [initialUser, initialProfile])
 
-    useEffect(() => {
-        const uid = user?.id ? String(user.id) : ''
-        if (!uid) return
-        let cancelled = false
-            ; (async () => {
-                try {
-                    const res = await fetch('/api/vip/access', { method: 'GET', credentials: 'include', cache: 'no-store' })
-                    const json = await res.json().catch((): unknown => null)
-                    if (cancelled) return
-                    if (json && json.ok) {
-                        setVipAccess({ loaded: true, hasVip: !!json.hasVip })
-                        return
-                    }
-                    setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
-                } catch {
-                    if (!cancelled) setVipAccess((prev: unknown) => ({ loaded: true, hasVip: !!(prev && typeof prev === 'object' ? (prev as Record<string, unknown>)?.hasVip : false) }))
-                }
-            })()
-        return () => { cancelled = true }
-    }, [user?.id])
+    // vipAccess fetch is handled by useVipAccess hook above
 
     useEffect(() => {
         try {
@@ -1955,35 +1872,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     }, [user, workouts.length]);
 
-    useEffect(() => {
-        if (!user?.id) return;
-        computeWorkoutStreakAndStats()
-            .then(res => {
-                if (res?.ok && res?.data) {
-                    const d = isRecord(res.data) ? (res.data as Record<string, unknown>) : {}
-                    const badgesRaw = Array.isArray(d.badges) ? d.badges : []
-                    const badges = badgesRaw
-                        .filter(isRecord)
-                        .map((b) => ({
-                            id: String(b.id ?? ''),
-                            label: String(b.label ?? ''),
-                            kind: String(b.kind ?? ''),
-                        }))
-                        .filter((b) => !!b.id)
-                    const streak: WorkoutStreak = {
-                        currentStreak: Number(d.currentStreak ?? d.current_streak ?? 0) || 0,
-                        bestStreak: Number(d.bestStreak ?? d.best_streak ?? d.longestStreak ?? d.longest_streak ?? 0) || 0,
-                        totalWorkouts: Number(d.totalWorkouts ?? d.total_workouts ?? 0) || 0,
-                        totalVolumeKg: Number(d.totalVolumeKg ?? d.total_volume_kg ?? 0) || 0,
-                        badges,
-                        lastWorkoutDate: d.lastWorkoutDate != null ? String(d.lastWorkoutDate) : null,
-                        longestStreak: d.longestStreak != null ? Number(d.longestStreak) : undefined,
-                    }
-                    setStreakStats(streak)
-                }
-            })
-            .catch(err => logError('error', 'Erro ao calcular streak:', err));
-    }, [user?.id]);
+    // streakStats fetch is handled by useWorkoutStreak hook above
 
 
 
@@ -3176,16 +3065,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         />
 
                         {view === 'edit' && (
-                            <ExerciseEditor
-                                workout={currentWorkout as unknown as Workout}
-                                onCancel={() => setView('dashboard')}
-                                onChange={(w) => setCurrentWorkout(w as unknown as ActiveSession)}
-                                onSave={handleSaveWorkout}
-                                onSaved={() => {
-                                    fetchWorkouts().catch(() => { });
-                                    setView('dashboard');
-                                }}
-                            />
+                            <SectionErrorBoundary section="Editor de Treino" fullScreen onReset={() => setView('dashboard')}>
+                                <ExerciseEditor
+                                    workout={currentWorkout as unknown as Workout}
+                                    onCancel={() => setView('dashboard')}
+                                    onChange={(w) => setCurrentWorkout(w as unknown as ActiveSession)}
+                                    onSave={handleSaveWorkout}
+                                    onSaved={() => {
+                                        fetchWorkouts().catch(() => { });
+                                        setView('dashboard');
+                                    }}
+                                />
+                            </SectionErrorBoundary>
                         )}
 
                         {view === 'active' && activeSession && (
@@ -3236,33 +3127,37 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         )}
 
                         {view === 'history' && (
-                            <HistoryList
-                                user={user as unknown as AdminUser}
-                                settings={userSettingsApi?.settings ?? null}
-                                onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]); setView('report'); }}
-                                onBack={() => setView('dashboard')}
-                                targetId={user?.id || ''}
-                                targetEmail={user?.email ? String(user.email) : ''}
-                                readOnly={false}
-                                title="Histórico"
-                                vipLimits={vipStatus?.limits as Record<string, unknown>}
-                                onUpgrade={() => setView('vip')}
-                            />
+                            <SectionErrorBoundary section="Histórico" fullScreen onReset={() => setView('dashboard')}>
+                                <HistoryList
+                                    user={user as unknown as AdminUser}
+                                    settings={userSettingsApi?.settings ?? null}
+                                    onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]); setView('report'); }}
+                                    onBack={() => setView('dashboard')}
+                                    targetId={user?.id || ''}
+                                    targetEmail={user?.email ? String(user.email) : ''}
+                                    readOnly={false}
+                                    title="Histórico"
+                                    vipLimits={vipStatus?.limits as Record<string, unknown>}
+                                    onUpgrade={() => setView('vip')}
+                                />
+                            </SectionErrorBoundary>
                         )}
 
                         {/* Evolução removida conforme solicitação */}
 
                         {view === 'report' && reportData.current && (
                             <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe">
-                                <WorkoutReport
-                                    session={reportData.current}
-                                    previousSession={reportData.previous}
-                                    user={user as unknown as AdminUser}
-                                    isVip={vipAccess?.hasVip}
-                                    settings={userSettingsApi?.settings ?? null}
-                                    onUpgrade={() => setView('vip')}
-                                    onClose={() => setView(reportBackView || 'dashboard')}
-                                />
+                                <SectionErrorBoundary section="Relatório" fullScreen onReset={() => setView(reportBackView || 'dashboard')}>
+                                    <WorkoutReport
+                                        session={reportData.current}
+                                        previousSession={reportData.previous}
+                                        user={user as unknown as AdminUser}
+                                        isVip={vipAccess?.hasVip}
+                                        settings={userSettingsApi?.settings ?? null}
+                                        onUpgrade={() => setView('vip')}
+                                        onClose={() => setView(reportBackView || 'dashboard')}
+                                    />
+                                </SectionErrorBoundary>
                             </div>
                         )}
 
@@ -3395,13 +3290,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                         {view === 'chat' && (
                             <div className="absolute inset-0 z-50 bg-neutral-900">
-                                <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                <SectionErrorBoundary section="Chat" fullScreen onReset={() => setView('dashboard')}>
+                                    <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                </SectionErrorBoundary>
                             </div>
                         )}
 
                         {view === 'globalChat' && (
                             <div className="absolute inset-0 z-50 bg-neutral-900">
-                                <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                <SectionErrorBoundary section="Chat Global" fullScreen onReset={() => setView('dashboard')}>
+                                    <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                </SectionErrorBoundary>
                             </div>
                         )}
 
@@ -3448,7 +3347,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                         {view === 'admin' && (
                             <div className="fixed inset-0 z-[60]">
-                                <AdminPanelV2 user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                <SectionErrorBoundary section="Painel Admin" fullScreen onReset={() => setView('dashboard')}>
+                                    <AdminPanelV2 user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                </SectionErrorBoundary>
                             </div>
                         )}
                     </div>
@@ -3663,7 +3564,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                     {/* Admin Panel Modal controlled by State */}
                     {showAdminPanel && (
-                        <AdminPanelV2 user={user as unknown as AdminUser} onClose={closeAdminPanel} />
+                        <SectionErrorBoundary section="Painel Admin" fullScreen onReset={closeAdminPanel}>
+                            <AdminPanelV2 user={user as unknown as AdminUser} onClose={closeAdminPanel} />
+                        </SectionErrorBoundary>
                     )}
 
                     {whatsNewOpen && (

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -103,7 +104,6 @@ export async function POST() {
 
     return NextResponse.json({ ok: true, planId: productId, expiresDate })
   } catch (e: unknown) {
-    const msg = (e as { message?: string })?.message ? String((e as { message?: string }).message) : String(e || 'error')
-    return NextResponse.json({ ok: false, error: msg }, { status: 400 })
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 400 })
   }
 }

@@ -3,6 +3,7 @@ import { requireRoleWithBearer } from '@/utils/auth/route'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
 
+// No body/params to validate
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
