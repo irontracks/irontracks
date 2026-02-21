@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const ZodBodySchema = z
   .object({
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, videos })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

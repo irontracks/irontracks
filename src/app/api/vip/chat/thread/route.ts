@@ -31,7 +31,7 @@ export async function GET() {
       .single()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, thread: data })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
 }

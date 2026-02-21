@@ -5,14 +5,15 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeArray = <T,>(v: any): T[] => (Array.isArray(v) ? (v as T[]) : [])
+const safeArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
-const normalizeMessages = (messages: any) => {
+const normalizeMessages = (messages: unknown) => {
   return safeArray<any>(messages)
     .map((m) => {
       const role = String(m?.role || '').trim()
@@ -89,13 +90,13 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent([{ text: prompt }] as any)
+    const result = await model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0])
     const text = String((await result?.response?.text()) || '').trim()
     if (!text) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
     await incrementVipUsage(supabase, userId, 'chat')
     return NextResponse.json({ ok: true, content: text })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

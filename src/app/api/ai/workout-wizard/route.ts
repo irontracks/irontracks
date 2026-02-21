@@ -5,12 +5,13 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeJsonParse = (raw: any) => {
+const safeJsonParse = (raw: unknown) => {
   try {
     if (!raw) return null
     if (typeof raw === 'object') return raw
@@ -33,21 +34,22 @@ const extractJsonFromModelText = (text: string) => {
   return safeJsonParse(cleaned.slice(start, end + 1))
 }
 
-const normalizeDraft = (draft: any) => {
+const normalizeDraft = (draft: unknown) => {
   const d = draft && typeof draft === 'object' ? draft : null
   if (!d) return null
   const title = String((d as Record<string, unknown>).title || '').trim() || 'Treino'
   const exsRaw = Array.isArray((d as Record<string, unknown>).exercises) ? ((d as Record<string, unknown>).exercises as unknown[]) : []
   const exercises = exsRaw
-    .map((e: any) => {
-      const name = String(e?.name || '').trim()
+    .map((e: unknown) => {
+      const ex = e as Record<string, unknown>
+      const name = String(ex?.name || '').trim()
       if (!name) return null
       return {
         name,
-        sets: Number(e?.sets) || 3,
-        reps: e?.reps ?? '8-12',
-        restTime: Number(e?.restTime ?? e?.rest_time) || 90,
-        notes: e?.notes ?? '',
+        sets: Number(ex?.sets) || 3,
+        reps: ex?.reps ?? '8-12',
+        restTime: Number(ex?.restTime ?? ex?.rest_time) || 90,
+        notes: ex?.notes ?? '',
       }
     })
     .filter(Boolean)
@@ -136,7 +138,7 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent([{ text: prompt }] as any)
+    const result = await model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0])
     const text = String((await result?.response?.text()) || '')
     const parsed = extractJsonFromModelText(text)
     if (!parsed) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
@@ -155,7 +157,7 @@ export async function POST(req: Request) {
     if (!draftValidated.success) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
     await incrementVipUsage(supabase, userId, 'wizard')
     return NextResponse.json({ ok: true, draft: draftValidated.data })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }
