@@ -36,7 +36,7 @@ import AdminWorkoutEditor, { AdminWorkout } from './AdminWorkoutEditor';
 import RequestsTab from '@/components/admin/RequestsTab';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { useDialog } from '@/contexts/DialogContext';
-import { sendBroadcastMessage, clearAllStudents, clearAllTeachers, clearAllWorkouts, deleteTeacher, updateTeacher, addTeacher, exportAllData, importAllData } from '@/actions/admin-actions';
+import { exportAllData, importAllData } from '@/actions/admin-actions';
 import { updateWorkout, deleteWorkout } from '@/actions/workout-actions';
 import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
@@ -79,22 +79,136 @@ export type AdminPanelV2Props = {
 const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     const { alert, confirm, prompt } = useDialog();
     const ctrl = useAdminPanelController({ user, onClose });
-    const supabase = useStableSupabaseClient();
-    const getAdminAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
-        try {
-            if (!supabase) return {};
-            const { data } = await supabase.auth.getSession();
-            const token = data?.session?.access_token || '';
-            if (!token) return {};
-            return { Authorization: `Bearer ${token}` };
-        } catch {
-            return {};
-        }
-    }, [supabase]);
 
-    // Permission Logic
-    const isAdmin = user?.role === 'admin';
-    const isTeacher = user?.role === 'teacher';
+    // Destructure all state + actions from controller (single source of truth)
+    const {
+        isAdmin, isTeacher,
+        tab, setTab,
+        subTab, setSubTab,
+        usersList, setUsersList,
+        teachersList, setTeachersList,
+        templates, setTemplates,
+        selectedTeacher, setSelectedTeacher,
+        selectedStudent, setSelectedStudent,
+        teacherDetailTab, setTeacherDetailTab,
+        teacherStudents, setTeacherStudents,
+        teacherStudentsLoading, setTeacherStudentsLoading,
+        teacherTemplatesRows, setTeacherTemplatesRows,
+        teacherTemplatesLoading, setTeacherTemplatesLoading,
+        teacherTemplatesCursor, setTeacherTemplatesCursor,
+        teacherHistoryRows, setTeacherHistoryRows,
+        teacherHistoryLoading, setTeacherHistoryLoading,
+        teacherHistoryCursor, setTeacherHistoryCursor,
+        teacherInboxItems, setTeacherInboxItems,
+        teacherInboxLoading, setTeacherInboxLoading,
+        studentWorkouts, setStudentWorkouts,
+        syncedWorkouts, setSyncedWorkouts,
+        assessments, setAssessments,
+        studentCheckinsRows, setStudentCheckinsRows,
+        studentCheckinsLoading, setStudentCheckinsLoading,
+        studentCheckinsError, setStudentCheckinsError,
+        studentCheckinsRange, setStudentCheckinsRange,
+        studentCheckinsFilter, setStudentCheckinsFilter,
+        loadedStudentInfo,
+        executionVideos, setExecutionVideos,
+        executionVideosLoading, setExecutionVideosLoading,
+        executionVideosError, setExecutionVideosError,
+        executionVideoModalOpen, setExecutionVideoModalOpen,
+        executionVideoModalUrl, setExecutionVideoModalUrl,
+        executionVideoFeedbackDraft, setExecutionVideoFeedbackDraft,
+        showRegisterModal, setShowRegisterModal,
+        newStudent, setNewStudent,
+        registering, setRegistering,
+        editingStudent, setEditingStudent,
+        editedStudent, setEditedStudent,
+        showTeacherModal, setShowTeacherModal,
+        newTeacher, setNewTeacher,
+        addingTeacher, setAddingTeacher,
+        editingTeacher, setEditingTeacher,
+        editingTemplate, setEditingTemplate,
+        editingStudentWorkout, setEditingStudentWorkout,
+        viewWorkout, setViewWorkout,
+        exportOpen, setExportOpen,
+        historyOpen, setHistoryOpen,
+        studentQuery, setStudentQuery,
+        studentStatusFilter, setStudentStatusFilter,
+        teacherQuery, setTeacherQuery,
+        teacherStatusFilter, setTeacherStatusFilter,
+        templateQuery, setTemplateQuery,
+        dangerOpen, setDangerOpen,
+        dangerActionLoading, setDangerActionLoading,
+        dangerStudentsConfirm, setDangerStudentsConfirm,
+        dangerTeachersConfirm, setDangerTeachersConfirm,
+        dangerWorkoutsConfirm, setDangerWorkoutsConfirm,
+        moreTabsOpen, setMoreTabsOpen,
+        systemExporting, setSystemExporting,
+        systemImporting, setSystemImporting,
+        systemFileInputRef,
+        prioritiesItems, setPrioritiesItems,
+        prioritiesLoading, setPrioritiesLoading,
+        prioritiesError, setPrioritiesError,
+        prioritiesSettingsOpen, setPrioritiesSettingsOpen,
+        prioritiesSettings, setPrioritiesSettings,
+        prioritiesSettingsLoading, setPrioritiesSettingsLoading,
+        prioritiesSettingsError, setPrioritiesSettingsError,
+        prioritiesSettingsPrefRef,
+        prioritiesComposeOpen, setPrioritiesComposeOpen,
+        prioritiesComposeStudentId, setPrioritiesComposeStudentId,
+        prioritiesComposeKind, setPrioritiesComposeKind,
+        prioritiesComposeText, setPrioritiesComposeText,
+        errorReports, setErrorReports,
+        errorsLoading, setErrorsLoading,
+        errorsQuery, setErrorsQuery,
+        errorsStatusFilter, setErrorsStatusFilter,
+        videoQueue, setVideoQueue,
+        videoLoading, setVideoLoading,
+        videoMissingCount, setVideoMissingCount,
+        videoMissingLoading, setVideoMissingLoading,
+        videoExerciseName, setVideoExerciseName,
+        videoBackfillLimit, setVideoBackfillLimit,
+        videoCycleRunning, setVideoCycleRunning,
+        videoCycleStats, setVideoCycleStats,
+        videoCycleStopRef,
+        exerciseAliasesReview, setExerciseAliasesReview,
+        exerciseAliasesLoading, setExerciseAliasesLoading,
+        exerciseAliasesError, setExerciseAliasesError,
+        exerciseAliasesBackfillLoading, setExerciseAliasesBackfillLoading,
+        exerciseAliasesNotice, setExerciseAliasesNotice,
+        userActivityQuery, setUserActivityQuery,
+        userActivityRole, setUserActivityRole,
+        userActivityUsers, setUserActivityUsers,
+        userActivityLoading, setUserActivityLoading,
+        userActivityError, setUserActivityError,
+        userActivitySelected, setUserActivitySelected,
+        userActivityDays, setUserActivityDays,
+        userActivitySummary, setUserActivitySummary,
+        userActivitySummaryLoading, setUserActivitySummaryLoading,
+        userActivityEvents, setUserActivityEvents,
+        userActivityEventsLoading, setUserActivityEventsLoading,
+        userActivityEventsBefore, setUserActivityEventsBefore,
+        userActivityErrors, setUserActivityErrors,
+        userActivityErrorsLoading, setUserActivityErrorsLoading,
+        userActivityQueryDebounceRef,
+        studentsWithTeacherFiltered,
+        studentsWithoutTeacherFiltered,
+        teachersFiltered,
+        templatesFiltered,
+        coachInboxItems,
+        handleRegisterStudent,
+        handleAddTeacher,
+        handleUpdateTeacher,
+        handleSendBroadcast,
+        handleUpdateStudentTeacher,
+        handleToggleStudentStatus,
+        handleDeleteStudent,
+        getAdminAuthHeaders,
+        supabase,
+        loading, setLoading,
+        broadcastMsg, setBroadcastMsg,
+        broadcastTitle, setBroadcastTitle,
+        sendingBroadcast, setSendingBroadcast,
+    } = ctrl;
+
     const unauthorized = !isAdmin && !isTeacher;
 
     const getSetsCount = (value: unknown): number => {
@@ -132,113 +246,6 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         }
     })();
 
-    const [tab, setTab] = useState<string>('dashboard');
-    const [usersList, setUsersList] = useState<AdminUser[]>([]);
-    const [teachersList, setTeachersList] = useState<AdminTeacher[]>([]);
-    const [selectedTeacher, setSelectedTeacher] = useState<AdminTeacher | null>(null);
-    const [teacherDetailTab, setTeacherDetailTab] = useState<string>('students');
-    const [teacherStudents, setTeacherStudents] = useState<AdminUser[]>([]);
-    const [teacherStudentsLoading, setTeacherStudentsLoading] = useState<boolean>(false);
-    const [teacherTemplatesRows, setTeacherTemplatesRows] = useState<AdminWorkoutTemplate[]>([]);
-    const [teacherTemplatesLoading, setTeacherTemplatesLoading] = useState<boolean>(false);
-    const [teacherTemplatesCursor, setTeacherTemplatesCursor] = useState<string | null>(null);
-    const [teacherHistoryRows, setTeacherHistoryRows] = useState<UnknownRecord[]>([]);
-    const [teacherHistoryLoading, setTeacherHistoryLoading] = useState<boolean>(false);
-    const [teacherHistoryCursor, setTeacherHistoryCursor] = useState<{ cursor_date?: string; cursor_created_at?: string } | null>(null);
-    const [teacherInboxItems, setTeacherInboxItems] = useState<AdminUser[]>([]);
-    const [teacherInboxLoading, setTeacherInboxLoading] = useState<boolean>(false);
-    const [templates, setTemplates] = useState<AdminWorkoutTemplate[]>([]);
-    const [templatesUserId, setTemplatesUserId] = useState<string>('');
-    const [myWorkoutsCount, setMyWorkoutsCount] = useState<number>(0);
-    const [selectedStudent, setSelectedStudent] = useState<AdminUser | null>(null);
-    const [subTab, setSubTab] = useState<string>('workouts');
-    const [studentWorkouts, setStudentWorkouts] = useState<UnknownRecord[]>([]);
-    const [syncedWorkouts, setSyncedWorkouts] = useState<UnknownRecord[]>([]);
-    const [assessments, setAssessments] = useState<UnknownRecord[]>([]);
-    const [editingStudent, setEditingStudent] = useState<boolean>(false);
-    const [editedStudent, setEditedStudent] = useState<{ name: string; email: string }>({ name: '', email: '' });
-    const [editingTemplate, setEditingTemplate] = useState<AdminWorkoutTemplate | null>(null);
-    const [editingStudentWorkout, setEditingStudentWorkout] = useState<UnknownRecord | null>(null);
-    const [viewWorkout, setViewWorkout] = useState<UnknownRecord | null>(null);
-    const [exportOpen, setExportOpen] = useState<boolean>(false);
-    const [historyOpen, setHistoryOpen] = useState<boolean>(false);
-    const [executionVideos, setExecutionVideos] = useState<ExecutionVideo[]>([]);
-    const [executionVideosLoading, setExecutionVideosLoading] = useState<boolean>(false);
-    const [executionVideosError, setExecutionVideosError] = useState<string>('');
-    const [executionVideoModalOpen, setExecutionVideoModalOpen] = useState<boolean>(false);
-    const [executionVideoModalUrl, setExecutionVideoModalUrl] = useState<string>('');
-    const [executionVideoFeedbackDraft, setExecutionVideoFeedbackDraft] = useState<UnknownRecord>({});
-    const [studentCheckinsRange, setStudentCheckinsRange] = useState<string>('7d');
-    const [studentCheckinsFilter, setStudentCheckinsFilter] = useState<string>('all');
-    const [studentCheckinsLoading, setStudentCheckinsLoading] = useState<boolean>(false);
-    const [studentCheckinsError, setStudentCheckinsError] = useState<string>('');
-    const [studentCheckinsRows, setStudentCheckinsRows] = useState<UnknownRecord[]>([]);
-    const loadedStudentInfo = useRef<Set<string>>(new Set<string>());
-    const [systemExporting, setSystemExporting] = useState<boolean>(false);
-    const [systemImporting, setSystemImporting] = useState<boolean>(false);
-    const systemFileInputRef = useRef<HTMLInputElement | null>(null);
-    const [userActivityQuery, setUserActivityQuery] = useState<string>('');
-    const [userActivityRole, setUserActivityRole] = useState<string>('all');
-    const [userActivityUsers, setUserActivityUsers] = useState<AdminUser[]>([]);
-    const [userActivityLoading, setUserActivityLoading] = useState<boolean>(false);
-    const [userActivityError, setUserActivityError] = useState<string>('');
-    const [userActivitySelected, setUserActivitySelected] = useState<AdminUser | null>(null);
-    const [userActivityDays, setUserActivityDays] = useState<number>(7);
-    const [userActivitySummary, setUserActivitySummary] = useState<UnknownRecord | null>(null);
-    const [userActivitySummaryLoading, setUserActivitySummaryLoading] = useState<boolean>(false);
-    const [userActivityEvents, setUserActivityEvents] = useState<UnknownRecord[]>([]);
-    const [userActivityEventsLoading, setUserActivityEventsLoading] = useState<boolean>(false);
-    const [userActivityEventsBefore, setUserActivityEventsBefore] = useState<string | null>(null);
-    const [userActivityErrors, setUserActivityErrors] = useState<UnknownRecord[]>([]);
-    const [userActivityErrorsLoading, setUserActivityErrorsLoading] = useState<boolean>(false);
-    const userActivityQueryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [dangerOpen, setDangerOpen] = useState<boolean>(false);
-    const [moreTabsOpen, setMoreTabsOpen] = useState<boolean>(false);
-    const [dangerStudentsConfirm, setDangerStudentsConfirm] = useState<string>('');
-    const [dangerTeachersConfirm, setDangerTeachersConfirm] = useState<string>('');
-    const [dangerWorkoutsConfirm, setDangerWorkoutsConfirm] = useState<string>('');
-    const [dangerActionLoading, setDangerActionLoading] = useState<string | null>(null);
-
-    const [studentQuery, setStudentQuery] = useState('');
-    const [studentStatusFilter, setStudentStatusFilter] = useState('all');
-    const [teacherQuery, setTeacherQuery] = useState('');
-    const [teacherStatusFilter, setTeacherStatusFilter] = useState('all');
-    const [templateQuery, setTemplateQuery] = useState('');
-
-    const [videoExerciseName, setVideoExerciseName] = useState<string>('');
-    const [videoQueue, setVideoQueue] = useState<UnknownRecord[]>([]);
-    const [videoLoading, setVideoLoading] = useState<boolean>(false);
-
-    const [prioritiesItems, setPrioritiesItems] = useState<UnknownRecord[]>([]);
-    const [prioritiesLoading, setPrioritiesLoading] = useState<boolean>(false);
-    const [prioritiesError, setPrioritiesError] = useState<string>('');
-    const [prioritiesSettingsOpen, setPrioritiesSettingsOpen] = useState<boolean>(false);
-    const [prioritiesSettingsLoading, setPrioritiesSettingsLoading] = useState<boolean>(false);
-    const [prioritiesSettingsError, setPrioritiesSettingsError] = useState<string>('');
-    const [prioritiesSettings, setPrioritiesSettings] = useState(() => ({ ...COACH_INBOX_DEFAULTS }));
-    const prioritiesSettingsPrefRef = useRef<UnknownRecord | null>(null);
-    const [prioritiesComposeOpen, setPrioritiesComposeOpen] = useState<boolean>(false);
-    const [prioritiesComposeStudentId, setPrioritiesComposeStudentId] = useState<string>('');
-    const [prioritiesComposeKind, setPrioritiesComposeKind] = useState<string>('');
-    const [prioritiesComposeText, setPrioritiesComposeText] = useState<string>('');
-    const [videoBackfillLimit, setVideoBackfillLimit] = useState<string>('20');
-    const [videoMissingCount, setVideoMissingCount] = useState<number | null>(null);
-    const [videoMissingLoading, setVideoMissingLoading] = useState<boolean>(false);
-    const [videoCycleRunning, setVideoCycleRunning] = useState<boolean>(false);
-    const [videoCycleStats, setVideoCycleStats] = useState<{ processed: number; created: number; skipped: number }>({ processed: 0, created: 0, skipped: 0 });
-    const videoCycleStopRef = useRef<boolean>(false);
-
-    const [errorReports, setErrorReports] = useState<ErrorReport[]>([]);
-    const [errorsLoading, setErrorsLoading] = useState<boolean>(false);
-    const [errorsQuery, setErrorsQuery] = useState<string>('');
-    const [errorsStatusFilter, setErrorsStatusFilter] = useState<string>('all');
-
-    const [exerciseAliasesReview, setExerciseAliasesReview] = useState<UnknownRecord[]>([]);
-    const [exerciseAliasesLoading, setExerciseAliasesLoading] = useState<boolean>(false);
-    const [exerciseAliasesError, setExerciseAliasesError] = useState<string>('');
-    const [exerciseAliasesBackfillLoading, setExerciseAliasesBackfillLoading] = useState<boolean>(false);
-    const [exerciseAliasesNotice, setExerciseAliasesNotice] = useState<string>('');
-
     useEffect(() => {
         if (unauthorized) onClose && onClose();
     }, [unauthorized, onClose]);
@@ -253,57 +260,6 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     }, [moreTabsOpen]);
 
     const normalizeText = useCallback((value: unknown) => String(value || '').toLowerCase(), []);
-
-    const statusMatches = useCallback((rowStatus: unknown, selected: unknown) => {
-        if (!selected || selected === 'all') return true;
-        return normalizeText(rowStatus) === normalizeText(selected);
-    }, [normalizeText]);
-
-    const studentMatchesQuery = useCallback((s: AdminUser) => {
-        const q = normalizeText(studentQuery).trim();
-        if (!q) return true;
-        return normalizeText(s?.name).includes(q) || normalizeText(s?.email).includes(q);
-    }, [normalizeText, studentQuery]);
-
-    const teacherMatchesQuery = useCallback((t: AdminTeacher) => {
-        const q = normalizeText(teacherQuery).trim();
-        if (!q) return true;
-        return normalizeText(t?.name).includes(q) || normalizeText(t?.email).includes(q);
-    }, [normalizeText, teacherQuery]);
-
-    const templateMatchesQuery = useCallback((t: AdminWorkoutTemplate) => {
-        const q = normalizeText(templateQuery).trim();
-        if (!q) return true;
-        return normalizeText(t?.title).includes(q); // Template uses title, not name
-    }, [normalizeText, templateQuery]);
-
-    const studentsWithTeacherFiltered = useMemo<AdminUser[]>(() => {
-        const list = Array.isArray(usersList) ? usersList : [];
-        return list
-            .filter((s) => !!s?.teacher_id)
-            .filter(studentMatchesQuery)
-            .filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
-    }, [studentStatusFilter, studentMatchesQuery, statusMatches, usersList]);
-
-    const studentsWithoutTeacherFiltered = useMemo<AdminUser[]>(() => {
-        const list = Array.isArray(usersList) ? usersList : [];
-        return list
-            .filter((s) => !s?.teacher_id)
-            .filter(studentMatchesQuery)
-            .filter((s) => statusMatches(s?.status || 'pendente', studentStatusFilter));
-    }, [studentStatusFilter, studentMatchesQuery, statusMatches, usersList]);
-
-    const teachersFiltered = useMemo<AdminTeacher[]>(() => {
-        const list = Array.isArray(teachersList) ? teachersList : [];
-        return list
-            .filter(teacherMatchesQuery)
-            .filter((t) => statusMatches(t?.status || 'pendente', teacherStatusFilter));
-    }, [statusMatches, teacherMatchesQuery, teacherStatusFilter, teachersList]);
-
-    const templatesFiltered = useMemo<AdminWorkoutTemplate[]>(() => {
-        const list = Array.isArray(templates) ? templates : [];
-        return list.filter(templateMatchesQuery);
-    }, [templateMatchesQuery, templates]);
 
     const errorsFiltered = useMemo<UnknownRecord[]>(() => {
         const list = Array.isArray(errorReports) ? errorReports : [];
@@ -322,89 +278,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             });
     }, [errorReports, errorsQuery, errorsStatusFilter, normalizeText]);
 
-    const coachInboxItems = useMemo<UnknownRecord[]>(() => {
-        if (!isTeacher) return [];
-        const list = Array.isArray(usersList) ? usersList : [];
-        const today = new Date();
-        const todayMs = today.getTime();
-        if (!Number.isFinite(todayMs)) return [];
-
-        const safeDays = (value: unknown) => {
-            const n = Number(value);
-            if (!Number.isFinite(n) || n < 0) return 0;
-            return n;
-        };
-
-        const items = list
-            .filter((s) => s && typeof s === 'object' && s.teacher_id === user?.id)
-            .map((s) => {
-                const workouts = Array.isArray(s.workouts) ? s.workouts : [];
-                const nonTemplate = workouts.filter((w) => w && typeof w === 'object' && w.is_template !== true);
-
-                if (!nonTemplate.length) {
-                    return {
-                        id: s.id,
-                        name: s.name || s.email || '',
-                        email: s.email || '',
-                        status: s.status || 'pendente',
-                        hasWorkouts: false,
-                        daysSinceLastWorkout: null,
-                    };
-                }
-
-                let lastWorkoutMs = 0;
-                nonTemplate.forEach((w) => {
-                    try {
-                        const raw = w.date || w.completed_at || w.created_at;
-                        if (!raw) return;
-                        const rawUnknown = raw as unknown;
-                        const d = rawUnknown && typeof rawUnknown === 'object' && typeof (rawUnknown as { toDate?: unknown }).toDate === 'function'
-                            ? (rawUnknown as { toDate: () => Date }).toDate()
-                            : new Date(raw);
-                        const t = d?.getTime ? d.getTime() : NaN;
-                        if (!Number.isFinite(t)) return;
-                        if (t > lastWorkoutMs) lastWorkoutMs = t;
-                    } catch { }
-                });
-
-                if (!lastWorkoutMs) {
-                    return {
-                        id: s.id,
-                        name: s.name || s.email || '',
-                        email: s.email || '',
-                        status: s.status || 'pendente',
-                        hasWorkouts: false,
-                        daysSinceLastWorkout: null,
-                    };
-                }
-
-                const diffMs = todayMs - lastWorkoutMs;
-                const days = diffMs > 0 ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) : 0;
-
-                return {
-                    id: s.id,
-                    name: s.name || s.email || '',
-                    email: s.email || '',
-                    status: s.status || 'pendente',
-                    hasWorkouts: true,
-                    daysSinceLastWorkout: days,
-                };
-            })
-            .filter((item) => item && typeof item === 'object')
-            .filter((item) => {
-                if (!item.hasWorkouts) return true;
-                const days = safeDays(item.daysSinceLastWorkout);
-                return days >= COACH_INBOX_INACTIVE_THRESHOLD_DAYS;
-            });
-
-        items.sort((a, b) => {
-            const aDays = a.hasWorkouts ? safeDays(a.daysSinceLastWorkout) : Number.MAX_SAFE_INTEGER;
-            const bDays = b.hasWorkouts ? safeDays(b.daysSinceLastWorkout) : Number.MAX_SAFE_INTEGER;
-            return bDays - aDays;
-        });
-
-        return items.slice(0, 5);
-    }, [isTeacher, usersList, user?.id]);
+    // coachInboxItems — from ctrl (useAdminPanelController)
 
     useEffect(() => {
         if (!selectedStudent) setHistoryOpen(false);
@@ -561,20 +435,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             }))
         });
     };
-    const [loading, setLoading] = useState<boolean>(false);
-
-    const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
-    const [newStudent, setNewStudent] = useState<{ name: string; email: string }>({ name: '', email: '' });
-    const [registering, setRegistering] = useState<boolean>(false);
-
-    const [broadcastMsg, setBroadcastMsg] = useState<string>('');
-    const [broadcastTitle, setBroadcastTitle] = useState<string>('');
-    const [sendingBroadcast, setSendingBroadcast] = useState<boolean>(false);
-
-    const [showTeacherModal, setShowTeacherModal] = useState<boolean>(false);
-    const [newTeacher, setNewTeacher] = useState<{ name: string; email: string; phone: string; birth_date: string }>({ name: '', email: '', phone: '', birth_date: '' });
-    const [addingTeacher, setAddingTeacher] = useState<boolean>(false);
-    const [editingTeacher, setEditingTeacher] = useState<UnknownRecord | null>(null);
+    // loading, showRegisterModal, newStudent, registering, showTeacherModal, newTeacher,
+    // addingTeacher, editingTeacher, broadcastMsg, broadcastTitle, sendingBroadcast — from ctrl
 
     // DIAGNOSTIC MODE: Connection Test
     const [debugError, setDebugError] = useState<string | null>(null);
@@ -899,7 +761,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             try {
                 const { data: { user: currentUser } } = await supabase.auth.getUser();
                 if (!currentUser) return;
-                setTemplatesUserId(currentUser.id || '');
+                // templatesUserId tracked by ctrl (useAdminPanelController)
                 let list = [];
                 if (isAdmin || isTeacher) {
                     try {
@@ -1127,56 +989,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         };
     }, [tab, isAdmin, supabase]);
 
-    useEffect(() => {
-        const fetchMyWorkoutsCount = async () => {
-            const { data: { user: currentUser } } = await supabase.auth.getUser();
-            if (!currentUser) { setMyWorkoutsCount(0); return; }
-            try {
-                if (isAdmin) {
-                    const authHeaders = await getAdminAuthHeaders();
-                    const res = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
-                    const json = await res.json();
-                    if (json.ok) {
-                        const byTitle = new Map();
-                        for (const w of (json.rows || [])) {
-                            const key = workoutTitleKey(w.name);
-                            if (!byTitle.has(key)) byTitle.set(key, w);
-                        }
-                        const count = byTitle.size;
-                        if (count > 0) setMyWorkoutsCount(count);
-                        else {
-                            const { data } = await supabase
-                                .from('workouts')
-                                .select('id, name, is_template, created_by, user_id')
-                                .or(`created_by.eq.${currentUser.id},user_id.eq.${currentUser.id},is_template.eq.true`)
-                                .order('name');
-                            const list = (data || []).filter(w => (w.is_template === true || w.created_by === currentUser.id || w.user_id === currentUser.id));
-                            setMyWorkoutsCount(list.length);
-                        }
-                    } else {
-                        const { data } = await supabase
-                            .from('workouts')
-                            .select('id, name, is_template, created_by, user_id')
-                            .or(`created_by.eq.${currentUser.id},user_id.eq.${currentUser.id},is_template.eq.true`)
-                            .order('name');
-                        const list = (data || []).filter(w => (w.is_template === true || w.created_by === currentUser.id || w.user_id === currentUser.id));
-                        setMyWorkoutsCount(list.length);
-                    }
-                } else {
-                    const { data } = await supabase
-                        .from('workouts')
-                        .select('id, name, is_template, created_by, user_id')
-                        .or(`created_by.eq.${currentUser.id},user_id.eq.${currentUser.id}`)
-                        .order('name');
-                    const list = (data || []).filter(w => (w.is_template === true || w.created_by === currentUser.id || w.user_id === currentUser.id));
-                    setMyWorkoutsCount(list.length);
-                }
-            } catch {
-                setMyWorkoutsCount(0);
-            }
-        };
-        if (tab === 'dashboard') fetchMyWorkoutsCount();
-    }, [tab, isAdmin, supabase, getAdminAuthHeaders]);
+    // fetchMyWorkoutsCount effect removed — myWorkoutsCount managed by ctrl (DashboardTab uses it via context)
 
     const fetchPriorities = useCallback(async () => {
         try {
@@ -1575,26 +1388,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         loadTeachers();
     }, [selectedStudent, isAdmin, supabase, getAdminAuthHeaders]);
 
-    const handleRegisterStudent = async () => {
-        if (!newStudent.name || !newStudent.email) return await alert('Preencha nome e email.');
-        setRegistering(true);
-        try {
-            const { data, error } = await supabase
-                .from('students')
-                .insert({ name: newStudent.name, email: newStudent.email, teacher_id: user.id })
-                .select();
-            if (error) throw error;
-            setUsersList(prev => (data?.[0] ? [data[0], ...prev] : prev));
-            setShowRegisterModal(false);
-            setNewStudent({ name: '', email: '' });
-            await alert('Aluno cadastrado com sucesso!', 'Sucesso');
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao cadastrar: ' + msg);
-        } finally {
-            setRegistering(false);
-        }
-    };
+    // handleRegisterStudent — from ctrl
 
     // Assign template workout to selected student (clone workout and exercises)
     const handleAddTemplateToStudent = async (template: UnknownRecord) => {
@@ -1676,22 +1470,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         }
     };
 
-    const handleSendBroadcast = async () => {
-        if (!broadcastTitle || !broadcastMsg) return await alert('Preencha título e mensagem.');
-        setSendingBroadcast(true);
-        try {
-            const res = await sendBroadcastMessage(broadcastTitle, broadcastMsg);
-            if (res.error) throw new Error(String(res.error));
-            await alert('Aviso enviado!', 'Sucesso');
-            setBroadcastTitle('');
-            setBroadcastMsg('');
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao enviar: ' + msg);
-        } finally {
-            setSendingBroadcast(false);
-        }
-    };
+    // handleSendBroadcast — from ctrl
 
     const loadUserActivityUsers = useCallback(async ({ q, role }: { q?: unknown; role?: unknown } = {}) => {
         if (!isAdmin) return;
@@ -1853,45 +1632,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         }
     };
 
-    const handleAddTeacher = async () => {
-        if (!newTeacher.name || !newTeacher.email) return await alert('Preencha nome e email.');
-        setAddingTeacher(true);
-        try {
-            const res = await addTeacher(newTeacher.name, newTeacher.email, newTeacher.phone, newTeacher.birth_date);
-            if (res.error) throw new Error(String(res.error));
-
-            await alert('Professor adicionado com sucesso!');
-            setShowTeacherModal(false);
-            setNewTeacher({ name: '', email: '', phone: '', birth_date: '' });
-            // Trigger refresh (simple way)
-            setTab('dashboard'); setTimeout(() => setTab('teachers'), 100);
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao adicionar professor: ' + msg);
-        } finally {
-            setAddingTeacher(false);
-        }
-    };
-
-    const handleUpdateTeacher = async () => {
-        if (!editingTeacher || !editingTeacher.name || !editingTeacher.email) return await alert('Preencha nome e email.');
-        try {
-            const res = await updateTeacher(editingTeacher.id, {
-                name: editingTeacher.name,
-                email: editingTeacher.email,
-                phone: editingTeacher.phone,
-                birth_date: editingTeacher.birth_date
-            });
-            if (res.error) throw new Error(String(res.error));
-            await alert('Professor atualizado com sucesso!');
-            setEditingTeacher(null);
-            // Trigger refresh
-            setTab('dashboard'); setTimeout(() => setTab('teachers'), 100);
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao atualizar professor: ' + msg);
-        }
-    };
+    // handleAddTeacher — from ctrl
+    // handleUpdateTeacher — from ctrl
 
     const handleDangerAction = async (actionName: string, actionFn: () => Promise<UnknownRecord>) => {
         if (!(await confirm(`Tem certeza que deseja ${actionName}?`, 'ATENÇÃO - PERIGO'))) return false;
@@ -1936,174 +1678,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     const tabKeys = Object.keys(TAB_LABELS);
     const currentTabLabel = TAB_LABELS[tab] || 'VISÃO GERAL';
 
-    const totalStudents = Array.isArray(usersList) ? usersList.length : 0;
-    const studentsWithTeacher = Array.isArray(usersList) ? usersList.filter(s => !!s.teacher_id).length : 0;
-    const studentsWithoutTeacher = Array.isArray(usersList) ? usersList.filter(s => !s.teacher_id).length : 0;
-    const totalTeachers = Array.isArray(teachersList) ? teachersList.length : 0;
-
-    const studentStatusStats = useMemo(() => {
-        const list = Array.isArray(usersList) ? usersList : [];
-        const stats = { pago: 0, pendente: 0, atrasado: 0, cancelar: 0, outros: 0 };
-        for (const s of list) {
-            try {
-                const rawStatus = s && typeof s === 'object' ? s.status : null;
-                const key = String(rawStatus || 'pendente').toLowerCase().trim();
-                if (Object.prototype.hasOwnProperty.call(stats, key)) {
-                    (stats as Record<string, number>)[key] += 1;
-                } else {
-                    stats.outros += 1;
-                }
-            } catch { }
-        }
-        return stats;
-    }, [usersList]);
-
-    const dashboardCharts = useMemo(() => {
-        const baseTotalStudents = typeof totalStudents === 'number' && Number.isFinite(totalStudents) && totalStudents > 0 ? totalStudents : 0;
-        const baseWith = typeof studentsWithTeacher === 'number' && Number.isFinite(studentsWithTeacher) && studentsWithTeacher > 0 ? studentsWithTeacher : 0;
-        const baseWithout = typeof studentsWithoutTeacher === 'number' && Number.isFinite(studentsWithoutTeacher) && studentsWithoutTeacher > 0 ? studentsWithoutTeacher : 0;
-
-        const teacherData = {
-            labels: ['Com professor', 'Sem professor'],
-            datasets: [
-                {
-                    label: 'Alunos',
-                    data: [baseWith, baseWithout],
-                    backgroundColor: ['rgba(250, 204, 21, 0.9)', 'rgba(82, 82, 82, 0.9)'],
-                    borderRadius: 999,
-                    maxBarThickness: 40
-                }
-            ]
-        };
-
-        const totalStatus =
-            studentStatusStats.pago +
-            studentStatusStats.pendente +
-            studentStatusStats.atrasado +
-            studentStatusStats.cancelar +
-            studentStatusStats.outros;
-
-        const statusValues =
-            totalStatus > 0
-                ? [
-                    studentStatusStats.pago,
-                    studentStatusStats.pendente,
-                    studentStatusStats.atrasado,
-                    studentStatusStats.cancelar,
-                    studentStatusStats.outros
-                ]
-                : [0, 0, 0, 0, 0];
-
-        const statusData = {
-            labels: ['Pago', 'Pendente', 'Atrasado', 'Cancelar', 'Outros'],
-            datasets: [
-                {
-                    label: 'Alunos',
-                    data: statusValues,
-                    backgroundColor: [
-                        'rgba(34, 197, 94, 0.9)',
-                        'rgba(234, 179, 8, 0.9)',
-                        'rgba(248, 113, 113, 0.9)',
-                        'rgba(148, 163, 184, 0.9)',
-                        'rgba(82, 82, 82, 0.9)'
-                    ],
-                    borderRadius: 12,
-                    maxBarThickness: 32
-                }
-            ]
-        };
-
-        const baseOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false,
-                    labels: {
-                        color: '#a3a3a3',
-                        font: { size: 10, weight: 600 }
-                    }
-                },
-                tooltip: {
-                    enabled: true,
-                    backgroundColor: 'rgba(10,10,10,0.9)',
-                    borderColor: '#404040',
-                    borderWidth: 1,
-                    titleColor: '#fafafa',
-                    bodyColor: '#e5e5e5',
-                    padding: 8,
-                    displayColors: false
-                }
-            },
-            scales: {
-                x: {
-                    grid: {
-                        display: false,
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: '#a3a3a3',
-                        font: { size: 10, weight: 600 }
-                    }
-                },
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(64,64,64,0.6)',
-                        drawBorder: false
-                    },
-                    ticks: {
-                        color: '#737373',
-                        font: { size: 9, weight: 500 },
-                        precision: 0,
-                        stepSize: 1
-                    }
-                }
-            }
-        };
-
-        const teacherOptions = {
-            ...baseOptions,
-            onClick: () => {
-                try {
-                    setTab('students');
-                    setSelectedStudent(null);
-                } catch { }
-            }
-        };
-
-        const statusOptions = {
-            ...baseOptions,
-            onClick: (evt: unknown, elements: unknown) => {
-                try {
-                    const list: unknown[] = Array.isArray(elements) ? elements : [];
-                    if (list.length === 0) return;
-                    const first = list[0] as UnknownRecord;
-                    const index = typeof first?.index === 'number' ? first.index : null;
-                    if (index == null || !Number.isFinite(index)) return;
-                    const mapping = ['pago', 'pendente', 'atrasado', 'cancelar', 'outros'];
-                    const key = mapping[index];
-                    if (!key) return;
-                    setStudentStatusFilter(key);
-                    setTab('students');
-                    setSelectedStudent(null);
-                } catch { }
-            }
-        };
-
-        return {
-            teacherDistribution: {
-                data: teacherData,
-                options: teacherOptions
-            },
-            statusDistribution: {
-                data: statusData,
-                options: statusOptions
-            },
-            statusTotal: totalStatus,
-            totalStudents: baseTotalStudents
-        };
-    }, [totalStudents, studentsWithTeacher, studentsWithoutTeacher, studentStatusStats, setStudentStatusFilter, setTab, setSelectedStudent]);
+    // totalStudents, studentsWithTeacher, studentsWithoutTeacher, totalTeachers,
+    // studentStatusStats, dashboardCharts — all from ctrl (useAdminPanelController)
 
     if (!isAdmin && !isTeacher) return null;
 
