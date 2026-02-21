@@ -369,12 +369,14 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
       } catch {}
     }
 
+    const handleVisibilityChange = () => {
+      try {
+        if (document.visibilityState === 'visible') refresh()
+      } catch {}
+    }
+
     try {
-      document.addEventListener('visibilitychange', () => {
-        try {
-          if (document.visibilityState === 'visible') refresh()
-        } catch {}
-      })
+      document.addEventListener('visibilitychange', handleVisibilityChange)
       window.addEventListener('pageshow', refresh)
     } catch {}
 
@@ -385,6 +387,9 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
       } catch {}
       try {
         if (outgoingChannel) supabase.removeChannel(outgoingChannel)
+      } catch {}
+      try {
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
       } catch {}
       try {
         window.removeEventListener('pageshow', refresh)

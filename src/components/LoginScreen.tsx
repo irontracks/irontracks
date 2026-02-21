@@ -102,13 +102,11 @@ const LoginScreen = () => {
     }, [recoverCooldownUntil, recoverCooldownLeft]);
 
     const handleGoogleLogin = async () => {
-        console.log('Iniciando login Google...');
         setIsLoading(true);
         setErrorMsg('');
-        
+
         try {
             const href = getOAuthHref('google');
-            console.log('Navegando para:', href);
             window.location.assign(href);
         } catch (error: unknown) {
             console.error("Login Error:", error);
@@ -170,11 +168,6 @@ const LoginScreen = () => {
             const password = emailData.password.trim();
 
             if (authMode === 'login') {
-                try {
-                    if (process.env.NODE_ENV !== 'production') {
-                        console.log('[Auth] Modo standalone:', isPwaStandalone());
-                    }
-                } catch {}
                 const { error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 

@@ -5,6 +5,7 @@ import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
+import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 
 const parseTrainingNumberOrZero = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(String(v || '').replace(',', '.'))
@@ -111,6 +112,10 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const userId = String(user.id || '').trim()
+    const ip = getRequestIp(request)
+    const rl = checkRateLimit(`workouts:finish:${userId}:${ip}`, 10, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(request, BodySchema)
     if (parsedBody.response) return parsedBody.response

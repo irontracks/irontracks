@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
+import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
@@ -275,6 +276,9 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response
 
     const userId = String(auth.user.id || '').trim()
+    const ip = getRequestIp(req)
+    const rl = checkRateLimit(`ai:muscle-map-day:${userId}:${ip}`, 30, 60_000)
+    if (\!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     const admin = createAdminClient()
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
