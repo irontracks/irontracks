@@ -296,7 +296,7 @@ export async function POST(req: Request) {
       aiMapped,
       remainingUnmapped: remainingAfter.slice(0, 50),
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }

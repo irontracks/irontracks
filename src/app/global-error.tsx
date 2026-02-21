@@ -1,6 +1,7 @@
 'use client';
 
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   return (
@@ -21,7 +22,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
 
             <div className="bg-black/50 p-4 rounded-xl mb-8 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
                 <p className="text-red-400 font-mono text-xs break-all">
-                    {error?.message || "Unknown Error"}
+                    {getErrorMessage(error) || "Unknown Error"}
                 </p>
             </div>
 

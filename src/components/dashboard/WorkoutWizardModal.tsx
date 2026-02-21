@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, Sparkles } from 'lucide-react'
 import { useVipCredits } from '@/hooks/useVipCredits'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export type WorkoutWizardGoal = 'hypertrophy' | 'strength' | 'conditioning' | 'maintenance'
 export type WorkoutWizardSplit = 'full_body' | 'upper_lower' | 'ppl'
@@ -170,8 +171,8 @@ export default function WorkoutWizardModal(props: Props) {
         }
         setDraft({ title, exercises })
       }
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao gerar treino.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao gerar treino.')
       setDraft(null)
       setDrafts(null)
     } finally {
@@ -188,8 +189,8 @@ export default function WorkoutWizardModal(props: Props) {
     setError('')
     try {
       await Promise.resolve(props.onSaveDrafts(list))
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao salvar treinos.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao salvar treinos.')
     } finally {
       setSavingAll(false)
     }

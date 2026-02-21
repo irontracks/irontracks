@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/utils/errorMessage'
 type MercadoPagoError = {
   message?: string
   error?: string
@@ -62,7 +63,7 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
 
   if (!res.ok) {
     const err = (json || {}) as MercadoPagoError
-    const msg = err?.cause?.[0]?.description || err?.message || err?.error || `mercadopago_http_${res.status}`
+    const msg = err?.cause?.[0]?.description || getErrorMessage(err) || err?.error || `mercadopago_http_${res.status}`
     throw new Error(msg)
   }
 

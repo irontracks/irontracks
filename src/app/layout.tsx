@@ -1,6 +1,7 @@
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import type { ReactNode } from 'react';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const metadata = {
   title: "IronTracks - Alta Performance",
@@ -183,7 +184,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     "error",
     (e) => {
       try {
-        const m = e?.message || e?.error?.message || "";
+        const m = getErrorMessage(e) || e?.getErrorMessage(error) || "";
         if (isChunkErr(m)) bust(m);
       } catch {}
     },

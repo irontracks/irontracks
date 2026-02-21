@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { z } from 'zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,8 +75,8 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'oauth_failed')}`, safeOrigin))
     }
     oauthUrl = data?.url || null
-  } catch (e: any) {
-    return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(e?.message || 'oauth_failed')}`, safeOrigin))
+  } catch (e: unknown) {
+    return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(getErrorMessage(e) || 'oauth_failed')}`, safeOrigin))
   }
 
   if (!oauthUrl) {

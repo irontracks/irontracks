@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -44,7 +45,7 @@ export async function GET(req: Request) {
     if (error) return jsonError(400, error.message)
 
     return NextResponse.json({ ok: true, items: Array.isArray(data) ? data : [] }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
-    return jsonError(500, e?.message ?? String(e))
+  } catch (e: unknown) {
+    return jsonError(500, getErrorMessage(e))
   }
 }

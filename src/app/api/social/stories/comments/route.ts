@@ -39,7 +39,7 @@ export async function GET(req: Request) {
     const userIds = Array.from(new Set(comments.map((c: Record<string, unknown>) => String(c?.user_id || '').trim()).filter(Boolean)))
     const { data: profilesRaw } = userIds.length
       ? await admin.from('profiles').select('id, display_name, photo_url').in('id', userIds)
-      : { data: [] as any[] }
+      : { data: [] as unknown[] }
     const profileById = new Map<string, any>()
     for (const p of Array.isArray(profilesRaw) ? (profilesRaw as any[]) : []) {
       const id = String(p?.id || '').trim()

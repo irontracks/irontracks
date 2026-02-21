@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -129,8 +130,8 @@ export async function POST(req: Request) {
         macros,
       },
     })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'unexpected_error' }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) || 'unexpected_error' }, { status: 500 })
   }
 }
 

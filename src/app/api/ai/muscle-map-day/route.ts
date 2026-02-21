@@ -383,7 +383,7 @@ export async function POST(req: Request) {
         let newlyMapped: Array<Record<string, unknown>> = []
         try {
           newlyMapped = await classifyExercisesWithAi(apiKey, batch)
-        } catch (e: any) {
+        } catch (e: unknown) {
           aiError = String((e as Error)?.message ?? e)
           ai.status = aiError.includes('429') ? 'rate_limited' : 'failed'
           ai.error = aiError
@@ -553,7 +553,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(payload)
-  } catch (e: any) {
+  } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 500 })
   }
 }

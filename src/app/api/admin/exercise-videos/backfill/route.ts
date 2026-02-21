@@ -6,6 +6,7 @@ import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { getVideoQueriesFromGemini, searchYouTubeCandidates } from '@/lib/videoSuggestions'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const ZodBodySchema = z
   .object({
@@ -159,8 +160,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, processed, created, skipped })
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : String(e)
+  } catch (e: unknown) {
+    const msg = getErrorMessage(e) ? String(getErrorMessage(e)) : String(e)
     const status = msg === 'missing_youtube_key' || msg === 'missing_gemini_key' ? 400 : 500
     return NextResponse.json({ ok: false, error: msg }, { status })
   }

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
       .eq('id', storyId)
       .maybeSingle()
 
-    if (error || !story?.media_path) return new Response(error?.message || 'not_found', { status: 404 })
+    if (error || !story?.media_path) return new Response(getErrorMessage(error) || 'not_found', { status: 404 })
     if (story?.is_deleted) return new Response('not_found', { status: 404 })
     if (story?.expires_at && new Date(String(story.expires_at)).getTime() <= Date.now()) return new Response('not_found', { status: 404 })
 
@@ -72,8 +73,8 @@ export async function GET(req: Request) {
     headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
     headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
     return new Response(null, { status: 307, headers })
-  } catch (e: any) {
-    return new Response(e?.message ?? 'internal_error', { status: 500 })
+  } catch (e: unknown) {
+    return new Response(getErrorMessage(e) ?? 'internal_error', { status: 500 })
   }
 }
 
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
       .eq('id', storyId)
       .maybeSingle()
 
-    if (error || !story?.media_path) return NextResponse.json({ ok: false, error: error?.message || 'not_found' }, { status: 404 })
+    if (error || !story?.media_path) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'not_found' }, { status: 404 })
 
     const admin = createAdminClient()
     const bucket = 'social-stories'
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
     if (sErr || !data?.signedUrl) return NextResponse.json({ ok: false, error: sErr?.message || 'failed' }, { status: 400 })
 
     return NextResponse.json({ ok: true, url: data.signedUrl })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

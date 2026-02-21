@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/utils/errorMessage'
 type AsaasError = {
   errors?: { code?: string; description?: string }[]
   message?: string
@@ -39,7 +40,7 @@ export async function asaasRequest<T>(options: AsaasRequestOptions): Promise<T> 
 
   if (!res.ok) {
     const err = (json || {}) as AsaasError
-    const msg = err?.errors?.[0]?.description || err?.message || `asaas_http_${res.status}`
+    const msg = err?.errors?.[0]?.description || getErrorMessage(err) || `asaas_http_${res.status}`
     throw new Error(msg)
   }
 

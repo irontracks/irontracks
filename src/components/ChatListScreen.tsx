@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 interface ChatUser {
     id: string;
@@ -62,7 +63,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
         } catch (error) {
             console.error('Erro ao carregar contatos:', error);
             // @ts-ignore
-            const msg = error?.message || String(error || '');
+            const msg = getErrorMessage(error) || String(error || '');
             await alert('Erro ao carregar contatos: ' + msg);
         } finally {
             setLoading(false);
@@ -147,7 +148,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
         } catch (e) {
             console.error('Erro ao abrir conversa:', e);
             // @ts-ignore
-            const msg = e?.message || String(e || '');
+            const msg = getErrorMessage(e) || String(e || '');
             await alert('Erro ao abrir conversa: ' + msg);
         }
     };

@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
     if (signedErr || !signed?.signedUrl) return jsonError(400, signedErr?.message || 'signed_url_failed')
 
     return NextResponse.json({ ok: true, url: signed.signedUrl }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
-    return jsonError(500, e?.message ?? String(e))
+  } catch (e: unknown) {
+    return jsonError(500, getErrorMessage(e))
   }
 }

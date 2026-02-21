@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, UserPlus, Check, X } from 'lucide-react';
 import Image from 'next/image';
 import { useDialog } from '@/contexts/DialogContext';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 interface InviteCandidate {
     id: string
@@ -119,7 +120,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                 } catch { }
             } catch (e) {
                 if (!cancelled) {
-                    const msg = (e as Error)?.message || String(e || '');
+                    const msg = getErrorMessage(e);
                     await alertRef.current('Erro ao carregar usuários: ' + msg);
                     setUsers([]);
                 }
@@ -176,7 +177,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                     }
                 } catch { }
             } catch (e) {
-                const msg = (e as Error)?.message || String(e || '');
+                const msg = getErrorMessage(e);
                 await alertRef.current('Erro ao buscar usuários: ' + msg);
                 setUsers([]);
             } finally {
@@ -206,7 +207,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                 return next;
             });
         } catch (e) {
-            const msg = (e as Error)?.message || String(e || '');
+            const msg = getErrorMessage(e);
             await alert("Erro ao enviar: " + msg);
         } finally {
             setPendingIds((prev) => {

@@ -6,6 +6,7 @@ import OfflineSyncModal from '@/components/OfflineSyncModal'
 import GlobalDialog from '@/components/GlobalDialog'
 import { DialogProvider } from '@/contexts/DialogContext'
 import { createClient } from '@/utils/supabase/client'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type VipAccess = {
   ok: boolean
@@ -31,7 +32,7 @@ export default function VipOfflinePage() {
     ;(async () => {
       try {
         const res = await fetch('/api/vip/access', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const json = (await res.json().catch((): any => null)) as VipAccess | null
+        const json = (await res.json().catch((): null => null)) as VipAccess | null
         if (cancelled) return
         if (!json?.ok) {
           setAccess(null)
@@ -39,8 +40,8 @@ export default function VipOfflinePage() {
           return
         }
         setAccess(json)
-      } catch (e: any) {
-        if (!cancelled) setAccessError(e?.message ? String(e.message) : 'Falha ao carregar acesso VIP.')
+      } catch (e: unknown) {
+        if (!cancelled) setAccessError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar acesso VIP.')
       }
     })()
     return () => {

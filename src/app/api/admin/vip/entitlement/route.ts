@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
     const entitlement = await getVipPlanLimits(admin, userId)
     return NextResponse.json({ ok: true, user_id: userId, entitlement })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
   }
 }

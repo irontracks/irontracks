@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,7 @@ const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlrea
       subject,
       html,
     }),
-  }).catch((): any => null)
+  }).catch((): null => null)
 }
 
 export async function POST(req: Request) {
@@ -201,8 +202,8 @@ export async function POST(req: Request) {
       })
     }
 
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Access Action Error:', e)
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

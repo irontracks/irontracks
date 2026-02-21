@@ -44,6 +44,7 @@ import { normalizeWorkoutTitle, workoutTitleKey } from '@/utils/workoutTitle';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
 import type { Exercise } from '@/types/app';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
 const COACH_INBOX_DEFAULTS = {
@@ -1093,7 +1094,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 if (cancelled) return;
                 if (error) {
                     setExerciseAliasesReview([]);
-                    const msg = String(error?.message || '');
+                    const msg = String(getErrorMessage(error) || '');
                     if (msg) setExerciseAliasesError(msg);
                     return;
                 }
@@ -1216,7 +1217,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 .eq('user_id', uid)
                 .maybeSingle();
             if (error) {
-                const msg = String(error?.message || '');
+                const msg = String(getErrorMessage(error) || '');
                 const code = String(error?.code || '');
                 const missing = code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg);
                 if (missing) {
@@ -1256,7 +1257,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             };
             const { error } = await supabase.from('user_settings').upsert(payload, { onConflict: 'user_id' });
             if (error) {
-                setPrioritiesSettingsError(String(error?.message || 'Falha ao salvar.'));
+                setPrioritiesSettingsError(String(getErrorMessage(error) || 'Falha ao salvar.'));
                 return false;
             }
             prioritiesSettingsPrefRef.current = payload.preferences;
@@ -3830,7 +3831,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                         .limit(200);
                                                     if (error) {
                                                         setExerciseAliasesReview([]);
-                                                        const msg = String(error?.message || '');
+                                                        const msg = String(getErrorMessage(error) || '');
                                                         if (msg) setExerciseAliasesError(msg);
                                                         return;
                                                     }

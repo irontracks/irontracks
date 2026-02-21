@@ -48,7 +48,7 @@ export async function GET(req: Request) {
       .limit(5000)
     if (stErr) return NextResponse.json({ ok: false, error: stErr.message }, { status: 400 })
 
-    const studentUserIds = (students || []).map((s: any) => String(s?.user_id || '').trim()).filter(Boolean)
+    const studentUserIds = (students || []).map((s: Record<string, unknown>) => String(s?.user_id || '').trim()).filter(Boolean)
     if (studentUserIds.length === 0) return NextResponse.json({ ok: true, rows: [], next_cursor: null })
 
     const studentNameById = new Map<string, string>()
@@ -72,16 +72,16 @@ export async function GET(req: Request) {
     const { data: rows, error } = await query.limit(limit)
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    const enriched = (rows || []).map((w: any) => ({
+    const enriched: Array<Record<string, unknown>> = (rows || []).map((w: Record<string, unknown>) => ({
       ...w,
       student_name: studentNameById.get(String(w?.user_id || '').trim()) || null,
     }))
 
-    const last = enriched.length ? enriched[enriched.length - 1] : null
-    const next_cursor = last?.date || last?.created_at ? { cursor_date: last?.date || null, cursor_created_at: last?.created_at || null } : null
+    const last: Record<string, unknown> | null = enriched.length ? enriched[enriched.length - 1] : null
+    const next_cursor = last?.date || last?.created_at ? { cursor_date: (last?.date as string | null) || null, cursor_created_at: (last?.created_at as string | null) || null } : null
 
     return NextResponse.json({ ok: true, rows: enriched, next_cursor }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const runtime = 'nodejs'
 
@@ -127,7 +128,7 @@ export async function POST(req: Request) {
     } finally {
       try { await browser?.close() } catch {}
     }
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+  } catch (e: unknown) {
+    return new Response(JSON.stringify({ error: getErrorMessage(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } })
   }
 }

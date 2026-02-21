@@ -1230,8 +1230,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: workoutId, workout: payload }),
-      }).catch((): any => null);
-      const result = response ? await response.json().catch((): any => null) : null;
+      }).catch((): null => null);
+      const result = response ? await response.json().catch((): null => null) : null;
       if (!response || !response.ok || !result?.ok) {
         setOrganizeError(String(result?.error || 'Falha ao salvar a ordem.'));
         setOrganizeSaving(false);

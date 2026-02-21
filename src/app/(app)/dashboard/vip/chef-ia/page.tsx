@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import NutritionConsoleShell from '@/components/dashboard/nutrition/NutritionConsoleShell'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type VipAccess = {
   ok: boolean
@@ -46,7 +47,7 @@ export default function VipChefIaPage() {
         setLoadingAccess(true)
         setAccessError('')
         const res = await fetch('/api/vip/access', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const json = (await res.json().catch((): any => null)) as VipAccess | null
+        const json = (await res.json().catch((): null => null)) as VipAccess | null
         if (cancelled) return
         if (!json?.ok) {
           setAccess(null)
@@ -54,8 +55,8 @@ export default function VipChefIaPage() {
           return
         }
         setAccess(json)
-      } catch (e: any) {
-        if (!cancelled) setAccessError(e?.message ? String(e.message) : 'Falha ao carregar acesso VIP.')
+      } catch (e: unknown) {
+        if (!cancelled) setAccessError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar acesso VIP.')
       } finally {
         if (!cancelled) setLoadingAccess(false)
       }
@@ -78,7 +79,7 @@ export default function VipChefIaPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      const json = await res.json().catch((): any => null)
+      const json = await res.json().catch((): null => null)
       if (!json?.ok) {
         const upgradeRequired = !!json?.upgradeRequired || String(json?.error || '') === 'vip_required'
         setError(upgradeRequired ? 'Disponível no VIP Elite.' : String(json?.error || 'Falha ao gerar plano.'))
@@ -90,8 +91,8 @@ export default function VipChefIaPage() {
         return
       }
       setResult(data as ChefResult)
-    } catch (e: any) {
-      setError(e?.message ? String(e.message) : 'Falha ao gerar plano.')
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao gerar plano.')
     } finally {
       setBusy(false)
     }

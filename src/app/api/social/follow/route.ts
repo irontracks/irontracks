@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
       .insert({ follower_id: followerId, following_id: followingId, status: 'pending' })
 
     if (error) {
-      const msg = String(error?.message || '')
+      const msg = String(getErrorMessage(error) || '')
       if (msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('unique')) {
         const { data: existing } = await auth.supabase
           .from('social_follows')

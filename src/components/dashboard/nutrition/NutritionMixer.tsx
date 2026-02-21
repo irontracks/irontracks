@@ -484,7 +484,7 @@ export default function NutritionMixer({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                if ((e as any).shiftKey) return
+                if (e.shiftKey) return
                 e.preventDefault()
                 if (!isPending && !schemaMissing) handleSubmit()
               }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { UserSettingsSchema, type UserSettings, DEFAULT_USER_SETTINGS } from '@/schemas/settings'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const DEFAULT_SETTINGS = DEFAULT_USER_SETTINGS
 
@@ -66,7 +67,7 @@ export function useUserSettings(userId: string | null | undefined) {
           const e = error as unknown as { status?: unknown; code?: unknown; message?: unknown }
           const status = Number(e?.status)
           const code = e?.code ? String(e.code) : ''
-          const msg = e?.message ? String(e.message) : ''
+          const msg = getErrorMessage(e) ? String(e.message) : ''
           const isMissing = status === 404 || code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg)
           if (isMissing) {
             tableMissingRef.current = true
@@ -136,7 +137,7 @@ export function useUserSettings(userId: string | null | undefined) {
         const e = error as unknown as { status?: unknown; code?: unknown; message?: unknown }
         const status = Number(e?.status)
         const code = e?.code ? String(e.code) : ''
-        const msg = e?.message ? String(e.message) : ''
+        const msg = getErrorMessage(e) ? String(e.message) : ''
         const isMissing = status === 404 || code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg)
         if (isMissing) {
           tableMissingRef.current = true

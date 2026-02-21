@@ -6,6 +6,7 @@ import { Crown, X } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { getIronRankLeaderboard } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type Props = {
   badges: Badge[]
@@ -101,18 +102,18 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
         const rows = Array.isArray(res?.data) ? res.data : []
         setLeaderboard(
           rows
-            .map((r: any) => ({
+            .map((r: Record<string, unknown>) => ({
               userId: String(r?.userId ?? r?.user_id ?? '').trim(),
               displayName: r?.displayName != null ? String(r.displayName) : r?.display_name != null ? String(r.display_name) : null,
               photoUrl: r?.photoUrl != null ? String(r.photoUrl) : r?.photo_url != null ? String(r.photo_url) : null,
               role: r?.role != null ? String(r.role) : null,
               totalVolumeKg: Number(r?.totalVolumeKg ?? r?.total_volume_kg ?? 0) || 0,
             }))
-            .filter((r: any) => !!r.userId)
+            .filter((r: Record<string, unknown>) => !!r.userId)
         )
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return
-        const raw = String(e?.message ?? e)
+        const raw = String(getErrorMessage(e) ?? e)
         const lower = raw.toLowerCase()
         const msg = (() => {
           if (lower.includes('does not exist') || lower.includes('function') || lower.includes('iron_rank_leaderboard') || lower.includes('schema cache')) {

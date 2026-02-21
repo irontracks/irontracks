@@ -83,7 +83,7 @@ export default function ErrorReporterProvider({ children }: { children: React.Re
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const json = await res.json().catch((): any => null);
+    const json = await res.json().catch((): null => null);
     if (!res.ok || !json?.ok) throw new Error(json?.error || 'Falha ao reportar erro');
     return json;
   };

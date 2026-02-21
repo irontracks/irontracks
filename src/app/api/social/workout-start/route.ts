@@ -9,6 +9,7 @@ import {
   shouldThrottleBySenderType,
 } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
     const res = await insertNotifications(rows)
     if (!res.ok) return NextResponse.json({ ok: false, error: res.error || 'failed' }, { status: 400 })
     return NextResponse.json({ ok: true, sent: res.inserted })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

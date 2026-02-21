@@ -6,6 +6,7 @@ import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -95,7 +96,7 @@ export async function POST(req: Request) {
     const rows = Array.isArray(jobs) ? jobs : []
     if (!rows.length) return NextResponse.json({ ok: true, processed: 0, created: 0, updated: 0, failed: 0 })
 
-    const users = Array.from(new Set(rows.map((r: any) => String(r?.user_id || '').trim()).filter(Boolean))).slice(0, 200)
+    const users = Array.from(new Set(rows.map((r: Record<string, unknown>) => String(r?.user_id || '').trim()).filter(Boolean))).slice(0, 200)
     const { data: canonicalRows } = await admin
       .from('exercise_canonical')
       .select('id, user_id, display_name, normalized_name, usage_count')
@@ -105,7 +106,7 @@ export async function POST(req: Request) {
       .limit(2000)
 
     const canonByUser = new Map<string, Array<{ id: string; display_name: string; normalized_name: string }>>()
-    ;(Array.isArray(canonicalRows) ? canonicalRows : []).forEach((r: any) => {
+    ;(Array.isArray(canonicalRows) ? canonicalRows : []).forEach((r: Record<string, unknown>) => {
       const uid = String(r?.user_id || '').trim()
       const id = String(r?.id || '').trim()
       const dn = String(r?.display_name || '').trim()
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
       canonByUser.get(uid)!.push({ id, display_name: dn, normalized_name: nn })
     })
 
-    const payload = rows.map((r: any) => {
+    const payload = rows.map((r: Record<string, unknown>) => {
       const uid = String(r?.user_id || '').trim()
       const alias = String(r?.alias || '').trim() || String(r?.normalized_alias || '').trim()
       const normalized = String(r?.normalized_alias || '').trim()
@@ -264,7 +265,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, processed, created, updated, failed })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }
