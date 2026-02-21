@@ -15,7 +15,7 @@ const ZodBodySchema = z
   .strip()
 
 const isMissingColumn = (err: unknown, column: string): boolean => {
-  const msg = String((err as any)?.message || '').toLowerCase()
+  const msg = String((err as { message?: string })?.message || '').toLowerCase()
   return msg.includes(column.toLowerCase()) && (msg.includes('could not find') || msg.includes('column'))
 }
 

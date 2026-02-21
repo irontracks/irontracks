@@ -15,11 +15,11 @@ interface NotificationItem {
     message: string;
     created_at?: string;
     read?: boolean;
-    data?: any;
+    data?: Record<string, unknown>;
 }
 
 interface NotificationCenterProps {
-    onStartSession?: (workout: any) => void;
+    onStartSession?: (workout: unknown) => void;
     user?: { id: string | number } | null;
     initialOpen?: boolean;
     embedded?: boolean;
@@ -137,8 +137,8 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
         : [];
 
     const allNotifications = [
-        ...safeIncomingInvites.map((inv: any, idx: number) => {
-            const safeFrom = inv?.from && typeof inv.from === 'object' ? inv.from : null;
+        ...safeIncomingInvites.map((inv, idx: number) => {
+            const safeFrom = inv?.from && typeof inv.from === 'object' ? (inv.from as Record<string, unknown>) : null;
             const fromName =
                 String(
                     safeFrom?.displayName ??
@@ -147,7 +147,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
                     inv?.fromName ??
                     ''
                 ).trim() || 'Alguém';
-            const safeWorkout = inv?.workout && typeof inv.workout === 'object' ? inv.workout : null;
+            const safeWorkout = inv?.workout && typeof inv.workout === 'object' ? (inv.workout as Record<string, unknown>) : null;
             const workoutTitle = String(safeWorkout?.title ?? safeWorkout?.name ?? 'Treino');
 
             const ts = (() => {
@@ -296,7 +296,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
                 <div className="divide-y divide-neutral-800">
                     {allNotifications.map(item => (
                         <div
-                            key={item.id}
+                            key={String(item.id ?? "")}
                             className={`p-4 transition-colors relative group ${item.read
                                 ? 'bg-neutral-900 hover:bg-neutral-800/40'
                                 : 'bg-neutral-900/80 hover:bg-neutral-800 border border-yellow-500/40'
@@ -313,7 +313,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
                                             </span>
                                         )}
                                     </p>
-                                    <p className="text-xs text-neutral-400 mt-1 break-words">{item.message}</p>
+                                    <p className="text-xs text-neutral-400 mt-1 break-words">{String(item.message ?? "")}</p>
                                     <p className="text-[10px] text-neutral-600 mt-1">{item.timeAgo}</p>
                                 </div>
                             </div>
@@ -337,7 +337,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
 
                             {item.type !== 'invite' && (
                                 <button
-                                    onClick={(e) => handleDelete(item.id, e)}
+                                    onClick={(e) => handleDelete(String(item.id ?? ""), e)}
                                     className="absolute top-2 right-2 p-2 text-neutral-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                     <Trash2 size={14} />

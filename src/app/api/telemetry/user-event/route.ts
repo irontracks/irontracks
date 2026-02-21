@@ -43,7 +43,7 @@ const safeStr = (v: unknown, max = 200) => {
 
 const safeJson = (v: unknown) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
-  return v as Record<string, any>
+  return v as Record<string, unknown>
 }
 
 const safeTs = (v: unknown) => {
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
           app_version: safeStr(e?.appVersion, 80) || null,
         }
       })
-      .filter(Boolean) as any[]
+      .filter(Boolean) as unknown[]
 
     if (!rows.length) return NextResponse.json({ ok: true, inserted: 0 })
 

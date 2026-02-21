@@ -40,11 +40,11 @@ export async function POST(req: Request) {
       .eq('id', id)
       .maybeSingle()
     if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 400 })
-    if (!w?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+    if (!(w as Record<string, unknown>)?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const { data: exs, error: exErr } = await admin.from('exercises').select('id').eq('workout_id', id)
     if (exErr) return NextResponse.json({ ok: false, error: exErr.message }, { status: 400 })
-    const exIds = (exs || []).map((e: any) => e?.id).filter(Boolean)
+    const exIds = (exs || []).map((e: unknown) => (e as Record<string, unknown>)?.id).filter(Boolean)
     if (exIds.length) {
       const { error: setsErr } = await admin.from('sets').delete().in('exercise_id', exIds)
       if (setsErr) return NextResponse.json({ ok: false, error: setsErr.message }, { status: 400 })

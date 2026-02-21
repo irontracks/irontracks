@@ -41,7 +41,7 @@ export async function GET(req: Request) {
     const map = new Map(profs.map(x => [x.id, x]))
     const enriched = (msgs || []).map(m => ({ ...m, profiles: map.get(m.user_id) || null }))
     return NextResponse.json({ ok: true, data: enriched })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

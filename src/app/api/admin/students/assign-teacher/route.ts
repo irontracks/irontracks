@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     // Resolve student row by id or email/user_id
     let targetId = student_id || ''
-    let srow: any | null = null
+    let srow: Record<string, unknown> | null = null
     if (targetId) {
       const { data } = await admin.from('students').select('id, email').eq('id', targetId).maybeSingle()
       srow = data || null
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     // Upsert by email if not exists
     if (!srow && email) {
       const { data: profile } = await admin.from('profiles').select('id, display_name').ilike('email', email).maybeSingle()
-      const payload: any = { email, teacher_id: teacher_user_id || null }
+      const payload: Record<string, unknown> = { email, teacher_id: teacher_user_id || null }
       if (profile?.display_name) payload.name = profile.display_name
       if (profile?.id) payload.user_id = profile.id
       const { data: ins, error: iErr } = await admin.from('students').insert(payload).select().single()

@@ -118,8 +118,8 @@ export async function POST(req: Request) {
         .replaceAll(/[\r\n"]/g, '')
         .slice(0, 80) || 'IronTracks_Report'
 
-      const body = typeof Buffer !== 'undefined' ? Buffer.from(pdfBuffer as any) : pdfBuffer
-      return new Response(body as any, {
+      const body = typeof Buffer !== 'undefined' ? Buffer.from(pdfBuffer as unknown as ArrayBufferLike) : pdfBuffer
+      return new Response(body as BodyInit, {
         headers: {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${safeName}.pdf"`,

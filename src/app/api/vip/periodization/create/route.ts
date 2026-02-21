@@ -176,8 +176,8 @@ const generateProgramOverviewWithGemini = async (q: VipPeriodizationQuestionnair
     `- Limitações: ${q.limitations || 'nenhuma'}`,
   ].join('\n')
   
-  const result = await (model.generateContent as (parts: Array<{ text: string }>) => Promise<any>)([{ text: prompt }])
-  const text = String((await result?.response?.text()) || '').trim()
+  const result = await (model.generateContent as (parts: Array<{ text: string }>) => Promise<unknown>)([{ text: prompt }])
+  const text = String((await (result as { response?: { text?: () => Promise<string> } })?.response?.text?.()) || '').trim()
   return text || null
 }
 
@@ -237,7 +237,7 @@ export async function POST(req: Request) {
         .limit(500)
       
       const prevWorkoutIds = (prevLinks || [])
-        .map((r) => String((r as any)?.workout_id || '').trim())
+        .map((r: Record<string, unknown>) => String(r?.workout_id || '').trim())
         .filter(Boolean)
 
       if (prevWorkoutIds.length) {
@@ -272,7 +272,7 @@ export async function POST(req: Request) {
         limitations: q.limitations || null,
         start_date: q.startDate ? String(q.startDate).slice(0, 10) : null,
         config: { created_at: createdAtIso },
-        questionnaire: q as any,
+        questionnaire: q as unknown,
       })
       .select('id')
       .single()

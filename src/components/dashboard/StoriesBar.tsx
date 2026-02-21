@@ -44,7 +44,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     }
   }, [])
 
-  const uploadStory = async (file: File, metadata: any = {}) => {
+  const uploadStory = async (file: File, metadata: Record<string, unknown> = {}) => {
     setUploading(true)
     setError('')
     try {
@@ -118,11 +118,11 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     reload()
     const onRefresh = () => reload()
     try {
-      window.addEventListener('irontracks:stories:refresh', onRefresh as any)
+      window.addEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
     } catch {}
     return () => {
       try {
-        window.removeEventListener('irontracks:stories:refresh', onRefresh as any)
+        window.removeEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
       } catch {}
     }
   }, [reload])

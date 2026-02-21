@@ -88,7 +88,7 @@ const formatDay = (dateIso: string) => {
 }
 
 const isWeekPayload = (data: ApiPayload | null): data is ApiPayloadWeek => {
-  const d: any = data
+  const d = data as Record<string, unknown>
   return !!d && typeof d.weekStartDate === 'string' && typeof d.weekEndDate === 'string'
 }
 
@@ -262,9 +262,9 @@ export default function MuscleMapCard(props: Props) {
     if (!id) return null
     const data = state.data?.muscles?.[id]
     if (data) return { id, ...data }
-    const meta = (MUSCLE_BY_ID as any)[id]
+    const meta = (MUSCLE_BY_ID as Record<string, Record<string, unknown>>)[id]
     if (!meta) return null
-    return { id, label: meta.label, sets: 0, minSets: meta.minSets, maxSets: meta.maxSets, ratio: 0, color: '#111827', view: meta.view }
+    return { id, label: String(meta.label || id), sets: 0, minSets: Number(meta.minSets || 0), maxSets: Number(meta.maxSets || 0), ratio: 0, color: '#111827', view: meta.view }
   }, [selected, state.data])
 
   const weekLabel = period === 'day' ? formatDay(selectedDate) : isWeekPayload(state.data) ? formatWeek(state.data.weekStartDate, state.data.weekEndDate) : 'Semana'
@@ -293,7 +293,7 @@ export default function MuscleMapCard(props: Props) {
       .filter((m) => Number.isFinite(m.minSets) && m.minSets > 0 && m.sets < m.minSets)
       .slice(0, 2)
     if (!deficits.length) return
-    const lines = deficits.map((m) => `- ${m.label}: ${m.sets.toLocaleString('pt-BR')} sets (meta ${m.minSets}–${Number((state.data?.muscles?.[m.id] as any)?.maxSets || 0)})`)
+    const lines = deficits.map((m) => `- ${m.label}: ${m.sets.toLocaleString('pt-BR')} sets (meta ${m.minSets}–${Number((state.data?.muscles?.[m.id] as Record<string, unknown>)?.maxSets || 0)})`)
     const constraints = [
       'FOCO (equilíbrio muscular):',
       ...lines,
@@ -564,7 +564,7 @@ export default function MuscleMapCard(props: Props) {
             {selectedInfo ? (
               <div className="mt-3">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-white font-black">{selectedInfo.label}</div>
+                  <div className="text-white font-black">{String(selectedInfo.label ?? "")}</div>
                   <div className="text-xs font-black text-neutral-300">{selectedInfo.sets.toLocaleString('pt-BR')} sets</div>
                 </div>
                 <div className="mt-2 h-2 rounded-full bg-neutral-800 overflow-hidden">
@@ -574,7 +574,7 @@ export default function MuscleMapCard(props: Props) {
                   />
                 </div>
                 <div className="mt-2 text-xs text-neutral-400">
-                  Meta sugerida: {selectedInfo.minSets}–{selectedInfo.maxSets} sets/semana
+                  Meta sugerida: {String(selectedInfo.minSets ?? "")}–{String(selectedInfo.maxSets ?? "")} sets/semana
                 </div>
 
                 {isWeekPayload(state.data) && state.data.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
@@ -651,7 +651,7 @@ export default function MuscleMapCard(props: Props) {
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setSelected(m.id as any)}
+                    onClick={() => setSelected(m.id as Parameters<typeof setSelected>[0])}
                     className="rounded-xl border border-neutral-800 bg-black p-3 text-left hover:bg-neutral-950 transition-colors"
                   >
                     <div className="flex items-center justify-between gap-2">

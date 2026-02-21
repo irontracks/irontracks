@@ -48,11 +48,11 @@ export async function GET(req: Request) {
     if (viewsError) return NextResponse.json({ ok: false, error: viewsError.message }, { status: 400 })
 
     const viewMap = new Map<string, { viewed_at: string | null; prompted_at: string | null }>()
-    ;(Array.isArray(views) ? views : []).forEach((row: any) => {
+    ;(Array.isArray(views) ? views : []).forEach((row: Record<string, unknown>) => {
       if (!row?.update_id) return
       viewMap.set(String(row.update_id), {
-        viewed_at: row.viewed_at ?? null,
-        prompted_at: row.prompted_at ?? null,
+        viewed_at: (row.viewed_at as string | null) ?? null,
+        prompted_at: (row.prompted_at as string | null) ?? null,
       })
     })
 
@@ -68,7 +68,7 @@ export async function GET(req: Request) {
     })
 
     return NextResponse.json({ ok: true, updates: filtered.slice(0, limit) })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

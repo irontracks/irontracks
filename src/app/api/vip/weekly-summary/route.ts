@@ -67,9 +67,9 @@ const computePrs = (latestNotes: unknown, prevNotesList: unknown[]) => {
     for (const [k, st] of Array.from(m.entries())) {
       const cur = prevBest.get(k) || { weight: 0, reps: 0, volume: 0 }
       prevBest.set(k, {
-        weight: Math.max(cur.weight, (st as any).weight || 0),
-        reps: Math.max(cur.reps, (st as any).reps || 0),
-        volume: Math.max(cur.volume, (st as any).volume || 0),
+        weight: Math.max(cur.weight, (st as Record<string, number>).weight || 0),
+        reps: Math.max(cur.reps, (st as Record<string, number>).reps || 0),
+        volume: Math.max(cur.volume, (st as Record<string, number>).volume || 0),
       })
     }
   }
@@ -86,7 +86,7 @@ const computePrs = (latestNotes: unknown, prevNotesList: unknown[]) => {
     prs.push({ ...st, improved })
   }
 
-  prs.sort((a, b) => ((b as any).volume || 0) - ((a as any).volume || 0))
+  prs.sort((a, b) => (Number(b.volume) || 0) - (Number(a.volume) || 0))
   return prs.slice(0, 6)
 }
 

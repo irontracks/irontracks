@@ -121,12 +121,12 @@ export async function POST(req: Request) {
       for (const q of queries) {
         if (candidates.length >= 5) break
         const found = await searchYouTubeCandidates(q, 6)
-        for (const it of found as any[]) {
+        for (const it of found as unknown[]) {
           if (!it) continue
           const videoId = String((it as Record<string, unknown>).videoId || '').trim()
           if (!videoId || seen.has(videoId)) continue
           seen.add(videoId)
-          candidates.push(it as any)
+          candidates.push(it as { videoId: string; url: string; title: string; channelTitle: string })
           if (candidates.length >= 5) break
         }
       }
@@ -152,7 +152,7 @@ export async function POST(req: Request) {
 
       const { data: inserted } = await admin
         .from('exercise_videos')
-        .upsert(rows as any, { onConflict: 'exercise_library_id,provider,provider_video_id' })
+        .upsert(rows as unknown, { onConflict: 'exercise_library_id,provider,provider_video_id' })
         .select('id')
 
       created += Array.isArray(inserted) ? inserted.length : 0

@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body: any = parsedBody.data!
+    const body: Record<string, unknown> = parsedBody.data!
     const id = String(body?.id || '').trim()
     const status = String(body?.status || '').trim()
     if (!id || !status) return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })

@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       resolvedName = (profile?.display_name || null) as string | null
     }
 
-    let teacherRow: any | null = null
+    let teacherRow: Record<string, unknown> | null = null
     if (teacherId) {
       const { data } = await admin.from('teachers').select('id, email, user_id, asaas_wallet_id').eq('id', teacherId).maybeSingle()
       teacherRow = data || null
@@ -130,7 +130,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'teacher_email_required' }, { status: 400 })
       }
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         email: resolvedEmail,
         name: resolvedName || resolvedEmail,
         status: 'active',
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
         .select('id, email, user_id, asaas_wallet_id')
         .single()
       if (insertErr || !inserted) {
-        let existing: any | null = null
+        let existing: Record<string, unknown> | null = null
         if (resolvedUserId) {
           const { data } = await admin
             .from('teachers')
@@ -231,7 +231,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'asaas_wallet_id_missing_in_response' }, { status: 502 })
       }
 
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         asaas_wallet_id: createdWalletId,
       }
       if (createdAccountId) updates.asaas_account_id = createdAccountId
@@ -250,7 +250,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, teacher: updated })
     }
 
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       asaas_wallet_id: walletId,
     }
     if (teacherUserId && !teacherRow.user_id) updates.user_id = teacherUserId

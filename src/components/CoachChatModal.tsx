@@ -8,8 +8,8 @@ import { logError, logWarn, logInfo } from '@/lib/logger'
 interface CoachChatModalProps {
     isOpen: boolean;
     onClose: () => void;
-    session?: any;
-    previousSession?: any;
+    session?: Record<string, unknown>;
+    previousSession?: Record<string, unknown>;
     isVip?: boolean;
     onSaveToReport?: (summary: string) => void;
     onUpgrade?: () => void;
@@ -60,8 +60,8 @@ export default function CoachChatModal({
                 currentExs.forEach((curr: Exercise) => {
                     const prev = prevExs.find((p: Exercise) => p.name === curr.name);
                     if (prev) {
-                        const currWeight = Number((curr as any).sets?.[0]?.weight || 0);
-                        const prevWeight = Number((prev as any).sets?.[0]?.weight || 0);
+                        const currSets = (curr as unknown as { sets?: Array<{ weight?: number }> }).sets; const currWeight = Number(currSets?.[0]?.weight || 0);
+                        const prevSets = (prev as unknown as { sets?: Array<{ weight?: number }> }).sets; const prevWeight = Number(prevSets?.[0]?.weight || 0);
                         
                         if (currWeight > 0 && prevWeight > 0 && currWeight < prevWeight) {
                             anomalies.push(`Notei que no ${curr.name} você reduziu a carga (de ${prevWeight}kg para ${currWeight}kg).`);

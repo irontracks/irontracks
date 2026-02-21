@@ -74,8 +74,8 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (existing && String(existing.status || '') === 'pending') {
       const ageMs = Date.now() - new Date(String(existing.created_at || '')).getTime()
-      const meta = existing?.metadata && typeof existing.metadata === 'object' ? (existing.metadata as any) : {}
-      const mp = meta?.mercadopago && typeof meta.mercadopago === 'object' ? meta.mercadopago : {}
+      const meta = existing?.metadata && typeof existing.metadata === 'object' ? (existing.metadata as Record<string, unknown>) : {} as Record<string, unknown>
+      const mp = meta?.mercadopago && typeof meta.mercadopago === 'object' ? (meta.mercadopago as Record<string, unknown>) : {} as Record<string, unknown>
       const payId = String(mp?.payment_id || '').trim()
       if (String(existing.provider || '') === 'mercadopago' && payId) {
         const { data: pay } = await admin

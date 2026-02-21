@@ -2,9 +2,9 @@ import React, { useEffect } from 'react'
 import Image from 'next/image'
 import { X } from 'lucide-react'
 
-export default function NotificationToast(props: any) {
+export default function NotificationToast(props: Record<string, unknown>) {
   const settings = props?.settings && typeof props.settings === 'object' ? props.settings : null
-  const allowToast = settings ? settings.inAppToasts !== false : true
+  const allowToast = settings ? (settings as Record<string, unknown>).inAppToasts !== false : true
   const rawNotification = props?.notification ?? null
   const legacyMessage = props?.message ?? null
   const legacySender = props?.sender ?? null
@@ -44,19 +44,20 @@ export default function NotificationToast(props: any) {
     } catch {}
   }
 
-  const handleCloseClick = (event: any) => {
+  const handleCloseClick = (event: unknown) => {
     try {
-      event?.stopPropagation?.()
+      (event as { stopPropagation?: () => void })?.stopPropagation?.()
     } catch {}
     try {
       if (typeof props?.onClose === 'function') props.onClose()
     } catch {}
   }
 
-  const photoURL = notification?.photoURL ? String(notification.photoURL).trim() : ''
-  const displayName = String(notification?.displayName || notification?.senderName || 'S')
-  const senderName = String(notification?.senderName || 'Aviso do Sistema')
-  const text = String(notification?.text || '').trim()
+  const n = notification as Record<string, unknown> | null
+  const photoURL = n?.photoURL ? String(n.photoURL).trim() : ''
+  const displayName = String(n?.displayName || n?.senderName || 'S')
+  const senderName = String(n?.senderName || 'Aviso do Sistema')
+  const text = String(n?.text || '').trim()
 
   if (!shouldRender) return null
   if (!text) return null

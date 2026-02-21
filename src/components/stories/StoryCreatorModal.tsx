@@ -41,7 +41,7 @@ type StoryOverlay =
 type StoryCreatorModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onPost: (file: File, metadata?: any) => Promise<void> | void;
+  onPost: (file: File, metadata?: Record<string, unknown>) => Promise<void> | void;
 };
 
 export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCreatorModalProps) {
@@ -200,7 +200,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
     setActiveTool(null);
   };
 
-  const updateOverlayPos = (id: number, info: any) => {
+  const updateOverlayPos = (id: number, info: unknown) => {
      // info.point is relative to viewport, we need percentage of container
      if (!containerRef.current) return;
      const rect = containerRef.current.getBoundingClientRect();
@@ -209,15 +209,16 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
      // A simpler way with framer motion is to update state onDragEnd
   };
 
-  const handleDragEnd = (id: number, info: any) => {
+  const handleDragEnd = (id: number, info: unknown) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     
     // Calculate new position as percentage
     // info.point.x/y are page coordinates
     // We need relative to container
-    const x = ((info.point.x - rect.left) / rect.width) * 100;
-    const y = ((info.point.y - rect.top) / rect.height) * 100;
+    const infoR = info as Record<string, unknown>; const pt = infoR?.point as Record<string, unknown> | null;
+    const x = (((pt?.x as number || 0) - rect.left) / rect.width) * 100;
+    const y = (((pt?.y as number || 0) - rect.top) / rect.height) * 100;
     
     // Clamp to 0-100 to keep inside
     const clampedX = Math.max(0, Math.min(100, x));
@@ -241,7 +242,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
       if (!previewUrl) throw new Error('preview_unavailable');
       let fileToUpload = media;
       setCompressionError('');
-      let metadata: any = {
+      let metadata: Record<string, unknown> = {
         filter: filter.class ? filter.class : undefined,
         trim: mediaType === 'video' ? {
           start: Math.max(0, trimRange.start),

@@ -41,7 +41,7 @@ export async function GET(req: Request) {
       ? await admin.from('profiles').select('id, display_name, photo_url').in('id', userIds)
       : { data: [] as unknown[] }
     const profileById = new Map<string, any>()
-    for (const p of Array.isArray(profilesRaw) ? (profilesRaw as any[]) : []) {
+    for (const p of Array.isArray(profilesRaw) ? (profilesRaw as Record<string, unknown>[]) : []) {
       const id = String(p?.id || '').trim()
       if (!id) continue
       profileById.set(id, p)

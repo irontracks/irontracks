@@ -3164,7 +3164,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onUseDraft={(draft) => {
                                 try {
                                     const title = String(draft?.title || '').trim() || 'Treino'
-                                    const exercises = Array.isArray(draft?.exercises) ? draft.exercises : []
+                                    const exercises = (Array.isArray(draft?.exercises) ? draft.exercises : []) as import('@/types/app').Exercise[]
                                     setCurrentWorkout({ title, exercises })
                                     setView('edit')
                                 } finally {
@@ -3614,7 +3614,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     {activeSession?.timerTargetTime && (
                         <RestTimerOverlay
                             targetTime={activeSession.timerTargetTime}
-                            context={activeSession.timerContext as any}
+                            context={activeSession.timerContext as unknown as Parameters<typeof import('@/components/RestTimerOverlay').default>[0]['context']}
                             settings={userSettingsApi?.settings ?? null}
                             onClose={handleCloseTimer}
                             onFinish={handleCloseTimer}

@@ -111,11 +111,11 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
                       : methodLabel === 'Bi-Set'
                         ? 'biSet'
                       : null;
-              const term = methodKey ? (HELP_TERMS as any)[methodKey] : null;
+              const term = methodKey ? (HELP_TERMS as Record<string, { title?: string; text?: string; tooltip?: string }>)[methodKey] : null;
               return (
                 <span className="truncate inline-flex items-center gap-1 group">
                   <span className="truncate">{methodLabel}</span>
-                  {term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null}
+                  {term ? <HelpHint title={term.title || ""} text={term.text || ""} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null}
                 </span>
               );
             })()}

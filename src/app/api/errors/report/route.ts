@@ -19,7 +19,7 @@ const ZodBodySchema = z
   })
   .strip()
 
-const trimLen = (v: any, max: number) => {
+const trimLen = (v: unknown, max: number) => {
   const s = String(v ?? '')
   if (!s) return ''
   return s.length > max ? s.slice(0, max) : s

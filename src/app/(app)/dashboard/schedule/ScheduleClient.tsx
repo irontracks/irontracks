@@ -230,7 +230,7 @@ export default function SchedulePage() {
     }
   }
 
-  const handleSubmitAppointment = async (event: any) => {
+  const handleSubmitAppointment = async (event: { preventDefault?: () => void } | null | undefined) => {
     event?.preventDefault?.()
     if (!userId) {
       setError('Usuário não identificado.')

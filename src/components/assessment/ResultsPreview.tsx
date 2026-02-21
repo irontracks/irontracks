@@ -36,7 +36,7 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       abdominal_skinfold: parseFloat(formData.abdominal_skinfold || '0'),
       thigh_skinfold: parseFloat(formData.thigh_skinfold || '0'),
       calf_skinfold: parseFloat(formData.calf_skinfold || '0')
-    } as any);
+    } as unknown as Parameters<typeof calculateSumSkinfolds>[0]);
 
     const bodyDensity = (sumOfSkinfolds > 0 && age > 0) ? calculateBodyDensity(sumOfSkinfolds, age, gender) : 1.05;
     const bodyFatPercentage = calculateBodyFatPercentage(bodyDensity);

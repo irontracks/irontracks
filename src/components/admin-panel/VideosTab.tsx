@@ -107,10 +107,10 @@ export const VideosTab: React.FC = () => {
                     <div className="mt-6 border-t border-neutral-800 pt-6">
                         <h4 className="font-bold text-white mb-3 text-sm uppercase tracking-wide">Fila de Processamento</h4>
                         <div className="max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                            {videoQueue.map((item: any, idx) => (
+                            {videoQueue.map((item: Record<string, unknown>, idx) => (
                                 <div key={idx} className="flex items-center justify-between p-3 bg-neutral-900 rounded-lg border border-neutral-800 text-sm">
-                                    <span className="text-neutral-300 truncate max-w-[70%]">{item.name}</span>
-                                    <span className="text-xs text-neutral-500">{item.status || 'Pendente'}</span>
+                                    <span className="text-neutral-300 truncate max-w-[70%]">{String(item.name || "")}</span>
+                                    <span className="text-xs text-neutral-500">{String(item.status || 'Pendente')}</span>
                                 </div>
                             ))}
                         </div>

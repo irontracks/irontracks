@@ -127,7 +127,7 @@ export async function POST(req: Request) {
 
     const resolvedItems = await resolveWithGemini(payload)
     const byNormalized = new Map<string, { canonical: string; confidence: number }>()
-    ;(Array.isArray(resolvedItems) ? resolvedItems : []).forEach((it: any) => {
+    ;(Array.isArray(resolvedItems) ? resolvedItems : []).forEach((it: Record<string, unknown>) => {
       const n = String(it?.normalized || '').trim()
       const c = String(it?.canonical || '').trim()
       const conf = Number(it?.confidence)

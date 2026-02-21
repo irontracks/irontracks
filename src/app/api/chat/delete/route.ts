@@ -62,7 +62,7 @@ export async function POST(req: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     if (!msg?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
-    const ownerId = String((msg as any)[ownerCol] || '').trim()
+    const ownerId = String((msg as Record<string, unknown>)[ownerCol] || '').trim()
     if (!ownerId || ownerId !== String(auth.user.id || '').trim()) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
