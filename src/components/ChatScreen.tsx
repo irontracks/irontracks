@@ -22,6 +22,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 interface ChannelRow { id: string; name?: string; [key: string]: unknown }
 interface InviteRow { to_uid: string; from_uid: string; [key: string]: unknown }
@@ -93,7 +94,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         try {
             const gid = await fetchGlobalId()
             setGlobalChannel(gid ? { id: gid } : null);
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error("Error loading chat data:", e);
         } finally {
             setLoading(false);
@@ -177,8 +178,8 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     throw new Error("Unknown error creating global channel");
                 }
             }
-        } catch (e: any) {
-            const msg = (e?.message ?? String(e ?? '')).trim();
+        } catch (e: unknown) {
+            const msg = (getErrorMessage(e) ?? String(e ?? '')).trim();
             try {
                 await alertRef.current(`Erro ao conectar no chat global: ${msg || 'Erro desconhecido'}`);
             } catch {}
@@ -210,7 +211,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                 
                 if (json.ok && json.data) {
                     const rows = Array.isArray(json.data) ? json.data : []
-                    setMessages(rows.reverse().map((row: any) => formatMessage(isRecord(row) ? row : {})));
+                    setMessages(rows.reverse().map((row: Record<string, unknown>) => formatMessage(isRecord(row) ? row : {})));
                 } else {
                     console.error("API returned error or no data:", json);
                 }
@@ -390,8 +391,8 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     await alertRef.current(`Convite enviado para ${targetName}! Aguarde a aceitação.`, "Convite Enviado");
                     setView('list');
                 }
-            } catch (e: any) {
-                await alertRef.current("Erro ao enviar convite: " + (e?.message ?? String(e)));
+            } catch (e: unknown) {
+                await alertRef.current("Erro ao enviar convite: " + (getErrorMessage(e) ?? String(e)));
             } finally {
                 setSendingInviteTo(null);
             }

@@ -419,7 +419,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ follower_id: fid, decision }),
       })
-      const data = await res.json().catch((): any => null)
+      const data = await res.json().catch((): null => null)
       if (!data?.ok) {
         const raw = String(data?.error || 'Falha ao responder')
         const msg = (() => {
@@ -456,7 +456,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ following_id: pid }),
       })
-      const data = await res.json().catch((): any => null)
+      const data = await res.json().catch((): null => null)
       if (!data?.ok) {
         const raw = String(data?.error || 'Falha ao cancelar')
         const msg = (() => {
@@ -503,7 +503,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ following_id: pid }),
       })
-      const data = await res.json().catch((): any => null)
+      const data = await res.json().catch((): null => null)
       if (!data?.ok) {
         const raw = String(data?.error || 'Falha ao seguir')
         const msg = (() => {

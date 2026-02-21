@@ -238,7 +238,7 @@ export async function generatePostWorkoutInsights(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch((): any => null)
+    const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as unknown as ActionResult<Record<string, unknown>>
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -257,7 +257,7 @@ export async function generateExerciseMuscleMap(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch((): any => null)
+    const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao mapear exercícios' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -276,7 +276,7 @@ export async function getMuscleMapWeek(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch((): any => null)
+    const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -295,7 +295,7 @@ export async function getMuscleMapDay(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch((): any => null)
+    const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular do dia' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -314,7 +314,7 @@ export async function backfillExerciseMuscleMaps(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch((): any => null)
+    const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao reprocessar histórico' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -333,7 +333,7 @@ export async function applyProgressionToNextTemplate(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const json = await res.json().catch((): any => null)
+    const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao aplicar progressão' }
     return json as unknown as ActionResult<Record<string, unknown>>
   } catch (e) {
@@ -640,7 +640,7 @@ export async function generatePeriodReportInsights(input: unknown) {
         `${totalMinutes} min no total (${avgMinutes} min/treino)`,
         `${totalVolumeKg.toLocaleString('pt-BR')}kg de volume (${avgVolumeKg.toLocaleString('pt-BR')}kg/treino)`,
       ],
-      highlights: topByVolume.map((x: any) => `${safeString(x?.name) || 'Exercício'}: ${Number(x?.volumeKg || 0).toLocaleString('pt-BR')}kg`),
+      highlights: topByVolume.map((x: Record<string, unknown>) => `${safeString(String(x?.name ?? '')) || 'Exercício'}: ${Number(x?.volumeKg ?? 0).toLocaleString('pt-BR')}kg`),
       focus: [
         uniqueDaysCount ? `Consistência: ${uniqueDaysCount} dia(s) treinados ${cadenceLabel}.` : '',
         topFreqName ? `Exercício mais frequente: ${topFreqName}.` : '',

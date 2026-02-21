@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,10 +13,11 @@ const BodySchema = z
   })
   .strip()
 
-const isMissingTable = (error: any) => {
-  const status = Number(error?.status)
-  const code = error?.code ? String(error.code) : ''
-  const msg = error?.message ? String(error.message) : ''
+const isMissingTable = (error: unknown) => {
+  const e = error !== null && typeof error === 'object' ? (error as Record<string, unknown>) : {}
+  const status = Number(e.status)
+  const code = e.code ? String(e.code) : ''
+  const msg = e.message ? String(e.message) : ''
   return status === 404 || code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg)
 }
 
@@ -36,17 +38,17 @@ export async function POST(req: Request) {
     const admin = createAdminClient()
     const userId = user.id
 
-    const safeDelete = async (query: any) => {
+    const safeDelete = async (query: PromiseLike<{ error: unknown }>) => {
       try {
         const { error } = await query
         if (error && !isMissingTable(error)) throw error
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (isMissingTable(e)) return
         throw e
       }
     }
 
-    const safeSelectIds = async (query: any, key: string) => {
+    const safeSelectIds = async (query: PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>, key: string) => {
       try {
         const { data, error } = await query
         if (error) {
@@ -54,8 +56,8 @@ export async function POST(req: Request) {
           throw error
         }
         const rows = Array.isArray(data) ? data : []
-        return rows.map((r: any) => r?.[key]).filter(Boolean)
-      } catch (e: any) {
+        return rows.map((r: Record<string, unknown>) => r?.[key]).filter(Boolean)
+      } catch (e: unknown) {
         if (isMissingTable(e)) return []
         throw e
       }
@@ -111,7 +113,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }
