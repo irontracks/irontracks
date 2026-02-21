@@ -64,14 +64,14 @@ const StudentDashboard = dynamic(() => import('@/components/dashboard/StudentDas
 const WorkoutWizardModal = dynamic(() => import('@/components/dashboard/WorkoutWizardModal'), { ssr: false });
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 import { useUserSettings } from '@/hooks/useUserSettings'
-import WhatsNewModal from '@/components/WhatsNewModal'
-import WelcomeFloatingWindow from '@/components/WelcomeFloatingWindow'
+const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
+const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 import { getLatestWhatsNew } from '@/content/whatsNew'
-import GuidedTour from '@/components/onboarding/GuidedTour'
+const GuidedTour = dynamic(() => import('@/components/onboarding/GuidedTour'), { ssr: false })
 import { getTourSteps } from '@/utils/tourSteps'
 import { cacheGetWorkouts, cacheSetWorkouts } from '@/lib/offline/offlineSync'
-import OfflineSyncModal from '@/components/OfflineSyncModal'
+const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useVipAccess } from '@/hooks/useVipAccess'
 import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getInternalSecret, hasValidInternalSecret } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ const isAuthorized = (req: Request) => {
 }
 
 export async function GET(req: Request) {
+  try {
   if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
@@ -43,4 +45,7 @@ export async function GET(req: Request) {
   })
 
   return NextResponse.json({ ok: true, purged: ids.length })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+  }
 }
