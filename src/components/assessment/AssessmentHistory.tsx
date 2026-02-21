@@ -23,6 +23,7 @@ import { useAssessment } from '@/hooks/useAssessment';
 import AssessmentPDFGenerator from '@/components/assessment/AssessmentPDFGenerator';
 import { generateAssessmentPlanAi } from '@/actions/workout-actions';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 ChartJS.register(
   CategoryScale,
@@ -396,7 +397,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           const storageKey = `assessment_import_${studentId}`;
           window.sessionStorage.setItem(storageKey, JSON.stringify({ formData: mergedFormData }));
         } catch (error) {
-          console.error('Erro ao salvar avaliação importada na sessão', error);
+          logError('error', 'Erro ao salvar avaliação importada na sessão', error);
           window.alert('Não foi possível preparar os dados importados. Tente novamente.');
           return;
         }
@@ -404,7 +405,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
 
       router.push(`/assessments/new/${studentId}`);
     } catch (error) {
-      console.error('Erro ao importar avaliação por imagem/PDF', error);
+      logError('error', 'Erro ao importar avaliação por imagem/PDF', error);
       if (typeof window !== 'undefined') {
         window.alert('Falha ao importar avaliação por imagem/PDF.');
       }
@@ -477,7 +478,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                 }
               }
             } catch (e) {
-              console.error('Erro ao resolver nome do aluno para histórico de avaliações', e);
+              logError('error', 'Erro ao resolver nome do aluno para histórico de avaliações', e);
             }
 
             setStudentName(resolvedName);

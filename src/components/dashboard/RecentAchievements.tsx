@@ -5,6 +5,7 @@ import { Trophy, TrendingUp, X, ChevronDown } from 'lucide-react'
 import { getLatestWorkoutPrs } from '@/actions/workout-actions'
 import { motion, AnimatePresence } from 'framer-motion'
 import BadgesInline, { type Badge } from './BadgesInline'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 type PrData = {
   exercise: string
@@ -59,7 +60,7 @@ export default function RecentAchievements({ userId, badges, showBadges = false,
           setPrs([])
         }
       } catch (e) {
-        console.error(e)
+        logError('error', e)
       } finally {
         if (!cancelled) setLoading(false)
       }

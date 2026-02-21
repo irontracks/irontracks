@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { Check, X, Loader2, Calendar, Mail, Phone, User, Clock, GraduationCap } from 'lucide-react'
 import { useDialog } from '@/contexts/DialogContext'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface AccessRequest {
     id: string
@@ -32,10 +33,10 @@ export default function RequestsTab() {
             if (json.ok) {
                 setRequests((json.data || []) as AccessRequest[])
             } else {
-                console.error(json.error)
+                logError('RequestsTab', json.error)
             }
         } catch (e) {
-            console.error(e)
+            logError('error', e)
         } finally {
             setLoading(false)
         }

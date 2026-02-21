@@ -14,6 +14,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface ChatUser {
     uid: string
@@ -152,7 +153,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             }
             setOtherUser({ ...normalized, last_seen: row.last_seen ?? null } as ChatUser);
         } catch (error) {
-            console.error('Erro ao carregar usuário:', error);
+            logError('error', 'Erro ao carregar usuário:', error);
         }
     }, [resolvedOtherUserId, supabase]);
 
@@ -174,7 +175,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             setChannelId(nextChannelId);
             return nextChannelId;
         } catch (error) {
-            console.error('Erro ao obter canal:', error);
+            logError('error', 'Erro ao obter canal:', error);
             const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
             if (/dm_blocked/i.test(msg) || /row-level security/i.test(msg) || /policy/i.test(msg)) {
                 await alert('Não foi possível iniciar a conversa. Um dos usuários desativou mensagens diretas nas configurações.');
@@ -200,7 +201,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         } catch (error) {
             const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
             if (msg.includes('Abort') || msg.includes('ERR_ABORTED')) return;
-            console.error('Erro ao marcar como lido:', error);
+            logError('error', 'Erro ao marcar como lido:', error);
         }
     }, [resolvedOtherUserId, supabase]);
 
@@ -259,7 +260,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             if (msg.includes('Abort') || msg.includes('ERR_ABORTED')) {
                 return;
             }
-            console.error('Erro ao carregar mensagens:', error);
+            logError('error', 'Erro ao carregar mensagens:', error);
             await alert('Erro ao carregar mensagens: ' + msg);
         }
     }, [alert, markMessagesAsRead, supabase]);
@@ -304,7 +305,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                             await markMessagesAsRead(channelId)
                         }
                     } catch (e) {
-                        console.error('Erro ao processar mensagem realtime (direct):', e)
+                        logError('error', 'Erro ao processar mensagem realtime (direct):', e)
                         return
                     }
                 }
@@ -326,7 +327,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 await loadMessages(id);
                 unsubscribe = setupRealtime(id);
             } catch (error) {
-                console.error('Erro ao inicializar chat:', error);
+                logError('error', 'Erro ao inicializar chat:', error);
             } finally {
                 setLoading(false);
             }
@@ -388,7 +389,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 .eq('id', channelId);
 
         } catch (error) {
-            console.error('Erro ao enviar mensagem:', error);
+            logError('error', 'Erro ao enviar mensagem:', error);
             const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
             await alert('Erro ao enviar mensagem: ' + msg);
             setNewMessage(message);
@@ -447,7 +448,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 }
             }
         } catch (err) {
-            console.error(err);
+            logError('error', err);
             const msg = (err as Record<string, unknown>)?.message
             await alert('Falha ao enviar mídia: ' + (typeof msg === 'string' ? msg : String(err)))
         }

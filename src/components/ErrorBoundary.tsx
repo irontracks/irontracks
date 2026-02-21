@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -22,7 +23,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    logError("Uncaught error:", error, errorInfo);
     this.setState({ errorInfo });
     try {
       if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {

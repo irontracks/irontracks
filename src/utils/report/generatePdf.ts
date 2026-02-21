@@ -1,3 +1,5 @@
+import { logError } from '@/lib/logger'
+
 interface AssessmentFormData {
   assessment_date?: string | null
   weight?: number | string | null
@@ -214,7 +216,7 @@ export async function generateAssessmentPdf(
     const blob = new Blob([html], { type: 'text/html' });
     return blob;
   } catch (error) {
-    console.error('Erro ao montar HTML da avaliação', error);
+    logError('error', 'Erro ao montar HTML da avaliação', error);
     const fallback = '<!doctype html><html><body><p>Não foi possível gerar o PDF da avaliação.</p></body></html>';
     return new Blob([fallback], { type: 'text/html' });
   }

@@ -9,6 +9,7 @@ import StoryCreatorModal from '@/components/stories/StoryCreatorModal'
 import { Story, StoryGroup } from '@/types/social'
 import { parseExt, guessMediaKind, extFromMime } from '@/utils/mediaUtils'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 const initials = (name: string) => {
   const n = String(name || '').trim()
@@ -101,7 +102,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       await reload()
     } catch (e: unknown) {
       const msg = String(getErrorMessage(e) || e)
-      console.error('Story upload error:', e)
+      logError('error', 'Story upload error:', e)
       const low = msg.toLowerCase()
       if (low.includes('exceeded') && low.includes('maximum') && low.includes('size')) {
         setError('Arquivo excede o limite de upload do Storage. Se o vídeo estiver <= 200MB, ajuste o “Global upload limit” no Supabase Storage.')

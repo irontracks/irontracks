@@ -1,3 +1,4 @@
+import { logError, logWarn, logInfo } from '@/lib/logger'
 let __ctx: AudioContext | null;
 let __unlocked = false;
 
@@ -80,7 +81,7 @@ export const playStartSound = (opts?: SoundOpts) => {
         osc.start();
         osc.stop(ctx.currentTime + 0.3);
     } catch (e) {
-        console.error("Erro ao tocar som de início:", e);
+        logError('error', "Erro ao tocar som de início:", e);
     }
 };
 
@@ -108,7 +109,7 @@ export const playFinishSound = (opts?: SoundOpts) => {
         playNote(783.99, now + 0.2, 0.6);
         playNote(1046.5, now + 0.3, 0.8);
     } catch (e) {
-        console.error("Erro ao tocar som de fim:", e);
+        logError('error', "Erro ao tocar som de fim:", e);
     }
 };
 
@@ -133,7 +134,7 @@ export const playTimerFinishSound = (opts?: SoundOpts) => {
         osc.start();
         osc.stop(ctx.currentTime + 0.5);
     } catch (e) {
-        console.error("Erro ao tocar som do timer:", e);
+        logError('error', "Erro ao tocar som do timer:", e);
     }
 };
 
@@ -154,6 +155,6 @@ export const playTick = (opts?: SoundOpts) => {
         osc.start();
         osc.stop(ctx.currentTime + 0.12);
     } catch (e) {
-        console.error("Erro ao tocar tick:", e);
+        logError('error', "Erro ao tocar tick:", e);
     }
 };

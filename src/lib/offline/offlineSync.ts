@@ -1,5 +1,6 @@
 
 import { kvGet, kvSet, queuePut, queueGetAll, queueDelete } from './idb';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 const CACHE_KEY_WORKOUTS = 'offline_workouts_cache';
 
@@ -35,7 +36,7 @@ export const cacheSetWorkouts = async (workouts: unknown, opts: unknown = null) 
   try {
     await kvSet(CACHE_KEY_WORKOUTS, workouts);
   } catch (e) {
-    console.error('Cache set failed', e);
+    logError('error', 'Cache set failed', e);
   }
 };
 
@@ -118,7 +119,7 @@ export const bumpOfflineJob = async ({ id }: { id: string }) => {
       await queuePut(next);
     }
   } catch (e) {
-    console.error('Bump failed', e);
+    logError('error', 'Bump failed', e);
   }
 };
 
@@ -154,7 +155,7 @@ export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
       await queueDelete(String(j.id));
       processed++;
     } catch (err) {
-      console.error('Failed to process offline job:', j, err);
+      logError('Failed to process offline job:', j, err);
       errors++;
 
       // Update job with failure info

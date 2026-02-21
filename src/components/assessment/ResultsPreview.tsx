@@ -12,6 +12,7 @@ import {
   classifyBodyFat
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface ResultsPreviewProps {
   formData: AssessmentFormData;
@@ -102,7 +103,7 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error('Erro ao gerar PDF da avaliação', e);
+      logError('error', 'Erro ao gerar PDF da avaliação', e);
     } finally {
       setShowExportMenu(false);
     }
@@ -126,7 +127,7 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       a.remove();
       URL.revokeObjectURL(url);
     } catch (e) {
-      console.error('Erro ao exportar avaliação em JSON', e);
+      logError('error', 'Erro ao exportar avaliação em JSON', e);
     } finally {
       setShowExportMenu(false);
     }

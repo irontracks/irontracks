@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { requireRole } from '@/utils/auth/route'
 import type { ActionResult } from '@/types/actions'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 type AdminActionResult<T = Record<string, unknown>> = ActionResult<T> & { success?: boolean; error?: string; data?: unknown }
 
@@ -89,7 +90,7 @@ export async function registerStudent(email: string, password: string, name: str
             last_seen: new Date()
         })
 
-        if (pError) console.error("Profile creation warning:", pError)
+        if (pError) logError('error', "Profile creation warning:", pError)
 
         return { success: true, user: data.user } as unknown as AdminActionResult<Record<string, unknown>>
     } catch (e) {
@@ -360,7 +361,8 @@ export async function assignWorkoutToStudent(
 
             const safeInsertedExs = Array.isArray(insertedExs) ? insertedExs : []
 
-            const insertSetSafe = async (payload: Record<string, any>) => {
+            type SetInsertPayload = Record<string, unknown> & { advanced_config?: unknown; is_warmup?: boolean }
+            const insertSetSafe = async (payload: SetInsertPayload) => {
                 try {
                     const { error } = await adminDb.from('sets').insert(payload);
                     if (!error) return;
@@ -524,21 +526,23 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
                 notes: w?.notes ?? null,
                 is_template: !!w?.is_template,
                 created_by: w?.created_by ?? null,
-                exercises: (Array.isArray(w?.exercises) ? w.exercises : []).map((e: any) => ({
-                    id: e?.id,
-                    name: e?.name ?? '',
-                    notes: e?.notes ?? null,
-                    video_url: e?.video_url ?? null,
-                    rest_time: e?.rest_time ?? null,
-                    cadence: e?.cadence ?? null,
-                    method: e?.method ?? null,
-                    order: e?.order ?? null,
-                    sets: (Array.isArray(e?.sets) ? e.sets : []).map((s: Record<string, unknown>) => ({
+                exercises: (Array.isArray(w?.exercises) ? w.exercises : []).map((e) => {
+                    const ex = e && typeof e === 'object' ? (e as Record<string, unknown>) : {}
+                    return ({
+                    id: ex?.id,
+                    name: ex?.name ?? '',
+                    notes: ex?.notes ?? null,
+                    video_url: ex?.video_url ?? null,
+                    rest_time: ex?.rest_time ?? null,
+                    cadence: ex?.cadence ?? null,
+                    method: ex?.method ?? null,
+                    order: ex?.order ?? null,
+                    sets: (Array.isArray(ex?.sets) ? ex.sets : []).map((s: Record<string, unknown>) => ({
                         reps: s?.reps ?? null,
                         rpe: s?.rpe ?? null,
                         set_number: s?.set_number ?? null
                     }))
-                }))
+                })})
             }))
         }
 

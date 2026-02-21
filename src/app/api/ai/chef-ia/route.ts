@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeJsonParse = (raw: any) => {
+const safeJsonParse = (raw: unknown) => {
   try {
     if (!raw) return null
     if (typeof raw === 'object') return raw
@@ -134,4 +134,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) || 'unexpected_error' }, { status: 500 })
   }
 }
-

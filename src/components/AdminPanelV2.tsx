@@ -45,6 +45,7 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
 import type { Exercise } from '@/types/app';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
 const COACH_INBOX_DEFAULTS = {
@@ -575,7 +576,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 const { data, error } = await supabase.from('workouts').select('*').limit(1);
 
                 if (error) {
-                    console.error("ERRO CRÍTICO SUPABASE:", error);
+                    logError('error', "ERRO CRÍTICO SUPABASE:", error);
                     setDebugError("Erro Supabase: " + error.message + " | Detalhes: " + JSON.stringify(error));
                 } else if (!data || data.length === 0) {
                     // Conexão OK, mas tabela vazia ou bloqueada por RLS
@@ -583,7 +584,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     // Conexão OK — dados encontrados
                 }
             } catch (e: unknown) {
-                console.error("ERRO DE CONEXÃO/FETCH:", e);
+                logError('error', "ERRO DE CONEXÃO/FETCH:", e);
                 const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
                 setDebugError("Erro Catch: " + msg);
             }
@@ -600,13 +601,13 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 let list: UnknownRecord[] = [];
                 if (isAdmin) {
                     const authHeaders = await getAdminAuthHeaders();
-                    const json = await adminFetchJson(supabase, '/api/admin/students/list');
-                    if (json?.ok) list = json.students || [];
+                    const json = await adminFetchJson(supabase, '/api/admin/students/list') as UnknownRecord;
+                    if (json?.ok) list = (json.students as UnknownRecord[]) || [];
 
-                    const legacyJson = await adminFetchJson(supabase, '/api/admin/legacy-students');
+                    const legacyJson = await adminFetchJson(supabase, '/api/admin/legacy-students') as UnknownRecord;
                     if (legacyJson?.ok && legacyJson.students) {
                         const existingIds = new Set(list.map((s: UnknownRecord) => s.user_id || s.id));
-                        const newLegacy = (legacyJson.students as UnknownRecord[]).filter((s: UnknownRecord) => !existingIds.has(s.id));
+                        const newLegacy = ((legacyJson.students as unknown) as UnknownRecord[]).filter((s: UnknownRecord) => !existingIds.has(s.id));
                         list = [...list, ...newLegacy];
 
                         // Dedup by email, prefer entries that already have teacher_id
@@ -629,8 +630,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         // Fetch teachers via admin API to exclude
                         let teacherEmails = new Set();
                         try {
-                            const tJson = await adminFetchJson(supabase, '/api/admin/teachers/list');
-                            if (tJson?.ok) teacherEmails = new Set((tJson.teachers || []).map((t: UnknownRecord) => String(t.email || '').toLowerCase()));
+                            const tJson = await adminFetchJson(supabase, '/api/admin/teachers/list') as UnknownRecord;
+                            if (tJson?.ok) teacherEmails = new Set(((tJson.teachers as UnknownRecord[]) || []).map((t: UnknownRecord) => String(t.email || '').toLowerCase()));
                         } catch { }
                         list = (profiles || [])
                             .filter((p: UnknownRecord) => !p.email || !teacherEmails.has(String(p.email).toLowerCase()))
@@ -669,10 +670,10 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     if (teachersList.length === 0) {
                         let jsonT = null;
                         try {
-                            jsonT = await adminFetchJson(supabase, '/api/admin/teachers/list');
+                            jsonT = await adminFetchJson(supabase, '/api/admin/teachers/list') as UnknownRecord;
                         } catch { }
                         if (jsonT?.ok) {
-                            const base = jsonT.teachers || [];
+                            const base = (jsonT.teachers as UnknownRecord[]) || [];
                             try {
                                 const emails = base.map((t: UnknownRecord) => t.email).filter(Boolean);
                                 if (emails.length > 0) {
@@ -681,7 +682,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                         .select('id, email')
                                         .in('email', emails);
                                     const idByEmail = new Map((profilesMap || []).map((p: UnknownRecord) => [String(p.email || ''), p.id]));
-                                    const enriched = base.map((t: UnknownRecord) => ({ ...t, user_id: idByEmail.get(String(t.email || '')) || null }));
+                                    const enriched: UnknownRecord[] = base.map((t: UnknownRecord) => ({ ...t, user_id: idByEmail.get(String(t.email || '')) || null }));
                                     // Ensure currently assigned teacher appears in dropdown
                                     if (selectedStudent?.teacher_id && !enriched.some((t: UnknownRecord) => t.user_id === selectedStudent.teacher_id)) {
                                         const { data: curProfile } = await supabase
@@ -689,13 +690,13 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                             .select('id, display_name, email')
                                             .eq('id', selectedStudent.teacher_id)
                                             .maybeSingle();
-                                        if (curProfile) enriched.unshift({ id: curProfile.id, name: curProfile.display_name, email: curProfile.email, user_id: curProfile.id, status: 'active' })
+                                        if (curProfile) enriched.unshift({ id: String(curProfile.id || ''), name: curProfile.display_name, email: curProfile.email, user_id: curProfile.id, status: 'active' } as unknown as UnknownRecord)
                                     }
-                                    setTeachersList(enriched);
+                                    setTeachersList(enriched as unknown as AdminTeacher[]);
                                 } else {
-                                    setTeachersList(base);
+                                    setTeachersList(base as unknown as AdminTeacher[]);
                                 }
-                            } catch { setTeachersList(base); }
+                            } catch { setTeachersList(base as unknown as AdminTeacher[]); }
                         }
                     }
                 } else {
@@ -897,7 +898,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         if (json.ok) {
                             list = (json.rows || []).filter((w: UnknownRecord) => w?.is_template === true && w?.user_id === currentUser.id);
                         }
-                    } catch (e) { console.error("API fetch error", e); }
+                    } catch (e) { logError('error', "API fetch error", e); }
 
                     if ((list || []).length === 0) {
                         try {
@@ -908,7 +909,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                 .eq('user_id', currentUser.id)
                                 .order('name');
                             list = (data || []).filter((w: UnknownRecord) => w?.is_template === true && w?.user_id === currentUser.id);
-                        } catch (e) { console.error("Supabase fetch error", e); }
+                        } catch (e) { logError('error', "Supabase fetch error", e); }
                     }
                 } else {
                     try {
@@ -919,7 +920,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                             .eq('user_id', currentUser.id)
                             .order('name');
                         list = data || [];
-                    } catch (e) { console.error("Supabase fetch error", e); }
+                    } catch (e) { logError('error', "Supabase fetch error", e); }
                 }
                 try {
                     const resLegacy = await fetch('/api/workouts/list');
@@ -951,14 +952,14 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         ) {
                             byTitle.set(key, w);
                         }
-                    } catch (e) { console.error("Error processing workout", w, e); }
+                    } catch (e) { logError("Error processing workout", w, e); }
                 }
                 const deduped = Array.from(byTitle.values())
                     .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name || '') }))
                     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
                 setTemplates(deduped || []);
             } catch (err) {
-                console.error("Critical error fetching templates", err);
+                logError('error', "Critical error fetching templates", err);
             }
         };
         fetchTemplates();

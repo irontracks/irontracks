@@ -197,10 +197,14 @@ interface SetOverridesInput {
   setsCount: number
 }
 
+type SetOverride =
+  | { kind: 'cluster'; label: string; plannedReps: string; advanced_config: Record<string, unknown> }
+  | { kind: 'rest_pause' | 'sst' | 'drop_set'; label: string; plannedReps: string; advanced_config: unknown }
+
 export function parseExerciseNotesToSetOverrides({ notes, setsCount }: SetOverridesInput) {
   const directives = splitDirectives(notes)
   const nSets = Math.max(0, Math.floor(Number(setsCount) || 0))
-  const overrides = Array.from({ length: nSets }).map(() => null)
+  const overrides: Array<SetOverride | null> = Array.from({ length: nSets }).map(() => null)
   if (!directives.length || !nSets) return { overrides, hash: hashString(notes) }
 
   directives.forEach((raw) => {
@@ -222,7 +226,7 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }: SetOverri
           label: detected.label,
           plannedReps: parsed.plannedReps,
           advanced_config: parsed.config,
-        } as any
+        }
       })
       return
     }
@@ -232,11 +236,11 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }: SetOverri
       if (!parsed) return
       targets.forEach((setIdx) => {
         overrides[setIdx] = {
-          kind: detected.kind,
+          kind: detected.kind as 'rest_pause' | 'sst' | 'drop_set',
           label: detected.kind === 'sst' ? 'SST' : 'Rest-P',
           plannedReps: safeString(pattern),
           advanced_config: parsed.config,
-        } as any
+        }
       })
       return
     }
@@ -250,7 +254,7 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }: SetOverri
           label: 'Drop',
           plannedReps: safeString(pattern),
           advanced_config: parsed.config,
-        } as any
+        }
       })
     }
   })

@@ -87,6 +87,7 @@ import {
 } from '@/types/app';
 import type { AdminUser } from '@/types/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
@@ -165,7 +166,7 @@ const mapWorkoutRow = (w: unknown) => {
                     setDetails,
                 };
             } catch (mapErr) {
-                console.error('Erro ao mapear exercício', {
+                logError('Erro ao mapear exercício', {
                     workoutId: workout?.id,
                     exerciseId: e?.id,
                     error: mapErr,
@@ -1315,14 +1316,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     .limit(1);
                 if (cancelled) return;
                 if (error) {
-                    console.error('Erro ao carregar notificações:', error);
+                    logError('error', 'Erro ao carregar notificações:', error);
                     setHasUnreadNotification(false);
                     return;
                 }
                 setHasUnreadNotification(Array.isArray(data) && data.length > 0);
             } catch (e) {
                 if (cancelled) return;
-                console.error('Erro ao carregar notificações:', e);
+                logError('error', 'Erro ao carregar notificações:', e);
                 setHasUnreadNotification(false);
             }
         };
@@ -1397,7 +1398,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         }),
                     });
                 } catch (e) {
-                    console.error('Erro ao gerar notificação de mensagem direta:', e);
+                    logError('error', 'Erro ao gerar notificação de mensagem direta:', e);
                 }
             })
             .subscribe();
@@ -1508,7 +1509,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 try {
                     return
                 } catch (e) {
-                    console.error('Erro ao sincronizar perfil:', e);
+                    logError('error', 'Erro ao sincronizar perfil:', e);
                 }
             };
             syncProfile();
@@ -1601,7 +1602,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const currentUser = specificUser;
 
             if (!currentUser?.id) {
-                console.warn("DASHBOARD: Usuário não identificado ao buscar treinos.");
+                logWarn('warn', "DASHBOARD: Usuário não identificado ao buscar treinos.");
                 return;
             }
 
@@ -1691,7 +1692,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         .or(`teacher_id.eq.${currentUser.id},user_id.eq.${currentUser.id}`)
                         .order('name');
                     studentsList = Array.isArray(st) ? st : [];
-                } catch (e) { console.error('Erro fetching students', e); }
+                } catch (e) { logError('error', 'Erro fetching students', e); }
 
                 // 2. Fetch My Workouts
                 const { data: myBase, error: myErr } = await supabase
@@ -1869,7 +1870,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         }).filter(f => (f.workouts || []).length > 0)
                         setStudentFolders(folders)
                     } catch (err) {
-                        console.error("Erro ao processar alunos:", err);
+                        logError('error', "Erro ao processar alunos:", err);
                         setStudentFolders([])
                     }
                 } else {
@@ -1911,7 +1912,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     activeStreak: 0 // Placeholder
                 });
             } else {
-                console.warn('Fetch sem dados; mantendo estado atual');
+                logWarn('warn', 'Fetch sem dados; mantendo estado atual');
             }
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
@@ -1929,7 +1930,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 } catch { }
                 return;
             }
-            console.error("Erro ao buscar:", { message: msg, error: e });
+            logError("Erro ao buscar:", { message: msg, error: e });
         } finally { isFetching.current = false; }
     }, [supabase, user]); // Depende apenas do usuário para evitar loops de busca
 
@@ -1979,7 +1980,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     setStreakStats(streak)
                 }
             })
-            .catch(err => console.error('Erro ao calcular streak:', err));
+            .catch(err => logError('error', 'Erro ao calcular streak:', err));
     }, [user?.id]);
 
 
@@ -2072,7 +2073,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             }
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e || '')
-            console.warn('Falha ao salvar check-in pré-treino:', message)
+            logWarn('warn', 'Falha ao salvar check-in pré-treino:', message)
         }
         let resolvedExercises = exercisesList;
         try {
@@ -2115,7 +2116,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
             const allowPrompt = s ? s.notificationPermissionPrompt !== false : true
             if (allowPrompt && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-                Notification.requestPermission().catch((e: unknown) => console.warn('Erro permissão notificação:', String((e as Error)?.message ?? e)));
+                Notification.requestPermission().catch((e: unknown) => logWarn('Erro permissão notificação:', String((e as Error)?.message ?? e)));
             }
         }
     };
@@ -2871,7 +2872,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             try { writeLocalTourDismissal(user?.id, 'completed') } catch { }
                             const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
                             if (!res?.ok) {
-                                console.warn('Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
+                                logWarn('warn', 'Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
                             }
                             await logTourEvent('tour_completed', { version: TOUR_VERSION })
                         }}
@@ -2881,7 +2882,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
                             const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
                             if (!res?.ok) {
-                                console.warn('Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
+                                logWarn('warn', 'Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
                             }
                             await logTourEvent('tour_skipped', { version: TOUR_VERSION })
                         }}
@@ -2891,7 +2892,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
                             const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
                             if (!res?.ok) {
-                                console.warn('Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
+                                logWarn('warn', 'Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
                             }
                             await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
                         }}

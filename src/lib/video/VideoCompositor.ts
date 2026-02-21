@@ -1,3 +1,4 @@
+import { logError, logWarn, logInfo } from '@/lib/logger'
 interface RenderOptions {
     videoElement: HTMLVideoElement;
     trimRange: [number, number];
@@ -137,7 +138,7 @@ export class VideoCompositor {
 
         for (const type of webmCandidates) {
             if (MediaRecorder.isTypeSupported(type)) {
-                console.warn('MP4 não suportado, usando WebM. Compatibilidade pode ser limitada.');
+                logWarn('warn', 'MP4 não suportado, usando WebM. Compatibilidade pode ser limitada.');
                 return type;
             }
         }
@@ -174,7 +175,7 @@ export class VideoCompositor {
             this.sourceNode = this.audioCtx.createMediaElementSource(videoElement);
             this.sourceNode.connect(this.destNode);
         } catch (e) {
-            console.warn('Falha ao conectar áudio via Web Audio API, tentando fallback simples', e);
+            logWarn('warn', 'Falha ao conectar áudio via Web Audio API, tentando fallback simples', e);
         }
 
         const canvasStream = this.canvas.captureStream(0); // 0 = modo manual
@@ -210,7 +211,7 @@ export class VideoCompositor {
                 audioBitsPerSecond
             });
         } catch (e) {
-            console.warn('Bitrate control not supported, using defaults', e);
+            logWarn('warn', 'Bitrate control not supported, using defaults', e);
             this.recorder = new MediaRecorder(canvasStream, { mimeType });
         }
 

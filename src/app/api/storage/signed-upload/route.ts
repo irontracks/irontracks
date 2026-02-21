@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { canUploadToChatMediaPath, isSafeStoragePath, requireUser } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const BodySchema = z
   .object({
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     if (error || !data) return NextResponse.json({ ok: false, error: error?.message || 'failed to sign' }, { status: 400 })
 
     return NextResponse.json({ ok: true, path: safe.path, token: data.token })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

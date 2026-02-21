@@ -1,4 +1,5 @@
 import { foodDatabase } from './food-database'
+import type { FoodItem } from './food-database'
 import type { MealLog } from './engine'
 
 function normalizeFoodText(input: string): string {
@@ -105,7 +106,7 @@ export function parseInput(text: string): MealLog {
       continue
     }
 
-    let matchedItem: any = null
+    let matchedItem: FoodItem | null = null
     let dbKeyMatched = ''
     for (const entry of normalizedFoodEntries) {
       if (!entry.normalizedKey) continue

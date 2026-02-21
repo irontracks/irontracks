@@ -21,6 +21,7 @@ import {
   calculateSumSkinfolds
 } from '@/utils/calculations/bodyComposition';
 import { getErrorMessage } from '@/utils/errorMessage';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface UseAssessmentReturn {
   // Estado
@@ -62,7 +63,7 @@ export const useAssessment = (): UseAssessmentReturn => {
           setUser(user);
         }
       } catch (e) {
-        console.error('Erro ao carregar usuário no hook useAssessment', e);
+        logError('error', 'Erro ao carregar usuário no hook useAssessment', e);
         if (isMounted) {
           setUser(null);
         }
@@ -98,7 +99,7 @@ export const useAssessment = (): UseAssessmentReturn => {
           .maybeSingle();
 
         if (directProfileError) {
-          console.error('Erro ao buscar perfil do aluno (por id) para avaliação', directProfileError);
+          logError('error', 'Erro ao buscar perfil do aluno (por id) para avaliação', directProfileError);
         }
 
         if (directProfile?.id) {
@@ -113,7 +114,7 @@ export const useAssessment = (): UseAssessmentReturn => {
           .maybeSingle();
 
         if (studentByIdError) {
-          console.error('Erro ao buscar aluno por id para avaliação', studentByIdError);
+          logError('error', 'Erro ao buscar aluno por id para avaliação', studentByIdError);
         }
 
         if (studentById?.user_id) {
@@ -128,7 +129,7 @@ export const useAssessment = (): UseAssessmentReturn => {
               return profileForStudent.id as string;
             }
           } catch (e) {
-            console.error('Erro ao validar perfil vinculado ao aluno (por id)', e);
+            logError('error', 'Erro ao validar perfil vinculado ao aluno (por id)', e);
             return studentById.user_id as string;
           }
         }
@@ -142,7 +143,7 @@ export const useAssessment = (): UseAssessmentReturn => {
             .maybeSingle();
 
           if (profileByEmailError) {
-            console.error('Erro ao buscar perfil por email do aluno (por id)', profileByEmailError);
+            logError('error', 'Erro ao buscar perfil por email do aluno (por id)', profileByEmailError);
           }
 
           if (profileByEmail?.id) {
@@ -158,7 +159,7 @@ export const useAssessment = (): UseAssessmentReturn => {
           .maybeSingle();
 
         if (studentByUserError) {
-          console.error('Erro ao buscar aluno por user_id para avaliação', studentByUserError);
+          logError('error', 'Erro ao buscar aluno por user_id para avaliação', studentByUserError);
         }
 
         if (studentByUser?.user_id) {
@@ -239,7 +240,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       if (error) throw error;
       return normalizeAssessmentRow(data);
     } catch (e: unknown) {
-      console.error('Erro ao buscar avaliação:', e);
+      logError('error', 'Erro ao buscar avaliação:', e);
       setError(getErrorMessage(e));
       return null;
     } finally {
@@ -267,7 +268,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       setAssessments(normalized);
       return normalized;
     } catch (e: unknown) {
-      console.error('Erro ao buscar avaliações do aluno:', e);
+      logError('error', 'Erro ao buscar avaliações do aluno:', e);
       setError(getErrorMessage(e));
       return [];
     } finally {
@@ -378,7 +379,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       return { success: true, data: normalized };
     } catch (e: unknown) {
-      console.error('Erro ao criar avaliação:', e);
+      logError('error', 'Erro ao criar avaliação:', e);
       setError(getErrorMessage(e));
       return { success: false, error: getErrorMessage(e) };
     } finally {
@@ -405,7 +406,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       return { success: true, data: normalized };
     } catch (e: unknown) {
-      console.error('Erro ao atualizar avaliação:', e);
+      logError('error', 'Erro ao atualizar avaliação:', e);
       setError(getErrorMessage(e));
       return { success: false, error: getErrorMessage(e) };
     } finally {
@@ -429,7 +430,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       return { success: true };
     } catch (e: unknown) {
-      console.error('Erro ao excluir avaliação:', e);
+      logError('error', 'Erro ao excluir avaliação:', e);
       setError(getErrorMessage(e));
       return { success: false, error: getErrorMessage(e) };
     } finally {

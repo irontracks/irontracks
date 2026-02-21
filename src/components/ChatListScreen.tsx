@@ -9,6 +9,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface ChatUser {
     id: string;
@@ -61,7 +62,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
             if (error) throw error;
             setUsers((data || []) as ChatUser[]);
         } catch (error) {
-            console.error('Erro ao carregar contatos:', error);
+            logError('error', 'Erro ao carregar contatos:', error);
             // @ts-ignore
             const msg = getErrorMessage(error) || String(error || '');
             await alert('Erro ao carregar contatos: ' + msg);
@@ -146,7 +147,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                 });
             }
         } catch (e) {
-            console.error('Erro ao abrir conversa:', e);
+            logError('error', 'Erro ao abrir conversa:', e);
             // @ts-ignore
             const msg = getErrorMessage(e) || String(e || '');
             await alert('Erro ao abrir conversa: ' + msg);

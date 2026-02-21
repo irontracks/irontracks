@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
 
-const safeString = (v: any) => String(v ?? '').trim()
+const safeString = (v: unknown) => String(v ?? '').trim()
 
 const ZodBodySchema = z
   .object({
@@ -15,19 +15,20 @@ const ZodBodySchema = z
   })
   .strip()
 
-const buildExercisesPayload = (workout: any) => {
-  const w = workout && typeof workout === 'object' ? workout : {}
+const buildExercisesPayload = (workout: unknown) => {
+  const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : {}
   const exercises = Array.isArray(w.exercises) ? w.exercises : []
   return exercises
-    .filter((ex: Record<string, unknown>) => ex && typeof ex === 'object')
-    .map((ex: any, idx: number) => {
+    .filter((ex): ex is Record<string, unknown> => !!ex && typeof ex === 'object' && !Array.isArray(ex))
+    .map((ex, idx: number) => {
       const setDetails =
         Array.isArray(ex.setDetails) ? ex.setDetails : Array.isArray(ex.set_details) ? ex.set_details : Array.isArray(ex.sets) ? ex.sets : null
       const headerSets = Number.parseInt(String(ex.sets ?? ''), 10) || 0
       const numSets = headerSets || (Array.isArray(setDetails) ? setDetails.length : 0)
       const sets: unknown[] = [];
       for (let i = 0; i < numSets; i += 1) {
-        const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null
+        const sUnknown = Array.isArray(setDetails) ? (setDetails[i] || null) : null
+        const s = sUnknown && typeof sUnknown === 'object' ? (sUnknown as Record<string, unknown>) : {}
         sets.push({
           weight: s?.weight ?? null,
           reps: s?.reps ?? ex?.reps ?? null,
@@ -55,8 +56,9 @@ export async function PATCH(request: Request) {
   try {
     const parsedBody = await parseJsonBody(request, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
-    const payload: any = parsedBody.data!
-    const workout = payload?.workout && typeof payload.workout === 'object' ? payload.workout : payload
+    const payload = (parsedBody.data ?? {}) as z.infer<typeof ZodBodySchema>
+    const workoutCandidate = payload?.workout && typeof payload.workout === 'object' ? payload.workout : payload
+    const workout = workoutCandidate && typeof workoutCandidate === 'object' ? (workoutCandidate as Record<string, unknown>) : {}
     const workoutId = safeString(payload?.id ?? payload?.workoutId ?? workout?.id ?? workout?.workout_id)
     if (!workoutId) return NextResponse.json({ ok: false, error: 'missing id' }, { status: 400 })
 

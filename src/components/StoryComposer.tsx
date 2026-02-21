@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 // --- Types ---
 
@@ -1014,7 +1015,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         })
         return result
     } catch (e) {
-        console.error('Render failed', e)
+        logError('error', 'Render failed', e)
         throw e
     } finally {
         compositorRef.current = null
@@ -1097,7 +1098,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
              return
           }
           // If not allowed or other error, fall through to download
-          console.warn('Share API failed, falling back to download:', shareErr)
+          logWarn('warn', 'Share API failed, falling back to download:', shareErr)
         }
       }
 
@@ -1212,7 +1213,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       } catch {}
 
     } catch (err: unknown) {
-      console.error(err)
+      logError('error', err)
       const msg = String(getErrorMessage(err) || '').trim()
       setError(msg || 'Falha ao publicar story.')
     } finally {

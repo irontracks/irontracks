@@ -5,6 +5,7 @@ import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import { useDialog } from '@/contexts/DialogContext';
 import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin-actions';
 import { workoutTitleKey, normalizeWorkoutTitle } from '@/utils/workoutTitle';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -215,7 +216,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                     if (jsonTeachers.ok) setTeachersList(jsonTeachers.teachers || []);
                 }
             } catch (e) {
-                console.error('Initial load error', e);
+                logError('error', 'Initial load error', e);
             }
         };
         loadInitial();

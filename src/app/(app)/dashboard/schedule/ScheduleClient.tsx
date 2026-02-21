@@ -6,6 +6,7 @@ import { Calendar, ArrowLeft, Clock, User, Plus, Pencil, Trash2 } from 'lucide-r
 import { createClient } from '@/utils/supabase/client'
 import { InAppNotificationsProvider } from '@/contexts/InAppNotificationsContext'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 type AppointmentRow = {
   id: string
@@ -225,7 +226,7 @@ export default function SchedulePage() {
         }),
       })
     } catch (e: unknown) {
-      console.error('Erro ao enviar notificação de agendamento:', e)
+      logError('error', 'Erro ao enviar notificação de agendamento:', e)
     }
   }
 

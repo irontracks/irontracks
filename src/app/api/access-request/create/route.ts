@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
         .eq('id', existingRequest.id)
 
       if (updateError) {
-        console.error('Error updating access request:', updateError)
+        logError('error', 'Error updating access request:', updateError)
         return NextResponse.json({ ok: false, error: 'Erro ao atualizar solicitação.' }, { status: 500 })
       }
 
@@ -107,14 +108,14 @@ export async function POST(req: Request) {
       .single()
 
     if (insertError) {
-      console.error('Error inserting access request:', insertError)
+      logError('error', 'Error inserting access request:', insertError)
       return NextResponse.json({ ok: false, error: 'Erro ao salvar solicitação.' }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: inserted?.id ?? null })
 
   } catch (error) {
-    console.error('Access Request Error:', error)
+    logError('error', 'Access Request Error:', error)
     return NextResponse.json({ ok: false, error: 'Erro interno do servidor.' }, { status: 500 })
   }
 }

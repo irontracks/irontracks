@@ -13,6 +13,7 @@ import { adminFetchJson } from '@/utils/admin/adminFetch';
 import { PeriodStats } from '@/types/workout';
 import { z } from 'zod';
 import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -555,7 +556,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
 
                 setHistory(formatted);
             } catch (e) {
-                console.error("Erro histórico", e);
+                logError('error', "Erro histórico", e);
                 setHistory([]);
             } finally {
                 setLoading(false);

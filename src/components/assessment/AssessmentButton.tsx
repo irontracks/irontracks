@@ -3,6 +3,7 @@ import React, { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, TrendingUp, X, Upload } from 'lucide-react';
 import { AssessmentForm } from './AssessmentForm';
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface AssessmentButtonProps {
   studentId: string;
@@ -92,7 +93,7 @@ export default function AssessmentButton({
       try {
         parsed = JSON.parse(text);
       } catch (error) {
-        console.error("Erro ao parsear JSON de avaliação", error);
+        logError('error', "Erro ao parsear JSON de avaliação", error);
         if (typeof window !== "undefined") {
           window.alert("Arquivo JSON inválido. Verifique o conteúdo exportado.");
         }
@@ -132,7 +133,7 @@ export default function AssessmentButton({
           const storageKey = `assessment_import_${studentId}`;
           window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
         } catch (error) {
-          console.error("Erro ao salvar avaliação importada na sessão", error);
+          logError('error', "Erro ao salvar avaliação importada na sessão", error);
           window.alert("Não foi possível preparar os dados importados. Tente novamente.");
           return;
         }
@@ -140,7 +141,7 @@ export default function AssessmentButton({
 
       router.push(`/assessments/new/${studentId}`);
     } catch (error) {
-      console.error("Erro ao importar JSON de avaliação", error);
+      logError('error', "Erro ao importar JSON de avaliação", error);
       if (typeof window !== "undefined") {
         window.alert("Falha ao importar arquivo JSON de avaliação.");
       }
@@ -198,7 +199,7 @@ export default function AssessmentButton({
           const storageKey = `assessment_import_${studentId}`;
           window.sessionStorage.setItem(storageKey, JSON.stringify({ formData: mergedFormData }));
         } catch (error) {
-          console.error('Erro ao salvar avaliação importada na sessão', error);
+          logError('error', 'Erro ao salvar avaliação importada na sessão', error);
           window.alert('Não foi possível preparar os dados importados. Tente novamente.');
           return;
         }
@@ -206,7 +207,7 @@ export default function AssessmentButton({
 
       router.push(`/assessments/new/${studentId}`);
     } catch (error) {
-      console.error('Erro ao importar avaliação por imagem/PDF', error);
+      logError('error', 'Erro ao importar avaliação por imagem/PDF', error);
       if (typeof window !== 'undefined') {
         window.alert('Falha ao importar avaliação por imagem/PDF.');
       }

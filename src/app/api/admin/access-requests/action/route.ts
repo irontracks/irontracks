@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError, logWarn, logInfo } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -203,7 +204,7 @@ export async function POST(req: Request) {
     }
 
   } catch (e: unknown) {
-    console.error('Access Action Error:', e)
+    logError('error', 'Access Action Error:', e)
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }
