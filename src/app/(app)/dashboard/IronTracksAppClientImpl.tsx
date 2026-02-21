@@ -78,6 +78,8 @@ import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'
 import { useGuidedTour } from '@/hooks/useGuidedTour'
 import { usePresencePing } from '@/hooks/usePresencePing'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
+import { useWhatsNew } from '@/hooks/useWhatsNew'
+import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 
 import {
     DirectChatState,
@@ -259,8 +261,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         })
     }, [preCheckinOpen, user?.id])
     const [settingsOpen, setSettingsOpen] = useState(false)
-    const [whatsNewOpen, setWhatsNewOpen] = useState(false)
-    const [pendingUpdate, setPendingUpdate] = useState<PendingUpdate | null>(null)
     const [isCoach, setIsCoach] = useState(false);
     const initialRole = String(initialProfileObj?.role || '').toLowerCase()
     // VIP access & status — extracted to useVipAccess hook
@@ -269,8 +269,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         initialRole,
     })
 
-    const [hasUnreadChat, setHasUnreadChat] = useState(false);
-    const [hasUnreadNotification, setHasUnreadNotification] = useState(false);
     const [exportWorkout, setExportWorkout] = useState<ActiveSession | null>(null);
     const [showExportModal, setShowExportModal] = useState(false);
     const [coachPending, setCoachPending] = useState(false);
@@ -305,7 +303,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const editActiveAddExerciseRef = useRef(false);
     const [showAdminPanel, setShowAdminPanel] = useState(false);
     const userSettingsApi = useUserSettings(user?.id)
-    const whatsNewShownRef = useRef(false)
     // Offline sync state — extracted to useOfflineSync hook
     const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
         userId: user?.id,
@@ -345,6 +342,23 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // Presence ping — extracted to usePresencePing hook
     usePresencePing(user?.id);
 
+    // What's New modal — extracted to useWhatsNew hook
+    const { whatsNewOpen, setWhatsNewOpen, pendingUpdate, setPendingUpdate, closeWhatsNew } = useWhatsNew({
+        userId: user?.id,
+        userSettingsApi,
+    })
+
+    // Unread badges — extracted to useUnreadBadges hook
+    const { hasUnreadNotification, setHasUnreadNotification, hasUnreadChat, setHasUnreadChat } = useUnreadBadges({
+        userId: user?.id,
+        supabase,
+        view,
+        userSettings: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+            ? (userSettingsApi.settings as Record<string, unknown>)
+            : null,
+        onInAppNotify: inAppNotify,
+    })
+
     useEffect(() => {
         if (authLoading) return;
         if (user) return;
@@ -358,58 +372,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
     }, [authLoading, user, router]);
 
-    useEffect(() => {
-        if (whatsNewShownRef.current) return
-        const uid = user?.id ? String(user.id) : ''
-        if (!uid) return
-        if (!userSettingsApi?.loaded) return
-        const prefs = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
-        if ((prefs as Record<string, unknown>)?.whatsNewAutoOpen === false) return
-            ; (async () => {
-                try {
-                    const res = await fetch(`/api/updates/unseen?limit=1`)
-                    const data = await res.json().catch(() => ({}))
-                    const updates = Array.isArray(data?.updates) ? data.updates : []
-                    const first = updates[0] || null
-                    if (!first) return
-                    try {
-                        await fetch('/api/updates/mark-prompted', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ updateId: String(first.id) })
-                        })
-                    } catch { }
-                    whatsNewShownRef.current = true
-                    setWhatsNewOpen(true)
-                    setPendingUpdate(first)
-                } catch { }
-            })()
-    }, [user?.id, userSettingsApi?.loaded, userSettingsApi?.settings])
-
-    const closeWhatsNew = useCallback(async () => {
-        try {
-            setWhatsNewOpen(false)
-            const updateId = pendingUpdate?.id ? String(pendingUpdate.id) : ''
-            if (updateId) {
-                try {
-                    await fetch('/api/updates/mark-viewed', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ updateId })
-                    })
-                } catch { }
-                setPendingUpdate(null)
-                return
-            }
-            const entry = getLatestWhatsNew()
-            if (!entry?.id) return
-            const prev = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : {}
-            const nextSeenAt = Date.now()
-            const next = { ...(prev || {}), whatsNewLastSeenId: String(entry.id), whatsNewLastSeenAt: nextSeenAt }
-            try { userSettingsApi?.setSettings?.(next as Parameters<NonNullable<typeof userSettingsApi>['setSettings']>[0]) } catch { }
-            try { await userSettingsApi?.save?.(next as Parameters<NonNullable<typeof userSettingsApi>['save']>[0]) } catch { }
-        } catch { }
-    }, [userSettingsApi, pendingUpdate])
+    // whatsNew useEffect + closeWhatsNew — handled by useWhatsNew hook above
     const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab';
 
     const setUrlTabParam = useCallback((nextTab: unknown) => {
@@ -1073,113 +1036,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         return () => clearInterval(id);
     }, [activeSession, view]);
 
-    useEffect(() => {
-        let cancelled = false;
-        if (!user?.id) {
-            setHasUnreadNotification(false);
-            return;
-        }
-
-        const loadInitial = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from('notifications')
-                    .select('id')
-                    .eq('user_id', user.id)
-                    .limit(1);
-                if (cancelled) return;
-                if (error) {
-                    logError('error', 'Erro ao carregar notificações:', error);
-                    setHasUnreadNotification(false);
-                    return;
-                }
-                setHasUnreadNotification(Array.isArray(data) && data.length > 0);
-            } catch (e) {
-                if (cancelled) return;
-                logError('error', 'Erro ao carregar notificações:', e);
-                setHasUnreadNotification(false);
-            }
-        };
-
-        loadInitial();
-
-        const channel = supabase
-            .channel(`notifications:badge:${user.id}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, () => {
-                if (!cancelled) setHasUnreadNotification(true);
-            })
-            .on('postgres_changes', {
-                event: 'DELETE',
-                schema: 'public',
-                table: 'notifications',
-                filter: `user_id=eq.${user.id}`
-            }, () => {
-                if (!cancelled) loadInitial();
-            })
-            .subscribe();
-
-        return () => {
-            cancelled = true;
-            supabase.removeChannel(channel);
-        };
-    }, [supabase, user?.id]);
-
-    useEffect(() => {
-        if (!user?.id) return;
-        const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
-        const allowNotifyDm = s ? s.notifyDirectMessages !== false : true
-
-        const channel = supabase
-            .channel(`direct-messages-badge:${user.id}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'direct_messages'
-            }, async (payload) => {
-                try {
-                    if (!allowNotifyDm) return;
-                    const msg = payload.new;
-                    if (!msg || msg.sender_id === user.id) return;
-
-                    const currentView = view;
-                    if (currentView === 'chat' || currentView === 'chatList' || currentView === 'directChat' || currentView === 'globalChat') {
-                        return;
-                    }
-
-                    const { data: senderProfile } = await supabase
-                        .from('profiles')
-                        .select('display_name')
-                        .eq('id', msg.sender_id)
-                        .maybeSingle();
-
-                    const senderName = senderProfile?.display_name || 'Nova mensagem';
-                    const preview = String(msg.content || '').slice(0, 120);
-                    if (!preview) return;
-
-                    await fetch('/api/notifications/direct-message', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            receiverId: user.id,
-                            senderName,
-                            preview,
-                        }),
-                    });
-                } catch (e) {
-                    logError('error', 'Erro ao gerar notificação de mensagem direta:', e);
-                }
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [supabase, user?.id, userSettingsApi?.settings, view]);
+    // Notification + DM badge useEffects — handled by useUnreadBadges hook above
 
     useEffect(() => {
         const baseUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
