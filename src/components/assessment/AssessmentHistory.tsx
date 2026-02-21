@@ -22,6 +22,7 @@ import GlobalDialog from '@/components/GlobalDialog';
 import { useAssessment } from '@/hooks/useAssessment';
 import AssessmentPDFGenerator from '@/components/assessment/AssessmentPDFGenerator';
 import { generateAssessmentPlanAi } from '@/actions/workout-actions';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 ChartJS.register(
   CategoryScale,
@@ -367,7 +368,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           body: form,
         });
 
-        const data = await res.json().catch((): any => null);
+        const data = await res.json().catch((): null => null);
         if (!data || !data.ok) {
           const msg = String(data?.error || 'Falha ao processar arquivo');
           if (typeof window !== 'undefined') window.alert(msg);
@@ -482,8 +483,8 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             setStudentName(resolvedName);
           }
         }
-      } catch (e: any) {
-        if (mounted) setError(e?.message || 'Erro ao carregar avaliações');
+      } catch (e: unknown) {
+        if (mounted) setError(getErrorMessage(e) || 'Erro ao carregar avaliações');
       } finally {
         if (mounted) setLoading(false);
       }

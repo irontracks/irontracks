@@ -5,6 +5,7 @@ import { X, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert } from 'lucid
 import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
@@ -775,8 +776,8 @@ export default function SettingsModal(props: SettingsModalProps) {
                     a.click()
                     a.remove()
                     URL.revokeObjectURL(url)
-                  } catch (e: any) {
-                    await alert('Falha ao exportar: ' + (e?.message ?? String(e)))
+                  } catch (e: unknown) {
+                    await alert('Falha ao exportar: ' + (getErrorMessage(e) ?? String(e)))
                   }
                 }}
                 className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 inline-flex items-center justify-center gap-2"
@@ -791,8 +792,8 @@ export default function SettingsModal(props: SettingsModalProps) {
                   try {
                     setDraft(DEFAULT_SETTINGS)
                     await alert('Preferências resetadas. Clique em Salvar para aplicar.')
-                  } catch (e: any) {
-                    await alert('Falha ao resetar: ' + (e?.message ?? String(e)))
+                  } catch (e: unknown) {
+                    await alert('Falha ao resetar: ' + (getErrorMessage(e) ?? String(e)))
                   }
                 }}
                 className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 inline-flex items-center justify-center gap-2"
@@ -817,8 +818,8 @@ export default function SettingsModal(props: SettingsModalProps) {
                       }
                     })
                     try { window.location.reload() } catch { }
-                  } catch (e: any) {
-                    await alert('Falha ao limpar cache: ' + (e?.message ?? String(e)))
+                  } catch (e: unknown) {
+                    await alert('Falha ao limpar cache: ' + (getErrorMessage(e) ?? String(e)))
                   }
                 }}
                 className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 inline-flex items-center justify-center gap-2"
@@ -834,7 +835,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                 onClick={async () => {
                   try {
                     const res = await fetch('/api/account/export', { method: 'GET' })
-                    const data = await res.json().catch((): any => null)
+                    const data = await res.json().catch((): null => null)
                     if (!data || !data.ok) {
                       await alert('Falha ao exportar dados: ' + (data?.error || ''))
                       return
@@ -849,8 +850,8 @@ export default function SettingsModal(props: SettingsModalProps) {
                     a.click()
                     a.remove()
                     URL.revokeObjectURL(url)
-                  } catch (e: any) {
-                    await alert('Falha ao exportar dados: ' + (e?.message ?? String(e)))
+                  } catch (e: unknown) {
+                    await alert('Falha ao exportar dados: ' + (getErrorMessage(e) ?? String(e)))
                   }
                 }}
                 className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 inline-flex items-center justify-center gap-2"
@@ -872,8 +873,8 @@ export default function SettingsModal(props: SettingsModalProps) {
                     }
                     await supabase.auth.signOut({ scope: 'global' })
                     try { window.location.href = '/auth/login' } catch { }
-                  } catch (e: any) {
-                    await alert('Falha ao sair: ' + (e?.message ?? String(e)))
+                  } catch (e: unknown) {
+                    await alert('Falha ao sair: ' + (getErrorMessage(e) ?? String(e)))
                   }
                 }}
                 className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 inline-flex items-center justify-center gap-2"
@@ -895,7 +896,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       headers: { 'content-type': 'application/json' },
                       body: JSON.stringify({ confirm: 'EXCLUIR' }),
                     })
-                    const data = await res.json().catch((): any => null)
+                    const data = await res.json().catch((): null => null)
                     if (!data || !data.ok) {
                       await alert('Falha ao excluir conta: ' + (data?.error || ''))
                       return
@@ -910,8 +911,8 @@ export default function SettingsModal(props: SettingsModalProps) {
                       if (supabase) await supabase.auth.signOut({ scope: 'global' })
                     } catch { }
                     try { window.location.href = '/auth/login' } catch { }
-                  } catch (e: any) {
-                    await alert('Falha ao excluir conta: ' + (e?.message ?? String(e)))
+                  } catch (e: unknown) {
+                    await alert('Falha ao excluir conta: ' + (getErrorMessage(e) ?? String(e)))
                   }
                 }}
                 className="w-full min-h-[44px] px-4 py-3 rounded-xl bg-red-600/15 border border-red-500/40 text-red-200 font-black hover:bg-red-600/25 inline-flex items-center justify-center gap-2"
@@ -1039,8 +1040,8 @@ export default function SettingsModal(props: SettingsModalProps) {
                 const ok = await props?.onSave?.(draft)
                 if (ok === false) return
                 props?.onClose?.()
-              } catch (e: any) {
-                await alert('Falha ao salvar: ' + (e?.message ?? String(e)))
+              } catch (e: unknown) {
+                await alert('Falha ao salvar: ' + (getErrorMessage(e) ?? String(e)))
               }
             }}
             className={

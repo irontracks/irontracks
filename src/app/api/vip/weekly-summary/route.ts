@@ -183,7 +183,7 @@ export async function GET() {
     if (prs.length) {
       const prTxt = prs
         .slice(0, 3)
-        .map((p) => `${String((p as any)?.exercise || '').trim()} (${(p as any)?.weight || 0}kg x ${(p as any)?.reps || 0})`)
+        .map((p) => `${String((p as Record<string, unknown>)?.exercise || '').trim()} (${(p as Record<string, unknown>)?.weight || 0}kg x ${(p as Record<string, unknown>)?.reps || 0})`)
         .filter(Boolean)
         .join(', ')
       if (prTxt) lines.push(`- PRs recentes: ${prTxt}`)
@@ -193,6 +193,6 @@ export async function GET() {
 
     return NextResponse.json({ ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText })
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: (e as any)?.message ?? String(e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
   }
 }

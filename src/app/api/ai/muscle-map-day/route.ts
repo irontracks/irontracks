@@ -278,7 +278,7 @@ export async function POST(req: Request) {
     const userId = String(auth.user.id || '').trim()
     const ip = getRequestIp(req)
     const rl = checkRateLimit(`ai:muscle-map-day:${userId}:${ip}`, 30, 60_000)
-    if (\!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     const admin = createAdminClient()
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)

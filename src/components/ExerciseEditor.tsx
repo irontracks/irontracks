@@ -7,6 +7,7 @@ import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
 import { parseExerciseNotesToSetOverrides } from '@/utils/training/notesMethodParser';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
@@ -357,19 +358,19 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
         onChange?.({ ...workout, exercises: newExercises });
     };
 
-    const updateExercise = (index: number, field: keyof Exercise | 'duplicate', value: any) => {
+    const updateExercise = (index: number, field: keyof Exercise | 'duplicate', value: unknown) => {
         const newExercises = [...(workout.exercises || [])];
         if (field === 'duplicate') {
             newExercises.splice(index + 1, 0, { ...newExercises[index] });
         } else {
             const ex = newExercises[index] || ({} as Exercise);
             if (field === 'sets') {
-                const nextCount = Math.max(0, parseInt(value) || 0);
+                const nextCount = Math.max(0, parseInt(String(value ?? '')) || 0);
                 const nextDetails = ensureSetDetails(ex, nextCount);
-                newExercises[index] = { ...ex, sets: value, setDetails: nextDetails };
+                newExercises[index] = { ...ex, sets: value as string | number, setDetails: nextDetails };
             } else if (field === 'method') {
                 const prevMethod = normalizeMethod(ex?.method);
-                const nextMethod = normalizeMethod(value);
+                const nextMethod = normalizeMethod(String(value ?? ''));
                 const currentCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
                 const nextIsSpecial =
                     nextMethod === 'Drop-set' ||
@@ -423,11 +424,11 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                     }
                     return s;
                 });
-                newExercises[index] = { ...ex, [field]: value, setDetails: updatedDetails };
+                newExercises[index] = { ...ex, [field]: value as Exercise[keyof Exercise], setDetails: updatedDetails as unknown as SetDetail[] };
             } else if (field === 'notes') {
                 const setsCount = Math.max(0, parseInt(String(ex?.sets)) || 0);
                 const existingDetails = ensureSetDetails(ex, setsCount);
-                const parsed = parseExerciseNotesToSetOverrides({ notes: value, setsCount });
+                const parsed = parseExerciseNotesToSetOverrides({ notes: value as string, setsCount });
                 const overrides: Array<Record<string, unknown> | null> = Array.isArray(parsed?.overrides) ? (parsed.overrides as Array<Record<string, unknown> | null>) : [];
                 const hash = String(parsed?.hash || '').trim();
 
@@ -467,9 +468,9 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                     return next;
                 });
 
-                newExercises[index] = { ...ex, notes: value, setDetails: updatedDetails };
+                newExercises[index] = { ...ex, notes: value as string, setDetails: updatedDetails };
             } else {
-                newExercises[index] = { ...ex, [field]: value };
+                newExercises[index] = { ...ex, [field]: value as Exercise[keyof Exercise] };
             }
         }
         onChange?.({ ...workout, exercises: newExercises });
@@ -574,9 +575,9 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             let detectedTitle = '';
 
             for (let i = 0; i < selectedFiles.length; i += 1) {
-                const file = selectedFiles[i] as any;
+                const file = selectedFiles[i] as File;
                 const formData = new FormData();
-                formData.append('file', file as any);
+                formData.append('file', file);
 
                 const res = await fetch('/api/iron-scanner', {
                     method: 'POST',
@@ -611,8 +612,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                 return;
             }
 
-            const mappedExercises = allRawExercises
-                .map((item: any) => {
+            const mappedExercises = (allRawExercises as Record<string, unknown>[])
+                .map((item: Record<string, unknown>) => {
                     const rawName = String(item?.name || '').trim();
                     const canonical = resolveCanonicalExerciseName(rawName);
                     const name = String(canonical?.canonical || rawName).trim();
@@ -720,8 +721,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
             onChange?.(nextWorkout);
             await alert('Treino importado pela IA. Revise antes de salvar.', 'Importação concluída');
-        } catch (err: any) {
-            const msg = err?.message ? String(err.message) : String(err);
+        } catch (err: unknown) {
+            const msg = getErrorMessage(err) ? String(getErrorMessage(err)) : String(err);
             const friendly = msg || 'Não conseguimos ler o treino. Tente uma foto mais nítida.';
             setScannerError(friendly);
             await alert(friendly, 'Erro na importação');
@@ -790,8 +791,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             }
 
             updateExercise(index, 'method', 'Bi-Set');
-        } catch (e: any) {
-            await alert('Não foi possível atualizar o link. ' + (e?.message ?? String(e)), 'Erro');
+        } catch (e: unknown) {
+            await alert('Não foi possível atualizar o link. ' + (getErrorMessage(e) ?? String(e)), 'Erro');
         }
     };
 
@@ -849,8 +850,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                     await alert(`Erro ao salvar: ${res.error || 'Falha ao salvar treino'}`);
                 }
             }
-        } catch (err: any) {
-            const msg = (err && typeof err === 'object' && 'message' in err) ? err.message : String(err || '');
+        } catch (err: unknown) {
+            const msg = (err && typeof err === 'object' && 'message' in err) ? getErrorMessage(err) : String(err || '');
             await alert(`Falha ao importar JSON${msg ? `: ${msg}` : ''}`, 'Erro');
         } finally {
             if (e.target) {
@@ -951,8 +952,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
             }
             // window.location.href = '/'; // Removido para evitar reload forçado que causava tela preta
 
-        } catch (e: any) {
-            const msg = e?.message || String(e || '');
+        } catch (e: unknown) {
+            const msg = getErrorMessage(e) || String(e || '');
             await alert("Erro ao salvar: " + msg);
         } finally {
             if (typeof closeDialog === 'function') {
@@ -1188,7 +1189,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     const config: AdvancedConfig = (cardioSet?.advanced_config as AdvancedConfig) || {};
                                                     const isHIT = !!config?.isHIT;
 
-                                                    const updateCardioConfig = (field: string, val: any) => {
+                                                    const updateCardioConfig = (field: string, val: string | number | boolean | null | undefined) => {
                                                         const newConfig = { ...config, [field]: val };
                                                         if (val === '' || val === null || val === undefined) delete newConfig[field];
 
