@@ -576,11 +576,9 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     console.error("ERRO CRÍTICO SUPABASE:", error);
                     setDebugError("Erro Supabase: " + error.message + " | Detalhes: " + JSON.stringify(error));
                 } else if (!data || data.length === 0) {
-                    // Se não retornar nada, pode ser RLS ou tabela vazia, mas a conexão funcionou
-                    // setDebugError("Conexão OK, mas tabela vazia ou bloqueada por RLS.");
-                    console.log("Conexão OK (tabela vazia ou RLS)");
+                    // Conexão OK, mas tabela vazia ou bloqueada por RLS
                 } else {
-                    console.log("Conexão OK (dados encontrados)");
+                    // Conexão OK — dados encontrados
                 }
             } catch (e: unknown) {
                 console.error("ERRO DE CONEXÃO/FETCH:", e);
