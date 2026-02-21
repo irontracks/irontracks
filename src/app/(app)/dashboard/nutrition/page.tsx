@@ -15,7 +15,7 @@ const DEFAULT_GOALS = {
   fat: 60,
 }
 
-function safeNumber(value: any): number {
+function safeNumber(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
 }
@@ -34,7 +34,7 @@ function normalizeGoalRow(row: Record<string, unknown>) {
   }
 }
 
-function isSchemaMissingError(e: any) {
+function isSchemaMissingError(e: unknown) {
   const message = getErrorMessage(e)
   const m = message.toLowerCase()
   return m.includes('could not find the table') || m.includes('schema cache')

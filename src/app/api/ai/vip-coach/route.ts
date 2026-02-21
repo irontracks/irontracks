@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -72,13 +73,13 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent([{ text: prompt }] as any)
+    const result = await model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0])
     const answer = String((await result?.response?.text()) || '').trim()
     if (!answer) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
     await incrementVipUsage(supabase, userId, 'chat')
     return NextResponse.json({ ok: true, answer, dataUsed: [], followUps: [], actions: [] })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

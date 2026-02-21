@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 
-const safeJson = (v: any) => {
+const safeJson = (v: unknown) => {
   try {
     return JSON.stringify(v)
   } catch {
@@ -11,7 +11,7 @@ const safeJson = (v: any) => {
   }
 }
 
-const parseJson = (raw: any) => {
+const parseJson = (raw: unknown) => {
   try {
     if (!raw) return null
     if (typeof raw === 'object') return raw
@@ -23,7 +23,7 @@ const parseJson = (raw: any) => {
   }
 }
 
-const extractLogs = (notes: any) => {
+const extractLogs = (notes: unknown) => {
   const base = notes && typeof notes === 'object' ? notes : null
   if (!base) return null
   const obj = base as Record<string, unknown>
@@ -96,7 +96,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       rpc: {
-        error: rpcRes.error ? { message: rpcRes.error.message, code: (rpcRes.error as any).code ?? null } : null,
+        error: rpcRes.error ? { message: rpcRes.error.message, code: (rpcRes.error as unknown as Record<string, unknown>).code ?? null } : null,
         rows: Array.isArray(rpcRes.data) ? rpcRes.data.length : 0,
         sample: Array.isArray(rpcRes.data) ? rpcRes.data.slice(0, 5) : null,
       },

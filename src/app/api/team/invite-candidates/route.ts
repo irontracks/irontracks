@@ -55,7 +55,7 @@ export async function GET(req: Request) {
         .in('id', ids)
 
       if (spData) {
-        for (const p of spData as any[]) {
+        for (const p of (spData as Record<string, unknown>[]) || []) {
           if (p && p.id) studentProfilesMap.set(String(p.id), p)
         }
       }
@@ -80,7 +80,7 @@ export async function GET(req: Request) {
       }
     }
 
-    let profilesQuery: any = supabase
+    let profilesQuery = supabase
       .from('profiles')
       .select('id, display_name, photo_url, last_seen')
       .order('last_seen', { ascending: false })

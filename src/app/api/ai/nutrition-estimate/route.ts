@@ -5,12 +5,13 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeJsonParse = (raw: any) => {
+const safeJsonParse = (raw: unknown) => {
   try {
     if (!raw) return null
     if (typeof raw === 'object') return raw
@@ -115,8 +116,8 @@ export async function POST(req: Request) {
 
     const row = Array.isArray(data) ? data[0] : null
     return NextResponse.json({ ok: true, row })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'unexpected_error' }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) || 'unexpected_error' }, { status: 500 })
   }
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,7 +83,7 @@ export async function GET() {
     }
 
     return NextResponse.json({ ok: true, teacher: data || null })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }

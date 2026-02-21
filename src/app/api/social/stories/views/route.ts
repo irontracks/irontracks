@@ -56,7 +56,7 @@ export async function GET(req: Request) {
         .select('id, display_name, photo_url, role')
         .in('id', viewerIds)
         .limit(2000)
-      for (const p of Array.isArray(profilesRaw) ? (profilesRaw as any[]) : []) {
+      for (const p of Array.isArray(profilesRaw) ? (profilesRaw as Record<string, unknown>[]) : []) {
         const id = String(p?.id || '').trim()
         if (!id) continue
         profileById.set(id, p)
