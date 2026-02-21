@@ -83,6 +83,9 @@ import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
 import { useSignOut } from '@/hooks/useSignOut'
+import { useActiveSession } from '@/hooks/useActiveSession'
+import { useWorkoutDuplicates } from '@/hooks/useWorkoutDuplicates'
+import { useWorkoutExport } from '@/hooks/useWorkoutExport'
 
 import {
     DirectChatState,
@@ -227,16 +230,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const { streakStats, setStreakStats } = useWorkoutStreak(user?.id);
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
-    const [importCode, setImportCode] = useState('');
-    const [shareCode, setShareCode] = useState<string | null>(null);
     const [quickViewWorkout, setQuickViewWorkout] = useState<ActiveSession | null>(null);
-    const [showImportModal, setShowImportModal] = useState(false);
-    const [showJsonImportModal, setShowJsonImportModal] = useState(false);
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const [reportBackView, setReportBackView] = useState('dashboard');
-    const [duplicatesOpen, setDuplicatesOpen] = useState(false);
-    const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
-    const [duplicatesBusy, setDuplicatesBusy] = useState(false);
     const inAppNotifyRef = useRef<((payload: unknown) => void) | null>(null);
     const bindInAppNotify = useCallback((fn: unknown) => {
         inAppNotifyRef.current = typeof fn === 'function' ? (fn as (payload: unknown) => void) : null;
@@ -246,23 +242,24 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (typeof fn === 'function') fn(payload);
     }, []);
 
-    const [preCheckinOpen, setPreCheckinOpen] = useState(false)
-    const [preCheckinWorkout, setPreCheckinWorkout] = useState<ActiveSession | null>(null)
-    const [preCheckinDraft, setPreCheckinDraft] = useState({ energy: '', soreness: '', timeMinutes: '60', notes: '' })
-    const preCheckinResolveRef = useRef<((value: unknown) => void) | null>(null)
+    // Sessão ativa, editor inline e pre-checkin — extraídos para useActiveSession
+    const {
+        activeSession, setActiveSession,
+        suppressForeignFinishToastUntilRef,
+        sessionTicker, setSessionTicker,
+        editActiveOpen, setEditActiveOpen,
+        editActiveDraft, setEditActiveDraft,
+        editActiveBaseRef, editActiveAddExerciseRef,
+        preCheckinOpen, setPreCheckinOpen,
+        preCheckinWorkout, setPreCheckinWorkout,
+        preCheckinDraft, setPreCheckinDraft,
+        preCheckinResolveRef,
+        requestPreWorkoutCheckin,
+        handleUpdateSessionLog,
+        handleStartTimer,
+        handleCloseTimer,
+    } = useActiveSession({ userId: user?.id })
 
-    const requestPreWorkoutCheckin = useCallback(async (workout: unknown) => {
-        if (!user?.id) return null
-        if (preCheckinOpen) return null
-        return await new Promise((resolve) => {
-            preCheckinResolveRef.current = (value: unknown) => {
-                resolve(value ?? null)
-            }
-            setPreCheckinWorkout(isRecord(workout) ? (workout as unknown as ActiveSession) : null)
-            setPreCheckinDraft({ energy: '', soreness: '', timeMinutes: '60', notes: '' })
-            setPreCheckinOpen(true)
-        })
-    }, [preCheckinOpen, user?.id])
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [isCoach, setIsCoach] = useState(false);
     const initialRole = String(initialProfileObj?.role || '').toLowerCase()
@@ -272,13 +269,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         initialRole,
     })
 
-    const [exportWorkout, setExportWorkout] = useState<ActiveSession | null>(null);
-    const [showExportModal, setShowExportModal] = useState(false);
     const [coachPending, setCoachPending] = useState(false);
     const [studentFolders, setStudentFolders] = useState<Array<Record<string, unknown>>>([]);
     const [openStudent, setOpenStudent] = useState<Record<string, unknown> | null>(null);
     const [showNotifCenter, setShowNotifCenter] = useState(false);
-    const [exportingAll, setExportingAll] = useState(false);
 
     // Profile completion state — extracted to useProfileCompletion hook
     const {
@@ -296,14 +290,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         initialProfile,
     });
 
-    // Estado Global da Sessão Ativa
-    const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null);
-    const suppressForeignFinishToastUntilRef = useRef(0);
-    const [sessionTicker, setSessionTicker] = useState(0);
-    const [editActiveOpen, setEditActiveOpen] = useState(false);
-    const [editActiveDraft, setEditActiveDraft] = useState<Record<string, unknown> | null>(null);
-    const editActiveBaseRef = useRef<Record<string, unknown> | null>(null);
-    const editActiveAddExerciseRef = useRef(false);
     const userSettingsApi = useUserSettings(user?.id)
     // Offline sync state — extracted to useOfflineSync hook
     const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
@@ -1335,7 +1321,35 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // streakStats fetch is handled by useWorkoutStreak hook above
 
+    // alert from useDialog returns Promise<boolean>; hooks expect Promise<void>
+    const alertVoid = useCallback(async (msg: string, title?: string): Promise<void> => { await alert(msg, title) }, [alert])
 
+    // Duplicados de treinos — extraídos para useWorkoutDuplicates
+    const {
+        duplicatesOpen, setDuplicatesOpen,
+        duplicateGroups, setDuplicateGroups,
+        duplicatesBusy,
+        handleOpenDuplicates,
+        handleArchiveDuplicateGroup,
+        handleMergeDuplicateGroup,
+    } = useWorkoutDuplicates({ workouts, fetchWorkouts, alert: alertVoid, confirm })
+
+    // Export/import de treinos — extraídos para useWorkoutExport
+    const {
+        exportWorkout, setExportWorkout,
+        showExportModal, setShowExportModal,
+        exportingAll,
+        showImportModal, setShowImportModal,
+        showJsonImportModal, setShowJsonImportModal,
+        importCode, setImportCode,
+        shareCode, setShareCode,
+        handleShareWorkout,
+        handleExportPdf,
+        handleExportJson,
+        handleExportAllWorkouts,
+        handleImportWorkout,
+        handleJsonUpload,
+    } = useWorkoutExport({ user, workouts, fetchWorkouts, alert: alertVoid, confirm })
 
     // Handlers de Sessão
     const handleLogout = async () => {
@@ -1473,29 +1487,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     };
 
-    const handleUpdateSessionLog = (key: string, data: unknown) => {
-        if (!activeSession) return;
-        setActiveSession((prev) => {
-            if (!prev) return prev
-            const logs = prev.logs && typeof prev.logs === 'object' ? prev.logs : {}
-            return { ...prev, logs: { ...logs, [key]: data } }
-        })
-    };
-
-    const handleStartTimer = (duration: number, context: unknown) => {
-        setActiveSession((prev) => {
-            if (!prev) return prev
-            return {
-                ...prev,
-                timerTargetTime: Date.now() + (duration * 1000),
-                timerContext: context && typeof context === 'object' ? context : null
-            };
-        });
-    };
-
-    const handleCloseTimer = () => {
-        setActiveSession((prev) => (prev ? { ...prev, timerTargetTime: null, timerContext: null } : prev));
-    };
 
     const handleFinishSession = async (sessionData: unknown, showReport?: boolean) => {
         suppressForeignFinishToastUntilRef.current = Date.now() + 8000;
@@ -1890,287 +1881,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             await alert('Erro ao normalizar exercícios: ' + message)
         }
     }
-
-    const handleOpenDuplicates = async () => {
-        const list = (Array.isArray(workouts) ? workouts : []).filter((w) => !w?.archived_at)
-        const keys = list.map((w) => {
-            const exercises = Array.isArray(w?.exercises) ? w.exercises : []
-            const set = new Set()
-            for (const ex of exercises) {
-                const name = String(ex?.name || '').trim()
-                if (!name) continue
-                const info = resolveCanonicalExerciseName(name)
-                const base = String(info?.canonical || name).trim()
-                const k = normalizeExerciseName(base)
-                if (k) set.add(k)
-            }
-            return set
-        })
-
-        const parent: number[] = Array.from({ length: list.length }).map((_, i) => i)
-        const find = (x: number) => {
-            let r = x
-            while (parent[r] !== r) r = parent[r]
-            let cur = x
-            while (parent[cur] !== cur) {
-                const p = parent[cur]
-                parent[cur] = r
-                cur = p
-            }
-            return r
-        }
-        const unite = (a: number, b: number) => {
-            const ra = find(a)
-            const rb = find(b)
-            if (ra !== rb) parent[rb] = ra
-        }
-
-        const similarity = (a: number, b: number): number => {
-            const A = keys[a]
-            const B = keys[b]
-            if (!A?.size || !B?.size) return 0
-            let inter = 0
-            for (const v of A) if (B.has(v)) inter += 1
-            const union = A.size + B.size - inter
-            if (!union) return 0
-            return inter / union
-        }
-
-        const edges: Array<{ i: number; j: number; score: number }> = [];
-        for (let i = 0; i < list.length; i += 1) {
-            for (let j = i + 1; j < list.length; j += 1) {
-                const score = similarity(i, j)
-                if (score >= 0.9) {
-                    unite(i, j)
-                    edges.push({ i, j, score })
-                }
-            }
-        }
-
-        const groupsMap = new Map<number, number[]>()
-        for (let i = 0; i < list.length; i += 1) {
-            const r = find(i)
-            const arr = groupsMap.get(r) || []
-            arr.push(i)
-            groupsMap.set(r, arr)
-        }
-
-        const groups: DuplicateGroup[] = [];
-        for (const idxs of groupsMap.values()) {
-            if (!idxs || idxs.length < 2) continue
-            let best = 0
-            for (const e of edges) {
-                if (idxs.includes(e.i) && idxs.includes(e.j)) best = Math.max(best, e.score)
-            }
-            groups.push({ items: idxs.map((i: number) => list[i] as Record<string, unknown>), score: best || 0.9 })
-        }
-
-        if (!groups.length) {
-            await alert('Não encontrei duplicados com alta similaridade.')
-            return
-        }
-        groups.sort((a, b) => b.score - a.score)
-        setDuplicateGroups(groups)
-        setDuplicatesOpen(true)
-    }
-
-    const handleArchiveDuplicateGroup = async (group: unknown) => {
-        if (duplicatesBusy) return
-        try {
-            const g = group && typeof group === 'object' ? (group as Record<string, unknown>) : ({} as Record<string, unknown>)
-            const items = Array.isArray(g?.items) ? (g.items as unknown[]) : []
-            if (items.length < 2) return
-            const base = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : null
-            const others = items.slice(1)
-            if (!(await confirm(`Arquivar ${others.length} duplicados e manter "${base?.title || 'Treino'}"?`, 'Arquivar duplicados'))) return
-            setDuplicatesBusy(true)
-            for (const w of others) {
-                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                const id = String(wo?.id || '').trim()
-                if (!id) continue
-                const res = await setWorkoutArchived(id, true)
-                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao arquivar'))
-            }
-            await fetchWorkouts()
-            setDuplicatesOpen(false)
-            setDuplicateGroups([])
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao arquivar duplicados: ' + message)
-        } finally {
-            setDuplicatesBusy(false)
-        }
-    }
-
-    const handleMergeDuplicateGroup = async (group: unknown) => {
-        if (duplicatesBusy) return
-        try {
-            const g = group && typeof group === 'object' ? (group as Record<string, unknown>) : ({} as Record<string, unknown>)
-            const items = Array.isArray(g?.items) ? (g.items as unknown[]) : []
-            if (items.length < 2) return
-            const base = items[0] && typeof items[0] === 'object' ? (items[0] as Record<string, unknown>) : null
-            const others = items.slice(1)
-            if (!(await confirm(`Mesclar ${others.length} duplicados em "${base?.title || 'Treino'}" e arquivar os demais?`, 'Mesclar duplicados'))) return
-            setDuplicatesBusy(true)
-
-            const baseExercises: Array<Record<string, unknown>> = Array.isArray(base?.exercises) ? (base.exercises as unknown[]).filter(isRecord) : []
-            const seen = new Set<string>()
-            const merged: Array<Record<string, unknown>> = [];
-            for (const ex of baseExercises) {
-                const name = String(ex?.name || '').trim()
-                const method = String(ex?.method || '').trim()
-                const reps = String(ex?.reps || '').trim()
-                const k = `${normalizeExerciseName(resolveCanonicalExerciseName(name).canonical || name)}|${method}|${reps}`
-                if (k && !seen.has(k)) {
-                    seen.add(k)
-                    merged.push(ex)
-                }
-            }
-            for (const w of others) {
-                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                const exs = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]) : []
-                for (const ex of exs) {
-                    const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
-                    const name = String(exObj?.name || '').trim()
-                    const method = String(exObj?.method || '').trim()
-                    const reps = String(exObj?.reps || '').trim()
-                    const k = `${normalizeExerciseName(resolveCanonicalExerciseName(name).canonical || name)}|${method}|${reps}`
-                    if (!k || seen.has(k)) continue
-                    seen.add(k)
-                    merged.push(exObj)
-                }
-            }
-
-            const baseId = String(base?.id || '').trim()
-            if (!baseId) throw new Error('Treino base sem ID')
-            const res = await updateWorkout(baseId, { title: String(base?.title || 'Treino'), notes: base?.notes ?? '', exercises: merged })
-            if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino mesclado'))
-
-            for (const w of others) {
-                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                const id = String(wo?.id || '').trim()
-                if (!id) continue
-                const a = await setWorkoutArchived(id, true)
-                if (!a?.ok) throw new Error(String(a?.error || 'Falha ao arquivar'))
-            }
-            await fetchWorkouts()
-            setDuplicatesOpen(false)
-            setDuplicateGroups([])
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao mesclar duplicados: ' + message)
-        } finally {
-            setDuplicatesBusy(false)
-        }
-    }
-
-    const handleShareWorkout = async (workout: unknown) => {
-        setExportWorkout(isRecord(workout) ? (workout as unknown as ActiveSession) : null);
-        setShowExportModal(true);
-    };
-
-    const handleExportPdf = async () => {
-        if (!exportWorkout || !user) return;
-        try {
-            const html = workoutPlanHtml(exportWorkout as Record<string, unknown>, user);
-            const win = window.open('', '_blank');
-            if (!win) return;
-            win.document.open();
-            win.document.write(html);
-            win.document.close();
-            win.focus();
-            setTimeout(() => { try { win.print(); } catch { } }, 300);
-            setShowExportModal(false);
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao gerar PDF: ' + message);
-        }
-    };
-
-    const handleExportJson = () => {
-        if (!exportWorkout) return;
-        const json = JSON.stringify({ workout: { title: exportWorkout.title, exercises: (exportWorkout.exercises || []).map((ex: unknown) => { const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>); return ({ name: e.name, sets: e.sets, reps: e.reps, rpe: e.rpe, cadence: e.cadence, restTime: e.restTime, method: e.method, videoUrl: e.videoUrl, notes: e.notes }) }) } }, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${(exportWorkout.title || 'treino').replace(/\s+/g, '_')}.json`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-        setShowExportModal(false);
-    };
-
-    const handleExportAllWorkouts = async () => {
-        try {
-            setExportingAll(true);
-            const payload = {
-                user: { id: user?.id || '', email: user?.email || '' },
-                workouts: (workouts || []).map((w: Record<string, unknown>) => ({
-                    id: w.id,
-                    title: w.title,
-                    notes: w.notes,
-                    is_template: true,
-                    exercises: (Array.isArray(w.exercises) ? (w.exercises as unknown[]) : []).map((ex: unknown) => {
-                        const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
-                        return ({
-                            name: e.name,
-                            sets: e.sets,
-                            reps: e.reps,
-                            rpe: e.rpe,
-                            cadence: e.cadence,
-                            restTime: e.restTime,
-                            method: e.method,
-                            videoUrl: e.videoUrl,
-                            notes: e.notes
-                        })
-                    })
-                }))
-            };
-            const json = JSON.stringify(payload, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `irontracks_workouts_${new Date().toISOString()}.json`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-        } catch (e) {
-        } finally {
-            setExportingAll(false);
-        }
-    };
-
-    const handleImportWorkout = async () => {
-        await alert("Funcionalidade de importar código temporariamente indisponível na migração.", "Em Manutenção");
-    };
-
-    // JSON IMPORT HANDLER
-    const handleJsonUpload = (e: unknown) => {
-        const input = (e as { target?: HTMLInputElement | null })?.target ?? null;
-        const file = input?.files?.[0];
-        if (!file) return;
-        try {
-            setShowJsonImportModal(false);
-        } catch { }
-
-        const reader = new FileReader();
-        reader.onload = async (event: ProgressEvent<FileReader>) => {
-            try {
-                const json = JSON.parse(String(event?.target?.result || ''));
-                if (await confirm(`Importar dados de ${json.user?.email || 'Unknown'}? Isso criará novos treinos.`, "Importar Backup")) {
-                    await importData(json);
-                    await fetchWorkouts();
-                    await alert("Dados importados com sucesso!", "Sucesso");
-                }
-            } catch (err) {
-                const message = err instanceof Error ? err.message : String(err)
-                await alert("Erro ao ler arquivo JSON: " + message);
-            } finally {
-                try {
-                    if (input) input.value = '';
-                } catch { }
-            }
-        };
-        reader.readAsText(file);
-    };
 
     if (authLoading) return <LoadingScreen />;
     if (!user?.id) return <LoadingScreen />;
