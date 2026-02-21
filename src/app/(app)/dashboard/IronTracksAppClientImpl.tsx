@@ -80,6 +80,7 @@ import { usePresencePing } from '@/hooks/usePresencePing'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
+import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 
 import {
     DirectChatState,
@@ -358,6 +359,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             : null,
         onInAppNotify: inAppNotify,
     })
+
+    // View + activeSession local persistence — extracted to useLocalPersistence hook
+    useLocalPersistence({ userId: user?.id, view, setView, activeSession })
 
     useEffect(() => {
         if (authLoading) return;
@@ -866,67 +870,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
     }, [supabase, alert, clearClientSessionState]);
 
-    // Persistência da View (Aba Atual)
-    useEffect(() => {
-        try {
-            if (!user?.id) return;
-            const scopedViewKey = `irontracks.appView.v2.${user.id}`;
-            const scopedSessionKey = `irontracks.activeSession.v2.${user.id}`;
-            const savedSession = localStorage.getItem(scopedSessionKey);
-            if (savedSession) {
-                setView('active');
-                return;
-            }
-
-            const raw = localStorage.getItem(scopedViewKey) || localStorage.getItem('appView');
-            const savedView = raw ? String(raw) : '';
-            if (!savedView) {
-                setView('dashboard');
-                return;
-            }
-
-            if (savedView === 'active') {
-                setView('dashboard');
-                return;
-            }
-
-            setView(savedView);
-        } catch {
-            setView('dashboard');
-        }
-    }, [supabase, user?.id]);
-
-    useEffect(() => {
-        try {
-            if (!user?.id) return;
-            if (!view) return;
-            localStorage.setItem(`irontracks.appView.v2.${user.id}`, view);
-        } catch {
-            return;
-        }
-    }, [view, user?.id]);
-
-    useEffect(() => {
-        try {
-            if (!user?.id) return;
-            const key = `irontracks.activeSession.v2.${user.id}`;
-            if (!activeSession) {
-                localStorage.removeItem(key);
-                localStorage.removeItem('activeSession');
-                return;
-            }
-
-            const payload = JSON.stringify({ ...(activeSession || {}), _savedAt: Date.now() });
-            const id = setTimeout(() => {
-                try {
-                    localStorage.setItem(key, payload);
-                } catch { }
-            }, 250);
-            return () => clearTimeout(id);
-        } catch {
-            return;
-        }
-    }, [activeSession, user?.id]);
+    // View + activeSession persistence — handled by useLocalPersistence hook above
 
     useEffect(() => {
         const userId = user?.id ? String(user.id) : '';
@@ -1112,20 +1056,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             } catch { }
         };
     }, [restoreAdminPanelIfNeeded]);
-
-    // Sync Profile Separately (Optimized)
-    useEffect(() => {
-        if (user?.id) {
-            const syncProfile = async () => {
-                try {
-                    return
-                } catch (e) {
-                    logError('error', 'Erro ao sincronizar perfil:', e);
-                }
-            };
-            syncProfile();
-        }
-    }, [supabase, user?.id]);
 
     // Profile completion effect — handled by useProfileCompletion hook above
 
