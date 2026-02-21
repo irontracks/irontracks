@@ -5651,7 +5651,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                 </div>
                                 < div className="p-4 max-h-[75vh] overflow-y-auto" >
                                     <AdminWorkoutEditor
-                                        initialData={editingTemplate}
+                                        initialData={editingTemplate as unknown as Partial<AdminWorkout>}
                                         onSave={async (data: AdminWorkout) => {
                                             try {
                                                 const res = await updateWorkout(String(editingTemplate.id || ''), data);
@@ -5717,7 +5717,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                 </div>
                                 < div className="p-4 max-h-[75vh] overflow-y-auto" >
                                     <AdminWorkoutEditor
-                                        initialData={editingStudentWorkout}
+                                        initialData={editingStudentWorkout as unknown as Partial<AdminWorkout>}
                                         onSave={async (data: AdminWorkout) => {
                                             try {
                                                 const targetUserId = selectedStudent?.user_id ? String(selectedStudent.user_id) : '';
