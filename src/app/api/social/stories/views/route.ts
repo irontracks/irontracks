@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseSearchParams } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
     if (vErr) return NextResponse.json({ ok: false, error: vErr.message }, { status: 400 })
 
     const views = Array.isArray(viewsRaw) ? viewsRaw : []
-    const viewerIds = views.map((r: any) => String(r?.viewer_id || '').trim()).filter(Boolean)
+    const viewerIds = views.map((r: Record<string, unknown>) => String(r?.viewer_id || '').trim()).filter(Boolean)
 
     const profileById = new Map<string, any>()
     if (viewerIds.length) {
@@ -65,7 +66,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       data: views
-        .map((r: any) => {
+        .map((r: Record<string, unknown>) => {
           const id = String(r?.viewer_id || '').trim()
           if (!id) return null
           const prof = profileById.get(id) || null
@@ -79,7 +80,7 @@ export async function GET(req: Request) {
         })
         .filter(Boolean),
     })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

@@ -2,11 +2,12 @@
 
 import { useEffect } from 'react'
 import { AlertCircle, RefreshCw, LogIn } from 'lucide-react'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     try {
-      const msg = String(error?.message || '')
+      const msg = String(getErrorMessage(error) || '')
       const lower = msg.toLowerCase()
       const shouldAutoReload =
         lower.includes('chunkloaderror') ||
@@ -20,7 +21,7 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
       window.sessionStorage.setItem(key, '1')
       window.location.reload()
     } catch {}
-  }, [error?.message])
+  }, [getErrorMessage(error)])
 
   return (
     <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-6 text-center">
@@ -32,7 +33,7 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
       <p className="text-neutral-400 mb-8 max-w-sm">Se isso persistir, recarregue o app ou volte para o login.</p>
 
       <div className="bg-black/50 p-4 rounded-xl mb-6 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
-        <p className="text-red-400 font-mono text-xs break-all">{String(error?.message || error?.toString?.() || 'Erro desconhecido')}</p>
+        <p className="text-red-400 font-mono text-xs break-all">{String(getErrorMessage(error) || error?.toString?.() || 'Erro desconhecido')}</p>
       </div>
 
       <div className="w-full max-w-md grid grid-cols-1 gap-3">

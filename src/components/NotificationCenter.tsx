@@ -55,7 +55,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
                     .order('created_at', { ascending: false });
 
                 if (isMounted) {
-                    setSystemNotifications((data as any) || []);
+                    setSystemNotifications((data as NotificationItem[]) || []);
                 }
             } catch {
                 if (isMounted) {
@@ -208,13 +208,14 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
         }
     };
 
-    const handleAccept = async (item: any) => {
+    const handleAccept = async (item: { data?: unknown; [key: string]: unknown }) => {
         setIsOpen(false);
         try {
             const invite = item?.data ?? null;
             if (!invite) return;
-            if (typeof acceptInvite === 'function') await acceptInvite(invite);
-            if (invite.workout && typeof onStartSession === 'function') onStartSession(invite.workout);
+            const inv = invite as Record<string, unknown>;
+            if (typeof acceptInvite === 'function') await acceptInvite(invite as Parameters<typeof acceptInvite>[0]);
+            if (inv.workout && typeof onStartSession === 'function') onStartSession(inv.workout);
         } catch (e) {
             // @ts-ignore
             const msg = getErrorMessage(e) ?? String(e);
@@ -226,9 +227,9 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
         }
     };
 
-    const handleReject = async (item: any) => {
+    const handleReject = async (item: { id?: unknown; [key: string]: unknown }) => {
         try {
-            if (typeof rejectInvite === 'function') await rejectInvite(item?.id);
+            if (typeof rejectInvite === 'function') await rejectInvite(item?.id as string);
         } catch {
             return;
         }

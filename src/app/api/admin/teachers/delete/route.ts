@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { jsonError, requireRole, requireRoleWithBearer, resolveRoleByUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const ZodBodySchema = z
   .object({
@@ -73,7 +74,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: msg || 'Falha ao excluir' }, { status: 400 })
     }
     return NextResponse.json({ ok: true, report: data ?? null })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

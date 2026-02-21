@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export async function POST(req: Request) {
   try {
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     const { data: directDeleted } = await admin.from('direct_messages').delete().like('content', '%"type"%').select('id')
     
     return NextResponse.json({ ok: true, deleted: allPaths.length, messagesRemoved: (globalDeleted?.length || 0) + (directDeleted?.length || 0) })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

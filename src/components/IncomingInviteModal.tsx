@@ -5,6 +5,7 @@ import { Users } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { Workout } from '@/types/app';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 interface IncomingInviteModalProps {
     onStartSession: (workout: Workout) => void;
@@ -44,8 +45,8 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
             if (typeof acceptInvite !== 'function') return;
             const workout = await acceptInvite(latestInvite);
             if (workout && typeof onStartSession === 'function') onStartSession(workout);
-        } catch (e: any) {
-            await alert("Erro: " + (e?.message ?? String(e)));
+        } catch (e: unknown) {
+            await alert("Erro: " + (getErrorMessage(e)));
         }
     };
 
@@ -54,8 +55,8 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
         try {
             if (typeof rejectInvite !== 'function') return;
             await rejectInvite(latestInvite.id);
-        } catch (e: any) {
-            await alert("Erro: " + (e?.message ?? String(e)));
+        } catch (e: unknown) {
+            await alert("Erro: " + (getErrorMessage(e)));
         }
     };
 

@@ -1,6 +1,6 @@
 /**
  * Extrai a mensagem de texto de um erro desconhecido de forma type-safe.
- * Substitui o padrão `catch (e: any) { e?.message || String(e) }`.
+ * Substitui o padrão `catch (e: any) { getErrorMessage(e) }`.
  *
  * @example
  * catch (e: unknown) {

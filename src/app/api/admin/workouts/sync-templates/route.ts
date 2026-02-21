@@ -498,7 +498,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, created_count: created, updated_count: updated, rows: rows || [], debug })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }

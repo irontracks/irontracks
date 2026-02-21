@@ -5,6 +5,7 @@ import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, s
 import { createAdminClient } from '@/utils/supabase/admin'
 import { isAllowedStoryPath, validateStoryPayload } from '@/lib/social/storyValidation'
 import { parseJsonBody } from '@/utils/zod'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       .select('id, created_at, expires_at')
       .maybeSingle()
 
-    if (error || !data?.id) return NextResponse.json({ ok: false, error: error?.message || 'failed' }, { status: 400 })
+    if (error || !data?.id) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'failed' }, { status: 400 })
 
     try {
       const throttled = await shouldThrottleBySenderType(auth.user.id, 'story_posted', 5)
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
       }
     } catch { }
     return NextResponse.json({ ok: true, data })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

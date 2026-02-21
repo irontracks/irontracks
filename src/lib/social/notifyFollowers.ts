@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 const chunk = (arr: unknown, size: unknown): unknown[][] => {
   const out: unknown[][] = []
@@ -68,7 +69,7 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
   for (const part of chunk(safeRows, 500)) {
     const { error } = await admin.from('notifications').insert(part as unknown as Array<Record<string, unknown>>)
     if (error) {
-      const msg = String(error?.message ?? error)
+      const msg = String(getErrorMessage(error) ?? error)
       const lower = msg.toLowerCase()
       const schemaMismatch =
         lower.includes('column') &&

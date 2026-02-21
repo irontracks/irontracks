@@ -350,7 +350,7 @@ export async function GET(req: Request) {
 
     items.sort((a, b) => (b.score || 0) - (a.score || 0))
     return NextResponse.json({ ok: true, items: items.slice(0, limit) }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
     return jsonError(500, msg)
   }

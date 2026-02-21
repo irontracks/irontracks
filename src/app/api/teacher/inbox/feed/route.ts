@@ -376,7 +376,7 @@ export async function GET(req: Request) {
     const sliced = items.slice(q?.offset ?? 0, (q?.offset ?? 0) + limit)
 
     return NextResponse.json({ ok: true, items: sliced }, { headers: { 'cache-control': 'no-store, max-age=0' } })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)
     return jsonError(500, msg)
   }

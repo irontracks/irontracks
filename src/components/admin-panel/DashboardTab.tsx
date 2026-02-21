@@ -135,29 +135,29 @@ export const DashboardTab: React.FC = () => {
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {coachInboxItems.map((item: any) => (
-                                    <div key={item.id} className="flex items-center justify-between p-4 bg-neutral-900/80 border border-neutral-800 rounded-xl hover:border-yellow-500/30 transition-all group">
+                                {coachInboxItems.map((item: Record<string, unknown>) => (
+                                    <div key={item.id as string} className="flex items-center justify-between p-4 bg-neutral-900/80 border border-neutral-800 rounded-xl hover:border-yellow-500/30 transition-all group">
                                         <div className="flex items-center gap-4">
                                             <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 border border-neutral-700">
-                                                {item.name.charAt(0).toUpperCase()}
+                                                {String(item.name ?? '').charAt(0).toUpperCase()}
                                             </div>
                                             <div>
                                                 <div className="font-bold text-white group-hover:text-yellow-500 transition-colors">
-                                                    {item.name}
+                                                    {String(item.name ?? '')}
                                                 </div>
                                                 <div className="text-xs text-neutral-500 flex items-center gap-2">
                                                     <span className="text-red-400 font-bold">
                                                         {item.hasWorkouts ? `${item.daysSinceLastWorkout} dias sem treino` : 'Nunca treinou'}
                                                     </span>
                                                     <span>•</span>
-                                                    <span>{item.email}</span>
+                                                    <span>{String(item.email ?? '')}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => {
-                                                    setSelectedStudent(item);
+                                                    setSelectedStudent(item as unknown as import('@/types/admin').AdminUser);
                                                     setTab('students');
                                                 }}
                                                 className="px-3 py-2 text-xs font-bold text-neutral-400 bg-neutral-800 hover:bg-neutral-700 hover:text-white rounded-lg transition-all"
@@ -166,7 +166,7 @@ export const DashboardTab: React.FC = () => {
                                             </button>
                                             <button
                                                 onClick={() => {
-                                                    setSelectedStudent(item);
+                                                    setSelectedStudent(item as unknown as import('@/types/admin').AdminUser);
                                                     setHistoryOpen(true);
                                                 }}
                                                 className="px-3 py-2 text-xs font-bold text-black bg-yellow-500 hover:bg-yellow-400 rounded-lg transition-all"

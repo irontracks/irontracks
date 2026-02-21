@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,7 @@ export async function POST() {
         .eq('user_id', userId)
         .eq('program_id', String(program.id))
         .limit(500)
-      ;(Array.isArray(links) ? links : []).forEach((r: any) => {
+      ;(Array.isArray(links) ? links : []).forEach((r: Record<string, unknown>) => {
         const id = String(r?.workout_id || '').trim()
         if (id) keepIds.add(id)
       })
@@ -51,7 +52,7 @@ export async function POST() {
       .limit(2000)
 
     const idsToArchive = (Array.isArray(vipTemplates) ? vipTemplates : [])
-      .map((r: any) => String(r?.id || '').trim())
+      .map((r: Record<string, unknown>) => String(r?.id || '').trim())
       .filter((id) => id && !keepIds.has(id))
 
     if (!idsToArchive.length) return NextResponse.json({ ok: true, archived: 0 })
@@ -60,8 +61,8 @@ export async function POST() {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     return NextResponse.json({ ok: true, archived: idsToArchive.length })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }
 

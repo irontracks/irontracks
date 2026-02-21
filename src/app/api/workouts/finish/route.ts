@@ -404,7 +404,7 @@ export async function POST(request: Request) {
     } catch {}
 
     return NextResponse.json({ ok: true, saved, idempotent })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : 'unknown_error' }, { status: 500 })
   }

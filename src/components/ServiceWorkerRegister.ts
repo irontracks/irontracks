@@ -15,7 +15,7 @@ export default function ServiceWorkerRegister(): null {
         }
       })()
       if (isLocal) return
-      navigator.serviceWorker.register('/sw.js').catch((): any => null)
+      navigator.serviceWorker.register('/sw.js').catch((): null => null)
     } catch {}
   }, [])
   return null

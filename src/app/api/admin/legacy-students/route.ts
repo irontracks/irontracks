@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +49,7 @@ export async function GET(req: Request) {
     const tEmails = new Set((teachers || []).map(t => (t.email || '').toLowerCase()))
     const students = (profiles || [])
       .filter(p => (p.role !== 'teacher') && (!p.email || !tEmails.has(p.email.toLowerCase())))
-      .map((p: any) => ({
+      .map((p: Record<string, unknown>) => ({
         id: String(p?.id || '').trim(),
         name: p?.display_name != null ? String(p.display_name) : null,
         email: p?.email != null ? String(p.email) : null,
@@ -59,7 +60,7 @@ export async function GET(req: Request) {
       .filter((s) => Boolean(s.id))
 
     return NextResponse.json({ ok: true, students })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

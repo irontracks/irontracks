@@ -3,6 +3,7 @@ import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { computeWeeklyStatsFromSessions } from '@/utils/vip/periodization'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ export async function GET() {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    const sessions = (Array.isArray(data) ? data : []).map((r: any) => ({
+    const sessions = (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => ({
       created_at: String(r?.created_at || ''),
       notes: r?.notes ?? null,
     }))
@@ -45,8 +46,8 @@ export async function GET() {
     const weekly = computeWeeklyStatsFromSessions(sessions)
 
     return NextResponse.json({ ok: true, weekly })
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 500 })
+  } catch (e: unknown) {
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }
 

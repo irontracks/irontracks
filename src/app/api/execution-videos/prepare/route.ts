@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
       { ok: true, submission_id: submissionId, bucket: bucketId, path: objectPath, token: signed.token, teacher_user_id: teacherId },
       { headers: { 'cache-control': 'no-store, max-age=0' } },
     )
-  } catch (e: any) {
-    return jsonError(500, e?.message ?? String(e))
+  } catch (e: unknown) {
+    return jsonError(500, getErrorMessage(e))
   }
 }

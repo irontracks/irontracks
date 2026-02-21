@@ -11,6 +11,7 @@ import CoachChatModal from '@/components/CoachChatModal';
 import { getKcalEstimate } from '@/utils/calories/kcalClient';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type AnyObj = Record<string, unknown>
 
@@ -683,8 +684,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 error: '', 
                 templateId: (res.templateId && typeof res.templateId === 'string') ? res.templateId : null 
             });
-        } catch (e: any) {
-            const msg = e?.message ? String(e.message) : String(e);
+        } catch (e: unknown) {
+            const msg = getErrorMessage(e) ? String(getErrorMessage(e)) : String(e);
             setApplyState({ status: 'error', error: msg || 'Falha ao aplicar progressão', templateId: null });
         }
     };
@@ -774,8 +775,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 setPdfBlob(blob);
                 setPdfUrl(url);
             }
-        } catch (e: any) {
-            alert('Não foi possível abrir impressão: ' + (e?.message ?? String(e)) + '\nPermita pop-ups para este site.');
+        } catch (e: unknown) {
+            alert('Não foi possível abrir impressão: ' + (getErrorMessage(e)) + '\nPermita pop-ups para este site.');
         } finally {
             setIsGenerating(false);
             setTimeout(() => setIsGenerating(false), 500);
@@ -870,8 +871,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     win.print();
                 } catch {}
             }, 300);
-        } catch (e: any) {
-            alert('Não foi possível gerar o PDF do parceiro: ' + (e?.message || String(e)));
+        } catch (e: unknown) {
+            alert('Não foi possível gerar o PDF do parceiro: ' + (getErrorMessage(e)));
         }
     };
 

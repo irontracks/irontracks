@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { parseInput } from '@/lib/nutrition/parser'
 import { trackMeal } from '@/lib/nutrition/engine'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export async function logMealAction(mealText: string, dateKey?: string) {
   try {
@@ -33,8 +34,8 @@ export async function logMealAction(mealText: string, dateKey?: string) {
 
     revalidatePath('/dashboard/nutrition')
     return { ok: true, meal, entry: row || null }
-  } catch (e: any) {
-    const message = String(e?.message || '')
+  } catch (e: unknown) {
+    const message = String(getErrorMessage(e) || '')
     const unknownPrefix = 'nutrition_parser_unknown_food:'
     if (message.startsWith(unknownPrefix)) {
       const raw = message.slice(unknownPrefix.length).trim()

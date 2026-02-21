@@ -4,6 +4,7 @@ import NutritionMixer from '@/components/dashboard/nutrition/NutritionMixer'
 import NutritionConsoleShell from '@/components/dashboard/nutrition/NutritionConsoleShell'
 import { createClient } from '@/utils/supabase/server'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ function safeNumber(value: any): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function normalizeGoalRow(row: any) {
+function normalizeGoalRow(row: Record<string, unknown>) {
   const calories = safeNumber(row?.calories ?? row?.cals ?? row?.kcal)
   const protein = safeNumber(row?.protein ?? row?.prot ?? row?.p)
   const carbs = safeNumber(row?.carbs ?? row?.carb ?? row?.c)
@@ -34,7 +35,7 @@ function normalizeGoalRow(row: any) {
 }
 
 function isSchemaMissingError(e: any) {
-  const message = String(e?.message || e || '')
+  const message = getErrorMessage(e)
   const m = message.toLowerCase()
   return m.includes('could not find the table') || m.includes('schema cache')
 }

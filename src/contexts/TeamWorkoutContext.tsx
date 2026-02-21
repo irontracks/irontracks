@@ -6,6 +6,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { playStartSound } from '@/lib/sounds';
 import { useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 interface TeamParticipant {
     id?: string
@@ -149,8 +150,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             const parts = Array.isArray(payload?.participants) ? payload.participants : [];
             setTeamSession({ id: sessionId, isHost: false, participants: parts as unknown as TeamParticipant[] });
             return { ok: true, teamSessionId: sessionId, participants: parts as unknown as TeamParticipant[], workout: (payload?.workout ?? null) as unknown as Record<string, unknown> | null };
-        } catch (e: any) {
-            return { ok: false, error: e?.message || String(e || '') };
+        } catch (e: unknown) {
+            return { ok: false, error: getErrorMessage(e) || String(e || '') };
         }
     }, [supabase, teamworkV2Enabled]);
 
@@ -748,8 +749,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
 
             if (inviteError) throw inviteError;
             return sessionId;
-        } catch (e: any) {
-            const msg = e?.message || String(e || 'Erro ao enviar convite');
+        } catch (e: unknown) {
+            const msg = getErrorMessage(e) || String(e || 'Erro ao enviar convite');
             throw new Error(msg);
         }
     };
@@ -807,8 +808,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 }
             })();
             return { ok: true, sessionId, code, expiresAt, url };
-        } catch (e: any) {
-            return { ok: false, error: e?.message || String(e || '') };
+        } catch (e: unknown) {
+            return { ok: false, error: getErrorMessage(e) || String(e || '') };
         }
     };
 
@@ -853,8 +854,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             if (onStartSession) onStartSession(workoutFromInvite);
 
             return workoutFromInvite;
-        } catch (e: any) {
-            const msg = e?.message || String(e || 'Erro ao aceitar convite');
+        } catch (e: unknown) {
+            const msg = getErrorMessage(e) || String(e || 'Erro ao aceitar convite');
             throw new Error(msg);
         }
     };

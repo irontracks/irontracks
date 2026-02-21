@@ -364,7 +364,7 @@ export async function assignWorkoutToStudent(
                 try {
                     const { error } = await adminDb.from('sets').insert(payload);
                     if (!error) return;
-                    const msg = (error?.message || '').toLowerCase();
+                    const msg = (getErrorMessage(error) || '').toLowerCase();
                     if (msg.includes('advanced_config') || msg.includes('is_warmup')) {
                         const reduced = { ...payload };
                         delete reduced.advanced_config;
@@ -516,7 +516,7 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
             messages: messages || [],
             invites: invites || [],
             team_sessions: team_sessions || [],
-            workouts: (Array.isArray(workouts) ? workouts : []).map((w: any) => ({
+            workouts: (Array.isArray(workouts) ? workouts : []).map((w: Record<string, unknown>) => ({
                 id: w?.id,
                 user_id: w?.user_id ?? null,
                 student_id: w?.student_id ?? null,
@@ -533,7 +533,7 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
                     cadence: e?.cadence ?? null,
                     method: e?.method ?? null,
                     order: e?.order ?? null,
-                    sets: (Array.isArray(e?.sets) ? e.sets : []).map((s: any) => ({
+                    sets: (Array.isArray(e?.sets) ? e.sets : []).map((s: Record<string, unknown>) => ({
                         reps: s?.reps ?? null,
                         rpe: s?.rpe ?? null,
                         set_number: s?.set_number ?? null

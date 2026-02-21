@@ -83,7 +83,7 @@ export async function GET() {
     }
 
     return NextResponse.json({ ok: true, teacher: teacher || null })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }
@@ -170,7 +170,7 @@ export async function POST(req: Request) {
     if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 400 })
 
     return NextResponse.json({ ok: true, teacher: updated })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
   }

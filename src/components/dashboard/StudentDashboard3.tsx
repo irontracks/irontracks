@@ -14,6 +14,7 @@ import WorkoutCalendarModal from './WorkoutCalendarModal'
 import StoriesBar from './StoriesBar'
 import MuscleMapCard from './MuscleMapCard'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -364,7 +365,7 @@ export default function StudentDashboard(props: Props) {
         if (error) {
           setPeriodizedWorkouts([])
           setPeriodizedLoaded(true)
-          setPeriodizedError(String(error?.message || 'Falha ao carregar treinos periodizados.'))
+          setPeriodizedError(String(getErrorMessage(error) || 'Falha ao carregar treinos periodizados.'))
           return
         }
 

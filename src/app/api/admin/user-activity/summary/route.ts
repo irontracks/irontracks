@@ -78,7 +78,7 @@ export async function GET(req: Request) {
     const days = Math.max(1, Math.round(msRange / (24 * 60 * 60 * 1000)))
 
     return NextResponse.json({ ok: true, days, total: rows.length, topEvents, topTypes })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

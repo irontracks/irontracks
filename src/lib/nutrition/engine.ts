@@ -1,3 +1,4 @@
+import { getErrorMessage } from '@/utils/errorMessage'
 export type Gender = 'MALE' | 'FEMALE'
 
 export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'VERY_ACTIVE' | 'EXTRA_ACTIVE'
@@ -114,7 +115,7 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
     if (error) throw new Error(error.message || 'nutrition_log_upsert_failed')
     const row = Array.isArray(data) ? data[0] : null
     return row || null
-  } catch (e: any) {
-    throw new Error(e?.message || 'nutrition_track_meal_failed')
+  } catch (e: unknown) {
+    throw new Error(getErrorMessage(e) || 'nutrition_track_meal_failed')
   }
 }

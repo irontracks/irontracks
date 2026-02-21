@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 type WeeklySummary = {
   ok: boolean
@@ -28,16 +29,16 @@ export default function VipWeeklySummaryCard() {
     setError('')
     try {
       const res = await fetch('/api/vip/weekly-summary', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch((): any => null)) as WeeklySummary | null
+      const json = (await res.json().catch((): null => null)) as WeeklySummary | null
       if (!json?.ok) {
         setData(null)
         setError(String(json?.error || 'Falha ao carregar resumo semanal.'))
         return
       }
       setData(json)
-    } catch (e: any) {
+    } catch (e: unknown) {
       setData(null)
-      setError(e?.message ? String(e.message) : 'Falha ao carregar resumo semanal.')
+      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar resumo semanal.')
     } finally {
       inFlightRef.current = false
       setLoading(false)

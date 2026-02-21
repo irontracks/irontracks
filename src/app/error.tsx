@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -24,7 +25,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
 
         <div className="bg-black/50 p-4 rounded-xl mb-8 w-full max-w-md overflow-x-auto text-left border border-red-900/30">
         <p className="text-red-400 font-mono text-xs break-all">
-            {error?.message || "Erro desconhecido"}
+            {getErrorMessage(error) || "Erro desconhecido"}
         </p>
         {error?.digest && (
             <p className="text-neutral-600 font-mono text-[10px] mt-2">

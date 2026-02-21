@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { NextResponse } from 'next/server'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,8 +71,8 @@ export async function GET() {
       isVip: tier !== 'free'
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching VIP credits:', error)
-    return NextResponse.json({ ok: false, error: error?.message || String(error) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: getErrorMessage(error) }, { status: 500 })
   }
 }

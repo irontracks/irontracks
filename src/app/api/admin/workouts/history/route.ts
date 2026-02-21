@@ -72,7 +72,7 @@ export async function GET(req: Request) {
       .limit(200)
 
     return NextResponse.json({ ok: true, rows: rows || [] })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }

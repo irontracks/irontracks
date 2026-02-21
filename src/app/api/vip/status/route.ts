@@ -30,7 +30,7 @@ export async function GET(req: Request) {
         wizard_weekly: wizardUsage.currentUsage
       }
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
