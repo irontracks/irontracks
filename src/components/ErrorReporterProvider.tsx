@@ -3,6 +3,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
+import { classifyError, hashString } from '@/utils/errorClassification';
 
 const getAppVersion = () => {
   try {
@@ -39,6 +40,7 @@ const normalizeKey = (v: unknown) => {
     return '';
   }
 };
+
 
 interface ErrorPayload {
   message: string;
@@ -108,6 +110,12 @@ export default function ErrorReporterProvider({ children }: { children: React.Re
 
       if (!shouldReport) return;
 
+      const errorName =
+        error && typeof error === 'object' && 'name' in (error as Record<string, unknown>)
+          ? String((error as { name?: unknown }).name || '')
+          : '';
+      const { severity, category } = classifyError(message, source);
+      const metaSafe = meta && typeof meta === 'object' ? meta : {};
       await reportToServer({
         message,
         stack,
@@ -116,7 +124,14 @@ export default function ErrorReporterProvider({ children }: { children: React.Re
         userAgent,
         source,
         appVersion: getAppVersion(),
-        meta: meta && typeof meta === 'object' ? meta : {},
+        meta: {
+          ...metaSafe,
+          severity,
+          category,
+          signature,
+          fingerprint: hashString(signature),
+          errorName,
+        },
       });
       await alert('Erro reportado. Obrigado!', 'Enviado');
     } catch (e) {
@@ -131,10 +146,11 @@ export default function ErrorReporterProvider({ children }: { children: React.Re
   useEffect(() => {
     const onWindowError = (event: ErrorEvent) => {
       try {
+        const err = event?.error || event?.message || 'Erro';
         handleError({
-          error: event?.error || event?.message || 'Erro',
+          error: err,
           source: 'window',
-          meta: { filename: event?.filename, lineno: event?.lineno, colno: event?.colno },
+          meta: { filename: event?.filename, lineno: event?.lineno, colno: event?.colno, type: event?.type },
         });
       } catch { }
     };

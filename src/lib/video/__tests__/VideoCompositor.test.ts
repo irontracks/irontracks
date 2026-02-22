@@ -1,5 +1,6 @@
 
-// Mocks para simular ambiente de navegador
+import { describe, it, expect, beforeEach } from 'vitest'
+
 class MockMediaRecorder {
     state = 'inactive';
     ondataavailable: ((event?: unknown) => void) | null = null;
@@ -52,11 +53,14 @@ globalWithMocks.document = {
         return {};
     }
 };
-globalWithMocks.navigator = {
-    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)',
-    platform: 'MacIntel',
-    maxTouchPoints: 5
-};
+Object.defineProperty(globalWithMocks, 'navigator', {
+    value: {
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)',
+        platform: 'MacIntel',
+        maxTouchPoints: 5
+    },
+    configurable: true
+});
 
 import { VideoCompositor } from '../VideoCompositor';
 

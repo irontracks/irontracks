@@ -34,14 +34,35 @@ interface AssessmentFormProps {
   onCancel?: () => void;
 }
 
-interface FormStep {
-  id: string;
-  title: string;
-  description: string;
-  icon: React.ComponentType<LucideProps>;
-  component: React.ComponentType<any>;
-  required: boolean;
-}
+type AssessmentStepComponent = React.ComponentType<AssessmentStepProps>;
+type PhotoStepComponent = typeof PhotoUploadStep;
+type ResultsStepComponent = typeof ResultsPreview;
+
+type FormStep =
+  | {
+      id: 'basic' | 'measurements' | 'skinfolds';
+      title: string;
+      description: string;
+      icon: React.ComponentType<LucideProps>;
+      component: AssessmentStepComponent;
+      required: true;
+    }
+  | {
+      id: 'photos';
+      title: string;
+      description: string;
+      icon: React.ComponentType<LucideProps>;
+      component: PhotoStepComponent;
+      required: false;
+    }
+  | {
+      id: 'results';
+      title: string;
+      description: string;
+      icon: React.ComponentType<LucideProps>;
+      component: ResultsStepComponent;
+      required: true;
+    };
 
 type AssessmentStepProps = {
   formData: AssessmentFormData;
@@ -188,7 +209,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
     ];
   }, []);
 
-  const CurrentStepComponent = steps[currentStep].component;
+  const currentStepData = steps[currentStep];
 
   const validateStep = useCallback((stepIndex: number): boolean => {
     const errors: Record<string, string> = {};
@@ -355,27 +376,30 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
             >
-              {steps[currentStep].id === 'photos' ? (
+              {currentStepData.id === 'photos' ? (
                 <PhotoUploadStep
                   formData={formData}
                   onUpdate={updateFormData}
                   onNext={handleNext}
                   onBack={handlePrevious}
                 />
-              ) : steps[currentStep].id === 'results' ? (
+              ) : currentStepData.id === 'results' ? (
                 <ResultsPreview
                   formData={formData}
                   onBack={handlePrevious}
                   studentName={studentName}
                 />
-              ) : (
-                <CurrentStepComponent
-                  formData={formData}
-                  updateFormData={updateFormData}
-                  errors={formErrors}
-                  studentName={studentName}
-                />
-              )}
+              ) : (() => {
+                const StepComponent = currentStepData.component;
+                return (
+                  <StepComponent
+                    formData={formData}
+                    updateFormData={updateFormData}
+                    errors={formErrors}
+                    studentName={studentName}
+                  />
+                );
+              })()}
             </motion.div>
           </AnimatePresence>
         </div>

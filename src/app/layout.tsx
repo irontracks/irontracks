@@ -1,5 +1,6 @@
 import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import PerformanceReporter from "@/components/PerformanceReporter";
 import type { ReactNode } from 'react';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { headers } from 'next/headers'
@@ -316,6 +317,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body className="antialiased bg-neutral-950 text-white">
         <ServiceWorkerRegister />
+        <PerformanceReporter />
         {children}
       </body>
     </html>

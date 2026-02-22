@@ -9,6 +9,7 @@ import ExerciseList from './workout/ExerciseList';
 import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
+import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 
 export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
@@ -26,6 +27,21 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       </div>
     );
   }
+
+  const finishPayload = React.useMemo(() => {
+    try {
+      return buildFinishWorkoutPayload({
+        workout,
+        elapsedSeconds: 0,
+        logs: (session?.logs ?? {}) as Record<string, unknown>,
+        ui: (session?.ui ?? {}) as Record<string, unknown>,
+        postCheckin: null,
+      });
+    } catch {
+      return null;
+    }
+  }, [session?.logs, session?.ui, workout]);
+  void finishPayload;
 
   return (
     <WorkoutProvider value={controller}>

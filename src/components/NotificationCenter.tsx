@@ -7,16 +7,9 @@ import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { getErrorMessage } from '@/utils/errorMessage'
+import type { AppNotification } from '@/types/social'
 
-interface NotificationItem {
-    id: string;
-    type: string;
-    title: string;
-    message: string;
-    created_at?: string;
-    read?: boolean;
-    data?: Record<string, unknown>;
-}
+type NotificationItem = AppNotification & { data?: Record<string, unknown> };
 
 interface NotificationCenterProps {
     onStartSession?: (workout: unknown) => void;
@@ -26,7 +19,7 @@ interface NotificationCenterProps {
 }
 
 const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: NotificationCenterProps) => {
-    const { confirm } = useDialog();
+    const { alert, confirm } = useDialog();
     const [isOpen, setIsOpen] = useState(() => !!initialOpen);
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
     const [systemNotifications, setSystemNotifications] = useState<NotificationItem[]>([]);
@@ -211,19 +204,14 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
     const handleAccept = async (item: { data?: unknown; [key: string]: unknown }) => {
         setIsOpen(false);
         try {
-            const invite = item?.data ?? null;
+            const invite = item?.data ?? item?.metadata ?? null;
             if (!invite) return;
             const inv = invite as Record<string, unknown>;
             if (typeof acceptInvite === 'function') await acceptInvite(invite as Parameters<typeof acceptInvite>[0]);
             if (inv.workout && typeof onStartSession === 'function') onStartSession(inv.workout);
         } catch (e) {
-            // @ts-ignore
             const msg = getErrorMessage(e) ?? String(e);
-            // @ts-ignore
-            await confirm("Erro ao aceitar: " + msg); // Using confirm as alert is not available in props but used in original code from DialogContext? Actually useDialog has alert. 
-            // The original code used `await alert(...)` but destructured `alert` from `useDialog`.
-            // I destructured only `confirm` above by mistake? No, I see `const { alert, confirm } = useDialog();` in original.
-            // I will fix destructuring.
+            await alert("Erro ao aceitar: " + msg);
         }
     };
 

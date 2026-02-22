@@ -14,6 +14,7 @@ import {
   WorkoutExercise, 
   WorkoutSession, 
   WorkoutDraft, 
+  WorkoutSetDetail,
   ReportHistory, 
   ReportHistoryItem,
   AiRecommendation,
@@ -75,8 +76,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const session = props.session;
   const workout = session?.workout ?? null;
   const exercises = useMemo<WorkoutExercise[]>(() => (Array.isArray(workout?.exercises) ? workout.exercises : []), [workout?.exercises]);
-  const logs: Record<string, unknown> = session?.logs ?? {};
-  const ui: UnknownRecord = session?.ui ?? {};
+  const logs: Record<string, unknown> = (session?.logs ?? {}) as Record<string, unknown>;
+  const ui: UnknownRecord = (session?.ui ?? {}) as UnknownRecord;
   const settings = props.settings ?? null;
 
   type PostCheckinDraft = { rpe: string; satisfaction: string; soreness: string; notes: string };
@@ -1119,13 +1120,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const sdArr = Array.isArray(sdArrRaw) ? [...sdArrRaw] : [];
       const previousSetsCount = Math.max(setsHeader, sdArr.length);
 
-      const nextSetDetails: unknown[] = [];
+      const nextSetDetails: WorkoutSetDetail[] = [];
       for (let i = 0; i < desiredSets; i += 1) {
         const current = sdArr[i];
         const currentObj = current && typeof current === 'object' ? (current as UnknownRecord) : null;
         const setNumber = i + 1;
         if (currentObj) {
-          nextSetDetails.push({ ...currentObj, set_number: (currentObj.set_number ?? currentObj.setNumber) ?? setNumber });
+          const nextSetNumber = Number(currentObj.set_number ?? currentObj.setNumber ?? setNumber) || setNumber;
+          nextSetDetails.push({ ...currentObj, set_number: nextSetNumber });
         } else {
           nextSetDetails.push({ set_number: setNumber, weight: null, reps: '', rpe: null, notes: null, is_warmup: false, advanced_config: null });
         }
@@ -1269,7 +1271,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     if (!session || !workout) return;
     if (finishing) return;
 
-    const startedAtMs = session?.startedAt ? new Date(session.startedAt).getTime() : 0;
+    const startedAtMs = session?.startedAt ? new Date(String(session.startedAt)).getTime() : 0;
     const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
 
     const minSecondsForFullSession = 30 * 60;
@@ -1582,7 +1584,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const currentExercise = exercises[currentExerciseIdx] ?? null;
 
   const elapsedSeconds = useMemo(() => {
-    const startedAtMs = session?.startedAt ? new Date(session.startedAt).getTime() : 0;
+    const startedAtMs = session?.startedAt ? new Date(String(session.startedAt)).getTime() : 0;
     return startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
   }, [session?.startedAt, ticker]);
 

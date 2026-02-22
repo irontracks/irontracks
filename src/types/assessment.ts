@@ -148,11 +148,11 @@ export interface PhotoUpload {
   error?: string;
 }
 
-export interface AssessmentStep {
+export interface AssessmentStep<TProps = Record<string, unknown>> {
   id: string;
   title: string;
   description: string;
-  component: React.ComponentType<Record<string, unknown>>;
+  component: React.ComponentType<TProps>;
 }
 
 export interface ValidationRule {
