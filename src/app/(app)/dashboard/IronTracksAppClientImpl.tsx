@@ -86,6 +86,9 @@ import { useSignOut } from '@/hooks/useSignOut'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useWorkoutDuplicates } from '@/hooks/useWorkoutDuplicates'
 import { useWorkoutExport } from '@/hooks/useWorkoutExport'
+import { useWorkoutCrud } from '@/hooks/useWorkoutCrud'
+import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
+import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 
 import {
     DirectChatState,
@@ -122,87 +125,7 @@ function InAppNotifyBinder({ bind }: { bind?: ((notify: ((payload: unknown) => v
     return null;
 }
 
-const mapWorkoutRow = (w: unknown) => {
-    const workout = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-    const rawExercises = Array.isArray(workout?.exercises) ? (workout.exercises as unknown[]) : [];
-    const exs = rawExercises
-        .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
-        .sort((a: Record<string, unknown>, b: Record<string, unknown>) => (Number(a.order) || 0) - (Number(b.order) || 0))
-        .map((e: Record<string, unknown>) => {
-            try {
-                const isCardio = String(e.method || '').toLowerCase() === 'cardio';
-                const dbSets = Array.isArray(e.sets)
-                    ? (e.sets as unknown[]).filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
-                    : [];
-
-                const sortedSets = dbSets
-                    .slice()
-                    .sort((aSet: Record<string, unknown>, bSet: Record<string, unknown>) => (Number(aSet?.set_number) || 0) - (Number(bSet?.set_number) || 0));
-
-                const setsCount = sortedSets.length || (isCardio ? 1 : 4);
-
-                const setDetails = sortedSets.map((s: Record<string, unknown>, idx: number) => ({
-                    set_number: s?.set_number ?? idx + 1,
-                    reps: s?.reps ?? null,
-                    rpe: s?.rpe ?? null,
-                    weight: s?.weight ?? null,
-                    is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-                    advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
-                }));
-
-                const nonEmptyReps = setDetails
-                    .map((s: { reps: unknown }) => s.reps)
-                    .filter((r: unknown) => r !== null && r !== undefined && r !== '');
-                const defaultReps = isCardio ? '20' : '10';
-                let repsHeader = defaultReps;
-                if (nonEmptyReps.length > 0) {
-                    const uniqueReps = Array.from(new Set(nonEmptyReps));
-                    repsHeader = uniqueReps.length === 1 ? String(uniqueReps[0] ?? defaultReps) : String(nonEmptyReps[0] ?? defaultReps);
-                }
-
-                const rpeValues = setDetails
-                    .map((s: { rpe: unknown }) => s.rpe)
-                    .filter((v: unknown) => v !== null && v !== undefined && !Number.isNaN(Number(v)));
-                const defaultRpe = isCardio ? 5 : 8;
-                const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe;
-
-                return {
-                    id: e.id,
-                    name: e.name,
-                    notes: e.notes,
-                    videoUrl: e.video_url,
-                    restTime: e.rest_time,
-                    cadence: e.cadence,
-                    method: e.method,
-                    sets: setsCount,
-                    reps: repsHeader,
-                    rpe: rpeHeader,
-                    setDetails,
-                };
-            } catch (mapErr) {
-                logError('Erro ao mapear exercício', {
-                    workoutId: workout?.id,
-                    exerciseId: e?.id,
-                    error: mapErr,
-                });
-                return null;
-            }
-        })
-        .filter(Boolean);
-
-    return {
-        id: workout.id != null ? String(workout.id) : undefined,
-        title: String(workout.name ?? ''),
-        notes: workout.notes,
-        exercises: exs,
-        is_template: !!workout.is_template,
-        userId: workout.user_id != null ? String(workout.user_id) : undefined,
-        createdBy: workout.created_by != null ? String(workout.created_by) : undefined,
-        archivedAt: workout.archived_at ?? null,
-        sortOrder: typeof workout.sort_order === 'number' ? workout.sort_order : (workout.sort_order == null ? 0 : Number(workout.sort_order) || 0),
-        createdAt: workout.created_at ?? null,
-    };
-};
+// mapWorkoutRow moved to @/utils/mapWorkoutRow
 
 function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
     const { confirm, alert } = useDialog();
@@ -1351,6 +1274,68 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleJsonUpload,
     } = useWorkoutExport({ user, workouts, fetchWorkouts, alert: alertVoid, confirm })
 
+    // CRUD de treinos — extraído para useWorkoutCrud
+    const userSettingsForCrud = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+        ? (userSettingsApi.settings as Record<string, unknown>)
+        : null
+    const {
+        handleStartSession,
+        handleFinishSession,
+        handleCreateWorkout,
+        handleEditWorkout,
+        handleSaveWorkout,
+        handlePersistWorkoutTemplateFromSession,
+        handleOpenActiveWorkoutEditor,
+        handleCloseActiveWorkoutEditor,
+        handleSaveActiveWorkoutEditor,
+        handleDeleteWorkout,
+        handleRestoreWorkout,
+        handleDuplicateWorkout,
+        handleBulkEditWorkouts,
+    } = useWorkoutCrud({
+        user,
+        workouts,
+        currentWorkout,
+        activeSession,
+        userSettings: userSettingsForCrud,
+        setCurrentWorkout,
+        setActiveSession,
+        setView,
+        setCreateWizardOpen,
+        setReportData: setReportData as (data: unknown) => void,
+        setReportBackView,
+        suppressForeignFinishToastUntilRef,
+        fetchWorkouts,
+        alert,
+        confirm,
+        requestPreWorkoutCheckin,
+        resolveExerciseVideos,
+        persistExerciseVideoUrls,
+        normalizeWorkoutForEditor,
+        stripWorkoutInternalKeys,
+        reindexSessionLogsAfterWorkoutEdit,
+        editActiveBaseRef,
+        editActiveAddExerciseRef,
+        setEditActiveDraft,
+        setEditActiveOpen,
+        inAppNotify,
+    })
+
+    // Normalização de títulos e exercícios — extraído para useWorkoutNormalize
+    const {
+        handleNormalizeAiWorkoutTitles,
+        handleApplyTitleRule,
+        handleNormalizeExercises,
+    } = useWorkoutNormalize({
+        workouts,
+        programTitleStartDay: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+            ? Number((userSettingsApi.settings as Record<string, unknown>).programTitleStartDay) || undefined
+            : undefined,
+        fetchWorkouts,
+        alert,
+        confirm,
+    })
+
     // Handlers de Sessão
     const handleLogout = async () => {
         const ok = await confirm("Deseja realmente sair da sua conta?", "Sair");
@@ -1394,492 +1379,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     };
 
-    const handleStartSession = async (workout: unknown) => {
-        const workoutObj = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
-        const exercisesList = Array.isArray(workoutObj?.exercises)
-            ? (workoutObj.exercises as unknown[]).filter((ex: unknown): ex is Record<string, unknown> => Boolean(ex && typeof ex === 'object'))
-            : [];
-
-        if (exercisesList.length === 0) {
-            await alert('Este treino está sem exercícios válidos. Edite o treino antes de iniciar.', 'Treino incompleto');
-            return;
-        }
-
-        const first = exercisesList[0] || {};
-        const exMin = toMinutesRounded(estimateExerciseSeconds(first));
-        const totalMin = toMinutesRounded(exercisesList.reduce((acc: number, ex: Record<string, unknown>) => acc + calculateExerciseDuration(ex), 0));
-        const workoutTitle = String(workoutObj?.title || workoutObj?.name || 'Treino');
-        const ok = await confirm(`Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`, 'Iniciar Treino');
-        if (!ok) return;
-        let preCheckin = null
-        try {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
-            const prompt = s ? s.promptPreWorkoutCheckin !== false : true
-            if (prompt) {
-                preCheckin = await requestPreWorkoutCheckin(workout)
-                if (preCheckin && user?.id) {
-                    const pre = preCheckin && typeof preCheckin === 'object' ? (preCheckin as Record<string, unknown>) : ({} as Record<string, unknown>)
-                    const energyN = Number(pre.energy)
-                    const sorenessN = Number(pre.soreness)
-                    const timeN = Number(pre.timeMinutes)
-                    const { error: checkinError } = await supabase.from('workout_checkins').insert({
-                        user_id: user.id,
-                        kind: 'pre',
-                        planned_workout_id: String(workoutObj?.id || '').trim() ? workoutObj.id : null,
-                        active_session_user_id: null,
-                        energy: Number.isFinite(energyN) && energyN >= 1 && energyN <= 5 ? Math.round(energyN) : null,
-                        soreness: Number.isFinite(sorenessN) && sorenessN >= 0 && sorenessN <= 10 ? Math.round(sorenessN) : null,
-                        notes: String(pre.notes || '').trim() ? String(pre.notes || '').trim() : null,
-                        answers: {
-                            time_minutes: Number.isFinite(timeN) && timeN > 0 ? Math.round(timeN) : null,
-                        },
-                    })
-                    if (checkinError) throw checkinError
-                }
-            }
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e || '')
-            logWarn('warn', 'Falha ao salvar check-in pré-treino:', message)
-        }
-        let resolvedExercises = exercisesList;
-        try {
-            const resolved = await resolveExerciseVideos(exercisesList);
-            resolvedExercises = Array.isArray(resolved?.exercises) ? resolved.exercises : exercisesList;
-            persistExerciseVideoUrls(resolved?.updates || []);
-        } catch { }
-        {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
-            const enabled = s ? s.enableSounds !== false : true
-            const volumeRaw = Number(s?.soundVolume ?? 100)
-            const volume = Number.isFinite(volumeRaw) ? Math.max(0, Math.min(1, volumeRaw / 100)) : 1
-            playStartSound({ enabled, volume })
-        }
-        const sessionWorkout = { ...workoutObj, exercises: resolvedExercises } as unknown as ActiveSession
-        const sessionLogs: Record<string, unknown> = {}
-        setActiveSession({
-            workout: sessionWorkout,
-            logs: sessionLogs,
-            ui: {
-                baseExerciseCount: resolvedExercises.length,
-                pendingTemplateUpdate: false,
-                preCheckin: preCheckin && typeof preCheckin === 'object' ? (preCheckin as Record<string, unknown>) : null,
-            },
-            startedAt: Date.now(),
-            timerTargetTime: null,
-            timerContext: null
-        });
-        setView('active');
-        try {
-            const wid = String(workoutObj?.id || '').trim() || null;
-            const title = String(workoutObj?.title || workoutObj?.name || 'Treino').trim();
-            fetch('/api/social/workout-start', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ workout_id: wid, workout_title: title }),
-            }).catch(() => { });
-        } catch { }
-        {
-            const s = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null
-            const allowPrompt = s ? s.notificationPermissionPrompt !== false : true
-            if (allowPrompt && typeof Notification !== 'undefined' && Notification.permission === 'default') {
-                Notification.requestPermission().catch((e: unknown) => logWarn('Erro permissão notificação:', String((e as Error)?.message ?? e)));
-            }
-        }
-    };
-
-
-    const handleFinishSession = async (sessionData: unknown, showReport?: boolean) => {
-        suppressForeignFinishToastUntilRef.current = Date.now() + 8000;
-        try {
-            if (user?.id) {
-                localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`);
-            }
-            localStorage.removeItem('activeSession');
-        } catch { }
-        setActiveSession(null);
-        if (showReport === false) {
-            setView('dashboard');
-            return;
-        }
-        setReportBackView('dashboard');
-        setReportData({ current: sessionData, previous: null } as unknown as Parameters<typeof setReportData>[0]);
-        setView('report');
-    };
-
-    // Handlers CRUD
+    // Abre o editor manual de treino (sem wizard)
     const openManualWorkoutEditor = () => {
-        setCurrentWorkout({ title: '', exercises: [] as Exercise[] })
+        setCurrentWorkout({ title: '', exercises: [] as Exercise[] } as unknown as ActiveSession)
         setView('edit')
-    }
-    const handleCreateWorkout = () => { setCreateWizardOpen(true) };
-
-    const handleEditWorkout = async (workout: unknown) => {
-        const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : null
-        if (!w || !w.id) return;
-        try {
-            const supabase = createClient();
-            const { data, error } = await supabase
-                .from('workouts')
-                .select('*, exercises(*, sets(*))')
-                .eq('id', w.id)
-                .maybeSingle();
-            if (error) throw error;
-            if (!data) {
-                setCurrentWorkout(w as unknown as ActiveSession);
-                setView('edit');
-                return;
-            }
-            const mapped = mapWorkoutRow(data);
-            try {
-                const mappedObj = mapped && typeof mapped === 'object' ? (mapped as Record<string, unknown>) : ({} as Record<string, unknown>)
-                const resolved = await resolveExerciseVideos(mappedObj?.exercises || []);
-                const exercises = Array.isArray(resolved?.exercises) ? resolved.exercises : (Array.isArray(mappedObj?.exercises) ? (mappedObj.exercises as Array<Record<string, unknown>>) : []);
-                persistExerciseVideoUrls(resolved?.updates || []);
-                setCurrentWorkout({ ...mappedObj, exercises: (exercises as unknown as Array<Record<string, unknown>>) } as unknown as ActiveSession);
-            } catch {
-                setCurrentWorkout(mapped as unknown as ActiveSession);
-            }
-            setView('edit');
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e || '');
-            await alert('Erro ao carregar treino para edição: ' + msg);
-        }
-    };
-
-    const handleSaveWorkout = useCallback(async (workoutToSave?: unknown) => {
-        const wRaw = workoutToSave || currentWorkout;
-        const w = wRaw && typeof wRaw === 'object' ? (wRaw as Record<string, unknown>) : null
-        if (!user || !w || !w.title) return { ok: false, error: 'Treino inválido ou usuário ausente' };
-        try {
-            if (w.id) {
-                const res = await updateWorkout(String(w.id), w);
-                setCurrentWorkout(isRecord(wRaw) ? (wRaw as unknown as ActiveSession) : (w as unknown as ActiveSession));
-                return res;
-            } else {
-                const created = await createWorkout(w);
-                const id = created?.ok ? created.data.id : null;
-                const baseObj: Record<string, unknown> = isRecord(wRaw) ? (wRaw as Record<string, unknown>) : w
-                setCurrentWorkout({ ...baseObj, id: id != null ? String(id) : undefined } as unknown as ActiveSession);
-                return created;
-            }
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e || 'Falha ao salvar treino');
-            return { ok: false, error: msg };
-        }
-    }, [currentWorkout, user]);
-
-    const handlePersistWorkoutTemplateFromSession = useCallback(async (workoutFromSession: unknown) => {
-        try {
-            const normalized = normalizeWorkoutForEditor(workoutFromSession);
-            const cleaned = stripWorkoutInternalKeys(normalized);
-            const cleanedObj = cleaned && typeof cleaned === 'object' ? (cleaned as Record<string, unknown>) : null
-            if (!cleanedObj || !cleanedObj.title) return { ok: false, error: 'Treino inválido para salvar' };
-
-            if (cleanedObj.id) {
-                await updateWorkout(String(cleanedObj.id), cleanedObj);
-                try {
-                    await fetchWorkouts();
-                } catch { }
-                return { ok: true, mode: 'update' };
-            }
-
-            const created = await createWorkout(cleanedObj);
-            try {
-                await fetchWorkouts();
-            } catch { }
-            return { ok: true, mode: 'create', id: created?.ok ? created.data.id : null };
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            return { ok: false, error: msg || 'Falha ao salvar treino' };
-        }
-    }, [fetchWorkouts, normalizeWorkoutForEditor, stripWorkoutInternalKeys]);
-
-    const handleOpenActiveWorkoutEditor = useCallback((options: Record<string, unknown> = {}) => {
-        try {
-            if (!activeSession?.workout) return;
-            const base = normalizeWorkoutForEditor(activeSession.workout);
-            const shouldAddExercise = options && typeof options === 'object' ? !!options.addExercise : false;
-            editActiveAddExerciseRef.current = shouldAddExercise;
-            const nextBase = shouldAddExercise
-                ? {
-                    ...base,
-                    exercises: [
-                        ...(Array.isArray(base?.exercises) ? base.exercises : []),
-                        {
-                            name: '',
-                            sets: 4,
-                            reps: '10',
-                            rpe: '8',
-                            cadence: '2020',
-                            restTime: 60,
-                            method: 'Normal',
-                            videoUrl: '',
-                            notes: ''
-                        }
-                    ]
-                }
-                : base;
-            editActiveBaseRef.current = base;
-            setEditActiveDraft(nextBase);
-            setEditActiveOpen(true);
-        } catch { }
-    }, [activeSession?.workout, normalizeWorkoutForEditor]);
-
-    const handleCloseActiveWorkoutEditor = useCallback(() => {
-        try {
-            setEditActiveOpen(false);
-            setEditActiveDraft(null);
-            editActiveBaseRef.current = null;
-            editActiveAddExerciseRef.current = false;
-        } catch { }
-    }, []);
-
-    const handleSaveActiveWorkoutEditor = useCallback(async (workoutFromEditor: unknown) => {
-        const normalized = normalizeWorkoutForEditor(workoutFromEditor);
-        const cleaned = stripWorkoutInternalKeys(normalized);
-        const shouldDeferPersist = !!editActiveAddExerciseRef.current;
-        const res = shouldDeferPersist ? { deferred: true } : await handleSaveWorkout(cleaned);
-        setActiveSession((prev) => {
-            if (!prev) return prev
-            const oldWorkout = editActiveBaseRef.current || normalizeWorkoutForEditor(prev.workout);
-            const nextLogs = reindexSessionLogsAfterWorkoutEdit(oldWorkout, normalized, prev.logs || {}) as Record<string, unknown>;
-            const baseUi = prev?.ui && typeof prev.ui === 'object' ? (prev.ui as Record<string, unknown>) : {};
-            const nextUi = shouldDeferPersist ? { ...baseUi, pendingTemplateUpdate: true } : baseUi;
-            return { ...prev, workout: normalized as unknown as ActiveSession, logs: nextLogs, ui: nextUi };
-        });
-        editActiveBaseRef.current = normalized;
-        setEditActiveDraft(normalized);
-        return res;
-    }, [handleSaveWorkout, normalizeWorkoutForEditor, reindexSessionLogsAfterWorkoutEdit, stripWorkoutInternalKeys]);
-
-    const handleDeleteWorkout = async (id: string, title: unknown) => {
-        const name = title || (workouts.find(w => w.id === id)?.title) || 'este treino';
-        if (!(await confirm(`Apagar o treino "${name}"?`, "Excluir Treino"))) return;
-        try {
-            const res = await deleteWorkout(id);
-            if (!res?.ok) {
-                await alert("Erro: " + (res?.error || 'Falha ao excluir treino'));
-                return;
-            }
-            await fetchWorkouts();
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert("Erro: " + message);
-        }
-    };
-
-    const handleRestoreWorkout = async (workout: unknown) => {
-        const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
-        const id = String(w?.id || '').trim()
-        if (!id) return
-        const name = w?.title || 'este treino'
-        if (!(await confirm(`Restaurar o treino "${name}"?`, 'Restaurar Treino'))) return
-        try {
-            const res = await setWorkoutArchived(id, false)
-            if (!res?.ok) {
-                await alert('Erro: ' + (res?.error || 'Falha ao restaurar treino'))
-                return
-            }
-            await fetchWorkouts()
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro: ' + message)
-        }
-    }
-
-    const handleDuplicateWorkout = async (workout: unknown) => {
-        const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)
-        if (!(await confirm(`Duplicar "${String(w.title || '')}"?`, "Duplicar Treino"))) return;
-        const newWorkout = { ...w, title: `${String(w.title || '')} (Cópia)` };
-        delete (newWorkout as Record<string, unknown>).id;
-        try {
-            await createWorkout(newWorkout as Record<string, unknown>);
-            await fetchWorkouts();
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert("Erro ao duplicar: " + message);
-        }
-    };
-
-    const handleBulkEditWorkouts = async (items: unknown) => {
-        try {
-            const arr = Array.isArray(items) ? items : []
-            if (!arr.length) return
-            let updatedTitles = 0
-            for (let i = 0; i < arr.length; i += 1) {
-                const it = arr[i]
-                const id = String(it?.id || '').trim()
-                if (!id) continue
-                const w = workouts.find((x) => String(x?.id || '') === id)
-                if (!w) continue
-
-                const desiredTitle = String(it?.title || '').trim() || String(w?.title || 'Treino')
-                if (desiredTitle !== String(w?.title || '')) {
-                    const r = await updateWorkout(id, { title: desiredTitle, notes: w?.notes ?? '', exercises: Array.isArray(w?.exercises) ? w.exercises : [] })
-                    if (!r?.ok) throw new Error(String(r?.error || 'Falha ao renomear treino'))
-                    updatedTitles += 1
-                }
-            }
-
-            let sortSaved = true
-            let sortError = ''
-            const sortIds = arr.map((it) => String(it?.id || '').trim()).filter(Boolean)
-            const r2 = await setWorkoutSortOrder(sortIds)
-            if (!r2?.ok) {
-                sortSaved = false
-                sortError = String(r2?.error || 'Falha ao ordenar treinos')
-            }
-
-            await fetchWorkouts()
-
-            if (!sortSaved) {
-                const suffix = sortError ? `\n\n${sortError}` : ''
-                await alert(`Lista salva parcialmente: a ordenação não foi aplicada.${suffix}`)
-                return
-            }
-
-            if (updatedTitles) {
-                await alert(`Lista salva: ${updatedTitles} título(s) atualizado(s).`)
-            } else {
-                await alert('Lista salva.')
-            }
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao salvar lista: ' + message)
-        }
-    }
-
-    const handleNormalizeAiWorkoutTitles = async () => {
-        try {
-            const list = Array.isArray(workouts) ? workouts : []
-            const candidates = list
-                .map((w) => {
-                    const title = String(w?.title || '').trim()
-                    const m = title.match(/\(\s*dia\s*(\d+)\s*\)/i)
-                    if (!m?.[1]) return null
-                    const day = Number(m[1])
-                    if (!Number.isFinite(day) || day <= 0) return null
-                    return { workout: w, dayIndex: Math.floor(day - 1) }
-                })
-                .filter(Boolean)
-            if (!candidates.length) {
-                await alert('Nenhum treino no formato antigo “(Dia X)” foi encontrado.')
-                return
-            }
-            if (!(await confirm(`Padronizar nomes de ${candidates.length} treinos gerados automaticamente?`, 'Padronizar nomes'))) return
-
-            let changed = 0
-            for (const item of candidates) {
-                if (!item) continue
-                const w = item.workout
-                const idx = item.dayIndex
-                const id = String(w?.id || '').trim()
-                if (!id) continue
-                const oldTitle = String(w?.title || '').trim()
-                const nextTitle = formatProgramWorkoutTitle(oldTitle, idx, { startDay: userSettingsApi?.settings?.programTitleStartDay })
-                if (!nextTitle || nextTitle === oldTitle) continue
-                const res = await updateWorkout(id, { title: nextTitle, notes: w?.notes ?? '', exercises: Array.isArray(w?.exercises) ? w.exercises : [] })
-                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao renomear treino'))
-                changed += 1
-            }
-            try {
-                await fetchWorkouts()
-            } catch { }
-            await alert(`Padronização concluída: ${changed} treinos atualizados.`)
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao padronizar nomes: ' + message)
-        }
-    }
-
-    const handleApplyTitleRule = async () => {
-        try {
-            const list = Array.isArray(workouts) ? workouts : []
-            if (!list.length) {
-                await alert('Nenhum treino encontrado.')
-                return
-            }
-            if (!(await confirm(`Padronizar títulos de ${list.length} treinos com A/B/C... e dia da semana?`, 'Padronizar títulos'))) return
-            let updated = 0
-            for (let i = 0; i < list.length; i += 1) {
-                const w = list[i]
-                const id = String(w?.id || '').trim()
-                if (!id) continue
-                const oldTitle = String(w?.title || '').trim()
-                const nextTitle = formatProgramWorkoutTitle(oldTitle || 'Treino', i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
-                if (!nextTitle || nextTitle === oldTitle) continue
-                const res = await updateWorkout(id, {
-                    title: nextTitle,
-                    notes: w?.notes ?? '',
-                    exercises: Array.isArray(w?.exercises) ? w.exercises : [],
-                })
-                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao renomear treino'))
-                updated += 1
-            }
-            try {
-                await fetchWorkouts()
-            } catch { }
-            await alert(`Padronização concluída: ${updated} treinos atualizados.`)
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao padronizar títulos: ' + message)
-        }
-    }
-
-    const handleNormalizeExercises = async () => {
-        try {
-            const list = Array.isArray(workouts) ? workouts : []
-            const candidates = list
-                .map((w) => {
-                    const exercises: Array<Record<string, unknown>> = Array.isArray(w?.exercises) ? (w.exercises as unknown[]).filter(isRecord) : []
-                    let changesCount = 0
-                    const nextExercises = exercises.map((ex: Record<string, unknown>) => {
-                        const name = String(ex?.name ?? '').trim()
-                        if (!name) return ex
-                        const info = resolveCanonicalExerciseName(name)
-                        if (!info?.changed || !info?.canonical) return ex
-                        changesCount += 1
-                        return { ...ex, name: info.canonical }
-                    })
-                    if (!changesCount) return null
-                    return { workout: w, nextExercises, changesCount }
-                })
-                .filter(Boolean)
-
-            if (!candidates.length) {
-                await alert('Nenhum exercício para normalizar foi encontrado.')
-                return
-            }
-            if (!(await confirm(`Normalizar exercícios em ${candidates.length} treinos?`, 'Normalizar exercícios'))) return
-
-            let updated = 0
-            const updatedWorkouts: Array<{ title: string; changesCount: number }> = [];
-            for (const item of candidates) {
-                if (!item) continue
-                const w = item.workout
-                const id = String(w?.id || '').trim()
-                if (!id) continue
-                const title = String(w?.title || '').trim() || `Treino ${id.slice(0, 8)}`
-                const notes = w?.notes ?? ''
-                const res = await updateWorkout(id, { title, notes, exercises: item.nextExercises })
-                if (!res?.ok) throw new Error(String(res?.error || 'Falha ao atualizar treino'))
-                updated += 1
-                updatedWorkouts.push({ title, changesCount: Number(item?.changesCount || 0) })
-            }
-            try {
-                await fetchWorkouts()
-            } catch { }
-            const lines = updatedWorkouts
-                .slice(0, 10)
-                .map((it) => `• ${it.title}${it.changesCount ? ` (${it.changesCount} exercício(s))` : ''}`)
-                .join('\n')
-            const more = updatedWorkouts.length > 10 ? `\n(+${updatedWorkouts.length - 10} outros)` : ''
-            const detail = lines ? `\n\nTreinos atualizados:\n${lines}${more}` : ''
-            await alert(`Normalização concluída: ${updated} treinos atualizados.${detail}`)
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao normalizar exercícios: ' + message)
-        }
     }
 
     if (authLoading) return <LoadingScreen />;
