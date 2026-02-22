@@ -141,7 +141,7 @@ export async function POST(req: Request) {
     const baseUrl = resolveBaseUrl(req)
     const idDigits = onlyDigits(cpfCnpj)
     const idType = idDigits.length === 14 ? 'CNPJ' : 'CPF'
-    const payment = await mercadopagoRequest<any>({
+    const payment = await mercadopagoRequest<Record<string, unknown>>({
       method: 'POST',
       path: '/v1/payments',
       body: {
@@ -159,7 +159,8 @@ export async function POST(req: Request) {
     })
 
     const providerPaymentId = String(payment?.id || '').trim()
-    const tx = payment?.point_of_interaction?.transaction_data || {}
+    const pointOfInteraction = (payment?.point_of_interaction || {}) as Record<string, unknown>
+    const tx = (pointOfInteraction?.transaction_data || {}) as Record<string, unknown>
     const pixQrCode = tx?.qr_code_base64 ? String(tx.qr_code_base64) : null
     const pixPayload = tx?.qr_code ? String(tx.qr_code) : null
     const invoiceUrl = tx?.ticket_url ? String(tx.ticket_url) : null
