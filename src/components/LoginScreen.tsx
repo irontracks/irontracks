@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar } from 'lucide-react';
-import { APP_VERSION } from '@/lib/version';
 import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
@@ -25,7 +24,7 @@ if (typeof window !== 'undefined') {
 
 const LoginScreen = () => {
     const router = useRouter();
-    const appVersionLabel = useMemo(() => (Capacitor.getPlatform() === 'ios' ? 'v1.0' : APP_VERSION), []);
+    const appVersionLabel = useMemo(() => 'v1..0', []);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0);
