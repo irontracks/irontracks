@@ -79,15 +79,15 @@ export default function VipPeriodizationPanel({
   onOpenWorkoutEditor,
 }: {
   locked: boolean
-  onStartSession: (workout: unknown) => void
-  onOpenWorkoutEditor?: (workout: unknown) => void
+  onStartSession: (workout: Record<string, unknown>) => void
+  onOpenWorkoutEditor?: (workout: Record<string, unknown>) => void
 }) {
   const supabase = useMemo(() => createClient(), [])
   const isLocked = !!locked
 
   const [loading, setLoading] = useState(false)
-  const [program, setProgram] = useState<any | null>(null)
-  const [schedule, setSchedule] = useState<unknown[]>([])
+  const [program, setProgram] = useState<Record<string, unknown> | null>(null)
+  const [schedule, setSchedule] = useState<Record<string, unknown>[]>([])
   const [stats, setStats] = useState<WeeklyStat[]>([])
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')

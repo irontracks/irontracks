@@ -15,6 +15,7 @@ import {
   ArrowRight,
   AlertCircle 
 } from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
 
 import { AssessmentFormData, isValidGender } from '@/types/assessment';
 import { useAssessment } from '@/hooks/useAssessment';
@@ -37,12 +38,17 @@ interface FormStep {
   id: string;
   title: string;
   description: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  icon: React.ComponentType<any>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  component: React.ComponentType<any>;
+  icon: React.ComponentType<LucideProps>;
+  component: React.ComponentType<AssessmentStepProps>;
   required: boolean;
 }
+
+type AssessmentStepProps = {
+  formData: AssessmentFormData;
+  updateFormData: (updates: Partial<AssessmentFormData>) => void;
+  errors: Record<string, string>;
+  studentName: string;
+};
 
 const buildDefaultFormData = (): AssessmentFormData => ({
   assessment_date: new Date().toISOString().split('T')[0],

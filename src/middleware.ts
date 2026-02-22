@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
+import { applySecurityHeaders, buildCspHeader } from '@/utils/security/headers'
 
 /**
  * Middleware global do IronTracks.
@@ -38,57 +39,21 @@ const isPublicPath = (pathname: string): boolean => {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
-/** Headers de segurança aplicados em todas as respostas */
-function applySecurityHeaders(response: NextResponse): NextResponse {
-  // Impede clickjacking
-  response.headers.set('X-Frame-Options', 'DENY')
-  // Impede MIME-type sniffing
-  response.headers.set('X-Content-Type-Options', 'nosniff')
-  // Proteção XSS legada
-  response.headers.set('X-XSS-Protection', '1; mode=block')
-  // Controla referrer
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  // Restringe features sensíveis do browser
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=self, microphone=self, geolocation=(), payment=()',
-  )
-
-  // Content Security Policy
-  const isDev = process.env.NODE_ENV === 'development'
-  const scriptSrc = isDev
-    ? "'self' 'unsafe-inline' 'unsafe-eval'"
-    : "'self' 'unsafe-inline'"
-
-  response.headers.set(
-    'Content-Security-Policy',
-    [
-      `default-src 'self'`,
-      `script-src ${scriptSrc}`,
-      `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-      `font-src 'self' https://fonts.gstatic.com data:`,
-      `img-src 'self' data: blob: https://*.googleusercontent.com https://*.supabase.co https://*.supabase.in https://i.ytimg.com https://img.youtube.com`,
-      `media-src 'self' blob: https://*.supabase.co https://*.supabase.in`,
-      `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://generativelanguage.googleapis.com https://api.mercadopago.com https://www.googleapis.com`,
-      `frame-src 'none'`,
-      `object-src 'none'`,
-      `base-uri 'self'`,
-      `form-action 'self'`,
-    ].join('; '),
-  )
-
-  return response
-}
-
 export async function middleware(request: NextRequest) {
-  // Sempre atualiza a sessão Supabase (necessário para SSR funcionar)
-  const response = await updateSession(request)
+  const nonce = crypto.randomUUID()
+  const isDev = process.env.NODE_ENV === 'development'
+  const csp = buildCspHeader(nonce, isDev)
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('content-security-policy', csp)
+  requestHeaders.set('x-nonce', nonce)
+
+  const response = await updateSession(request, requestHeaders)
 
   const { pathname } = request.nextUrl
 
   // Rotas públicas: deixa passar sem verificar autenticação
   if (isPublicPath(pathname)) {
-    return applySecurityHeaders(response)
+    return applySecurityHeaders(response, nonce, isDev)
   }
 
   // Rotas de API privadas: verifica cookie de sessão
@@ -98,12 +63,22 @@ export async function middleware(request: NextRequest) {
       return name.startsWith('sb-') && name.includes('auth-token')
     })
 
-    if (!hasAuthCookie) {
+    const hasBearer = (() => {
+      try {
+        const auth = String(request.headers.get('authorization') || '').trim()
+        if (!auth) return false
+        return /^Bearer\s+\S+$/i.test(auth)
+      } catch {
+        return false
+      }
+    })()
+
+    if (!hasAuthCookie && !hasBearer) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
   }
 
-  return applySecurityHeaders(response)
+  return applySecurityHeaders(response, nonce, isDev)
 }
 
 export const config = {

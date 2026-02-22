@@ -5,7 +5,6 @@ import { resolveRoleByUser } from '@/utils/auth/route'
 
 type SP = Record<string, string | string[] | undefined>
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const hydrateWorkouts = async (supabase: Awaited<ReturnType<typeof import('@/utils/supabase/server').createClient>>, rows: unknown[]) => {
   const base = (Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []) as Record<string, unknown>[]
   const workoutIds = base.map((w) => (w as Record<string, unknown>)?.id).filter(Boolean)

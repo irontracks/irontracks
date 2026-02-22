@@ -5,7 +5,7 @@ import crypto from 'crypto'
 import { parseJsonBody } from '@/utils/zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getVipPlanLimits } from '@/utils/vip/limits'
+import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { errorResponse } from '@/utils/api'
@@ -187,9 +187,12 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response
 
     const userId = String(auth.user.id || '').trim()
-    const limits = await getVipPlanLimits(auth.supabase, userId)
-    if (limits.tier === 'free') {
-      return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
+    const access = await checkVipFeatureAccess(auth.supabase, userId, 'wizard_weekly')
+    if (!access.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de gerações do Wizard atingido. Faça upgrade para continuar.' },
+        { status: 403 },
+      )
     }
 
     const parsed = await parseJsonBody(req, BodySchema)

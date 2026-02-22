@@ -67,9 +67,19 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
   // Load VIP Status
   useEffect(() => {
-    fetch('/api/vip/status').then(r => r.json()).then(data => {
-      if (data.ok) setVipStatus(data)
-    }).catch(() => { })
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/vip/status', { credentials: 'include', cache: 'no-store' })
+        const data = await res.json().catch(() => null) as Record<string, unknown> | null
+        if (cancelled) return
+        if (data && typeof data === 'object' && data.ok) setVipStatus(data as VipStatus)
+      } catch {
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const [threadId, setThreadId] = useState('')
@@ -292,8 +302,18 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         <div className="text-xs font-bold text-neutral-400">
           IA Diária: <span className={isClose ? 'text-red-400' : 'text-white'}>{current}/{limit}</span>
         </div>
-        <div className="w-16 h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-          <div className={`h-full rounded-full ${isClose ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${pct}%` }} />
+        <div className="w-16 h-1.5">
+          <svg className="w-full h-1.5" viewBox="0 0 100 6" preserveAspectRatio="none">
+            <rect x="0" y="0" width="100" height="6" rx="3" fill="#27272a" />
+            <rect
+              x="0"
+              y="0"
+              width={pct}
+              height="6"
+              rx="3"
+              fill={isClose ? '#ef4444' : '#22c55e'}
+            />
+          </svg>
         </div>
         {isClose && !hideVipCtas && (
           <button

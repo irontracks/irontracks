@@ -42,7 +42,7 @@ export default function WorkoutCalendarModal(props: Props) {
   const [view, setView] = useState<'month' | 'week'>('month')
   const [cursor, setCursor] = useState(() => startOfDay(new Date()))
   const [loading, setLoading] = useState(false)
-  const [rows, setRows] = useState<any[]>([])
+  const [rows, setRows] = useState<Record<string, unknown>[]>([])
   const [checkinsByWorkoutId, setCheckinsByWorkoutId] = useState<Record<string, { pre: boolean; post: boolean }>>({})
   const [selectedDayIso, setSelectedDayIso] = useState(() => toIsoDate(new Date()))
 
@@ -136,7 +136,7 @@ export default function WorkoutCalendarModal(props: Props) {
   }, [isOpen, uid, range.end, range.start])
 
   const workoutsByDayIso = useMemo(() => {
-    const map = new Map<string, any[]>()
+    const map = new Map<string, Record<string, unknown>[]>()
     for (const w of Array.isArray(rows) ? rows : []) {
       const d = w?.date ? new Date(String(w.date)) : null
       if (!d || Number.isNaN(d.getTime())) continue
@@ -322,4 +322,3 @@ export default function WorkoutCalendarModal(props: Props) {
     </div>
   )
 }
-

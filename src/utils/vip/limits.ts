@@ -8,6 +8,7 @@ export type VipTierLimits = {
   insights_weekly: number // New limit
   history_days: number | null // null = unlimited
   nutrition_macros: boolean
+  analytics: boolean
   offline: boolean
   chef_ai: boolean
 }
@@ -31,9 +32,10 @@ export type VipPlanResult = {
 export const FREE_LIMITS: VipTierLimits = {
   chat_daily: 0,
   wizard_weekly: 0,
-  insights_weekly: 1, // 1 per week for Free
+  insights_weekly: 0,
   history_days: 30,
   nutrition_macros: false,
+  analytics: false,
   offline: false,
   chef_ai: false
 }
@@ -45,8 +47,99 @@ export const UNLIMITED_LIMITS: VipTierLimits = {
   insights_weekly: 9999,
   history_days: null,
   nutrition_macros: true,
+  analytics: true,
   offline: true,
   chef_ai: true
+}
+
+const normalizePlanId = (raw: unknown) => {
+  try {
+    const base = String(raw || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '_')
+    if (!base) return ''
+    const match = base.match(/^vip_(start|pro|elite)(?:_(monthly|month|mensal|annual|year|yearly|anual))?$/)
+    if (match) return `vip_${match[1]}`
+    return base
+  } catch {
+    return ''
+  }
+}
+
+const applyTierDefaults = (tier: string, limits: VipTierLimits) => {
+  try {
+    const normalized = normalizePlanId(tier)
+    if (normalized === 'vip_elite') {
+      return { ...limits, nutrition_macros: true, analytics: true, offline: true, chef_ai: true }
+    }
+    if (normalized === 'vip_pro') {
+      return { ...limits, offline: true }
+    }
+    return limits
+  } catch {
+    return limits
+  }
+}
+
+const capNumber = (value: unknown, max: number) => {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return max
+  return Math.min(n, max)
+}
+
+const capHistory = (value: unknown, max: number) => {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return max
+  return Math.min(n, max)
+}
+
+const applyTierCaps = (tier: string, limits: VipTierLimits) => {
+  try {
+    const normalized = normalizePlanId(tier)
+    if (normalized === 'vip_start') {
+      return {
+        ...limits,
+        chat_daily: capNumber(limits.chat_daily, 10),
+        insights_weekly: capNumber(limits.insights_weekly, 3),
+        wizard_weekly: capNumber(limits.wizard_weekly, 1),
+        history_days: capHistory(limits.history_days, 60),
+        nutrition_macros: false,
+        analytics: false,
+        offline: false,
+        chef_ai: false,
+      }
+    }
+    if (normalized === 'vip_pro') {
+      return {
+        ...limits,
+        chat_daily: capNumber(limits.chat_daily, 40),
+        insights_weekly: capNumber(limits.insights_weekly, 7),
+        wizard_weekly: capNumber(limits.wizard_weekly, 3),
+        history_days: null,
+        nutrition_macros: true,
+        analytics: false,
+        offline: true,
+        chef_ai: false,
+      }
+    }
+    if (normalized === 'vip_elite') {
+      return {
+        ...limits,
+        chat_daily: capNumber(limits.chat_daily, 9999),
+        insights_weekly: capNumber(limits.insights_weekly, 9999),
+        wizard_weekly: capNumber(limits.wizard_weekly, 9999),
+        history_days: null,
+        nutrition_macros: true,
+        analytics: true,
+        offline: true,
+        chef_ai: true,
+      }
+    }
+    return limits
+  } catch {
+    return limits
+  }
 }
 
 export async function getVipPlanLimits(supabase: SupabaseClient, userId: string): Promise<VipPlanResult> {
@@ -80,9 +173,10 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
   if (ent?.id) {
     const override = ent?.limits_override && typeof ent.limits_override === 'object' ? ent.limits_override : null
     if (override && Object.keys(override).length > 0) {
+      const tier = normalizePlanId(ent.plan_id || 'custom') || String(ent.plan_id || 'custom')
       return {
-        tier: String(ent.plan_id || 'custom'),
-        limits: { ...FREE_LIMITS, ...(override as Record<string, unknown>) },
+        tier,
+        limits: applyTierCaps(tier, applyTierDefaults(tier, { ...FREE_LIMITS, ...(override as Record<string, unknown>) } as VipTierLimits)),
         source: 'entitlement_table',
         debug: {
           entitlement_id: ent.id || null,
@@ -95,11 +189,12 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     }
 
     if (ent?.plan_id) {
+      const tier = normalizePlanId(ent.plan_id) || String(ent.plan_id || '')
       const limits = await fetchPlanLimits(supabase, ent.plan_id)
       if (limits) {
         return {
-          tier: ent.plan_id,
-          limits,
+          tier,
+          limits: applyTierCaps(tier, applyTierDefaults(tier, limits)),
           source: 'entitlement_table',
           debug: { entitlement_id: ent.id || null, entitlement_status: ent.status || null },
         }
@@ -132,11 +227,12 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     .maybeSingle()
 
   if (appSub?.plan_id) {
+    const tier = normalizePlanId(appSub.plan_id) || String(appSub.plan_id || '')
     const limits = await fetchPlanLimits(supabase, appSub.plan_id)
     if (limits) {
       return {
-        tier: appSub.plan_id,
-        limits,
+        tier,
+        limits: applyTierCaps(tier, applyTierDefaults(tier, limits)),
         source: 'app_subscription',
         debug: { app_subscription_id: appSub.id || null, app_subscription_status: appSub.status || null },
       }
@@ -160,21 +256,23 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
 }
 
 async function fetchPlanLimits(supabase: SupabaseClient, planId: string): Promise<VipTierLimits | null> {
-  // Normalize planId (remove _annual suffix to match base plan limits if needed, 
-  // though we inserted annual plans with limits too)
-  
-  const { data: plan } = await supabase
-    .from('app_plans')
-    .select('limits')
-    .eq('id', planId)
-    .single()
-
-  if (plan?.limits) {
-    // Merge with defaults to ensure all keys exist
-    return { ...FREE_LIMITS, ...plan.limits }
+  try {
+    const normalized = normalizePlanId(planId)
+    const ids = normalized && normalized !== planId ? [planId, normalized] : [planId]
+    for (const id of ids) {
+      const { data: plan } = await supabase
+        .from('app_plans')
+        .select('limits')
+        .eq('id', id)
+        .maybeSingle()
+      if (plan?.limits) {
+        return { ...FREE_LIMITS, ...(plan.limits as Record<string, unknown>) } as VipTierLimits
+      }
+    }
+    return null
+  } catch {
+    return null
   }
-  
-  return null
 }
 
 export async function checkVipFeatureAccess(
@@ -183,6 +281,19 @@ export async function checkVipFeatureAccess(
   feature: keyof VipTierLimits
 ): Promise<{ allowed: boolean, currentUsage: number, limit: number | null, tier: string }> {
   const { tier, limits } = await getVipPlanLimits(supabase, userId)
+  const normalizedTier = normalizePlanId(tier)
+  if (feature === 'chef_ai' && normalizedTier !== 'vip_elite') {
+    return { allowed: false, currentUsage: 0, limit: 0, tier }
+  }
+  if (feature === 'analytics' && normalizedTier !== 'vip_elite') {
+    return { allowed: false, currentUsage: 0, limit: 0, tier }
+  }
+  if (feature === 'nutrition_macros' && normalizedTier !== 'vip_pro' && normalizedTier !== 'vip_elite') {
+    return { allowed: false, currentUsage: 0, limit: 0, tier }
+  }
+  if (feature === 'offline' && normalizedTier !== 'vip_pro' && normalizedTier !== 'vip_elite') {
+    return { allowed: false, currentUsage: 0, limit: 0, tier }
+  }
   const limit = limits[feature]
 
   // Boolean features (macros, offline, chef_ai)

@@ -150,6 +150,11 @@ interface ManualExercise {
     [key: string]: unknown;
 }
 
+type NewWorkoutState = {
+    title: string;
+    exercises: ManualExercise[];
+};
+
 type PeriodReport = { type: 'week' | 'month'; stats: PeriodStats };
 type PeriodAiState = { status: 'idle' | 'loading' | 'ready' | 'error'; ai: Record<string, unknown> | null; error: string };
 type PeriodPdfState = { status: 'idle' | 'loading' | 'ready' | 'error'; url: string | null; blob: Blob | null; error: string };
@@ -187,7 +192,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     const weeklyReportCtaEnabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.weeklyReportCTA), [settings]);
     const [availableWorkouts, setAvailableWorkouts] = useState<WorkoutTemplate[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<WorkoutTemplate | null>(null);
-    const [newWorkout, setNewWorkout] = useState<Record<string, any>>({ title: '', exercises: [] });
+    const [newWorkout, setNewWorkout] = useState<NewWorkoutState>({ title: '', exercises: [] });
     const [manualExercises, setManualExercises] = useState<ManualExercise[]>([]);
     const [showEdit, setShowEdit] = useState(false);
     const [selectedSession, setSelectedSession] = useState<Record<string, unknown> | null>(null);
@@ -563,7 +568,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             }
         };
         loadHistory();
-    }, [supabase, user?.id, targetId, targetEmail]);
+    }, [supabase, user?.id, user?.role, targetId, targetEmail, safeUserEmail, safeUserId, setHistory, setLoading]);
 
     const saveManualExisting = async () => {
         try {

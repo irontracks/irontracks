@@ -13,10 +13,8 @@ let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' };
 let SignInWithApple: { authorize: (opts: { clientId: string; scopes: string }) => Promise<{ response: { identityToken: string } }> } | null = null;
 if (typeof window !== 'undefined') {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const cap = require('@capacitor/core');
         if (cap?.Capacitor) Capacitor = cap.Capacitor;
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const appleSignIn = require('@capacitor-community/apple-sign-in');
         if (appleSignIn?.SignInWithApple) SignInWithApple = appleSignIn.SignInWithApple;
     } catch {}

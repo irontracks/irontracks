@@ -630,7 +630,7 @@ export default function StudentDashboard(props: Props) {
 
       {props.view === 'dashboard' && showStoriesBar ? <StoriesBar currentUserId={props.currentUserId} /> : null}
 
-      <div style={{ minHeight: `${TABS_BAR_MIN_HEIGHT_PX}px` }}>
+      <div className="min-h-[60px]">
         <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
           <div className="bg-neutral-900/70 backdrop-blur-md border border-neutral-800/70 rounded-2xl p-1 shadow-lg shadow-black/30">
             <div data-tour="tabs" className="bg-neutral-800 border border-neutral-700 rounded-xl p-1 flex gap-1">

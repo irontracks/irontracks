@@ -58,7 +58,7 @@ function Meter({
   const pct = clamp01(ratio)
   const pctValue = Math.round(pct * PERCENT_SCALE)
   const clipping = safeGoal > 0 && ratio > 1
-  const barClass = clipping ? 'bg-red-500/70' : 'bg-yellow-500/80'
+  const barColor = clipping ? '#ef4444' : '#facc15'
 
   return (
     <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800 p-4 shadow-[0_8px_24px_rgba(0,0,0,0.35)] ring-1 ring-neutral-800/70">
@@ -78,8 +78,11 @@ function Meter({
         {Math.round(safeValue)}
         <span className="text-neutral-500">/{Math.round(safeGoal || 0)}{unit}</span>
       </div>
-      <div className="mt-3 h-1.5 rounded-full bg-neutral-800/70 overflow-hidden">
-        <div className={`h-full ${barClass}`} style={{ width: `${pctValue}%` }} />
+      <div className="mt-3 h-1.5">
+        <svg className="w-full h-1.5" viewBox="0 0 100 6" preserveAspectRatio="none">
+          <rect x="0" y="0" width="100" height="6" rx="3" fill="#27272a" />
+          <rect x="0" y="0" width={pctValue} height="6" rx="3" fill={barColor} />
+        </svg>
       </div>
     </div>
   )
@@ -147,7 +150,7 @@ export default function NutritionMixer({
   const calorieRatio = safeGoals.calories > 0 ? safeNumber(totals?.calories) / safeGoals.calories : 0
   const caloriePct = Math.round(clamp01(calorieRatio) * PERCENT_SCALE)
   const calorieClipping = safeGoals.calories > 0 && calorieRatio > 1
-  const calorieBarClass = calorieClipping ? 'bg-red-500/70' : 'bg-yellow-500/80'
+  const calorieBarColor = calorieClipping ? '#ef4444' : '#facc15'
   const calorieStatusLabel = calorieClipping ? 'Acima da meta' : 'Dentro da meta'
   const calorieStatusClass = calorieClipping
     ? 'text-red-200 bg-red-500/10 border-red-500/20'
@@ -443,8 +446,11 @@ export default function NutritionMixer({
               {caloriePct}%
             </span>
           </div>
-          <div className="mt-2 h-1.5 rounded-full bg-neutral-800/70 overflow-hidden">
-            <div className={`h-full ${calorieBarClass}`} style={{ width: `${caloriePct}%` }} />
+          <div className="mt-2 h-1.5">
+            <svg className="w-full h-1.5" viewBox="0 0 100 6" preserveAspectRatio="none">
+              <rect x="0" y="0" width="100" height="6" rx="3" fill="#27272a" />
+              <rect x="0" y="0" width={caloriePct} height="6" rx="3" fill={calorieBarColor} />
+            </svg>
           </div>
         </div>
 

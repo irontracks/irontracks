@@ -40,6 +40,18 @@ const TIER_LABELS: Record<string, string> = {
     vip_pro: 'VIP Pro',
     vip_elite: 'VIP Elite'
 };
+const TIER_DOT_CLASS: Record<string, string> = {
+    free: 'bg-gray-400',
+    vip_start: 'bg-yellow-500',
+    vip_pro: 'bg-green-500',
+    vip_elite: 'bg-purple-500',
+};
+const TIER_TEXT_CLASS: Record<string, string> = {
+    free: 'text-gray-300',
+    vip_start: 'text-yellow-400',
+    vip_pro: 'text-green-400',
+    vip_elite: 'text-purple-400',
+};
 
 interface VipStatsRow {
     tier: string;
@@ -300,19 +312,26 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                             {stats.map((row) => (
                                 <tr key={row.tier} className="hover:bg-neutral-800/50 transition-colors">
                                     <td className="px-6 py-4 font-bold flex items-center gap-2">
-                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: TIER_COLORS[row.tier] || '#fff' }} />
-                                        <span style={{ color: TIER_COLORS[row.tier] || '#fff' }}>{TIER_LABELS[row.tier] || row.tier}</span>
+                                        <div className={`w-3 h-3 rounded-full ${TIER_DOT_CLASS[row.tier] || 'bg-white'}`} />
+                                        <span className={TIER_TEXT_CLASS[row.tier] || 'text-white'}>{TIER_LABELS[row.tier] || row.tier}</span>
                                     </td>
                                     <td className="px-6 py-4 text-center font-mono text-white">{row.user_count}</td>
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex flex-col items-center">
                                             <span className="font-bold text-white">{row.stats.chat.usage.toLocaleString()}</span>
                                             <span className="text-xs text-neutral-500">de {row.stats.chat.capacity.toLocaleString()}</span>
-                                            <div className="w-16 h-1 bg-neutral-800 rounded-full mt-1 overflow-hidden">
-                                                <div 
-                                                    className="h-full bg-blue-500" 
-                                                    style={{ width: `${Math.min(100, (row.stats.chat.usage / (row.stats.chat.capacity || 1)) * 100)}%` }} 
-                                                />
+                                            <div className="w-16 h-1 mt-1">
+                                                <svg className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
+                                                    <rect x="0" y="0" width="100" height="4" rx="2" fill="#27272a" />
+                                                    <rect
+                                                        x="0"
+                                                        y="0"
+                                                        width={Math.min(100, (row.stats.chat.usage / (row.stats.chat.capacity || 1)) * 100)}
+                                                        height="4"
+                                                        rx="2"
+                                                        fill="#3b82f6"
+                                                    />
+                                                </svg>
                                             </div>
                                         </div>
                                     </td>
@@ -320,11 +339,18 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                         <div className="flex flex-col items-center">
                                             <span className="font-bold text-white">{row.stats.insights.usage.toLocaleString()}</span>
                                             <span className="text-xs text-neutral-500">de {row.stats.insights.capacity.toLocaleString()}</span>
-                                            <div className="w-16 h-1 bg-neutral-800 rounded-full mt-1 overflow-hidden">
-                                                <div 
-                                                    className="h-full bg-orange-500" 
-                                                    style={{ width: `${Math.min(100, (row.stats.insights.usage / (row.stats.insights.capacity || 1)) * 100)}%` }} 
-                                                />
+                                            <div className="w-16 h-1 mt-1">
+                                                <svg className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
+                                                    <rect x="0" y="0" width="100" height="4" rx="2" fill="#27272a" />
+                                                    <rect
+                                                        x="0"
+                                                        y="0"
+                                                        width={Math.min(100, (row.stats.insights.usage / (row.stats.insights.capacity || 1)) * 100)}
+                                                        height="4"
+                                                        rx="2"
+                                                        fill="#f97316"
+                                                    />
+                                                </svg>
                                             </div>
                                         </div>
                                     </td>

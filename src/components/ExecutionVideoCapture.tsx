@@ -350,11 +350,18 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
       />
       {uploading ? (
         <div className="mt-1 w-full flex items-center gap-2">
-          <div className="flex-1 h-1 rounded-full bg-neutral-800 overflow-hidden">
-            <div
-              className="h-full bg-yellow-500 transition-[width]"
-              style={{ width: `${Math.round((processing ? progress : 1) * 100)}%` }}
-            />
+          <div className="flex-1 h-1">
+            <svg className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
+              <rect x="0" y="0" width="100" height="4" rx="2" fill="#27272a" />
+              <rect
+                x="0"
+                y="0"
+                width={Math.round((processing ? progress : 1) * 100)}
+                height="4"
+                rx="2"
+                fill="#facc15"
+              />
+            </svg>
           </div>
           <span className="text-[10px] text-neutral-400">
             {processing ? 'Montando vídeo' : 'Enviando vídeo'}

@@ -47,7 +47,7 @@ function buildCloseUpdateSettings(
   return {
     ...prevSettings,
     whatsNewLastSeenId: String(entryId),
-    whatsNewLastSeenAt: expect.any(Number), // timestamp
+    whatsNewLastSeenAt: Date.now(),
   }
 }
 
@@ -189,6 +189,7 @@ describe('buildCloseUpdateSettings', () => {
   it('define whatsNewLastSeenId', () => {
     const result = buildCloseUpdateSettings({}, 'entry-42')
     expect(result.whatsNewLastSeenId).toBe('entry-42')
+    expect(typeof result.whatsNewLastSeenAt).toBe('number')
   })
 
   it('converte id numérico para string', () => {
