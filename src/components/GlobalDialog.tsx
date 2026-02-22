@@ -6,7 +6,7 @@ import { AlertCircle, HelpCircle, X, MessageSquare } from 'lucide-react';
 
 const GlobalDialog = () => {
 	const { dialog, closeDialog } = useDialog();
-	const inputRef = useRef<any>(null);
+	const inputRef = useRef<HTMLInputElement | null>(null);
 
 	useEffect(() => {
 		if (dialog?.type === 'prompt') {

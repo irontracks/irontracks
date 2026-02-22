@@ -37,7 +37,9 @@ interface FormStep {
   id: string;
   title: string;
   description: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: React.ComponentType<any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   component: React.ComponentType<any>;
   required: boolean;
 }
