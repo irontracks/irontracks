@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs .",
     "test:unit": "vitest run",
-    "test:smoke": "tsx scripts/delete-teacher-cascade.test.ts && tsx scripts/vip-entitlement.test.ts && tsx scripts/admin-routes-smoke.test.ts && tsx scripts/auth-origin-smoke.test.ts && tsx scripts/no-duplicate-style-files.test.ts && tsx scripts/vip-endpoints-no-dup.test.ts && tsx scripts/no-direct-req-json.test.ts && tsx scripts/workouts-history-enforcement.test.ts && tsx scripts/finish-payload-smoke.test.ts",
+    "test:smoke": "tsx scripts/delete-teacher-cascade.test.ts && tsx scripts/vip-entitlement.test.ts && tsx scripts/admin-routes-smoke.test.ts && tsx scripts/auth-origin-smoke.test.ts && tsx scripts/no-duplicate-style-files.test.ts && tsx scripts/vip-endpoints-no-dup.test.ts && tsx scripts/no-direct-req-json.test.ts && tsx scripts/workouts-history-enforcement.test.ts && tsx scripts/finish-payload-smoke.test.ts && tsx scripts/critical-flow-smoke.test.ts",
     "flags:report": "NODE_NO_WARNINGS=1 tsx scripts/feature-flags-report.ts",
     "deploy": "echo '⛔️ PARE! O deploy agora é automático via GitHub. Faça commit e push na main.' && exit 1",
     "e2e:deload": "tsx scripts/e2e/deload.e2e.ts",

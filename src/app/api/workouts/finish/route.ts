@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { safeRecord } from '@/utils/guards'
 
 const parseTrainingNumberOrZero = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(String(v || '').replace(',', '.'))
@@ -97,9 +98,21 @@ const computeWorkoutStreak = (dateRows: unknown[]) => {
   return streak
 }
 
+const SessionSchema = z
+  .object({
+    workoutTitle: z.unknown().optional(),
+    workout_title: z.unknown().optional(),
+    date: z.unknown().optional(),
+    exercises: z.array(z.unknown()).optional(),
+    logs: z.record(z.unknown()).optional(),
+    idempotencyKey: z.unknown().optional(),
+    finishIdempotencyKey: z.unknown().optional(),
+  })
+  .passthrough()
+
 const BodySchema = z
   .object({
-    session: z.unknown(),
+    session: SessionSchema,
     idempotencyKey: z.string().optional(),
   })
   .strip()
@@ -121,8 +134,8 @@ export async function POST(request: Request) {
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data as Record<string, unknown>
     const session = (body as Record<string, unknown>)?.session
-    if (!session) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
-    const sessionObj = session && typeof session === 'object' ? (session as Record<string, unknown>) : ({} as Record<string, unknown>)
+    const sessionObj = safeRecord(session)
+    if (!Object.keys(sessionObj).length) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
     const idempotencyKey = String((body as Record<string, unknown>)?.idempotencyKey || sessionObj?.idempotencyKey || sessionObj?.finishIdempotencyKey || '').trim()
     const reqId =
       (() => {

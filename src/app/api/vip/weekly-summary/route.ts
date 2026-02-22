@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
-import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +104,10 @@ export async function GET() {
 
   const access = await checkVipFeatureAccess(supabase, user.id, 'analytics')
   if (!access.allowed) {
+    return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
+  }
+  const plan = await getVipPlanLimits(supabase, user.id)
+  if (!plan?.limits?.analytics) {
     return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
   }
 

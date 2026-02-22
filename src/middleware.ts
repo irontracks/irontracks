@@ -76,6 +76,24 @@ export async function middleware(request: NextRequest) {
     if (!hasAuthCookie && !hasBearer) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
+
+    const shouldCheckCsrf = !hasBearer && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String(request.method || '').toUpperCase())
+    if (shouldCheckCsrf) {
+      try {
+        const origin = String(request.headers.get('origin') || '').trim()
+        const referer = String(request.headers.get('referer') || '').trim()
+        const expected = request.nextUrl.origin
+        const isSameOrigin = (value: string) => {
+          if (!value) return true
+          return value.startsWith(expected)
+        }
+        if ((origin && !isSameOrigin(origin)) || (!origin && referer && !isSameOrigin(referer))) {
+          return NextResponse.json({ ok: false, error: 'invalid_origin' }, { status: 403 })
+        }
+      } catch {
+        return NextResponse.json({ ok: false, error: 'invalid_origin' }, { status: 403 })
+      }
+    }
   }
 
   return applySecurityHeaders(response, nonce, isDev)

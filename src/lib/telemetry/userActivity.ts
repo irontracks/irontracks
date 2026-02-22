@@ -130,6 +130,9 @@ export async function flushUserEvents() {
 async function flush({ preferBeacon }: { preferBeacon: boolean }) {
   try {
     if (typeof window === 'undefined') return
+    try {
+      if (navigator && 'onLine' in navigator && navigator.onLine === false) return
+    } catch {}
     if (flushing) return
     flushing = true
 

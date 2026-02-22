@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest'
 import { parseExt, guessMediaKind, extFromMime, mediaKindFromUrl } from '../mediaUtils'
 
 describe('mediaUtils', () => {

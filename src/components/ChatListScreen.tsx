@@ -19,6 +19,13 @@ interface ChatUser {
     [key: string]: unknown;
 }
 
+interface ProfilePresenceRow {
+    id?: string | number | null;
+    display_name?: string | null;
+    photo_url?: string | null;
+    last_seen?: string | null;
+}
+
 interface ChatListScreenProps {
     user: { id: string | number } | null;
     onClose: () => void;
@@ -63,7 +70,6 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
             setUsers((data || []) as ChatUser[]);
         } catch (error) {
             logError('error', 'Erro ao carregar contatos:', error);
-            // @ts-ignore
             const msg = getErrorMessage(error) || String(error || '');
             await alert('Erro ao carregar contatos: ' + msg);
         } finally {
@@ -77,8 +83,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
             .channel('profiles_presence_list')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
                 try {
-                    const p = payload?.new && typeof payload.new === 'object' ? payload.new : null
-                    // @ts-ignore
+                    const p = payload?.new && typeof payload.new === 'object' ? (payload.new as ProfilePresenceRow) : null
                     const pid = p?.id ? String(p.id) : ''
                     if (!pid) return
                     setUsers((prev) => {
@@ -88,12 +93,9 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                         const next = [...safePrev]
                         next[idx] = {
                             ...next[idx],
-                            // @ts-ignore
-                            display_name: p?.display_name,
-                            // @ts-ignore
-                            photo_url: p?.photo_url,
-                            // @ts-ignore
-                            last_seen: p?.last_seen,
+                            display_name: p?.display_name ?? null,
+                            photo_url: p?.photo_url ?? null,
+                            last_seen: p?.last_seen ?? null,
                         }
                         return next
                     })
@@ -148,7 +150,6 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
             }
         } catch (e) {
             logError('error', 'Erro ao abrir conversa:', e);
-            // @ts-ignore
             const msg = getErrorMessage(e) || String(e || '');
             await alert('Erro ao abrir conversa: ' + msg);
         }
