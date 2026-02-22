@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
+import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
@@ -160,8 +161,12 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
-
+    const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
+    const access = await checkVipFeatureAccess(supabase, userId, 'analytics')
+    if (!access.allowed) {
+      return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
+    }
     const admin = createAdminClient()
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)

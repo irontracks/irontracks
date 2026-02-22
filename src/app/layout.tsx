@@ -2,6 +2,7 @@ import "./globals.css";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import type { ReactNode } from 'react';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { headers } from 'next/headers'
 
 export const metadata = {
   title: "IronTracks - Alta Performance",
@@ -50,7 +51,11 @@ export const viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const dynamic = 'force-dynamic'
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const headersList = await headers()
+  const nonce = headersList?.get ? (headersList.get('x-nonce') || '') : ''
   const inlineScript = process.env.NODE_ENV === "production" ? `(() => {
   const now = () => Date.now();
   const ss = () => {
@@ -302,6 +307,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="apple-touch-icon" href="/icone.png" />
         {inlineScript ? (
           <script
+            nonce={nonce || undefined}
             dangerouslySetInnerHTML={{
               __html: inlineScript,
             }}

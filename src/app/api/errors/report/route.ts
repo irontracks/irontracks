@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,12 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const ip = getRequestIp(request)
+    const rl = await checkRateLimitAsync(`errors:report:${user.id}:${ip}`, 30, 60_000)
+    if (!rl.allowed) {
+      return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+    }
 
     const parsedBody = await parseJsonBody(request, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response

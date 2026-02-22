@@ -19,6 +19,16 @@ const FILTERS = [
 
 const EMOJIS = ['🔥', '💪', '🏋️', '💯', '🥵', '🚀', '😤', '💧', '🥗', '🥩', '🍗', '🛑', '✅', '❌', '⚠️', '💤', '❤️', '👏'];
 const COLORS = ['#FFFFFF', '#000000', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', '#EC4899'];
+const COLOR_CLASS_MAP: Record<string, string> = {
+  '#FFFFFF': 'bg-white',
+  '#000000': 'bg-black',
+  '#EF4444': 'bg-red-500',
+  '#F59E0B': 'bg-amber-500',
+  '#10B981': 'bg-emerald-500',
+  '#3B82F6': 'bg-blue-500',
+  '#8B5CF6': 'bg-violet-500',
+  '#EC4899': 'bg-pink-500',
+};
 
 const MAX_VIDEO_SECONDS = 60;
 const PHOTO_SECONDS = 15;
@@ -319,7 +329,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
           canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('blob_failed'))), 'image/jpeg', 0.9)
         );
         fileToUpload = new File([blob], `story_${Date.now()}.jpg`, { type: 'image/jpeg' });
-        metadata.processed = true; // Flag to skip server processing if any
+        metadata.processed = true;
       }
 
       if (mediaType === 'video' && fileToUpload.size > MAX_VIDEO_BYTES) {
@@ -469,7 +479,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                             dragMomentum={false}
                             dragConstraints={containerRef}
                             onDragEnd={(e, info) => handleDragEnd(ov.id, info)}
-                            className="absolute pointer-events-auto cursor-move select-none active:scale-110 transition-transform"
+                            className="absolute pointer-events-auto cursor-move select-none active:scale-110 transition-transform font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
                             style={{ 
                                 left: `${ov.x}%`, 
                                 top: `${ov.y}%`,
@@ -477,8 +487,6 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                 y: '-50%', // Center anchor
                                 fontSize: ov.type === 'text' ? '24px' : '48px',
                                 color: ov.type === 'text' ? ov.color : undefined,
-                                textShadow: '0px 2px 4px rgba(0,0,0,0.5)',
-                                fontWeight: 'bold'
                             }}
                             onClick={() => { /* Optional: Edit on click */ }} 
                         >
@@ -512,8 +520,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     <button 
                                         key={c}
                                         onClick={() => setTextColor(c)}
-                                        className={`w-8 h-8 rounded-full border-2 ${textColor === c ? 'border-white scale-110' : 'border-transparent'}`}
-                                        style={{ backgroundColor: c }}
+                                        className={`w-8 h-8 rounded-full border-2 ${textColor === c ? 'border-white scale-110' : 'border-transparent'} ${COLOR_CLASS_MAP[c] || 'bg-white'}`}
                                     />
                                 ))}
                             </div>
@@ -650,8 +657,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                             }
                                         }
                                     }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                    style={{ pointerEvents: trimRange.start > videoDuration / 2 ? 'none' : 'auto' }} // Hack to prevent overlap blocking
+                                    className={`absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 ${trimRange.start > videoDuration / 2 ? 'pointer-events-none' : 'pointer-events-auto'}`}
                                 />
                                 
                                 {/* End Slider (Invisible but clickable) */}
@@ -673,8 +679,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                             }
                                         }
                                     }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                    style={{ pointerEvents: trimRange.end < videoDuration / 2 ? 'none' : 'auto' }}
+                                    className={`absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 ${trimRange.end < videoDuration / 2 ? 'pointer-events-none' : 'pointer-events-auto'}`}
                                 />
 
                                 {/* Thumbs Visuals (since inputs are hidden) */}

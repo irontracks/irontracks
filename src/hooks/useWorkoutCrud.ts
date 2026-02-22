@@ -225,7 +225,6 @@ export function useWorkoutCrud({
     }, [
         alert,
         confirm,
-        inAppNotify,
         persistExerciseVideoUrls,
         requestPreWorkoutCheckin,
         resolveExerciseVideos,
@@ -328,7 +327,7 @@ export function useWorkoutCrud({
             const msg = e instanceof Error ? e.message : String(e || 'Falha ao salvar treino')
             return { ok: false, error: msg }
         }
-    }, [currentWorkout, user]) as (workoutToSave?: unknown) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown> }>
+    }, [currentWorkout, setCurrentWorkout, user]) as (workoutToSave?: unknown) => Promise<{ ok: boolean; error?: string; data?: Record<string, unknown> }>
 
     const handlePersistWorkoutTemplateFromSession = useCallback(async (workoutFromSession: unknown) => {
         try {

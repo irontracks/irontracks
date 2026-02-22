@@ -1,23 +1,19 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
+import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import VipAnalyticsClient from './vip-analytics-client'
 
-import NutritionConsoleShell from '@/components/dashboard/nutrition/NutritionConsoleShell'
-import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
-import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
+export default async function VipAnalyticsPage() {
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    const userId = String(data?.user?.id || '').trim()
+    if (!userId) redirect('/')
+    const access = await checkVipFeatureAccess(supabase, userId, 'analytics')
+    if (!access.allowed) redirect('/marketplace')
+  } catch {
+    redirect('/')
+  }
 
-export default function VipAnalyticsPage() {
-  return (
-    <NutritionConsoleShell title="Analytics" subtitle="Performance">
-      <div className="space-y-4">
-        <div className="rounded-3xl bg-neutral-900/85 border border-neutral-800 p-5 shadow-[0_18px_45px_rgba(0,0,0,0.5)] ring-1 ring-neutral-800/70">
-          <div className="text-[10px] uppercase tracking-[0.24em] text-neutral-400">Analytics</div>
-          <div className="mt-2 text-sm font-semibold text-white">Resumo e insights</div>
-          <div className="mt-1 text-xs text-neutral-400">Acompanhe consistência, padrões e recomendações.</div>
-        </div>
-
-        <VipWeeklySummaryCard />
-        <VipInsightsPanel />
-      </div>
-    </NutritionConsoleShell>
-  )
+  return <VipAnalyticsClient />
 }
-

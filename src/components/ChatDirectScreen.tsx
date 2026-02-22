@@ -155,7 +155,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         } catch (error) {
             logError('error', 'Erro ao carregar usuário:', error);
         }
-    }, [resolvedOtherUserId, supabase]);
+    }, [resolvedOtherUserId, resolvedOtherUserName, supabase]);
 
     const getOrCreateChannel = useCallback(async () => {
         try {

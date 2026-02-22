@@ -404,7 +404,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         return () => {
             cancelled = true;
         };
-    }, [supabase, user?.id, inAppNotify]);
+    }, [supabase, user?.id, inAppNotify, setActiveSession, setView, suppressForeignFinishToastUntilRef]);
 
     useEffect(() => {
         const userId = user?.id ? String(user.id) : '';
@@ -477,7 +477,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 } catch { }
             }
         };
-    }, [supabase, user?.id, inAppNotify]);
+    }, [supabase, user?.id, inAppNotify, setActiveSession, setView, suppressForeignFinishToastUntilRef]);
 
     useEffect(() => {
         const handler = () => { try { unlockAudio(); } catch { } };
@@ -487,7 +487,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             document.removeEventListener('touchstart', handler);
             document.removeEventListener('click', handler);
         };
-    }, [supabase, alert, clearClientSessionState]);
+    }, []);
 
     // View + activeSession persistence — handled by useLocalPersistence hook above
 
@@ -591,13 +591,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 if (timerId) clearTimeout(timerId);
             } catch { }
         };
-    }, [activeSession, supabase, user?.id, inAppNotify]);
+    }, [activeSession, supabase, user?.id, inAppNotify, setActiveSession, setView]);
 
     useEffect(() => {
         if (!activeSession) return;
         const id = setInterval(() => setSessionTicker(Date.now()), 1000);
         return () => clearInterval(id);
-    }, [activeSession, view]);
+    }, [activeSession, view, setSessionTicker]);
 
     // Notification + DM badge useEffects — handled by useUnreadBadges hook above
 
@@ -721,7 +721,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         return () => {
             cancelled = true;
         };
-    }, [user?.id]);
+    }, [user?.id, setIsCoach, setStats, setUser, setWorkouts]);
 
     // fetchWorkouts, workouts, stats, studentFolders — handled by useWorkoutFetch hook above
     // streakStats fetch is handled by useWorkoutStreak hook above

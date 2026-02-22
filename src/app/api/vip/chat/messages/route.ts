@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
-import { getVipPlanLimits } from '@/utils/vip/limits'
+import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
@@ -52,6 +52,13 @@ export async function POST(req: Request) {
 
   const entitlement = await getVipPlanLimits(supabase, user.id)
   if (entitlement.tier === 'free') return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
+  const access = await checkVipFeatureAccess(supabase, user.id, 'chat_daily')
+  if (!access.allowed) {
+    return NextResponse.json(
+      { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de mensagens atingido. Faça upgrade para continuar.' },
+      { status: 403 },
+    )
+  }
 
   try {
     const parsedBody = await parseJsonBody(req, PostBodySchema)

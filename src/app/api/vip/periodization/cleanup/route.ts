@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
-import { getVipPlanLimits } from '@/utils/vip/limits'
+import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -12,9 +12,9 @@ export async function POST() {
     if (!auth.ok) return auth.response
 
     const userId = String(auth.user.id || '').trim()
-    const limits = await getVipPlanLimits(auth.supabase, userId)
-    if (limits.tier === 'free') {
-      return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
+    const access = await checkVipFeatureAccess(auth.supabase, userId, 'wizard_weekly')
+    if (!access.allowed) {
+      return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
     }
 
     const admin = createAdminClient()
@@ -65,4 +65,3 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }
-

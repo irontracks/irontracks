@@ -539,15 +539,15 @@ export default function MuscleMapCard(props: Props) {
           <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-black uppercase tracking-widest">
             <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
               <div className="text-neutral-500">Baixo</div>
-              <div className="h-2 rounded-full mt-1" style={{ background: '#1f2937' }} />
+              <div className="h-2 rounded-full mt-1 bg-[#1f2937]" />
             </div>
             <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
               <div className="text-neutral-500">Na meta</div>
-              <div className="h-2 rounded-full mt-1" style={{ background: '#f59e0b' }} />
+              <div className="h-2 rounded-full mt-1 bg-[#f59e0b]" />
             </div>
             <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
               <div className="text-neutral-500">Alto</div>
-              <div className="h-2 rounded-full mt-1" style={{ background: '#ef4444' }} />
+              <div className="h-2 rounded-full mt-1 bg-[#ef4444]" />
             </div>
           </div>
         </motion.div>
@@ -567,11 +567,18 @@ export default function MuscleMapCard(props: Props) {
                   <div className="text-white font-black">{String(selectedInfo.label ?? "")}</div>
                   <div className="text-xs font-black text-neutral-300">{selectedInfo.sets.toLocaleString('pt-BR')} sets</div>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-neutral-800 overflow-hidden">
-                  <div
-                    className="h-2 rounded-full"
-                    style={{ width: `${Math.min(100, Math.max(0, selectedInfo.ratio * 100))}%`, background: selectedInfo.color }}
-                  />
+                <div className="mt-2 h-2">
+                  <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
+                    <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
+                    <rect
+                      x="0"
+                      y="0"
+                      width={Math.min(100, Math.max(0, selectedInfo.ratio * 100))}
+                      height="8"
+                      rx="4"
+                      fill={selectedInfo.color}
+                    />
+                  </svg>
                 </div>
                 <div className="mt-2 text-xs text-neutral-400">
                   Meta sugerida: {String(selectedInfo.minSets ?? "")}–{String(selectedInfo.maxSets ?? "")} sets/semana
@@ -658,11 +665,18 @@ export default function MuscleMapCard(props: Props) {
                       <div className="text-sm font-black text-neutral-100">{m.label}</div>
                       <div className="text-xs font-black text-neutral-400">{Number(m.sets || 0).toLocaleString('pt-BR')}</div>
                     </div>
-                    <div className="mt-2 h-2 rounded-full bg-neutral-800 overflow-hidden">
-                      <div
-                        className="h-2 rounded-full"
-                        style={{ width: `${Math.min(100, Math.max(0, Number(state.data?.muscles?.[m.id]?.ratio || 0) * 100))}%`, background: state.data?.muscles?.[m.id]?.color || '#1f2937' }}
-                      />
+                    <div className="mt-2 h-2">
+                      <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
+                        <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
+                        <rect
+                          x="0"
+                          y="0"
+                          width={Math.min(100, Math.max(0, Number(state.data?.muscles?.[m.id]?.ratio || 0) * 100))}
+                          height="8"
+                          rx="4"
+                          fill={state.data?.muscles?.[m.id]?.color || '#1f2937'}
+                        />
+                      </svg>
                     </div>
                   </button>
                 ))}
@@ -684,7 +698,9 @@ export default function MuscleMapCard(props: Props) {
               <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400">{m.label}</div>
               <div className="mt-1 flex items-center justify-between gap-2">
                 <div className="text-sm font-black text-neutral-100">{Number(state.data?.muscles?.[m.id]?.sets || 0).toLocaleString('pt-BR')}</div>
-                <div className="w-3 h-3 rounded-full" style={{ background: state.data?.muscles?.[m.id]?.color || '#111827' }} />
+                <svg className="w-3 h-3" viewBox="0 0 12 12">
+                  <circle cx="6" cy="6" r="6" fill={state.data?.muscles?.[m.id]?.color || '#111827'} />
+                </svg>
               </div>
             </button>
           ))}

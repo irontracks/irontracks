@@ -458,10 +458,16 @@ export default function StoryViewer({
           <div className="flex gap-1 mb-2">
             {stories.map((s, i) => (
               <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
-                <div
-                  className="h-full bg-white/90 transition-all duration-100 ease-linear"
-                  style={{ width: `${Math.round((i < idx ? 1 : i === idx ? progress : 0) * 100)}%` }}
-                />
+                <svg className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
+                  <rect
+                    x="0"
+                    y="0"
+                    width={Math.round((i < idx ? 1 : i === idx ? progress : 0) * 100)}
+                    height="4"
+                    rx="2"
+                    fill="rgba(255,255,255,0.9)"
+                  />
+                </svg>
               </div>
             ))}
           </div>

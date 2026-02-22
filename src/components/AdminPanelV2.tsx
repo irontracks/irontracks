@@ -273,7 +273,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         };
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [moreTabsOpen]);
+    }, [moreTabsOpen, setMoreTabsOpen]);
 
     const normalizeText = useCallback((value: unknown) => String(value || '').toLowerCase(), []);
 
@@ -298,11 +298,11 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
 
     useEffect(() => {
         if (!selectedStudent) setHistoryOpen(false);
-    }, [selectedStudent]);
+    }, [selectedStudent, setHistoryOpen]);
 
     useEffect(() => {
         if (selectedStudent) setSelectedTeacher(null);
-    }, [selectedStudent]);
+    }, [selectedStudent, setSelectedTeacher]);
 
     const handleExportSystem = async () => {
         try {
@@ -611,7 +611,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             } finally { setLoading(false); }
         };
         fetchStudents();
-    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, teachersList.length, getAdminAuthHeaders]);
+    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, teachersList.length, getAdminAuthHeaders, setLoading, setUsersList, setTeachersList]);
 
     useEffect(() => {
         if (tab === 'teachers' && isAdmin) {
@@ -651,7 +651,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             };
             fetchTeachers();
         }
-    }, [tab, isAdmin, addingTeacher, editingTeacher, supabase, getAdminAuthHeaders]);
+    }, [tab, isAdmin, addingTeacher, editingTeacher, supabase, getAdminAuthHeaders, setTeachersList]);
 
     // loadTeacher* + effects — moved to useAdminPanelController
 
@@ -664,7 +664,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         if (t && ['dashboard', 'students', 'teachers', 'templates', 'videos', 'broadcast', 'system'].includes(t)) {
             setTab(t);
         }
-    }, []);
+    }, [setTab]);
 
     useEffect(() => {
         if (typeof window === 'undefined') return;
@@ -763,7 +763,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             }
         };
         fetchTemplates();
-    }, [tab, isAdmin, isTeacher, supabase, getAdminAuthHeaders]);
+    }, [tab, isAdmin, isTeacher, supabase, getAdminAuthHeaders, setTemplates]);
 
     useEffect(() => {
         if (tab !== 'videos' || !isAdmin) return;
@@ -848,7 +848,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         };
         fetchVideos();
         fetchMissing();
-    }, [tab, isAdmin, supabase]);
+    }, [tab, isAdmin, supabase, setVideoLoading, setVideoMissingCount, setVideoMissingLoading, setVideoQueue]);
 
     useEffect(() => {
         if (tab !== 'errors' || !isAdmin) return;
@@ -877,7 +877,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         return () => {
             cancelled = true;
         };
-    }, [tab, isAdmin, supabase]);
+    }, [tab, isAdmin, supabase, setErrorReports, setErrorsLoading]);
 
     useEffect(() => {
         if (tab !== 'system' || !isAdmin) return;
@@ -914,7 +914,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         return () => {
             cancelled = true;
         };
-    }, [tab, isAdmin, supabase]);
+    }, [tab, isAdmin, supabase, setExerciseAliasesError, setExerciseAliasesLoading, setExerciseAliasesReview]);
 
     // fetchMyWorkoutsCount effect removed — myWorkoutsCount managed by ctrl (DashboardTab uses it via context)
 
@@ -1077,7 +1077,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             setLoading(false);
         };
         fetchDetails();
-    }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher, getAdminAuthHeaders]);
+    }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher, getAdminAuthHeaders, loadedStudentInfo, setAssessments, setLoading, setSelectedStudent, setStudentWorkouts, setSyncedWorkouts, setTemplates]);
 
     useEffect(() => {
         if (!executionVideoEnabled) return;
@@ -1113,7 +1113,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         return () => {
             cancelled = true;
         };
-    }, [executionVideoEnabled, selectedStudent, subTab]);
+    }, [executionVideoEnabled, selectedStudent, subTab, setExecutionVideos, setExecutionVideosError, setExecutionVideosLoading]);
 
     useEffect(() => {
         if (!selectedStudent) return;
@@ -1159,7 +1159,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         return () => {
             cancelled = true;
         };
-    }, [selectedStudent, subTab, studentCheckinsFilter, studentCheckinsRange, supabase]);
+    }, [selectedStudent, subTab, studentCheckinsFilter, studentCheckinsRange, supabase, setStudentCheckinsError, setStudentCheckinsLoading, setStudentCheckinsRows]);
 
     // Ensure teachers list available when viewing a student (for assignment)
     useEffect(() => {
@@ -1205,7 +1205,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
             } catch { }
         };
         loadTeachers();
-    }, [selectedStudent, isAdmin, supabase, getAdminAuthHeaders]);
+    }, [selectedStudent, isAdmin, supabase, getAdminAuthHeaders, setTeachersList]);
 
     // handleRegisterStudent — from ctrl
 
@@ -1898,7 +1898,12 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                             const json: UnknownRecord = await res.json().catch(() => ({} as UnknownRecord));
                                                             if (json.ok) {
                                                                 const debugObj: UnknownRecord | null = json.debug && typeof json.debug === 'object' ? (json.debug as UnknownRecord) : null;
-                                                                const resolvedTargetUserId = String(debugObj?.targetUserId || selectedStudent.user_id || '').trim();
+                                                                const selectedUserId = String((selectedStudent as UnknownRecord | null)?.user_id || '').trim();
+                                                                const resolvedTargetUserId = String(debugObj?.targetUserId || selectedUserId || '').trim();
+                                                                if (!resolvedTargetUserId) {
+                                                                    await alert('Não foi possível resolver o user_id do aluno para sincronizar.');
+                                                                    return;
+                                                                }
                                                                 // Se rota retorna vazio, reforçar fetch direto por OR user_id/student_id
                                                                 let rows: UnknownRecord[] = Array.isArray(json.rows) ? (json.rows as UnknownRecord[]) : [];
                                                                 if (rows.length === 0) {

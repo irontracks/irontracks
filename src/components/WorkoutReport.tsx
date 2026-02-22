@@ -223,6 +223,7 @@ const computeMatchKey = (s: unknown): { originId: string | null; titleKey: strin
 };
 
 const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings, onUpgrade }: WorkoutReportProps) => {
+    const safeSession = session && typeof session === 'object' ? (session as AnyObj) : null;
     const reportRef = useRef<HTMLDivElement | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [showExportMenu, setShowExportMenu] = useState(false);
@@ -933,11 +934,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     const handleDownloadJson = () => {
         try {
-            const payload = session || {};
+            const payload = safeSession || {};
             const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(payload, null, 2))}`;
             const link = document.createElement('a');
             link.href = jsonString;
-            const baseName = (session.workoutTitle || 'Treino');
+            const baseName = String(safeSession?.workoutTitle || 'Treino');
             link.download = `${baseName}_${new Date().toISOString()}.json`;
             document.body.appendChild(link);
             link.click();
@@ -947,7 +948,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         }
     };
 
-    const teamMeta = session.teamMeta && typeof session.teamMeta === 'object' ? (session.teamMeta as AnyObj) : null;
+    const teamMeta = safeSession?.teamMeta && typeof safeSession.teamMeta === 'object' ? (safeSession.teamMeta as AnyObj) : null;
     const rawParticipants = teamMeta && Array.isArray(teamMeta.participants) ? (teamMeta.participants as unknown[]) : [];
     const currentUserId = user?.id || user?.uid || null;
     const partners = rawParticipants.filter((p: unknown) => {
@@ -958,6 +959,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     });
 
     const isTeamSession = partners.length > 0;
+    const exercisesList = Array.isArray(safeSession?.exercises) ? (safeSession.exercises as unknown[]) : [];
     const preCheckin = (() => {
         const local = session?.preCheckin && typeof session.preCheckin === 'object' ? (session.preCheckin as AnyObj) : null;
         const db = checkinsByKind?.pre || null;
@@ -1131,7 +1133,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
                         <div className="shrink-0 text-right">
                             <div className="font-mono text-xs font-semibold text-neutral-300">
-                                {formatDate(session.date)}
+                                {formatDate(safeSession?.date)}
                             </div>
                         </div>
                     </div>
@@ -1463,7 +1465,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800 flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Tempo Total</p>
-                        <p className="text-3xl font-mono font-bold">{formatDuration(session.totalTime)}</p>
+                        <p className="text-3xl font-mono font-bold">{formatDuration(safeSession?.totalTime)}</p>
                     </div>
                     <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800 flex flex-col justify-between">
                         <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Volume (Kg)</p>
@@ -1525,12 +1527,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 )}
 
                 <div className="space-y-8">
-                {(!Array.isArray(session?.exercises) || session.exercises.length === 0) && (
+                {exercisesList.length === 0 && (
                     <div className="text-neutral-300 p-4 bg-neutral-900/60 rounded-lg border border-neutral-800">
                         Nenhum dado de exercício registrado para este treino.
                     </div>
                 )}
-                {(Array.isArray(session?.exercises) ? session.exercises : []).map((ex, exIdx) => {
+                {exercisesList.map((ex, exIdx) => {
                     const exName = String(ex?.name || '').trim();
                     const exKey = normalizeExerciseKey(exName);
                     const prevLogs = prevLogsMap[exKey] || [];

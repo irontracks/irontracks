@@ -1,5 +1,6 @@
 import { updateSession } from '@/utils/supabase/middleware'
 import { NextRequest, NextResponse } from 'next/server'
+import { applySecurityHeaders, buildCspHeader } from '@/utils/security/headers'
 
 export async function middleware(request: NextRequest) {
   try {
@@ -10,7 +11,15 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url)
     }
   } catch {}
-  return await updateSession(request)
+  const nonce = crypto.randomUUID()
+  const isDev = process.env.NODE_ENV === 'development'
+  const csp = buildCspHeader(nonce, isDev)
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('content-security-policy', csp)
+  requestHeaders.set('x-nonce', nonce)
+
+  const response = await updateSession(request, requestHeaders)
+  return applySecurityHeaders(response, nonce, isDev)
 }
 
 export const config = {

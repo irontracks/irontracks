@@ -14,7 +14,7 @@ interface UseLocalPersistenceOptions {
  * Persists and restores the current view and active session
  * to/from localStorage, keeping the UI state across page refreshes.
  *
- * - On mount: restores saved view (respecting any active session key)
+ * - On mount: restores saved view (respecting existing active session key)
  * - On view change: saves the current view
  * - On activeSession change: saves or removes the active session payload
  */

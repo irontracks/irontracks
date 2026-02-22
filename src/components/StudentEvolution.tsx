@@ -12,8 +12,8 @@ interface StudentEvolutionProps {
 
 const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
     const [mode, setMode] = useState('simple');
-    const [assessments, setAssessments] = useState<any[]>([]);
-    const [photos, setPhotos] = useState<any[]>([]);
+    const [assessments, setAssessments] = useState<Record<string, unknown>[]>([]);
+    const [photos, setPhotos] = useState<Record<string, unknown>[]>([]);
     const supabase = useMemo(() => createClient(), []);
     const safeUserId = user?.id ? String(user.id) : '';
     

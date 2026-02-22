@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
+    const supabase = auth.supabase
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data as Record<string, unknown>
@@ -43,6 +45,10 @@ export async function POST(req: Request) {
     if (!progression.length) return NextResponse.json({ ok: false, error: 'missing progression' }, { status: 400 })
 
     const userId = String(auth.user.id || '').trim()
+    const entitlement = await getVipPlanLimits(supabase, userId)
+    if (entitlement.tier === 'free') {
+      return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
+    }
     const originWorkoutId = String(session?.originWorkoutId || session?.origin_workout_id || '').trim()
     if (!originWorkoutId) return NextResponse.json({ ok: false, error: 'originWorkoutId missing' }, { status: 400 })
 
