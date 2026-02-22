@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle, Download, Loader2, Lock } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
@@ -197,6 +197,42 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     const [showEdit, setShowEdit] = useState(false);
     const [selectedSession, setSelectedSession] = useState<Record<string, unknown> | null>(null);
     const [editId, setEditId] = useState<string | null>(null);
+    const normalizeEditorWorkout = useCallback((workout: unknown): NewWorkoutState => {
+        const base = isRecord(workout) ? workout : {};
+        const title = String(base?.title || base?.name || '').trim();
+        const exercises = (Array.isArray(base?.exercises) ? base.exercises : []).map((e) => {
+            const row = isRecord(e) ? e : {};
+            return {
+                name: String(row?.name || ''),
+                sets: Number(row?.sets || 0) || 0,
+                reps: String(row?.reps || ''),
+                restTime: Number(row?.restTime ?? row?.rest_time ?? 0) || 0,
+                cadence: String(row?.cadence || ''),
+                notes: String(row?.notes || ''),
+                weights: Array.isArray(row?.weights) ? row.weights.map((v: unknown) => String(v ?? '')) : undefined,
+                repsPerSet: Array.isArray(row?.repsPerSet) ? row.repsPerSet.map((v: unknown) => String(v ?? '')) : undefined,
+            } as ManualExercise;
+        });
+        return { title, exercises };
+    }, []);
+
+    const editorWorkout = useMemo(() => {
+        const exercises = (Array.isArray(newWorkout.exercises) ? newWorkout.exercises : []).map((e) => {
+            const row = (isRecord(e) ? e : {}) as Record<string, unknown>;
+            const rpeRaw = Number(row?.rpe);
+            const rpe = Number.isFinite(rpeRaw) ? rpeRaw : null;
+            return {
+                name: String(row?.name || ''),
+                sets: Number(row?.sets ?? 0) || 0,
+                reps: String(row?.reps ?? ''),
+                rpe,
+                restTime: Number(row?.restTime ?? row?.rest_time ?? 0) || 0,
+                cadence: String(row?.cadence ?? ''),
+                notes: String(row?.notes ?? ''),
+            };
+        });
+        return { title: String(newWorkout.title || ''), exercises };
+    }, [newWorkout]);
     const [editTitle, setEditTitle] = useState('');
     const [editDate, setEditDate] = useState(new Date().toISOString().slice(0, 16));
     const [editDuration, setEditDuration] = useState('45');
@@ -1422,10 +1458,10 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                             {manualTab === 'new' && (
                                 <div>
                                     <ExerciseEditor
-                                        workout={newWorkout}
-                                        onSave={async (w) => setNewWorkout(w)}
+                                        workout={editorWorkout}
+                                        onSave={async (w) => setNewWorkout(normalizeEditorWorkout(w))}
                                         onCancel={() => { }}
-                                        onChange={(w) => setNewWorkout(w)}
+                                        onChange={(w) => setNewWorkout(normalizeEditorWorkout(w))}
                                         onSaved={() => { }}
                                     />
                                 </div>

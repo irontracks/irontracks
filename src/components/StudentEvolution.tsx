@@ -113,11 +113,11 @@ const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
                     {latest ? (
                         <div className="animate-fade-in">
                             <div className="w-48 h-48 rounded-full border-4 border-yellow-500 flex flex-col items-center justify-center mx-auto mb-8 shadow-[0_0_50px_rgba(234,179,8,0.2)] bg-neutral-800">
-                                <span className="text-6xl font-black text-white tracking-tighter">{latest.bf}</span>
+                                <span className="text-6xl font-black text-white tracking-tighter">{String((latest as Record<string, unknown>)?.bf ?? '')}</span>
                                 <span className="text-sm font-bold text-yellow-500 uppercase tracking-widest">% GORDURA</span>
                             </div>
                             <h3 className="text-2xl font-bold text-white mb-2">Resultado Incrível!</h3>
-                            <p className="text-neutral-400 text-sm">Avaliação feita em {formatDate(latest?.date)}</p>
+                            <p className="text-neutral-400 text-sm">Avaliação feita em {formatDate((latest as Record<string, unknown>)?.date as string | number | Date | null)}</p>
                         </div>
                     ) : (
                         <div className="py-20 opacity-50"><Activity size={64} className="mx-auto mb-4"/><p>Ainda sem avaliações.</p></div>
@@ -128,35 +128,40 @@ const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
                 <div className="space-y-6 animate-slide-up">
                         <div className="bg-neutral-800 p-6 rounded-3xl border border-neutral-700">
                         <h3 className="font-bold mb-6 text-yellow-500 text-sm uppercase tracking-widest">Histórico Corporal</h3>
-                        {safeAssessments.map((a, idx) => (
-                            <div key={a?.id ?? `assessment_${idx}`} className="border-b border-neutral-700 py-4 last:border-0">
+                        {safeAssessments.map((a, idx) => {
+                            const obj = (a || {}) as Record<string, unknown>;
+                            const key = String(obj?.id || `assessment_${idx}`);
+                            return (
+                            <div key={key} className="border-b border-neutral-700 py-4 last:border-0">
                                 <div className="flex justify-between items-center mb-2">
-                                    <span className="font-mono text-neutral-400">{formatDate(a?.date)}</span>
-                                    <div className="text-right"><span className="font-black text-xl text-white block">{a?.bf ?? '-'}%</span><span className="text-[10px] text-neutral-500 uppercase">Gordura</span></div>
+                                    <span className="font-mono text-neutral-400">{formatDate(obj?.date as string | number | Date | null)}</span>
+                                    <div className="text-right"><span className="font-black text-xl text-white block">{String(obj?.bf ?? '-')}%</span><span className="text-[10px] text-neutral-500 uppercase">Gordura</span></div>
                                 </div>
                                 <div className="grid grid-cols-4 gap-2 text-[10px] text-neutral-400 bg-neutral-900/50 p-2 rounded-lg">
-                                    <div className="text-center"><span className="block font-bold text-white">{a?.weight || '-'}kg</span>Peso</div>
-                                    <div className="text-center"><span className="block font-bold text-white">{a?.waist || '-'}cm</span>Cintura</div>
-                                    <div className="text-center"><span className="block font-bold text-white">{a?.arm || '-'}cm</span>Braço</div>
-                                    <div className="text-center"><span className="block font-bold text-white">{a?.sum7 || '-'}mm</span>Dobras</div>
+                                    <div className="text-center"><span className="block font-bold text-white">{String(obj?.weight || '-')}kg</span>Peso</div>
+                                    <div className="text-center"><span className="block font-bold text-white">{String(obj?.waist || '-')}cm</span>Cintura</div>
+                                    <div className="text-center"><span className="block font-bold text-white">{String(obj?.arm || '-')}cm</span>Braço</div>
+                                    <div className="text-center"><span className="block font-bold text-white">{String(obj?.sum7 || '-')}mm</span>Dobras</div>
                                 </div>
                             </div>
-                        ))}
+                        )})}
                         </div>
                         <div className="bg-neutral-800 p-6 rounded-3xl border border-neutral-700">
                         <h3 className="font-bold mb-6 text-yellow-500 text-sm uppercase tracking-widest">Galeria</h3>
                         {safePhotos.length===0 && <p className="text-neutral-500 text-sm">Nenhuma foto.</p>}
                         <div className="grid grid-cols-2 gap-3">
                             {safePhotos.map((p, idx) => {
-                                const url = typeof p?.url === 'string' ? p.url : '';
+                                const pobj = (p || {}) as Record<string, unknown>;
+                                const url = typeof pobj?.url === 'string' ? (pobj.url as string) : '';
+                                const key = String(pobj?.id || `photo_${idx}`);
                                 return (
-                                    <div key={p?.id ?? `photo_${idx}`} className="aspect-square bg-black rounded-2xl overflow-hidden border border-neutral-700 relative">
+                                    <div key={key} className="aspect-square bg-black rounded-2xl overflow-hidden border border-neutral-700 relative">
                                         {url ? (
                                             <Image src={url} alt="Foto de progresso" fill className="object-cover" sizes="(max-width: 768px) 50vw, 33vw"/>
                                         ) : (
                                             <div className="absolute inset-0 flex items-center justify-center text-neutral-500 text-xs">Sem imagem</div>
                                         )}
-                                        <div className="absolute bottom-0 inset-x-0 bg-black/60 p-2 text-[10px] text-center text-white">{formatDate(p?.date)}</div>
+                                        <div className="absolute bottom-0 inset-x-0 bg-black/60 p-2 text-[10px] text-center text-white">{formatDate(pobj?.date as string | number | Date | null)}</div>
                                     </div>
                                 );
                             })}

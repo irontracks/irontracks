@@ -121,7 +121,7 @@ export default function VipPeriodizationPanel({
         return
       }
       setProgram(json.program || null)
-      setSchedule(Array.isArray(json.workouts) ? json.workouts : [])
+      setSchedule(Array.isArray(json.workouts) ? (json.workouts as unknown[]).filter((w): w is Record<string, unknown> => !!w && typeof w === 'object') : [])
     } catch (e: unknown) {
       setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar periodização.')
     } finally {
@@ -349,9 +349,9 @@ export default function VipPeriodizationPanel({
       {error ? <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</div> : null}
       {success ? <div className="rounded-xl border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-200">{success}</div> : null}
 
-      {program?.config?.overview ? (
+      {program && typeof program === 'object' && program.config && typeof (program as Record<string, unknown>).config === 'object' && (program as Record<string, unknown>).config && (program as Record<string, unknown> & { config?: Record<string, unknown> }).config?.overview ? (
         <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4 whitespace-pre-wrap text-sm text-neutral-200">
-          {String(program.config.overview)}
+          {String(((program as unknown as { config?: Record<string, unknown> }).config?.overview))}
         </div>
       ) : null}
 
