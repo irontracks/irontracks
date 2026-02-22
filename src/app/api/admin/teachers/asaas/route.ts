@@ -203,7 +203,7 @@ export async function POST(req: Request) {
       if (!province) return NextResponse.json({ ok: false, error: 'missing_province' }, { status: 400 })
       if (incomeValue === null || incomeValue <= 0) return NextResponse.json({ ok: false, error: 'missing_income_value' }, { status: 400 })
 
-      const created = await asaasRequest<any>({
+      const created = await asaasRequest<Record<string, unknown>>({
         method: 'POST',
         path: '/accounts',
         body: {

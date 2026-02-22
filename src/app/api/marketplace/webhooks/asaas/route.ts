@@ -20,10 +20,10 @@ const BodySchema = z
     eventType: z.string().optional(),
     id: z.string().optional(),
     eventId: z.string().optional(),
-    payment: z.any().optional(),
+    payment: z.unknown().optional(),
     data: z
       .object({
-        payment: z.any().optional(),
+        payment: z.unknown().optional(),
       })
       .optional(),
   })

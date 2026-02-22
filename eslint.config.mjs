@@ -5,7 +5,7 @@ import tseslint from "typescript-eslint";
 const eslintConfig = defineConfig([
   ...nextVitals,
   {
-    files: ["src/app/auth/**/*.{ts,tsx}", "src/actions/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}", "src/utils/**/*.{ts,tsx}", "src/contexts/**/*.{ts,tsx}"],
+    files: ["src/app/api/**/*.{ts,tsx}", "src/app/auth/**/*.{ts,tsx}", "src/actions/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}", "src/utils/**/*.{ts,tsx}", "src/contexts/**/*.{ts,tsx}"],
     languageOptions: {
       parser: tseslint.parser,
     },

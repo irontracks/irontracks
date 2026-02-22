@@ -49,7 +49,7 @@ export async function GET(req: Request) {
     const views = Array.isArray(viewsRaw) ? viewsRaw : []
     const viewerIds = views.map((r: Record<string, unknown>) => String(r?.viewer_id || '').trim()).filter(Boolean)
 
-    const profileById = new Map<string, any>()
+    const profileById = new Map<string, Record<string, unknown>>()
     if (viewerIds.length) {
       const { data: profilesRaw } = await admin
         .from('profiles')

@@ -99,7 +99,7 @@ export async function POST(req: Request) {
     } catch {}
 
     if (eventType === 'preapproval' || action.startsWith('preapproval.')) {
-      const preapproval = await mercadopagoRequest<any>({
+      const preapproval = await mercadopagoRequest<Record<string, unknown>>({
         method: 'GET',
         path: `/preapproval/${encodeURIComponent(dataId)}`,
       })
@@ -158,7 +158,7 @@ export async function POST(req: Request) {
     }
 
     if (eventType === 'payment' || action.startsWith('payment.')) {
-      const payment = await mercadopagoRequest<any>({
+      const payment = await mercadopagoRequest<Record<string, unknown>>({
         method: 'GET',
         path: `/v1/payments/${encodeURIComponent(dataId)}`,
       })
