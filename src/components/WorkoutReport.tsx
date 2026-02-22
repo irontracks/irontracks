@@ -1533,7 +1533,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     </div>
                 )}
                 {exercisesList.map((ex, exIdx) => {
-                    const exName = String(ex?.name || '').trim();
+                    const obj = (ex && typeof ex === 'object' ? ex as Record<string, unknown> : {}) as Record<string, unknown>;
+                    const exName = String(obj?.name || '').trim();
                     const exKey = normalizeExerciseKey(exName);
                     const prevLogs = prevLogsMap[exKey] || [];
                     const baseMs = prevBaseMsMap[exKey] ?? null;
@@ -1556,9 +1557,15 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                 </h3>
                                 <div className="flex gap-3 text-xs font-mono text-neutral-400">
                                     {baseText && <span>Base: <span className="font-bold text-neutral-100">{baseText}</span></span>}
-                                    {ex?.method && ex.method !== 'Normal' && <span className="text-red-300 font-bold uppercase">{ex.method}</span>}
-                                    {ex?.rpe && <span>RPE: <span className="font-bold text-neutral-100">{ex.rpe}</span></span>}
-                                    <span>Cad: <span className="font-bold text-neutral-100">{ex?.cadence || '-'}</span></span>
+                                    {(() => {
+                                        const m = String((obj?.method ?? '') as string).trim();
+                                        return m && m !== 'Normal' ? <span className="text-red-300 font-bold uppercase">{m}</span> : null;
+                                    })()}
+                                    {(() => {
+                                        const r = obj?.rpe as unknown;
+                                        return r != null && String(r).trim() ? <span>RPE: <span className="font-bold text-neutral-100">{String(r)}</span></span> : null;
+                                    })()}
+                                    <span>Cad: <span className="font-bold text-neutral-100">{String((obj?.cadence ?? '-') as string)}</span></span>
                                 </div>
                             </div>
                             <table className="w-full text-sm">
@@ -1571,7 +1578,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                         </tr>
                                     </thead>
                                     <tbody>
-                                    {Array.from({ length: Number(ex?.sets) || 0 }).map((_, sIdx) => {
+                                    {Array.from({ length: Number((obj?.sets as unknown) ?? 0) || 0 }).map((_, sIdx) => {
                                         const key = `${exIdx}-${sIdx}`;
                                         const log = sessionLogs[key];
                                         const prevLog = Array.isArray(prevLogs) && prevLogs[sIdx] ? prevLogs[sIdx] : null;

@@ -39,7 +39,7 @@ interface FormStep {
   title: string;
   description: string;
   icon: React.ComponentType<LucideProps>;
-  component: React.ComponentType<AssessmentStepProps>;
+  component: React.ComponentType<any>;
   required: boolean;
 }
 
