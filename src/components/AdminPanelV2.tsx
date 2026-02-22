@@ -207,6 +207,22 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         broadcastMsg, setBroadcastMsg,
         broadcastTitle, setBroadcastTitle,
         sendingBroadcast, setSendingBroadcast,
+        // Teacher loaders
+        loadTeacherStudents,
+        loadTeacherTemplates,
+        loadTeacherHistory,
+        loadTeacherInbox,
+        // Priorities
+        fetchPriorities,
+        loadPrioritiesSettings,
+        savePrioritiesSettings,
+        normalizeCoachInboxSettings,
+        // User Activity
+        loadUserActivityUsers,
+        loadUserActivitySummary,
+        loadUserActivityEvents,
+        loadUserActivityErrors,
+        openUserActivityUser,
     } = ctrl;
 
     const unauthorized = !isAdmin && !isTeacher;
@@ -637,96 +653,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         }
     }, [tab, isAdmin, addingTeacher, editingTeacher, supabase, getAdminAuthHeaders]);
 
-    const loadTeacherStudents = useCallback(async (teacher: UnknownRecord) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherStudents([]); return; }
-        setTeacherStudentsLoading(true);
-        try {
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/students?teacher_user_id=${encodeURIComponent(uid)}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) { setTeacherStudents([]); return; }
-            setTeacherStudents(Array.isArray(json.students) ? json.students : []);
-        } finally {
-            setTeacherStudentsLoading(false);
-        }
-    }, [getAdminAuthHeaders]);
-
-    const loadTeacherTemplates = useCallback(async (teacher: UnknownRecord, reset: boolean = false) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); return; }
-        if (reset) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); }
-        setTeacherTemplatesLoading(true);
-        try {
-            const cursor = reset ? '' : String(teacherTemplatesCursor || '');
-            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
-            if (cursor) qs.set('cursor', cursor);
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/workouts/templates?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) return;
-            const rows = Array.isArray(json.rows) ? json.rows : [];
-            setTeacherTemplatesRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
-            setTeacherTemplatesCursor(json.next_cursor || null);
-        } finally {
-            setTeacherTemplatesLoading(false);
-        }
-    }, [teacherTemplatesCursor, getAdminAuthHeaders]);
-
-    const loadTeacherHistory = useCallback(async (teacher: UnknownRecord, reset: boolean = false) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); return; }
-        if (reset) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); }
-        setTeacherHistoryLoading(true);
-        try {
-            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
-            const cur = reset ? null : teacherHistoryCursor;
-            if (cur?.cursor_date) qs.set('cursor_date', String(cur.cursor_date));
-            if (cur?.cursor_created_at) qs.set('cursor_created_at', String(cur.cursor_created_at));
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/workouts/history?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) return;
-            const rows = Array.isArray(json.rows) ? json.rows : [];
-            setTeacherHistoryRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
-            setTeacherHistoryCursor(json.next_cursor || null);
-        } finally {
-            setTeacherHistoryLoading(false);
-        }
-    }, [teacherHistoryCursor, getAdminAuthHeaders]);
-
-    const loadTeacherInbox = useCallback(async (teacher: UnknownRecord) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherInboxItems([]); return; }
-        setTeacherInboxLoading(true);
-        try {
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/inbox?teacher_user_id=${encodeURIComponent(uid)}&limit=80`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) { setTeacherInboxItems([]); return; }
-            setTeacherInboxItems(Array.isArray(json.items) ? json.items : []);
-        } finally {
-            setTeacherInboxLoading(false);
-        }
-    }, [getAdminAuthHeaders]);
-
-    useEffect(() => {
-        if (!selectedTeacher || !isAdmin) return;
-        setTeacherDetailTab('students');
-        setTeacherTemplatesRows([]);
-        setTeacherTemplatesCursor(null);
-        setTeacherHistoryRows([]);
-        setTeacherHistoryCursor(null);
-        setTeacherInboxItems([]);
-        loadTeacherStudents(selectedTeacher).catch(() => { });
-    }, [isAdmin, loadTeacherStudents, selectedTeacher]);
-
-    useEffect(() => {
-        if (!selectedTeacher || !isAdmin) return;
-        if (teacherDetailTab === 'templates' && teacherTemplatesRows.length === 0) loadTeacherTemplates(selectedTeacher, true).catch(() => { });
-        if (teacherDetailTab === 'history' && teacherHistoryRows.length === 0) loadTeacherHistory(selectedTeacher, true).catch(() => { });
-        if (teacherDetailTab === 'inbox' && teacherInboxItems.length === 0) loadTeacherInbox(selectedTeacher).catch(() => { });
-    }, [isAdmin, loadTeacherHistory, loadTeacherInbox, loadTeacherTemplates, selectedTeacher, teacherDetailTab, teacherHistoryRows.length, teacherInboxItems.length, teacherTemplatesRows.length]);
+    // loadTeacher* + effects — moved to useAdminPanelController
 
     // URL Persistence for Tabs (Fixed)
     useEffect(() => {
@@ -991,115 +918,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
 
     // fetchMyWorkoutsCount effect removed — myWorkoutsCount managed by ctrl (DashboardTab uses it via context)
 
-    const fetchPriorities = useCallback(async () => {
-        try {
-            setPrioritiesLoading(true);
-            setPrioritiesError('');
-            const res = await fetch('/api/teacher/inbox/feed?limit=80', { cache: 'no-store', credentials: 'include' });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) {
-                setPrioritiesItems([]);
-                setPrioritiesError(String(json?.error || `Falha ao carregar (${res.status})`));
-                return;
-            }
-            setPrioritiesItems(Array.isArray(json.items) ? json.items : []);
-        } catch (e: unknown) {
-            setPrioritiesItems([]);
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
-            setPrioritiesError(msg || 'Erro ao carregar');
-        } finally {
-            setPrioritiesLoading(false);
-        }
-    }, []);
-
-    const normalizeCoachInboxSettings = useCallback((raw: unknown) => {
-        const s: UnknownRecord = raw && typeof raw === 'object' ? (raw as UnknownRecord) : {};
-        const toInt = (v: unknown, min: number, max: number, fallback: number) => {
-            const n = Number(v);
-            if (!Number.isFinite(n)) return fallback;
-            const x = Math.floor(n);
-            return Math.max(min, Math.min(max, x));
-        };
-        return {
-            churnDays: toInt(s.churnDays, 1, 60, COACH_INBOX_DEFAULTS.churnDays),
-            volumeDropPct: toInt(s.volumeDropPct, 5, 90, COACH_INBOX_DEFAULTS.volumeDropPct),
-            loadSpikePct: toInt(s.loadSpikePct, 10, 300, COACH_INBOX_DEFAULTS.loadSpikePct),
-            minPrev7Volume: toInt(s.minPrev7Volume, 0, 1000000, COACH_INBOX_DEFAULTS.minPrev7Volume),
-            minCurrent7VolumeSpike: toInt(s.minCurrent7VolumeSpike, 0, 1000000, COACH_INBOX_DEFAULTS.minCurrent7VolumeSpike),
-            snoozeDefaultMinutes: toInt(s.snoozeDefaultMinutes, 5, 10080, COACH_INBOX_DEFAULTS.snoozeDefaultMinutes),
-        };
-    }, []);
-
-    const loadPrioritiesSettings = useCallback(async () => {
-        try {
-            setPrioritiesSettingsLoading(true);
-            setPrioritiesSettingsError('');
-            const uid = user?.id ? String(user.id) : '';
-            if (!uid) return;
-            const { data, error } = await supabase
-                .from('user_settings')
-                .select('preferences')
-                .eq('user_id', uid)
-                .maybeSingle();
-            if (error) {
-                const msg = String(getErrorMessage(error) || '');
-                const code = String(error?.code || '');
-                const missing = code === '42P01' || /does not exist/i.test(msg) || /not found/i.test(msg);
-                if (missing) {
-                    prioritiesSettingsPrefRef.current = null;
-                    setPrioritiesSettings({ ...COACH_INBOX_DEFAULTS });
-                    setPrioritiesSettingsError('Tabela user_settings não disponível (migrations pendentes).');
-                    return;
-                }
-                setPrioritiesSettingsError(msg || 'Falha ao carregar configurações.');
-                return;
-            }
-            const prefs: UnknownRecord = data?.preferences && typeof data.preferences === 'object' ? (data.preferences as UnknownRecord) : {};
-            prioritiesSettingsPrefRef.current = prefs;
-            const next = normalizeCoachInboxSettings(prefs.coachInbox);
-            setPrioritiesSettings(next);
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
-            setPrioritiesSettingsError(msg || 'Falha ao carregar configurações.');
-        } finally {
-            setPrioritiesSettingsLoading(false);
-        }
-    }, [normalizeCoachInboxSettings, supabase, user?.id]);
-
-    const savePrioritiesSettings = useCallback(async () => {
-        try {
-            const uid = user?.id ? String(user.id) : '';
-            if (!uid) return false;
-            setPrioritiesSettingsLoading(true);
-            setPrioritiesSettingsError('');
-            const basePrefs = prioritiesSettingsPrefRef.current && typeof prioritiesSettingsPrefRef.current === 'object'
-                ? prioritiesSettingsPrefRef.current
-                : {};
-            const payload = {
-                user_id: uid,
-                preferences: { ...basePrefs, coachInbox: normalizeCoachInboxSettings(prioritiesSettings) },
-                updated_at: new Date().toISOString(),
-            };
-            const { error } = await supabase.from('user_settings').upsert(payload, { onConflict: 'user_id' });
-            if (error) {
-                setPrioritiesSettingsError(String(getErrorMessage(error) || 'Falha ao salvar.'));
-                return false;
-            }
-            prioritiesSettingsPrefRef.current = payload.preferences;
-            return true;
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
-            setPrioritiesSettingsError(msg || 'Falha ao salvar.');
-            return false;
-        } finally {
-            setPrioritiesSettingsLoading(false);
-        }
-    }, [normalizeCoachInboxSettings, prioritiesSettings, supabase, user?.id]);
-
-    useEffect(() => {
-        if (tab !== 'priorities') return;
-        fetchPriorities();
-    }, [tab, fetchPriorities]);
+    // fetchPriorities, normalizeCoachInboxSettings, loadPrioritiesSettings, savePrioritiesSettings + effect — moved to useAdminPanelController
 
     useEffect(() => {
         if (!selectedStudent) return;
@@ -1472,141 +1291,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
 
     // handleSendBroadcast — from ctrl
 
-    const loadUserActivityUsers = useCallback(async ({ q, role }: { q?: unknown; role?: unknown } = {}) => {
-        if (!isAdmin) return;
-        setUserActivityLoading(true);
-        setUserActivityError('');
-        try {
-            const qs = new URLSearchParams();
-            const qq = String(q ?? '').trim();
-            const rr = String(role ?? '').trim();
-            if (qq) qs.set('q', qq);
-            if (rr && rr !== 'all') qs.set('role', rr);
-            qs.set('limit', '200');
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/users?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) {
-                setUserActivityUsers([]);
-                setUserActivityError(String(json?.error || `Falha ao carregar usuários (${res.status})`));
-                return;
-            }
-            setUserActivityUsers(Array.isArray(json?.users) ? json.users : []);
-        } catch (e: unknown) {
-            setUserActivityUsers([]);
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            setUserActivityError(msg);
-        } finally {
-            setUserActivityLoading(false);
-        }
-    }, [isAdmin, getAdminAuthHeaders]);
-
-    const loadUserActivitySummary = useCallback(async ({ userId, days }: { userId?: unknown; days?: unknown } = {}) => {
-        if (!isAdmin) return;
-        const uid = String(userId || '').trim();
-        if (!uid) return;
-        const d = Math.min(90, Math.max(1, Number(days) || 7));
-        setUserActivitySummaryLoading(true);
-        try {
-            const qs = new URLSearchParams({ user_id: uid, days: String(d) });
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/summary?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) {
-                setUserActivitySummary(null);
-                return;
-            }
-            setUserActivitySummary(json);
-        } catch {
-            setUserActivitySummary(null);
-        } finally {
-            setUserActivitySummaryLoading(false);
-        }
-    }, [isAdmin, getAdminAuthHeaders]);
-
-    const loadUserActivityEvents = useCallback(async ({ userId, before, reset = false }: { userId?: unknown; before?: unknown; reset?: boolean } = {}) => {
-        if (!isAdmin) return;
-        const uid = String(userId || '').trim();
-        if (!uid) return;
-        setUserActivityEventsLoading(true);
-        try {
-            const qs = new URLSearchParams({ user_id: uid, limit: '80' });
-            if (before) qs.set('before', String(before));
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/events?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) {
-                if (reset) setUserActivityEvents([]);
-                return;
-            }
-            const list = Array.isArray(json?.events) ? json.events : [];
-            setUserActivityEventsBefore(json?.nextBefore ?? null);
-            setUserActivityEvents((prev) => (reset ? list : [...prev, ...list]));
-        } catch {
-            if (reset) setUserActivityEvents([]);
-        } finally {
-            setUserActivityEventsLoading(false);
-        }
-    }, [isAdmin, getAdminAuthHeaders]);
-
-    const loadUserActivityErrors = useCallback(async ({ userId }: { userId?: unknown } = {}) => {
-        if (!isAdmin) return;
-        const uid = String(userId || '').trim();
-        if (!uid) return;
-        setUserActivityErrorsLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('error_reports')
-                .select('id, created_at, message, pathname, url, status, app_version, source')
-                .eq('user_id', uid)
-                .order('created_at', { ascending: false })
-                .limit(10);
-            if (error) {
-                setUserActivityErrors([]);
-                return;
-            }
-            setUserActivityErrors(Array.isArray(data) ? data : []);
-        } catch {
-            setUserActivityErrors([]);
-        } finally {
-            setUserActivityErrorsLoading(false);
-        }
-    }, [isAdmin, supabase]);
-
-    useEffect(() => {
-        if (!isAdmin) return;
-        if (tab !== 'system') return;
-        try {
-            if (userActivityQueryDebounceRef.current) clearTimeout(userActivityQueryDebounceRef.current);
-        } catch { }
-        userActivityQueryDebounceRef.current = setTimeout(() => {
-            loadUserActivityUsers({ q: userActivityQuery, role: userActivityRole });
-        }, 400);
-        return () => {
-            try {
-                if (userActivityQueryDebounceRef.current) clearTimeout(userActivityQueryDebounceRef.current);
-            } catch { }
-        };
-    }, [isAdmin, tab, userActivityQuery, userActivityRole, loadUserActivityUsers]);
-
-    const openUserActivityUser = useCallback(async (u: UnknownRecord) => {
-        const id = String(u?.id || u?.userId || '').trim();
-        if (!id) return;
-        setUserActivitySelected(u as unknown as AdminUser);
-        setUserActivityEvents([]);
-        setUserActivityEventsBefore(null);
-        setUserActivitySummary(null);
-        setUserActivityErrors([]);
-        try {
-            await loadUserActivitySummary({ userId: id, days: userActivityDays });
-        } catch { }
-        try {
-            await loadUserActivityEvents({ userId: id, reset: true });
-        } catch { }
-        try {
-            await loadUserActivityErrors({ userId: id });
-        } catch { }
-    }, [loadUserActivityErrors, loadUserActivityEvents, loadUserActivitySummary, userActivityDays]);
+    // loadUserActivity* + openUserActivityUser + effect — moved to useAdminPanelController
 
     const handleEditStudent = () => {
         if (!selectedStudent) return;
