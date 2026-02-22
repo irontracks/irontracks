@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 
     const studentsList = Array.isArray(students) ? students.filter((s) => s && s.user_id) : []
 
-    const studentProfilesMap = new Map<string, any>()
+    const studentProfilesMap = new Map<string, Record<string, unknown>>()
     if (studentsList.length > 0) {
       const ids = studentsList.map((s) => s.user_id)
       const { data: spData } = await supabase

@@ -77,7 +77,7 @@ export async function GET(req: Request) {
       }
     }
 
-    const bestByKey = new Map<string, any>()
+    const bestByKey = new Map<string, Record<string, unknown>>()
     for (const t of teachers) {
       const enriched = {
         ...t,

@@ -14,10 +14,10 @@ const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 const safeArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
 const normalizeMessages = (messages: unknown) => {
-  return safeArray<any>(messages)
+  return safeArray<Record<string, unknown>>(messages)
     .map((m) => {
-      const role = String(m?.role || '').trim()
-      const content = String(m?.content || '').trim()
+      const role = typeof m?.role === 'string' ? m.role.trim() : ''
+      const content = typeof m?.content === 'string' ? m.content.trim() : ''
       if (!role || !content) return null
       if (!['user', 'assistant', 'system'].includes(role)) return null
       return { role, content }

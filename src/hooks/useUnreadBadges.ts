@@ -40,8 +40,13 @@ export function useUnreadBadges({
   useEffect(() => {
     let cancelled = false
     if (!userId) {
-      setHasUnreadNotification(false)
-      return
+      const timer = setTimeout(() => {
+        if (!cancelled) setHasUnreadNotification(false)
+      }, 0)
+      return () => {
+        cancelled = true
+        clearTimeout(timer)
+      }
     }
 
     const loadInitial = async () => {
