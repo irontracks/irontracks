@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -30,7 +30,7 @@ const extractJsonFromText = (text: string) => {
     const end = s.lastIndexOf('}')
     if (start < 0 || end < 0 || end <= start) return null
     const candidate = s.slice(start, end + 1)
-    return JSON.parse(candidate)
+    return parseJsonWithSchema(candidate, z.record(z.unknown()))
   } catch {
     return null
   }

@@ -4,19 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { UserSettingsSchema, type UserSettings, DEFAULT_USER_SETTINGS } from '@/schemas/settings'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 export const DEFAULT_SETTINGS = DEFAULT_USER_SETTINGS
 
 const STORAGE_KEY = 'irontracks.userSettings.v1'
 const TABLE_MISSING_KEY = 'irontracks.userSettings.user_settings_table_missing.v1'
 
-const safeJsonParse = (raw: string): unknown => {
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
-}
+const safeJsonParse = (raw: string): unknown => parseJsonWithSchema(raw, z.record(z.unknown()))
 
 export function useUserSettings(userId: string | null | undefined) {
   const supabase = useMemo(() => {

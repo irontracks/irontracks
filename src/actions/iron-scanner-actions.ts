@@ -1,6 +1,8 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { parseJsonWithSchema } from "@/utils/zod";
+import { z } from "zod";
 
 type IronScannerExercise = {
   name: string;
@@ -97,19 +99,16 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
       }
     }
 
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch (e) {
+    let parsed: unknown = parseJsonWithSchema(jsonText, z.unknown());
+    if (!parsed) {
       const start = jsonText.indexOf("[");
       const end = jsonText.lastIndexOf("]");
       if (start === -1 || end === -1 || end <= start) {
         return { ok: false, error: "Falha ao interpretar JSON retornado pela IA" };
       }
       const slice = jsonText.substring(start, end + 1);
-      try {
-        parsed = JSON.parse(slice);
-      } catch {
+      parsed = parseJsonWithSchema(slice, z.unknown());
+      if (!parsed) {
         return { ok: false, error: "Falha ao interpretar JSON retornado pela IA" };
       }
     }

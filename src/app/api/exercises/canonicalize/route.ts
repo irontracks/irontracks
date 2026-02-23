@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
@@ -21,6 +21,8 @@ const ZodBodySchema = z
 
 const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
+const JsonSchema = z.object({ items: z.array(z.record(z.unknown())).optional() }).passthrough()
+
 const extractJson = (raw: string) => {
   const text = String(raw || '').trim()
   if (!text) return null
@@ -32,19 +34,13 @@ const extractJson = (raw: string) => {
       candidate = candidate.substring(firstBreak + 1, lastFence).trim()
     }
   }
-  try {
-    return JSON.parse(candidate)
-  } catch {
-    const start = candidate.indexOf('{')
-    const end = candidate.lastIndexOf('}')
-    if (start === -1 || end === -1 || end <= start) return null
-    const slice = candidate.substring(start, end + 1)
-    try {
-      return JSON.parse(slice)
-    } catch {
-      return null
-    }
-  }
+  const direct = parseJsonWithSchema(candidate, JsonSchema)
+  if (direct) return direct
+  const start = candidate.indexOf('{')
+  const end = candidate.lastIndexOf('}')
+  if (start === -1 || end === -1 || end <= start) return null
+  const slice = candidate.substring(start, end + 1)
+  return parseJsonWithSchema(slice, JsonSchema)
 }
 
 const isMissingTable = (error: unknown) => {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
@@ -21,15 +21,7 @@ const ZodBodySchema = z
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeJsonParse = (raw: string) => {
-  try {
-    const trimmed = String(raw || '').trim()
-    if (!trimmed) return null
-    return JSON.parse(trimmed)
-  } catch {
-    return null
-  }
-}
+const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
 
 const extractJsonFromModelText = (text: string) => {
   const cleaned = String(text || '').trim()

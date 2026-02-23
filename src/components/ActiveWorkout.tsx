@@ -15,6 +15,22 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
   const { session, workout } = controller;
 
+  const finishPayload = React.useMemo(() => {
+    if (!session || !workout) return null;
+    try {
+      return buildFinishWorkoutPayload({
+        workout,
+        elapsedSeconds: 0,
+        logs: (session?.logs ?? {}) as Record<string, unknown>,
+        ui: (session?.ui ?? {}) as Record<string, unknown>,
+        postCheckin: null,
+      });
+    } catch {
+      return null;
+    }
+  }, [session, workout]);
+  void finishPayload;
+
   if (!session || !workout) {
     return (
       <div className="min-h-screen bg-neutral-900 text-white p-6">
@@ -27,21 +43,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       </div>
     );
   }
-
-  const finishPayload = React.useMemo(() => {
-    try {
-      return buildFinishWorkoutPayload({
-        workout,
-        elapsedSeconds: 0,
-        logs: (session?.logs ?? {}) as Record<string, unknown>,
-        ui: (session?.ui ?? {}) as Record<string, unknown>,
-        postCheckin: null,
-      });
-    } catch {
-      return null;
-    }
-  }, [session?.logs, session?.ui, workout]);
-  void finishPayload;
 
   return (
     <WorkoutProvider value={controller}>

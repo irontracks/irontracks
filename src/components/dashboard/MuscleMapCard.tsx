@@ -6,6 +6,8 @@ import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
 import { backfillExerciseMuscleMaps, getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
 import { motion, AnimatePresence } from 'framer-motion'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 type ApiMuscle = {
   label: string
@@ -105,7 +107,7 @@ const readCache = (key: string) => {
     if (typeof window === 'undefined') return null
     const raw = window.localStorage.getItem(key)
     if (!raw) return null
-    const parsed = JSON.parse(raw)
+    const parsed = parseJsonWithSchema(raw, z.record(z.unknown()))
     const cachedAt = Number(parsed?.cachedAt || 0)
     const data = parsed?.data
     if (!cachedAt || !data) return null

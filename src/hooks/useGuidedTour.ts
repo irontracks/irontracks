@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { TourState } from '@/types/app'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 const TOUR_VERSION = 1
 
@@ -59,7 +61,7 @@ export function useGuidedTour({
         if (!key) return null
         const raw = window.localStorage.getItem(key) || ''
         if (!raw) return null
-        const parsed = JSON.parse(raw)
+        const parsed = parseJsonWithSchema(raw, z.record(z.unknown()))
         if (!parsed || typeof parsed !== 'object') return null
         const version = Number(parsed?.version || 0) || 0
         if (version !== TOUR_VERSION) return null

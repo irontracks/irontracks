@@ -103,7 +103,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       const raw = s.getItem(k) || "";
       let st = { t: 0, c: 0 };
       try {
-        st = raw ? JSON.parse(raw) : st;
+        const parts = String(raw || "").split("|");
+        const t0 = Number(parts[0] || 0);
+        const c0 = Number(parts[1] || 0);
+        st = { t: Number.isFinite(t0) ? t0 : 0, c: Number.isFinite(c0) ? c0 : 0 };
       } catch {}
       if (t - (st.t || 0) < reloadWindowMs) {
         st.c = (st.c || 0) + 1;
@@ -112,7 +115,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         st.c = 1;
       }
       st.t = t;
-      s.setItem(k, JSON.stringify(st));
+      s.setItem(k, String(st.t || 0) + "|" + String(st.c || 0));
       if (isLocal()) {
         if (st.c > 2) return;
         safeReload(t);

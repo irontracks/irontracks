@@ -24,6 +24,8 @@ import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 interface ChannelRow { id: string; name?: string; [key: string]: unknown }
 interface InviteRow { to_uid: string; from_uid: string; [key: string]: unknown }
@@ -115,7 +117,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         let payload: Record<string, unknown> | null = null
         try {
             if (contentStr && contentStr.startsWith('{')) {
-                const parsed: unknown = JSON.parse(contentStr)
+                const parsed: unknown = parseJsonWithSchema(contentStr, z.record(z.unknown()))
                 payload = isRecord(parsed) ? parsed : null
             }
         } catch {}

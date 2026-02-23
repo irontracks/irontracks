@@ -1,4 +1,6 @@
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 type AsaasError = {
   errors?: { code?: string; description?: string }[]
   message?: string
@@ -32,11 +34,7 @@ export async function asaasRequest<T>(options: AsaasRequestOptions): Promise<T> 
 
   const text = await res.text()
   let json: unknown = null
-  try {
-    json = text ? JSON.parse(text) : null
-  } catch {
-    json = null
-  }
+  json = text ? parseJsonWithSchema(text, z.unknown()) : null
 
   if (!res.ok) {
     const err = (json || {}) as AsaasError

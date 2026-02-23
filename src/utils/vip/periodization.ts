@@ -1,6 +1,8 @@
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseTrainingNumber } from '@/utils/trainingNumber'
 import { vipPeriodizationExerciseSeed, VipExerciseSeed } from '@/data/vipPeriodizationExercises'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 export type VipPeriodizationModel = 'linear' | 'undulating'
 export type VipPeriodizationWeeks = 4 | 6 | 8
@@ -335,7 +337,7 @@ export const parseSessionFromNotes = (notes: unknown): Record<string, unknown> |
   const raw = safeString(notes)
   if (!raw) return null
   try {
-    const obj = JSON.parse(raw)
+    const obj = parseJsonWithSchema(raw, z.record(z.unknown()))
     if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj as Record<string, unknown>
     return null
   } catch {

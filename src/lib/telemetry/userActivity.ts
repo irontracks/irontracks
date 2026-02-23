@@ -1,4 +1,6 @@
 import { getRawVersion } from '@/lib/version'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 export type UserActivityEvent = {
   name: string
@@ -29,6 +31,16 @@ let lastByKey = new Map<string, number>()
 
 const now = () => Date.now()
 
+const queuedEventSchema = z.object({
+  name: z.string(),
+  type: z.string().optional(),
+  screen: z.string().optional(),
+  path: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+  clientTs: z.string().optional(),
+  appVersion: z.string().optional(),
+})
+
 const safeObj = (v: unknown) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
   return v as Record<string, unknown>
@@ -39,8 +51,8 @@ const readStored = () => {
     if (typeof window === 'undefined') return []
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
+    const parsed = parseJsonWithSchema(raw, z.array(queuedEventSchema))
+    return Array.isArray(parsed) ? (parsed as QueuedEvent[]) : []
   } catch {
     return []
   }

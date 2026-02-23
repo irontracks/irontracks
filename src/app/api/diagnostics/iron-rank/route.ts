@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 const safeJson = (v: unknown) => {
   try {
@@ -11,17 +13,7 @@ const safeJson = (v: unknown) => {
   }
 }
 
-const parseJson = (raw: unknown) => {
-  try {
-    if (!raw) return null
-    if (typeof raw === 'object') return raw
-    const s = String(raw).trim()
-    if (!s) return null
-    return JSON.parse(s)
-  } catch {
-    return null
-  }
-}
+const parseJson = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
 
 const extractLogs = (notes: unknown) => {
   const base = notes && typeof notes === 'object' ? notes : null

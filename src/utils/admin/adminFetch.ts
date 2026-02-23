@@ -1,13 +1,11 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 const safeJsonParse = (raw: string) => {
-  try {
-    const s = String(raw || '').trim()
-    if (!s) return null
-    return JSON.parse(s)
-  } catch {
-    return null
-  }
+  const s = String(raw || '').trim()
+  if (!s) return null
+  return parseJsonWithSchema(s, z.unknown())
 }
 
 export const getAdminAuthHeaders = async (supabase: SupabaseClient) => {
