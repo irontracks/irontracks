@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { Download, ArrowLeft, TrendingUp, TrendingDown, Flame, FileText, Code, Users, Sparkles, Loader2, Check, MessageSquare } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
-import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
+import { generatePostWorkoutInsights, applyProgressionToNextTemplate, getMuscleMapWeek } from '@/actions/workout-actions';
 import { createClient } from '@/utils/supabase/client';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import StoryComposer from '@/components/StoryComposer';
@@ -14,6 +14,7 @@ import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
 
 type AnyObj = Record<string, unknown>
 
@@ -224,6 +225,43 @@ const computeMatchKey = (s: unknown): { originId: string | null; titleKey: strin
     return { originId: originId ? String(originId) : null, titleKey };
 };
 
+const getWeekStartIso = (date: Date) => {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        weekday: 'short',
+    })
+    const parts = formatter.formatToParts(date)
+    const map = parts.reduce<Record<string, string>>((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value
+        return acc
+    }, {})
+    const weekday = String(map.weekday || '').toLowerCase()
+    const weekdayIndex =
+        weekday === 'mon' ? 1 : weekday === 'tue' ? 2 : weekday === 'wed' ? 3 : weekday === 'thu' ? 4 : weekday === 'fri' ? 5 : weekday === 'sat' ? 6 : 0
+    const y = Number(map.year)
+    const m = Number(map.month)
+    const d = Number(map.day) - ((weekdayIndex + 6) % 7)
+    const base = new Date(Date.UTC(y, m - 1, d, 3, 0, 0))
+    return base.toISOString().slice(0, 10)
+};
+
+const buildSparklinePoints = (values: number[], width: number, height: number) => {
+    const safe = values.map((v) => (Number.isFinite(v) ? v : 0))
+    const max = Math.max(1, ...safe)
+    const min = Math.min(0, ...safe)
+    const span = max - min || 1
+    return safe
+        .map((v, i) => {
+            const x = (width / Math.max(1, safe.length - 1)) * i
+            const y = height - ((v - min) / span) * height
+            return `${x.toFixed(1)},${y.toFixed(1)}`
+        })
+        .join(' ')
+};
+
 const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings, onUpgrade }: WorkoutReportProps) => {
     const safeSession = session && typeof session === 'object' ? (session as AnyObj) : null;
     const reportRef = useRef<HTMLDivElement | null>(null);
@@ -254,6 +292,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         return { loading: false, error: null, result: existing, cached: !!existing };
     });
     const [showCoachChat, setShowCoachChat] = useState(false);
+    const [muscleTrend, setMuscleTrend] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; data: null | { current: Record<string, number>; previous: Record<string, number> } }>({ status: 'idle', data: null })
+    const [muscleTrend4w, setMuscleTrend4w] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; data: null | { weeks: string[]; series: Record<string, number[]> } }>({ status: 'idle', data: null })
+    const [exerciseTrend, setExerciseTrend] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; data: null | { weeks: string[]; series: Array<{ name: string; values: number[] }> } }>({ status: 'idle', data: null })
     const { credits } = useVipCredits();
     const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
     const isInsightsExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
@@ -548,6 +589,166 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         };
     }, [session]);
 
+    useEffect(() => {
+        let cancelled = false
+        if (!session?.date) return
+        const run = async () => {
+            setMuscleTrend({ status: 'loading', data: null })
+            try {
+                const base = new Date(String(session.date))
+                const weekStart = getWeekStartIso(base)
+                const prevWeek = new Date(`${weekStart}T00:00:00.000Z`)
+                prevWeek.setDate(prevWeek.getDate() - 7)
+                const prevWeekStart = prevWeek.toISOString().slice(0, 10)
+                const [curRes, prevRes] = await Promise.all([
+                    getMuscleMapWeek({ weekStart }),
+                    getMuscleMapWeek({ weekStart: prevWeekStart }),
+                ])
+                if (cancelled) return
+                const curMuscles = (curRes?.ok && curRes.muscles && typeof curRes.muscles === 'object') ? (curRes.muscles as Record<string, unknown>) : {}
+                const prevMuscles = (prevRes?.ok && prevRes.muscles && typeof prevRes.muscles === 'object') ? (prevRes.muscles as Record<string, unknown>) : {}
+                const current = Object.fromEntries(Object.entries(curMuscles).map(([id, v]) => [id, Number((v as AnyObj)?.sets || 0)]))
+                const previous = Object.fromEntries(Object.entries(prevMuscles).map(([id, v]) => [id, Number((v as AnyObj)?.sets || 0)]))
+                setMuscleTrend({ status: 'ready', data: { current, previous } })
+            } catch {
+                if (!cancelled) setMuscleTrend({ status: 'error', data: null })
+            }
+        }
+        run()
+        return () => {
+            cancelled = true
+        }
+    }, [session?.date])
+
+    useEffect(() => {
+        let cancelled = false
+        if (!session?.date) return
+        const run = async () => {
+            setMuscleTrend4w({ status: 'loading', data: null })
+            try {
+                const base = new Date(String(session.date))
+                const baseWeek = getWeekStartIso(base)
+                const weekDates: string[] = [0, 1, 2, 3].map((idx) => {
+                    const d = new Date(`${baseWeek}T00:00:00.000Z`)
+                    d.setDate(d.getDate() - idx * 7)
+                    return d.toISOString().slice(0, 10)
+                })
+                const responses = await Promise.all(weekDates.map((weekStart) => getMuscleMapWeek({ weekStart })))
+                if (cancelled) return
+                const series: Record<string, number[]> = {}
+                Object.keys(MUSCLE_BY_ID).forEach((id) => {
+                    series[id] = responses.map((res) => {
+                        const muscles = res?.ok && res.muscles && typeof res.muscles === 'object' ? (res.muscles as Record<string, unknown>) : {}
+                        const entry = muscles[id]
+                        const sets = entry && typeof entry === 'object' ? Number((entry as AnyObj).sets || 0) : 0
+                        return Number.isFinite(sets) ? sets : 0
+                    }).reverse()
+                })
+                setMuscleTrend4w({ status: 'ready', data: { weeks: weekDates.reverse(), series } })
+            } catch {
+                if (!cancelled) setMuscleTrend4w({ status: 'error', data: null })
+            }
+        }
+        run()
+        return () => {
+            cancelled = true
+        }
+    }, [session?.date])
+
+    useEffect(() => {
+        let cancelled = false
+        if (!session?.date || !supabase) return
+        const run = async () => {
+            setExerciseTrend({ status: 'loading', data: null })
+            try {
+                const base = new Date(String(session.date))
+                const baseWeek = getWeekStartIso(base)
+                const weekDates: string[] = [0, 1, 2, 3].map((idx) => {
+                    const d = new Date(`${baseWeek}T00:00:00.000Z`)
+                    d.setDate(d.getDate() - idx * 7)
+                    return d.toISOString().slice(0, 10)
+                })
+                const startDate = new Date(`${weekDates[weekDates.length - 1]}T00:00:00.000Z`)
+                const { data: rows } = await supabase
+                    .from('workouts')
+                    .select('notes, date, created_at')
+                    .eq('user_id', user?.id || '')
+                    .eq('is_template', false)
+                    .gte('date', startDate.toISOString())
+                    .order('date', { ascending: false })
+                    .limit(220)
+                const sessions = (Array.isArray(rows) ? rows : [])
+                    .map((row) => {
+                        if (row?.notes && typeof row.notes === 'object') return row.notes as Record<string, unknown>
+                        if (typeof row?.notes === 'string') return parseJsonWithSchema(row.notes, z.record(z.unknown()))
+                        return null
+                    })
+                    .filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
+                const reportMetaLocal = session?.reportMeta && typeof session.reportMeta === 'object' ? (session.reportMeta as Record<string, unknown>) : null
+                const keyExercises = Array.isArray(reportMetaLocal?.exercises)
+                    ? (reportMetaLocal?.exercises as Array<Record<string, unknown>>)
+                        .map((e) => ({ name: String(e?.name || '').trim(), volume: Number((e?.volumeKg ?? 0) as number) || 0 }))
+                        .filter((e) => e.name)
+                        .sort((a, b) => b.volume - a.volume)
+                        .slice(0, 4)
+                        .map((e) => e.name)
+                    : []
+                if (!keyExercises.length) {
+                    setExerciseTrend({ status: 'ready', data: { weeks: weekDates.reverse(), series: [] } })
+                    return
+                }
+                const weekIndexByDate = new Map<string, number>()
+                weekDates.forEach((w, idx) => weekIndexByDate.set(w, idx))
+                const series = keyExercises.map((name) => ({ name, values: [0, 0, 0, 0] }))
+                const normalizeKey = (value: string) => normalizeExerciseName(value).toLowerCase()
+                const seriesByKey = new Map(series.map((s) => [normalizeKey(s.name), s]))
+
+                const addToSeries = (sessionObj: Record<string, unknown>) => {
+                    const dateRaw = sessionObj?.date ?? sessionObj?.created_at ?? null
+                    const dateMs = dateRaw ? new Date(String(dateRaw)).getTime() : 0
+                    if (!Number.isFinite(dateMs)) return
+                    const weekStart = getWeekStartIso(new Date(dateMs))
+                    const weekIdx = weekIndexByDate.get(weekStart)
+                    if (weekIdx == null) return
+                    const exercises = Array.isArray(sessionObj.exercises) ? (sessionObj.exercises as unknown[]) : []
+                    const logs = sessionObj.logs && typeof sessionObj.logs === 'object' ? (sessionObj.logs as Record<string, unknown>) : {}
+                    exercises.forEach((raw, exIdx) => {
+                        if (!raw || typeof raw !== 'object') return
+                        const exObj = raw as Record<string, unknown>
+                        const name = String(exObj.name || '').trim()
+                        if (!name) return
+                        const key = normalizeKey(name)
+                        const bucket = seriesByKey.get(key)
+                        if (!bucket) return
+                        let volume = 0
+                        Object.entries(logs).forEach(([k, v]) => {
+                            const parts = String(k || '').split('-')
+                            const eIdx = Number(parts[0])
+                            if (!Number.isFinite(eIdx) || eIdx !== exIdx) return
+                            if (!v || typeof v !== 'object') return
+                            const obj = v as Record<string, unknown>
+                            const w = Number(String(obj.weight ?? '').replace(',', '.'))
+                            const r = Number(String(obj.reps ?? '').replace(',', '.'))
+                            if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return
+                            volume += w * r
+                        })
+                        bucket.values[weekIdx] += volume
+                    })
+                }
+
+                sessions.forEach(addToSeries)
+                const normalizedSeries = series.map((s) => ({ name: s.name, values: s.values.map((v) => Math.round(v * 10) / 10).reverse() }))
+                setExerciseTrend({ status: 'ready', data: { weeks: weekDates.reverse(), series: normalizedSeries } })
+            } catch {
+                if (!cancelled) setExerciseTrend({ status: 'error', data: null })
+            }
+        }
+        run()
+        return () => {
+            cancelled = true
+        }
+    }, [session?.date, session?.reportMeta, supabase, user?.id])
+
     if (!session) return null;
 
     const formatDate = (ts: unknown): string => {
@@ -607,6 +808,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal);
         return Math.round((currentVolume * 0.02) + (durationInMinutes * 4));
     })();
+    const reportMeta = session?.reportMeta && typeof session.reportMeta === 'object' ? (session.reportMeta as AnyObj) : null
+    const reportTotals = reportMeta?.totals && typeof reportMeta.totals === 'object' ? (reportMeta.totals as AnyObj) : null
+    const reportRest = reportMeta?.rest && typeof reportMeta.rest === 'object' ? (reportMeta.rest as AnyObj) : null
+    const reportWeekly = reportMeta?.weekly && typeof reportMeta.weekly === 'object' ? (reportMeta.weekly as AnyObj) : null
+    const reportLoadFlags = reportMeta?.loadFlags && typeof reportMeta.loadFlags === 'object' ? (reportMeta.loadFlags as AnyObj) : null
 
     const formatKm = (meters: unknown): string => {
         const m = Number(meters);
@@ -1148,6 +1354,323 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     </div>
                 </div>
 
+                {reportMeta && (
+                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Métricas do treino</div>
+                                <div className="text-lg font-black text-white">Resumo técnico</div>
+                                <div className="text-xs text-neutral-300">Volume, densidade e diagnóstico da sessão.</div>
+                            </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+                            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Duração</div>
+                                <div className="text-lg font-mono font-bold text-white">
+                                    {(() => {
+                                        const v = Number(reportTotals?.durationMinutes || 0)
+                                        if (!Number.isFinite(v) || v <= 0) return '—'
+                                        return `${v.toFixed(1)} min`
+                                    })()}
+                                </div>
+                            </div>
+                            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Densidade</div>
+                                <div className="text-lg font-mono font-bold text-white">
+                                    {(() => {
+                                        const v = Number(reportTotals?.densityKgPerMin || 0)
+                                        if (!Number.isFinite(v) || v <= 0) return '—'
+                                        return `${v.toFixed(1)} kg/min`
+                                    })()}
+                                </div>
+                            </div>
+                            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Descanso médio</div>
+                                <div className="text-lg font-mono font-bold text-white">
+                                    {(() => {
+                                        const v = Number(reportRest?.avgPlannedRestSec || 0)
+                                        if (!Number.isFinite(v) || v <= 0) return '—'
+                                        return `${Math.round(v)} s`
+                                    })()}
+                                </div>
+                            </div>
+                            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Descanso máximo</div>
+                                <div className="text-lg font-mono font-bold text-white">
+                                    {(() => {
+                                        const v = Number(reportRest?.maxPlannedRestSec || 0)
+                                        if (!Number.isFinite(v) || v <= 0) return '—'
+                                        return `${Math.round(v)} s`
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Volume semanal</div>
+                                <div className="text-sm font-mono font-bold text-white">
+                                    {(() => {
+                                        const v = Number(reportWeekly?.currentWeekKg || 0)
+                                        if (!Number.isFinite(v) || v <= 0) return '—'
+                                        return `${v.toLocaleString('pt-BR')} kg`
+                                    })()}
+                                </div>
+                                <div className="text-[10px] text-neutral-500 mt-1">
+                                    {(() => {
+                                        const v = Number(reportWeekly?.previousWeekKg || 0)
+                                        if (!Number.isFinite(v) || v <= 0) return 'sem semana anterior'
+                                        return `semana anterior ${v.toLocaleString('pt-BR')} kg`
+                                    })()}
+                                </div>
+                            </div>
+                            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Variação semanal</div>
+                                <div className="text-sm font-mono font-bold text-white">
+                                    {(() => {
+                                        const v = Number(reportWeekly?.deltaPct || 0)
+                                        if (!Number.isFinite(v)) return '—'
+                                        return `${v.toFixed(1)}%`
+                                    })()}
+                                </div>
+                                <div className="text-[10px] text-neutral-500 mt-1">
+                                    {reportWeekly?.isHeavyWeek ? 'semana pesada' : 'semana normal'}
+                                </div>
+                            </div>
+                            <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+                                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Diagnóstico</div>
+                                <div className="text-xs text-neutral-200 font-semibold">
+                                    {(() => {
+                                        const reason = String(reportLoadFlags?.reason || '—')
+                                        const heavy = !!reportLoadFlags?.isHeavyWeek
+                                        const badDay = !!reportLoadFlags?.isBadDay
+                                        if (reason === '—') return '—'
+                                        if (badDay && heavy) return 'Queda explicada por semana pesada'
+                                        if (badDay) return 'Queda pontual no dia'
+                                        if (heavy) return 'Semana pesada controlada'
+                                        return 'Dentro do padrão recente'
+                                    })()}
+                                </div>
+                                <div className="text-[10px] text-neutral-500 mt-1">
+                                    {(() => {
+                                        const v = Number(reportLoadFlags?.dayDropPct || 0)
+                                        if (!Number.isFinite(v)) return '—'
+                                        return `dia vs média ${v.toFixed(1)}%`
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {muscleTrend.status === 'ready' && muscleTrend.data && (
+                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tendência semanal por músculo</div>
+                                <div className="text-lg font-black text-white">Comparativo semanal</div>
+                                <div className="text-xs text-neutral-300">Top músculos da semana vs semana anterior.</div>
+                            </div>
+                        </div>
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
+                                    <tr>
+                                        <th className="px-3 py-2">Músculo</th>
+                                        <th className="px-3 py-2 text-right">Semana atual</th>
+                                        <th className="px-3 py-2 text-right">Semana anterior</th>
+                                        <th className="px-3 py-2 text-right">Δ Sets</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {Object.entries(muscleTrend.data.current)
+                                        .map(([id, sets]) => ({ id, sets: Number(sets || 0), prev: Number(muscleTrend.data?.previous?.[id] || 0) }))
+                                        .sort((a, b) => b.sets - a.sets)
+                                        .slice(0, 6)
+                                        .map((row) => {
+                                            const delta = row.sets - row.prev
+                                            const label = String((MUSCLE_BY_ID as Record<string, { label?: string }>)[row.id]?.label || row.id)
+                                            const deltaLabel = `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`
+                                            const deltaClass = delta < 0 ? 'text-red-300' : 'text-emerald-300'
+                                            return (
+                                                <tr key={row.id} className="hover:bg-neutral-800/40">
+                                                    <td className="px-3 py-2 font-semibold text-white">{label}</td>
+                                                    <td className="px-3 py-2 text-right font-mono text-neutral-200">{row.sets.toFixed(1)}</td>
+                                                    <td className="px-3 py-2 text-right font-mono text-neutral-400">{row.prev.toFixed(1)}</td>
+                                                    <td className={`px-3 py-2 text-right font-mono ${deltaClass}`}>{deltaLabel}</td>
+                                                </tr>
+                                            )
+                                        })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {muscleTrend4w.status === 'ready' && muscleTrend4w.data && (
+                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Histórico 4 semanas</div>
+                                <div className="text-lg font-black text-white">Sparklines por músculo</div>
+                                <div className="text-xs text-neutral-300">Tendência das últimas 4 semanas (sets equivalentes).</div>
+                            </div>
+                        </div>
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
+                                    <tr>
+                                        <th className="px-3 py-2">Músculo</th>
+                                        <th className="px-3 py-2 text-right">Atual</th>
+                                        <th className="px-3 py-2 text-right">Sparkline</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {Object.entries(muscleTrend4w.data.series)
+                                        .map(([id, values]) => ({ id, values }))
+                                        .map((row) => {
+                                            const last = row.values[row.values.length - 1] ?? 0
+                                            return { ...row, last: Number(last) || 0 }
+                                        })
+                                        .sort((a, b) => b.last - a.last)
+                                        .slice(0, 6)
+                                        .map((row) => {
+                                            const label = String((MUSCLE_BY_ID as Record<string, { label?: string }>)[row.id]?.label || row.id)
+                                            const points = buildSparklinePoints(row.values, 120, 24)
+                                            return (
+                                                <tr key={`spark-${row.id}`} className="hover:bg-neutral-800/40">
+                                                    <td className="px-3 py-2 font-semibold text-white">{label}</td>
+                                                    <td className="px-3 py-2 text-right font-mono text-neutral-200">{row.last.toFixed(1)}</td>
+                                                    <td className="px-3 py-2 text-right">
+                                                        <svg width="120" height="24" viewBox="0 0 120 24">
+                                                            <polyline
+                                                                fill="none"
+                                                                stroke="#eab308"
+                                                                strokeWidth="2"
+                                                                points={points}
+                                                            />
+                                                        </svg>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {exerciseTrend.status === 'ready' && exerciseTrend.data && exerciseTrend.data.series.length > 0 && (
+                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Evolução 4 semanas</div>
+                                <div className="text-lg font-black text-white">Exercícios‑chave</div>
+                                <div className="text-xs text-neutral-300">Volume semanal por exercício‑chave.</div>
+                            </div>
+                        </div>
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
+                                    <tr>
+                                        <th className="px-3 py-2">Exercício</th>
+                                        <th className="px-3 py-2 text-right">Atual</th>
+                                        <th className="px-3 py-2 text-right">Sparkline</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {exerciseTrend.data.series.map((row) => {
+                                        const last = row.values[row.values.length - 1] ?? 0
+                                        const points = buildSparklinePoints(row.values, 120, 24)
+                                        return (
+                                            <tr key={`ex-spark-${row.name}`} className="hover:bg-neutral-800/40">
+                                                <td className="px-3 py-2 font-semibold text-white">{row.name}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number(last).toLocaleString('pt-BR')}</td>
+                                                <td className="px-3 py-2 text-right">
+                                                    <svg width="120" height="24" viewBox="0 0 120 24">
+                                                        <polyline
+                                                            fill="none"
+                                                            stroke="#22c55e"
+                                                            strokeWidth="2"
+                                                            points={points}
+                                                        />
+                                                    </svg>
+                                                </td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {reportMeta && Array.isArray(reportMeta.exercises) && reportMeta.exercises.length > 0 && (
+                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Ordem e execução</div>
+                                <div className="text-lg font-black text-white">Detalhe por exercício</div>
+                                <div className="text-xs text-neutral-300">Ordem, descanso e volume executado.</div>
+                            </div>
+                        </div>
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
+                                    <tr>
+                                        <th className="px-3 py-2">#</th>
+                                        <th className="px-3 py-2">Exercício</th>
+                                        <th className="px-3 py-2 text-center">Séries</th>
+                                        <th className="px-3 py-2 text-center">Reps</th>
+                                        <th className="px-3 py-2 text-center">Descanso</th>
+                                        <th className="px-3 py-2 text-right">Peso médio</th>
+                                        <th className="px-3 py-2 text-right">Volume</th>
+                                        <th className="px-3 py-2 text-right">Δ Volume</th>
+                                        <th className="px-3 py-2 text-right">Δ Reps</th>
+                                        <th className="px-3 py-2 text-right">Δ Peso</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {(reportMeta.exercises as unknown[]).map((raw, idx) => {
+                                        const ex = raw && typeof raw === 'object' ? (raw as AnyObj) : null
+                                        if (!ex) return null
+                                        const name = String(ex.name || '').trim() || '—'
+                                        const order = Number(ex.order || idx + 1)
+                                        const setsDone = Number(ex.setsDone || 0)
+                                        const repsDone = Number(ex.repsDone || 0)
+                                        const rest = Number(ex.restTimePlannedSec || 0)
+                                        const avgWeight = Number(ex.avgWeightKg || 0)
+                                        const volume = Number(ex.volumeKg || 0)
+                                        const deltaVolume = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).volumeKg) : NaN
+                                        const deltaReps = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).reps) : NaN
+                                        const deltaWeight = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).avgWeightKg) : NaN
+                                        const deltaVolumeLabel = Number.isFinite(deltaVolume) ? `${deltaVolume > 0 ? '+' : ''}${deltaVolume.toFixed(1)} kg` : '—'
+                                        const deltaRepsLabel = Number.isFinite(deltaReps) ? `${deltaReps > 0 ? '+' : ''}${Math.round(deltaReps)}` : '—'
+                                        const deltaWeightLabel = Number.isFinite(deltaWeight) ? `${deltaWeight > 0 ? '+' : ''}${deltaWeight.toFixed(1)} kg` : '—'
+                                        const deltaVolumeClass = Number.isFinite(deltaVolume) && deltaVolume < 0 ? 'text-red-300' : 'text-emerald-300'
+                                        const deltaRepsClass = Number.isFinite(deltaReps) && deltaReps < 0 ? 'text-red-300' : 'text-emerald-300'
+                                        const deltaWeightClass = Number.isFinite(deltaWeight) && deltaWeight < 0 ? 'text-red-300' : 'text-emerald-300'
+                                        return (
+                                            <tr key={`${name}-${idx}`} className="hover:bg-neutral-800/40">
+                                                <td className="px-3 py-2 font-mono text-neutral-300">{Number.isFinite(order) ? order : idx + 1}</td>
+                                                <td className="px-3 py-2 font-semibold text-white">{name}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(setsDone) && setsDone > 0 ? setsDone : '—'}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(repsDone) && repsDone > 0 ? repsDone : '—'}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(rest) && rest > 0 ? `${Math.round(rest)}s` : '—'}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(avgWeight) && avgWeight > 0 ? `${avgWeight.toFixed(1)} kg` : '—'}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(volume) && volume > 0 ? `${volume.toLocaleString('pt-BR')} kg` : '—'}</td>
+                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
+                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
+                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
                 {(preCheckin || postCheckin) && (
                     <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1628,8 +2151,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                             }
 
                                             return (
-                                                <>
-                                                    <tr key={sIdx} className="border-b border-neutral-800">
+                                                <React.Fragment key={`${exIdx}-${sIdx}`}>
+                                                    <tr className="border-b border-neutral-800">
                                                         <td className="py-2 font-mono text-neutral-400 text-xs">#{sIdx + 1}</td>
                                                         <td className="py-2 text-center font-semibold text-sm">{logObj.weight != null && String(logObj.weight) !== '' ? String(logObj.weight) : '-'}</td>
                                                         <td className="py-2 text-center font-mono text-sm">{logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '-'}</td>
@@ -1648,7 +2171,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                                             </tr>
                                                         );
                                                     })()}
-                                                </>
+                                                </React.Fragment>
                                             );
                                         })}
                                     </tbody>
