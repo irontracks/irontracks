@@ -1,0 +1,590 @@
+# For a detailed guide to building and testing on iOS, read the docs:
+# https://circleci.com/docs/2.0/testing-ios/
+
+orbs:
+  android: circleci/android@2.4.0
+  revenuecat: revenuecat/sdks-common-config@3.7.0
+  macos: circleci/macos@2.0.1
+  node: circleci/node@5.1.0
+
+version: 2.1
+
+aliases:
+  base-ios-job: &base-ios-job
+    resource_class: m4pro.medium
+    macos:
+      xcode: << parameters.xcode_version >>
+    parameters:
+      xcode_version:
+        type: string
+        default: 16.4.0
+    working_directory: ~/ios
+    shell: /bin/bash --login -o pipefail
+  release-tags: &release-tags
+    filters:
+      tags:
+        ignore:
+          - /^.*-SNAPSHOT/
+      branches:
+        ignore: /.*/
+  stable-release-tags: &stable-release-tags
+    filters:
+      tags:
+        ignore:
+          - /^.*-.*$/
+      branches:
+        ignore: /.*/
+  release-branches: &release-branches
+    filters:
+      tags:
+        ignore: /.*/
+      branches:
+        only: /^release\/.*/
+
+parameters:
+  action:
+    type: enum
+    enum: [ build, dependency-update, bump ]
+    default: build
+
+commands:
+  install-sdkman:
+    description: Install SDKMAN
+    steps:
+      - run:
+          name: Installing SDKMAN
+          command: |
+            if curl -s "https://get.sdkman.io?rcupdate=false" | bash; then
+              echo -e '\nsource "/home/circleci/.sdkman/bin/sdkman-init.sh"' >> $BASH_ENV
+              source $BASH_ENV
+            else
+              echo "Error installing SDKMAN, continuing with default Java" >&2
+            fi
+      - run:
+          name: Setup Java environment
+          command: |
+            if ! sdk env install; then
+              echo "Error installing Java SDK through SDKMAN, continuing with default Java" >&2
+            fi
+
+  setup-git-credentials:
+     steps:
+       - run:
+           name: Setup Git config
+           command: |
+             git config user.email $GIT_EMAIL
+             git config user.name $GIT_USERNAME
+
+  trust-github-key:
+    steps:
+      - run:
+          name: Trust GitHub key
+          command: |
+              for ip in $(dig @8.8.8.8 github.com +short); \
+              do ssh-keyscan github.com,$ip; \
+              ssh-keyscan $ip; \
+              done 2>/dev/null >> ~/.ssh/known_hosts
+
+  copy-npm-rc:
+    steps:
+      - run:
+          name: Copy npmrc sample file to final location
+          command: cp typescript/.npmrc.SAMPLE typescript/.npmrc
+      - run:
+          name: Copy purchases-js-hybrid-mappings/.npmrc sample file to final location
+          command: cp purchases-js-hybrid-mappings/.npmrc.SAMPLE purchases-js-hybrid-mappings/.npmrc
+
+  install-cocoapods:
+    steps:
+      - run:
+          name: Install pods
+          command: bundle exec pod install --repo-update
+          working_directory: ios/PurchasesHybridCommon
+
+jobs:
+  test-ios-16:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - install-cocoapods
+      - run:
+          name: Run ios tests
+          command: fastlane scan
+          working_directory: ios/PurchasesHybridCommon
+          environment:
+            SCAN_SCHEME: PurchasesHybridCommon
+            SCAN_DEVICE: iPhone 14 (16.4)
+      - store_test_results:
+          path: ios/PurchasesHybridCommon/test_output
+      - store_artifacts:
+          path: ios/PurchasesHybridCommon/test_output
+          destination: scan-output
+
+  test-ios-17:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - install-cocoapods
+      - run:
+          name: Run ios tests
+          command: fastlane scan
+          working_directory: ios/PurchasesHybridCommon
+          environment:
+            SCAN_SCHEME: PurchasesHybridCommon
+            SCAN_DEVICE: iPhone 15 (17.2)
+      - store_test_results:
+          path: ios/PurchasesHybridCommon/test_output
+      - store_artifacts:
+          path: ios/PurchasesHybridCommon/test_output
+          destination: scan-output
+
+  test-ios-18:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - install-cocoapods
+      - run:
+          name: Run ios tests
+          command: fastlane scan
+          working_directory: ios/PurchasesHybridCommon
+          environment:
+            SCAN_SCHEME: PurchasesHybridCommon
+            SCAN_DEVICE: iPhone 16 (18.5)
+      - store_test_results:
+          path: ios/PurchasesHybridCommon/test_output
+      - store_artifacts:
+          path: ios/PurchasesHybridCommon/test_output
+          destination: scan-output
+
+  test-ios-26:
+    <<: *base-ios-job
+    parameters:
+      xcode_version:
+        type: string
+        default: "26.2"
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - install-cocoapods
+      - run:
+          name: Run ios tests
+          command: fastlane scan
+          working_directory: ios/PurchasesHybridCommon
+          environment:
+            SCAN_SCHEME: PurchasesHybridCommon
+            SCAN_DEVICE: iPhone 17 (26.2)
+      - store_test_results:
+          path: ios/PurchasesHybridCommon/test_output
+      - store_artifacts:
+          path: ios/PurchasesHybridCommon/test_output
+          destination: scan-output
+
+  integration-test-ios:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - install-cocoapods
+      - run:
+          name: Update API key
+          command: bundle exec fastlane ios replace_api_key_integration_tests
+      - run:
+          name: Run ios tests
+          command: bundle exec fastlane scan --result_bundle=true --testplan=CI
+          working_directory: ios/PurchasesHybridCommon
+          environment:
+            SCAN_DEVICE: iPhone 16 (18.5)
+            SCAN_SCHEME: PurchasesHybridCommonIntegrationTests
+      - run:
+          name: Compress result bundle
+          command: |
+             tar -czf test_output/xcresult.tar.gz test_output/PurchasesHybridCommonIntegrationTests.xcresult && \
+             rm -r test_output/PurchasesHybridCommonIntegrationTests.xcresult
+          working_directory: ios/PurchasesHybridCommon
+          when: always
+      - store_test_results:
+          path: ios/PurchasesHybridCommon/test_output
+      - store_artifacts:
+          path: ios/PurchasesHybridCommon/test_output
+          destination: scan-output
+
+  deploy-ios-phc:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - trust-github-key
+      - run:
+          name: Deploy PurchasesHybridCommon to Cocoapods
+          command: bundle exec fastlane ios push_pod_PHC
+          no_output_timeout: 30m
+
+  deploy-ios-phcui:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - trust-github-key
+      - run:
+          name: Deploy PurchasesHybridCommonUI to Cocoapods
+          command: bundle exec fastlane ios push_pod_PHCUI
+          no_output_timeout: 30m
+
+  detekt-android:
+    executor:
+      name: android/android-machine
+      resource-class: large
+      tag: default
+    working_directory: ~/purchases-hybrid-common/android
+    shell: /bin/bash --login -o pipefail
+    steps:
+      - checkout:
+          path: ~/purchases-hybrid-common
+      - install-sdkman
+      - android/restore-gradle-cache
+      - run:
+          name: Detekt
+          command: ./gradlew detekt
+      - android/save-gradle-cache
+
+  test-android:
+    executor:
+      name: android/android-machine
+      resource-class: large
+      tag: default
+    working_directory: ~/purchases-hybrid-common/android
+    steps:
+      - checkout:
+          path: ~/purchases-hybrid-common
+      - install-sdkman
+      - android/restore-gradle-cache
+      - run:
+          name: Run Tests
+          command: ./gradlew lint test
+      - android/save-build-cache
+      - store_artifacts:
+          path: build/reports
+      - store_test_results:
+          path: build/test-results
+
+  deploy-android:
+    executor:
+      name: android/android-machine
+      resource-class: large
+      tag: default
+    steps:
+      - checkout
+      - install-sdkman
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - android/accept-licenses
+      - restore_cache:
+          key: jars-{{ checksum "android/hybridcommon/build.gradle.kts" }}
+      - android/restore-build-cache
+      - run:
+          name: Deployment
+          command: bundle exec fastlane android deploy
+
+  deploy-typescript:
+    docker:
+      - image: cimg/ruby:3.3.0-node
+    steps:
+      - checkout
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - copy-npm-rc
+      - run:
+          name: Deploy typescript interfaces NPM package
+          command: bundle exec fastlane typescript deploy
+
+  deploy-typescript-esm:
+    docker:
+      - image: cimg/ruby:3.3.0-node
+    steps:
+      - checkout
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - copy-npm-rc
+      - run:
+          name: Deploy typescript interfaces ESNext NPM package
+          command: bundle exec fastlane typescript deploy_esm
+
+  deploy-js-mappings:
+    docker:
+      - image: cimg/ruby:3.3.0-node
+    steps:
+      - checkout
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - copy-npm-rc
+      - run:
+          name: Deploy js-mappings NPM package
+          command: bundle exec fastlane web deploy_js_mappings
+
+  make-github-release:
+    docker:
+      - image: cimg/ruby:3.3.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - run:
+          name: Make GitHub release for current version
+          command: bundle exec fastlane github_release_current
+
+  dependency-update:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - setup-git-credentials
+      - trust-github-key
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - run:
+          name: Update dependencies to latest versions
+          command: bundle exec fastlane open_pr_upgrading_dependencies
+
+  tag-release-branch:
+    docker:
+      - image: cimg/ruby:3.3.0
+    working_directory: ~/purchases-ios
+    shell: /bin/bash --login -o pipefail
+    steps:
+      - checkout
+      - setup-git-credentials
+      - trust-github-key
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - run:
+          name: Tag branch
+          command: bundle exec fastlane tag_current_branch
+
+  trigger-dependent-updates:
+    docker:
+      - image: cimg/ruby:3.3.0
+    steps:
+      - checkout
+      - setup-git-credentials
+      - trust-github-key
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - run:
+          name: Kick off Flutter automatic dependency update
+          command: bundle exec fastlane bump_hybrid_dependencies repo_name:purchases-flutter
+          when: always
+      - run:
+          name: Kick off React Native automatic dependency update
+          command: bundle exec fastlane bump_hybrid_dependencies repo_name:react-native-purchases
+          when: always
+      - run:
+          name: Kick off Cordova automatic dependency update
+          command: bundle exec fastlane bump_hybrid_dependencies repo_name:cordova-plugin-purchases
+          when: always
+      - run:
+          name: Kick off Unity automatic dependency update
+          command: bundle exec fastlane bump_hybrid_dependencies repo_name:purchases-unity
+          when: always
+      - run:
+          name: Kick off Capacitor automatic dependency update
+          command: bundle exec fastlane bump_hybrid_dependencies repo_name:purchases-capacitor
+          when: always
+      - run:
+          name: Kick off KMP automatic dependency update
+          command: bundle exec fastlane bump_hybrid_dependencies repo_name:purchases-kmp
+          when: always
+
+  typescript-lint:
+    executor: node/default
+    working_directory: ~/purchases-hybrid-common/typescript
+    steps:
+      - checkout:
+          path: ~/purchases-hybrid-common
+      - node/install:
+          install-yarn: true
+      - run:
+          command: yarn && yarn eslint
+
+  typescript-apitests:
+    docker:
+      - image: cimg/ruby:3.3.0-node
+    steps:
+      - checkout
+      - node/install:
+          install-yarn: true
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - run:
+          name: Check if API has changed
+          command: bundle exec fastlane check_typescript_api_changes
+
+  web-tests:
+    docker:
+      - image: cimg/ruby:3.3.0-node
+    steps:
+      - checkout
+      - node/install:
+          install-yarn: true
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - run:
+          name: Run web tests
+          command: bundle exec fastlane web test_js_mappings
+
+  web-api-tests:
+    docker:
+      - image: cimg/ruby:3.3.0-node
+    steps:
+      - checkout
+      - node/install:
+          install-yarn: true
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - run:
+          name: Run web API tests
+          command: bundle exec fastlane web test_js_mappings_api
+
+  web-lint:
+    docker:
+      - image: cimg/ruby:3.3.0-node
+    steps:
+      - checkout
+      - node/install:
+          install-yarn: true
+      - revenuecat/install-gem-unix-dependencies:
+          cache-version: v1
+      - run:
+          name: Run web linter
+          command: bundle exec fastlane web lint_js_mappings
+
+  check-pods:
+    <<: *base-ios-job
+    steps:
+      - checkout
+      - revenuecat/install-gem-mac-dependencies:
+          cache-version: v1
+      - trust-github-key
+      - run:
+          name: Lint Podspec
+          command: bundle exec fastlane ios pod_lint
+          no_output_timeout: 30m
+
+workflows:
+  version: 2
+  test:
+    when:
+      not:
+        equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+    jobs:
+      - test-ios-16
+      - test-ios-17
+      - test-ios-18
+      - test-ios-26
+      - check-pods
+      - integration-test-ios
+      - test-android
+      - detekt-android
+      - typescript-lint
+      - typescript-apitests
+      - web-tests
+      - web-api-tests
+      - web-lint
+
+  deploy:
+    when:
+      and:
+      - not:
+          equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+      # Only run this workflow when the action is "build" (the default), 
+      # so it doesn't run for other actions like "bump" on a release branch,
+      # which should only open the release PR but not deploy it.
+      # (Deployment happens after the hold job is approved on the release PR.)
+      - equal: [ build, << pipeline.parameters.action >> ]
+    jobs:
+      - hold:
+          type: approval
+          <<: *release-branches
+      - tag-release-branch:
+          requires:
+            - hold
+          <<: *release-branches
+      - deploy-ios-phc:
+          <<: *release-tags
+      - deploy-ios-phcui:
+          <<: *release-tags
+          requires:
+            - deploy-ios-phc
+      - deploy-android:
+          <<: *release-tags
+          context: maven-central-publishing
+      - deploy-typescript:
+          <<: *release-tags
+      - deploy-typescript-esm:
+          <<: *release-tags
+      - deploy-js-mappings:
+          <<: *release-tags
+      - make-github-release:
+          <<: *release-tags
+          requires:
+            - deploy-android
+            - deploy-typescript
+            - deploy-typescript-esm
+            - deploy-js-mappings
+            - deploy-ios-phc
+            - deploy-ios-phcui
+      - trigger-dependent-updates:
+          <<: *stable-release-tags
+          requires:
+            - make-github-release
+
+  dependency-update:
+    when:
+      or:
+        - and:
+            - equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+            - equal: [ "update-native-dependencies", << pipeline.schedule.name >> ]
+        - equal: [ dependency-update, << pipeline.parameters.action >> ]
+    jobs:
+      - dependency-update
+
+  danger:
+    when:
+      not:
+        equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+    jobs:
+      - revenuecat/danger
+
+  automatic-release:
+    when:
+      and:
+        - not:
+            equal: [ scheduled_pipeline, << pipeline.trigger_source >> ]
+        - not:
+            equal: [ dependency-update, << pipeline.parameters.action >> ]
+    jobs:
+      - revenuecat/automatic-bump:
+          ruby_version: "3.3.0"
+          filters:
+            tags:
+              ignore: /.*/
+            branches:
+              only: main
+
+  trigger-bump:
+    when:
+      equal: [ bump, << pipeline.parameters.action >> ]
+    jobs:
+      - release

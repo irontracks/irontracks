@@ -1,0 +1,81 @@
+{
+  "customerInfo" : {
+    "activeSubscriptions" : [
+      "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro"
+    ],
+    "allPurchasedProductIdentifiers" : [
+      "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro"
+    ],
+    "entitlements" : {
+      "active" : {
+        "premium" : {
+          "billingIssueDetectedAt" : null,
+          "billingIssueDetectedAtMillis" : null,
+          "identifier" : "premium",
+          "isActive" : true,
+          "isSandbox" : true,
+          "ownershipType" : "PURCHASED",
+          "periodType" : "TRIAL",
+          "productIdentifier" : "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro",
+          "productPlanIdentifier" : null,
+          "store" : "APP_STORE",
+          "unsubscribeDetectedAt" : null,
+          "unsubscribeDetectedAtMillis" : null,
+          "verification" : "VERIFIED",
+          "willRenew" : true
+        }
+      },
+      "all" : {
+        "premium" : {
+          "billingIssueDetectedAt" : null,
+          "billingIssueDetectedAtMillis" : null,
+          "identifier" : "premium",
+          "isActive" : true,
+          "isSandbox" : true,
+          "ownershipType" : "PURCHASED",
+          "periodType" : "TRIAL",
+          "productIdentifier" : "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro",
+          "productPlanIdentifier" : null,
+          "store" : "APP_STORE",
+          "unsubscribeDetectedAt" : null,
+          "unsubscribeDetectedAtMillis" : null,
+          "verification" : "VERIFIED",
+          "willRenew" : true
+        }
+      },
+      "verification" : "VERIFIED"
+    },
+    "managementURL" : "https:\/\/apps.apple.com\/account\/subscriptions",
+    "nonSubscriptionTransactions" : [
+
+    ],
+    "originalApplicationVersion" : "1",
+    "subscriptionsByProductIdentifier" : {
+      "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro" : {
+        "billingIssuesDetectedAt" : null,
+        "gracePeriodExpiresDate" : null,
+        "isActive" : true,
+        "isSandbox" : true,
+        "ownershipType" : "PURCHASED",
+        "periodType" : "TRIAL",
+        "price" : {
+          "amount" : 0,
+          "currency" : "USD"
+        },
+        "productIdentifier" : "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro",
+        "refundedAt" : null,
+        "store" : "APP_STORE",
+        "storeTransactionId" : "0",
+        "unsubscribeDetectedAt" : null,
+        "willRenew" : true
+      }
+    }
+  },
+  "productIdentifier" : "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro",
+  "transaction" : {
+    "productId" : "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro",
+    "productIdentifier" : "com.revenuecat.purchases_hybrid_common.monthly_19.99_.1_week_intro",
+    "revenueCatId" : "0",
+    "transactionIdentifier" : "0"
+  }
+}
