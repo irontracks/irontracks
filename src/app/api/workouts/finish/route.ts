@@ -8,6 +8,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { safeRecord } from '@/utils/guards'
+import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } from '@/utils/report/reportMetrics'
 
 const parseTrainingNumberOrZero = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(String(v || '').replace(',', '.'))
@@ -136,6 +137,51 @@ export async function POST(request: Request) {
     const body = parsedBody.data as Record<string, unknown>
     const session = (body as Record<string, unknown>)?.session
     const sessionObj = safeRecord(session)
+    let previousSessionObj: Record<string, unknown> | null = null
+    try {
+      const { data: prevRow } = await supabase
+        .from('workouts')
+        .select('notes')
+        .eq('user_id', user.id)
+        .eq('is_template', false)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (prevRow?.notes && typeof prevRow.notes === 'object') previousSessionObj = prevRow.notes as Record<string, unknown>
+      else if (typeof prevRow?.notes === 'string') {
+        const parsed = parseJsonWithSchema(prevRow.notes, z.record(z.unknown()))
+        if (parsed && typeof parsed === 'object') previousSessionObj = parsed
+      }
+    } catch {}
+    try {
+      sessionObj.reportMeta = buildReportMetrics(sessionObj, previousSessionObj)
+    } catch {}
+    try {
+      const baseDate = new Date(String(sessionObj?.date ?? new Date().toISOString()))
+      const start = new Date(baseDate)
+      start.setDate(baseDate.getDate() - 13)
+      const { data: rows } = await supabase
+        .from('workouts')
+        .select('notes, date, created_at')
+        .eq('user_id', user.id)
+        .eq('is_template', false)
+        .gte('date', start.toISOString())
+        .lte('date', baseDate.toISOString())
+        .order('date', { ascending: false })
+        .limit(180)
+      const historySessions = (Array.isArray(rows) ? rows : [])
+        .map((row) => {
+          if (row?.notes && typeof row.notes === 'object') return row.notes as Record<string, unknown>
+          if (typeof row?.notes === 'string') return parseJsonWithSchema(row.notes, z.record(z.unknown()))
+          return null
+        })
+        .filter((s): s is Record<string, unknown> => Boolean(s && typeof s === 'object'))
+      const reportMeta = safeRecord(sessionObj.reportMeta)
+      const weekly = buildWeeklyVolumeStats(sessionObj, historySessions)
+      const loadFlags = buildTrainingLoadFlags(sessionObj, historySessions, weekly)
+      sessionObj.reportMeta = { ...reportMeta, weekly, loadFlags }
+    } catch {}
     if (!Object.keys(sessionObj).length) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
     const idempotencyKey = String((body as Record<string, unknown>)?.idempotencyKey || sessionObj?.idempotencyKey || sessionObj?.finishIdempotencyKey || '').trim()
     const reqId =
