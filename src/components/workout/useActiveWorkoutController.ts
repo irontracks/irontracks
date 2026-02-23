@@ -69,6 +69,18 @@ import {
 import { HELP_TERMS } from '@/utils/help/terms';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
+const parseStartedAtMs = (raw: unknown): number => {
+  const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
+  if (Number.isFinite(direct) && direct > 0) return direct
+  try {
+    const d = new Date(String(raw ?? ''))
+    const t = d.getTime()
+    return Number.isFinite(t) ? t : 0
+  } catch {
+    return 0
+  }
+}
+
 export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const { alert, confirm } = useDialog();
   const teamWorkout = useTeamWorkout() as unknown as { sendInvite: (targetUser: unknown, workout: UnknownRecord) => Promise<unknown> };
@@ -135,7 +147,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;
 
   useEffect(() => {
-    const id = setInterval(() => setTicker(Date.now()), 1000);
+    const id = setInterval(() => {
+      try {
+        if (typeof document !== 'undefined' && document.hidden) return;
+      } catch {}
+      setTicker(Date.now());
+    }, 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -1271,7 +1288,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     if (!session || !workout) return;
     if (finishing) return;
 
-    const startedAtMs = session?.startedAt ? new Date(String(session.startedAt)).getTime() : 0;
+    const startedAtMs = parseStartedAtMs(session?.startedAt);
     const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
 
     const minSecondsForFullSession = 30 * 60;
@@ -1584,7 +1601,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const currentExercise = exercises[currentExerciseIdx] ?? null;
 
   const elapsedSeconds = useMemo(() => {
-    const startedAtMs = session?.startedAt ? new Date(String(session.startedAt)).getTime() : 0;
+    const startedAtMs = parseStartedAtMs(session?.startedAt);
     return startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
   }, [session?.startedAt, ticker]);
 

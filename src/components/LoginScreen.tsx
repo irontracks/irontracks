@@ -95,7 +95,7 @@ const LoginScreen = () => {
     useEffect(() => {
         if (!recoverCooldownUntil) return;
         if (recoverCooldownLeft <= 0) return;
-        const id = setInterval(() => setCooldownTick((t) => t + 1), 500);
+        const id = setInterval(() => setCooldownTick((t) => t + 1), 1000);
         return () => clearInterval(id);
     }, [recoverCooldownUntil, recoverCooldownLeft]);
 

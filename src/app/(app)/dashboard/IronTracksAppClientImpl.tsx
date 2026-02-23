@@ -12,7 +12,6 @@ import {
     Share2,
     Trash2,
     Download,
-    Copy,
     Plus,
     Flame,
     Play,
@@ -83,7 +82,6 @@ import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
 import { useSignOut } from '@/hooks/useSignOut'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { useWorkoutDuplicates } from '@/hooks/useWorkoutDuplicates'
 import { useWorkoutExport } from '@/hooks/useWorkoutExport'
 import { useWorkoutCrud } from '@/hooks/useWorkoutCrud'
 import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
@@ -99,7 +97,6 @@ import {
     ActiveSession,
     ActiveWorkoutSession,
     PendingUpdate,
-    DuplicateGroup,
     Workout,
     Exercise,
     UserRecord
@@ -109,6 +106,17 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+const parseStartedAtMs = (raw: unknown): number => {
+    const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
+    if (Number.isFinite(direct) && direct > 0) return direct
+    try {
+        const d = new Date(String(raw ?? ''))
+        const t = d.getTime()
+        return Number.isFinite(t) ? t : 0
+    } catch {
+        return 0
+    }
+}
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
@@ -597,7 +605,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     useEffect(() => {
         if (!activeSession) return;
-        const id = setInterval(() => setSessionTicker(Date.now()), 1000);
+        const id = setInterval(() => {
+            try {
+                if (typeof document !== 'undefined' && document.hidden) return;
+            } catch { }
+            setSessionTicker(Date.now());
+        }, 1000);
         return () => clearInterval(id);
     }, [activeSession, view, setSessionTicker]);
 
@@ -731,16 +744,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // alert from useDialog returns Promise<boolean>; hooks expect Promise<void>
     const alertVoid = useCallback(async (msg: string, title?: string): Promise<void> => { await alert(msg, title) }, [alert])
 
-    // Duplicados de treinos — extraídos para useWorkoutDuplicates
-    const {
-        duplicatesOpen, setDuplicatesOpen,
-        duplicateGroups, setDuplicateGroups,
-        duplicatesBusy,
-        handleOpenDuplicates,
-        handleArchiveDuplicateGroup,
-        handleMergeDuplicateGroup,
-    } = useWorkoutDuplicates({ workouts, fetchWorkouts, alert: alertVoid, confirm })
-
     // Export/import de treinos — extraídos para useWorkoutExport
     const {
         exportWorkout, setExportWorkout,
@@ -774,7 +777,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleSaveActiveWorkoutEditor,
         handleDeleteWorkout,
         handleRestoreWorkout,
-        handleDuplicateWorkout,
         handleBulkEditWorkouts,
     } = useWorkoutCrud({
         user,
@@ -1121,7 +1123,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 onStartSession={(w) => handleStartSession(w)}
                                 onRestoreWorkout={(w) => handleRestoreWorkout(w)}
                                 onShareWorkout={(w) => handleShareWorkout(w)}
-                                onDuplicateWorkout={(w) => handleDuplicateWorkout(w)}
                                 onEditWorkout={(w) => handleEditWorkout(w)}
                                 onDeleteWorkout={(id, title) => {
                                     if (id) handleDeleteWorkout(id, String(title || ''))
@@ -1134,7 +1135,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 onOpenJsonImport={() => setShowJsonImportModal(true)}
                                 onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
                                 onNormalizeExercises={handleNormalizeExercises}
-                                onOpenDuplicates={handleOpenDuplicates}
                                 onApplyTitleRule={handleApplyTitleRule}
                                 onOpenIronScanner={async () => {
                                     try {
@@ -1316,80 +1316,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         onClose={() => setView(reportBackView || 'dashboard')}
                                     />
                                 </SectionErrorBoundary>
-                            </div>
-                        )}
-
-                        {duplicatesOpen && (
-                            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => !duplicatesBusy && setDuplicatesOpen(false)}>
-                                <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Ferramentas</div>
-                                            <div className="text-white font-black text-lg truncate">Duplicados</div>
-                                            <div className="text-xs text-neutral-400 truncate">{Array.isArray(duplicateGroups) ? `${duplicateGroups.length} grupos` : ''}</div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setDuplicatesOpen(false)}
-                                            disabled={duplicatesBusy}
-                                            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center disabled:opacity-50"
-                                            aria-label="Fechar"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                    <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                                        {(Array.isArray(duplicateGroups) ? duplicateGroups : []).map((g, idx) => {
-                                            const items = Array.isArray(g?.items) ? g.items : []
-                                            const score = Number(g?.score || 0)
-                                            const base = items[0]
-                                            return (
-                                                <div key={`dup-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-4">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div className="min-w-0">
-                                                            <div className="text-xs text-neutral-500 font-bold uppercase tracking-widest">Similaridade</div>
-                                                            <div className="text-white font-black truncate">{String((base as Record<string, unknown>)?.title ?? 'Treino')}</div>
-                                                            <div className="text-xs text-neutral-400">{Math.round(score * 100)}%</div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                type="button"
-                                                                disabled={duplicatesBusy}
-                                                                onClick={() => handleMergeDuplicateGroup(g)}
-                                                                className="min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-50"
-                                                            >
-                                                                Mesclar
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                disabled={duplicatesBusy}
-                                                                onClick={() => handleArchiveDuplicateGroup(g)}
-                                                                className="min-h-[40px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
-                                                            >
-                                                                Arquivar
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="mt-3 space-y-2">
-                                                        {items.map((w: unknown, wi: number) => {
-                                                            const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                                            const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
-                                                            return (
-                                                                <div key={`dup-item-${idx}-${wi}`} className="flex items-center justify-between gap-3 rounded-lg bg-neutral-900/40 border border-neutral-800 px-3 py-2">
-                                                                    <div className="min-w-0">
-                                                                        <div className="text-sm font-bold text-white truncate">{String(wo?.title || 'Treino')}</div>
-                                                                        <div className="text-[11px] text-neutral-500 font-mono">{exCount} EXERCÍCIOS</div>
-                                                                    </div>
-                                                                    <div className="text-[11px] font-bold text-neutral-500">{wi === 0 ? 'BASE' : 'DUP'}</div>
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
                             </div>
                         )}
 
@@ -1689,7 +1615,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-white truncate">{activeSession.workout?.title || 'Treino em andamento'}</h3>
                                         <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
-                                            <span className="font-mono text-yellow-500">{(() => { const end = sessionTicker || activeSession.startedAt; const s = Math.max(0, Math.floor((end - activeSession.startedAt) / 1000)); const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
+                                            <span className="font-mono text-yellow-500">{(() => { const startMs = parseStartedAtMs(activeSession.startedAt); const endMs = sessionTicker || startMs; const s = startMs > 0 ? Math.max(0, Math.floor((endMs - startMs) / 1000)) : 0; const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
                                             <span className="text-neutral-500">tempo atual</span>
                                             <span className="opacity-30">•</span>
                                             <span className="font-mono text-neutral-200">{(() => { const list = Array.isArray(activeSession.workout?.exercises) ? activeSession.workout.exercises : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>

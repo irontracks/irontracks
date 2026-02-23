@@ -139,7 +139,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         };
 
         updateTimer();
-        const interval = setInterval(updateTimer, 100);
+        const interval = setInterval(updateTimer, 250);
         return () => clearInterval(interval);
     }, [allowNotify, targetTime]);
 
