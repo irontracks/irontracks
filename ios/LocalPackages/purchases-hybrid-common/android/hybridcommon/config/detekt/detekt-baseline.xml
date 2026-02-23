@@ -1,0 +1,21 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues>
+    <ID>EmptyFunctionBlock:CommonKtTests.kt$CommonKtTests.&lt;no name provided&gt;${}</ID>
+    <ID>Filename:common.kt$com.revenuecat.purchases.hybridcommon.common.kt</ID>
+    <ID>Filename:mappersHelpers.kt$com.revenuecat.purchases.hybridcommon.mappers.mappersHelpers.kt</ID>
+    <ID>Filename:subscriberAttributes.kt$com.revenuecat.purchases.hybridcommon.subscriberAttributes.kt</ID>
+    <ID>LargeClass:CommonKtTests.kt$CommonKtTests</ID>
+    <ID>LongMethod:CommonKtTests.kt$CommonKtTests$@Test fun `purchaseProduct with base plan id passes correct productIdentifier after a successful purchase`()</ID>
+    <ID>LongParameterList:CommonKtTests.kt$( billingPeriod: Period = Period(1, Period.Unit.MONTH, "P1M"), priceCurrencyCodeValue: String = "USD", priceFormatted: String = "$4.99", price: Double = 4.99, recurrenceMode: RecurrenceMode = RecurrenceMode.INFINITE_RECURRING, billingCycleCount: Int = 0, )</ID>
+    <ID>SwallowedException:CommonKtTests.kt$CommonKtTests$e: InvalidReplacementModeException</ID>
+    <ID>SwallowedException:common.kt$e: IllegalArgumentException</ID>
+    <ID>SwallowedException:common.kt$e: IndexOutOfBoundsException</ID>
+    <ID>SwallowedException:common.kt$e: InvalidReplacementModeException</ID>
+    <ID>TooGenericExceptionCaught:common.kt$e: IndexOutOfBoundsException</ID>
+    <ID>TooManyFunctions:StoreProductMapper.kt$com.revenuecat.purchases.hybridcommon.mappers.StoreProductMapper.kt</ID>
+    <ID>TooManyFunctions:common.kt$com.revenuecat.purchases.hybridcommon.common.kt</ID>
+    <ID>TooManyFunctions:subscriberAttributes.kt$com.revenuecat.purchases.hybridcommon.subscriberAttributes.kt</ID>
+  </CurrentIssues>
+</SmellBaseline>
