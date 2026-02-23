@@ -275,6 +275,54 @@ async function fetchPlanLimits(supabase: SupabaseClient, planId: string): Promis
   }
 }
 
+const toTzParts = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(date)
+  const map = parts.reduce<Record<string, string>>((acc, part) => {
+    if (part.type !== 'literal') acc[part.type] = part.value
+    return acc
+  }, {})
+  const weekday = String(map.weekday || '').toLowerCase()
+  const weekdayIndex =
+    weekday === 'mon' ? 1 : weekday === 'tue' ? 2 : weekday === 'wed' ? 3 : weekday === 'thu' ? 4 : weekday === 'fri' ? 5 : weekday === 'sat' ? 6 : 0
+  return {
+    year: Number(map.year),
+    month: Number(map.month),
+    day: Number(map.day),
+    weekdayIndex,
+  }
+}
+
+const tzDateToUtc = (timeZone: string, year: number, month: number, day: number, hour: number, minute: number, second: number) => {
+  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
+  const tzDate = new Date(utcGuess.toLocaleString('en-US', { timeZone }))
+  const offset = utcGuess.getTime() - tzDate.getTime()
+  return new Date(utcGuess.getTime() + offset)
+}
+
+const getWeeklyResetStart = (now: Date) => {
+  const timeZone = 'America/Sao_Paulo'
+  const currentParts = toTzParts(now, timeZone)
+  const daysSinceMonday = (currentParts.weekdayIndex + 6) % 7
+  const mondayDay = currentParts.day - daysSinceMonday
+  const weekStart = tzDateToUtc(timeZone, currentParts.year, currentParts.month, mondayDay, 3, 0, 0)
+  if (now.getTime() < weekStart.getTime()) {
+    const prevMonday = new Date(weekStart.getTime() - 7 * 24 * 60 * 60 * 1000)
+    return prevMonday
+  }
+  return weekStart
+}
+
 export async function checkVipFeatureAccess(
   supabase: SupabaseClient, 
   userId: string, 
@@ -309,6 +357,18 @@ export async function checkVipFeatureAccess(
   // Numeric limits (chat_daily, wizard_weekly)
   if (feature === 'chat_daily') {
     const today = new Date().toISOString().split('T')[0]
+    if (normalizedTier === 'free') {
+      const weekStart = getWeeklyResetStart(new Date()).toISOString()
+      const { data: usages } = await supabase
+        .from('vip_usage_daily')
+        .select('usage_count')
+        .eq('user_id', userId)
+        .eq('feature_key', 'chat')
+        .gte('last_used_at', weekStart)
+      const current = usages?.reduce((sum, row) => sum + row.usage_count, 0) || 0
+      return { allowed: current < limit, currentUsage: current, limit, tier }
+    }
+
     const { data: usage } = await supabase
       .from('vip_usage_daily')
       .select('usage_count')
@@ -322,21 +382,14 @@ export async function checkVipFeatureAccess(
   }
 
   if (feature === 'wizard_weekly' || feature === 'insights_weekly') {
-    // Sum usage of last 7 days
-    const today = new Date()
-    const sevenDaysAgo = new Date(today)
-    sevenDaysAgo.setDate(today.getDate() - 6) // -6 days + today = 7 days window
-    
-    // Map feature to db key
+    const weekStart = getWeeklyResetStart(new Date()).toISOString()
     const dbKey = feature === 'wizard_weekly' ? 'wizard' : 'insights'
-
     const { data: usages } = await supabase
       .from('vip_usage_daily')
       .select('usage_count')
       .eq('user_id', userId)
       .eq('feature_key', dbKey)
-      .gte('day', sevenDaysAgo.toISOString().split('T')[0])
-    
+      .gte('last_used_at', weekStart)
     const current = usages?.reduce((sum, row) => sum + row.usage_count, 0) || 0
     return { allowed: current < (limit || 0), currentUsage: current, limit, tier }
   }

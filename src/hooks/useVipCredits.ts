@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
 interface VipCredits {
-    chat?: { used: number; limit: number }
-    wizard?: { used: number; limit: number }
-    insights?: { used: number; limit: number }
+    chat?: { used: number; limit: number | null; label?: string }
+    wizard?: { used: number; limit: number | null; label?: string }
+    insights?: { used: number; limit: number | null; label?: string }
     plan?: string
     [key: string]: unknown
 }
