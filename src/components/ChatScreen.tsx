@@ -68,6 +68,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const [showEmoji, setShowEmoji] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [uploading, setUploading] = useState(false);
+    const visibilityRef = useRef(true);
     
     const [searchQuery] = useState('');
     const userObj: Record<string, unknown> = isRecord(user) ? user : {}
@@ -81,6 +82,25 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         confirmRef.current = confirm;
         promptRef.current = prompt;
     }, [alert, confirm, prompt]);
+
+    useEffect(() => {
+        const updateVisibility = () => {
+            try {
+                visibilityRef.current = typeof document === 'undefined' ? true : !document.hidden;
+            } catch {
+                visibilityRef.current = true;
+            }
+        };
+        updateVisibility();
+        try {
+            if (typeof document !== 'undefined') document.addEventListener('visibilitychange', updateVisibility);
+        } catch { }
+        return () => {
+            try {
+                if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', updateVisibility);
+            } catch { }
+        };
+    }, []);
 
     const [privateChannels, setPrivateChannels] = useState<Array<Record<string, unknown>>>([]);
     const [sendingInviteTo, setSendingInviteTo] = useState<{ uid: string; displayName: string } | null>(null);
@@ -200,6 +220,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
 
         setMessages([]);
         const loadMessages = async () => {
+            if (!visibilityRef.current) return;
             try {
                 const res = await fetch(`/api/chat/messages?channel_id=${activeChannel.id}`);
                 const ct = res.headers.get('content-type') || '';
@@ -250,7 +271,10 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             )
             .subscribe();
 
-        const poll = setInterval(loadMessages, 5000);
+        const poll = setInterval(() => {
+            if (!visibilityRef.current) return;
+            loadMessages();
+        }, 5000);
         return () => { supabase.removeChannel(channel); clearInterval(poll); };
     }, [activeChannel, formatMessage, supabase]);
 

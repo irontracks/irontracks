@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Plus, Dumbbell, Play, Share2, Copy, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2, Crown } from 'lucide-react'
+import { Plus, Dumbbell, Play, Share2, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2, Crown } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { z } from 'zod'
@@ -217,7 +217,6 @@ type Props = {
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
   onShareWorkout: (w: DashboardWorkout) => MaybePromise<void>
-  onDuplicateWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onEditWorkout: (w: DashboardWorkout) => MaybePromise<void>
   onDeleteWorkout: (id?: string, title?: string) => MaybePromise<void>
   onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
@@ -228,7 +227,6 @@ type Props = {
   onOpenJsonImport: () => void
   onNormalizeExercises?: () => MaybePromise<void>
   onNormalizeAiWorkoutTitles?: () => MaybePromise<void>
-  onOpenDuplicates?: () => MaybePromise<void>
   onApplyTitleRule?: () => MaybePromise<void>
   onOpenIronScanner: () => void
   streakStats?: {
@@ -261,7 +259,6 @@ export default function StudentDashboard(props: Props) {
   const [creatingWorkout, setCreatingWorkout] = useState(false)
   const [normalizingAiTitles, setNormalizingAiTitles] = useState(false)
   const [normalizingExercises, setNormalizingExercises] = useState(false)
-  const [findingDuplicates, setFindingDuplicates] = useState(false)
   const [applyingTitleRule, setApplyingTitleRule] = useState(false)
   const [editListOpen, setEditListOpen] = useState(false)
   const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
@@ -1194,23 +1191,6 @@ export default function StudentDashboard(props: Props) {
                           <button
                             onClick={async () => {
                               setToolsOpen(false)
-                              if (typeof props.onOpenDuplicates !== 'function') return
-                              try {
-                                setFindingDuplicates(true)
-                                await props.onOpenDuplicates()
-                              } finally {
-                                setFindingDuplicates(false)
-                              }
-                            }}
-                            disabled={findingDuplicates}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
-                          >
-                            <span className="font-bold text-white">{findingDuplicates ? 'Buscando...' : 'Encontrar duplicados'}</span>
-                            {findingDuplicates ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">≋</span>}
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setToolsOpen(false)
                               if (typeof props.onApplyTitleRule !== 'function') return
                               try {
                                 setApplyingTitleRule(true)
@@ -1394,17 +1374,6 @@ export default function StudentDashboard(props: Props) {
                     onClick={async (e) => {
                       e.stopPropagation()
                       const key = getWorkoutKey(w, idx)
-                      await runWorkoutAction(key, 'duplicate', () => props.onDuplicateWorkout(w))
-                    }}
-                    disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-                  >
-                    {isActionBusy(getWorkoutKey(w, idx), 'duplicate') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Copy size={14} />}
-                  </button>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      const key = getWorkoutKey(w, idx)
                       await runWorkoutAction(key, 'edit', () => props.onEditWorkout(w))
                     }}
                     disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
@@ -1412,19 +1381,17 @@ export default function StudentDashboard(props: Props) {
                   >
                     {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
                   </button>
-                  {w?.user_id && props.currentUserId && w.user_id === props.currentUserId ? (
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        const key = getWorkoutKey(w, idx)
-                        await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
-                      }}
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-                    >
-                      {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
-                    </button>
-                  ) : null}
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      const key = getWorkoutKey(w, idx)
+                      await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
+                    }}
+                    disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                  >
+                    {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
+                  </button>
                 </div>
               </div>
             ))}

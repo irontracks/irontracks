@@ -65,7 +65,6 @@ interface UseWorkoutCrudReturn {
     handleSaveActiveWorkoutEditor: (workoutFromEditor: unknown) => Promise<unknown>
     handleDeleteWorkout: (id: string, title: unknown) => Promise<void>
     handleRestoreWorkout: (workout: unknown) => Promise<void>
-    handleDuplicateWorkout: (workout: unknown) => Promise<void>
     handleBulkEditWorkouts: (items: unknown) => Promise<void>
 }
 
@@ -478,22 +477,6 @@ export function useWorkoutCrud({
         }
     }, [alert, confirm, fetchWorkouts])
 
-    const handleDuplicateWorkout = useCallback(async (workout: unknown) => {
-        const w = workout && typeof workout === 'object'
-            ? (workout as Record<string, unknown>)
-            : ({} as Record<string, unknown>)
-        if (!(await confirm(`Duplicar "${String(w.title || '')}"?`, 'Duplicar Treino'))) return
-        const newWorkout = { ...w, title: `${String(w.title || '')} (Cópia)` }
-        delete (newWorkout as Record<string, unknown>).id
-        try {
-            await createWorkout(newWorkout as Record<string, unknown>)
-            await fetchWorkouts()
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e)
-            await alert('Erro ao duplicar: ' + message)
-        }
-    }, [alert, confirm, fetchWorkouts])
-
     const handleBulkEditWorkouts = useCallback(async (items: unknown) => {
         try {
             const arr = Array.isArray(items) ? items : []
@@ -558,7 +541,6 @@ export function useWorkoutCrud({
         handleSaveActiveWorkoutEditor,
         handleDeleteWorkout,
         handleRestoreWorkout,
-        handleDuplicateWorkout,
         handleBulkEditWorkouts,
     }
 }
