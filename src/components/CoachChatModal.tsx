@@ -171,6 +171,9 @@ export default function CoachChatModal({
     if (!isOpen) return null;
     const hideVipCtas = isIosNative();
 
+    const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
+    const isChatExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
+
     return (
         <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-neutral-900 border border-neutral-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
@@ -184,8 +187,8 @@ export default function CoachChatModal({
                             <div className="flex items-center gap-2">
                                 <div className="text-xs text-yellow-500 font-bold">IA Analysis</div>
                                 {credits?.chat && (
-                                    <div className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${credits.chat.used >= credits.chat.limit ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
-                                        {credits.chat.used}/{credits.chat.limit > 1000 ? '∞' : credits.chat.limit}
+                                    <div className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${isChatExhausted(credits.chat) ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
+                                        {credits.chat.used}/{formatLimit(credits.chat.limit)}
                                     </div>
                                 )}
                             </div>
@@ -274,8 +277,8 @@ export default function CoachChatModal({
                     <div className="p-4 border-t border-neutral-800 bg-neutral-950/50 rounded-b-2xl">
                         {credits?.chat && (
                             <div className="flex justify-end mb-2">
-                                <span className={`text-[10px] font-mono font-bold ${credits.chat.used >= credits.chat.limit ? 'text-red-400' : 'text-neutral-500'}`}>
-                                    Mensagens hoje: {credits.chat.used}/{credits.chat.limit > 1000 ? '∞' : credits.chat.limit}
+                                <span className={`text-[10px] font-mono font-bold ${isChatExhausted(credits.chat) ? 'text-red-400' : 'text-neutral-500'}`}>
+                                    Mensagens hoje: {credits.chat.used}/{formatLimit(credits.chat.limit)}
                                 </span>
                             </div>
                         )}

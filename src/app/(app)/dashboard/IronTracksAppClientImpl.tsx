@@ -191,6 +191,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         initialRole,
     })
 
+    useEffect(() => {
+        try {
+            const flag = sessionStorage.getItem('irontracks_open_vip')
+            if (!flag) return
+            sessionStorage.removeItem('irontracks_open_vip')
+            setView('vip')
+        } catch { }
+    }, [])
+
     const [coachPending, setCoachPending] = useState(false);
     const [openStudent, setOpenStudent] = useState<Record<string, unknown> | null>(null);
     const [showNotifCenter, setShowNotifCenter] = useState(false);

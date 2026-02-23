@@ -63,6 +63,28 @@ interface VipStatsRow {
     };
 }
 
+type VipUsageRow = {
+    user_id: string;
+    feature_key: string;
+    usage_count: number;
+    day: string | null;
+    last_used_at: string | null;
+};
+
+type ProfileRow = {
+    id: string;
+    display_name: string | null;
+    email: string | null;
+};
+
+type UserUsageRow = {
+    userId: string;
+    name: string;
+    email: string;
+    totals: { chat: number; insights: number; wizard: number };
+    total: number;
+};
+
 interface AdminVipReportsProps {
     supabase: SupabaseClient;
 }
@@ -72,6 +94,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
     const [stats, setStats] = useState<VipStatsRow[]>([]);
     const [period, setPeriod] = useState<'7d' | '30d'>('7d');
     const [error, setError] = useState('');
+    const [userUsage, setUserUsage] = useState<UserUsageRow[]>([]);
 
     const loadStats = useCallback(async () => {
         setLoading(true);
@@ -79,7 +102,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
         try {
             const endDate = new Date();
             const startDate = new Date();
-            startDate.setDate(endDate.getDate() - (period === '30d' ? 30 : 7));
+            startDate.setDate(endDate.getDate() - (period === '30d' ? 29 : 6));
 
             const { data, error } = await supabase.rpc('admin_get_vip_stats', {
                 period_start: startDate.toISOString().split('T')[0],
@@ -88,6 +111,50 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
 
             if (error) throw error;
             setStats(data || []);
+
+            const { data: usageRows } = await supabase
+                .from('vip_usage_daily')
+                .select('user_id, feature_key, usage_count, day, last_used_at')
+                .gte('last_used_at', startDate.toISOString())
+                .lte('last_used_at', endDate.toISOString())
+            const usageList = Array.isArray(usageRows) ? (usageRows as VipUsageRow[]) : [];
+            const usageMap = new Map<string, { chat: number; insights: number; wizard: number }>();
+            usageList.forEach((row) => {
+                const userId = String(row.user_id || '').trim();
+                if (!userId) return;
+                const acc = usageMap.get(userId) || { chat: 0, insights: 0, wizard: 0 };
+                if (row.feature_key === 'chat') acc.chat += Number(row.usage_count || 0);
+                if (row.feature_key === 'insights') acc.insights += Number(row.usage_count || 0);
+                if (row.feature_key === 'wizard') acc.wizard += Number(row.usage_count || 0);
+                usageMap.set(userId, acc);
+            });
+
+            const userIds = Array.from(usageMap.keys());
+            if (!userIds.length) {
+                setUserUsage([]);
+                return;
+            }
+
+            const { data: profilesRows } = await supabase
+                .from('profiles')
+                .select('id, display_name, email')
+                .in('id', userIds);
+            const profilesList = Array.isArray(profilesRows) ? (profilesRows as ProfileRow[]) : [];
+            const profileMap = new Map<string, ProfileRow>();
+            profilesList.forEach((row) => {
+                profileMap.set(String(row.id || ''), row);
+            });
+
+            const rows: UserUsageRow[] = userIds.map((userId) => {
+                const totals = usageMap.get(userId) || { chat: 0, insights: 0, wizard: 0 };
+                const profile = profileMap.get(userId);
+                const name = String(profile?.display_name || '').trim() || '—';
+                const email = String(profile?.email || '').trim() || '—';
+                const total = totals.chat + totals.insights + totals.wizard;
+                return { userId, name, email, totals, total };
+            });
+            rows.sort((a, b) => b.total - a.total);
+            setUserUsage(rows.slice(0, 20));
         } catch (err) {
             logError('error', err);
             setError('Falha ao carregar relatórios VIP.');
@@ -359,6 +426,48 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                     </td>
                                 </tr>
                             ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div className="bg-neutral-900 rounded-xl border border-neutral-800 overflow-hidden">
+                <div className="p-4 border-b border-neutral-800">
+                    <h3 className="text-sm font-bold text-white">Gastos por Usuário (Top 20)</h3>
+                    <p className="text-xs text-neutral-400 mt-1">Somatório de uso por função no período selecionado.</p>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-neutral-950 text-neutral-400 uppercase text-xs font-bold">
+                            <tr>
+                                <th className="px-6 py-3">Usuário</th>
+                                <th className="px-6 py-3 text-center">Chat</th>
+                                <th className="px-6 py-3 text-center">Insights</th>
+                                <th className="px-6 py-3 text-center">Wizard</th>
+                                <th className="px-6 py-3 text-center">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-800">
+                            {userUsage.length ? (
+                                userUsage.map((row) => (
+                                    <tr key={row.userId} className="hover:bg-neutral-800/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="text-white font-bold">{row.name}</div>
+                                            <div className="text-xs text-neutral-500">{row.email}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-center font-mono text-neutral-300">{row.totals.chat.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-center font-mono text-neutral-300">{row.totals.insights.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-center font-mono text-neutral-300">{row.totals.wizard.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-center font-mono text-white">{row.total.toLocaleString()}</td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-6 text-center text-neutral-500">
+                                        Nenhum consumo encontrado para o período selecionado.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

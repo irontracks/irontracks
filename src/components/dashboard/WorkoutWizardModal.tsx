@@ -6,6 +6,8 @@ import { useVipCredits } from '@/hooks/useVipCredits'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { useDialog } from '@/contexts/DialogContext'
+import { useRouter } from 'next/navigation'
 
 export type WorkoutWizardGoal = 'hypertrophy' | 'strength' | 'conditioning' | 'maintenance'
 export type WorkoutWizardSplit = 'full_body' | 'upper_lower' | 'ppl'
@@ -75,8 +77,9 @@ const titleFocus = (f: WorkoutWizardFocus) =>
 const titleEquipment = (e: WorkoutWizardEquipment) => (e === 'gym' ? 'Academia' : e === 'home' ? 'Casa' : 'Mínimo (halteres/elástico)')
 
 export default function WorkoutWizardModal(props: Props) {
-  const { credits: creditsRaw, loading: creditsLoading, error: creditsError } = useVipCredits() as { credits: unknown; loading: boolean; error: string | null }
-  const credits = creditsRaw as Record<string, Record<string, number>> | null | undefined
+  const { credits, loading: creditsLoading, error: creditsError } = useVipCredits()
+  const { confirm } = useDialog()
+  const router = useRouter()
   const isOpen = !!props.isOpen
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<GenerateMode>('single')
@@ -99,6 +102,8 @@ export default function WorkoutWizardModal(props: Props) {
 
   const canBack = step > 0
   const canNext = step < 4
+  const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
+  const isWizardExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
 
   useEffect(() => {
     if (!isOpen) return
@@ -142,6 +147,21 @@ export default function WorkoutWizardModal(props: Props) {
 
   const doGenerate = async () => {
     if (generating) return
+    const wizardCredits = credits?.wizard
+    if (isWizardExhausted(wizardCredits)) {
+      const ok = await confirm(
+        'Seus créditos do Wizard acabaram. Assine o VIP para liberar mais gerações.',
+        'Créditos esgotados',
+        { confirmText: 'Assinar VIP', cancelText: 'Agora não' }
+      )
+      if (ok) {
+        try {
+          sessionStorage.setItem('irontracks_open_vip', '1')
+        } catch { }
+        router.push('/dashboard')
+      }
+      return
+    }
     setGenerating(true)
     setError('')
     setDraft(null)
@@ -209,8 +229,8 @@ export default function WorkoutWizardModal(props: Props) {
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
               Criar Treino
               {credits?.wizard && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono text-white ${credits.wizard.used >= credits.wizard.limit ? 'bg-red-500/40' : 'bg-neutral-800'}`}>
-                  {credits.wizard.used}/{credits.wizard.limit > 1000 ? '∞' : credits.wizard.limit}
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono text-white ${isWizardExhausted(credits.wizard) ? 'bg-red-500/40' : 'bg-neutral-800'}`}>
+                  {credits.wizard.used}/{formatLimit(credits.wizard.limit)}
                 </span>
               )}
             </div>
@@ -461,8 +481,8 @@ export default function WorkoutWizardModal(props: Props) {
                 {credits?.wizard && (
                   <div className="mt-3 flex items-center justify-between bg-neutral-900/60 p-2 rounded-lg border border-neutral-800">
                     <div className="text-xs text-neutral-400 font-bold">Seus créditos semanais</div>
-                    <div className={`text-xs font-mono font-bold ${credits.wizard.used >= credits.wizard.limit ? 'text-red-400' : 'text-green-400'}`}>
-                      {credits.wizard.used} / {credits.wizard.limit > 1000 ? '∞' : credits.wizard.limit}
+                    <div className={`text-xs font-mono font-bold ${isWizardExhausted(credits.wizard) ? 'text-red-400' : 'text-green-400'}`}>
+                      {credits.wizard.used} / {formatLimit(credits.wizard.limit)}
                     </div>
                   </div>
                 )}

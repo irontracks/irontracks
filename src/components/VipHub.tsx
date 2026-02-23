@@ -7,6 +7,8 @@ import VipPeriodizationPanel from '@/components/vip/VipPeriodizationPanel'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
 import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
 import { useVipCredits } from '@/hooks/useVipCredits'
+import { useDialog } from '@/contexts/DialogContext'
+import { useRouter } from 'next/navigation'
 import type { Workout } from '@/types/app'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -63,6 +65,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const [busy, setBusy] = useState(false)
   const [vipStatus, setVipStatus] = useState<VipStatus | null>(null)
   const { credits } = useVipCredits()
+  const { confirm } = useDialog()
+  const router = useRouter()
   const chatRef = useRef<HTMLDivElement | null>(null)
   const [weeklyOpen, setWeeklyOpen] = useState(false)
   const [insightsOpen, setInsightsOpen] = useState(false)
@@ -114,6 +118,25 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const send = async () => {
     const text = String(draft || '').trim()
     if (!text || busy) return
+    const chatCredits = credits?.chat
+    if (chatCredits && chatCredits.limit !== null && chatCredits.used >= chatCredits.limit) {
+      const ok = await confirm(
+        'Seus créditos do Coach IA acabaram. Assine o VIP para liberar mais mensagens.',
+        'Créditos esgotados',
+        { confirmText: 'Assinar VIP', cancelText: 'Agora não' }
+      )
+      if (ok) {
+        if (typeof onOpenVipTab === 'function') {
+          onOpenVipTab()
+        } else {
+          try {
+            sessionStorage.setItem('irontracks_open_vip', '1')
+          } catch { }
+          router.push('/dashboard')
+        }
+      }
+      return
+    }
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
     setMessages((prev) => [...(Array.isArray(prev) ? prev : []), { id, role: 'user', text }].slice(-60))
     setDraft('')
@@ -382,7 +405,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const chip = (label: string, used: number | null | undefined, limit: number | null | undefined) => {
     const u = Number(used || 0)
     const l = limit == null ? null : Number(limit)
-    const unlimited = l != null && l > 1000
+    const unlimited = l == null || l > 1000
     const txt = unlimited ? `${label}: ∞` : l != null && Number.isFinite(l) ? `${label}: ${u}/${l}` : `${label}: ${u}`
     const danger = !unlimited && l != null && Number.isFinite(l) && l > 0 && u >= l
     const cls = danger ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-neutral-800 bg-neutral-900/40 text-neutral-200'

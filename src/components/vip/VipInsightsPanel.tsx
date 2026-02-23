@@ -7,6 +7,9 @@ import { generatePostWorkoutInsights } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { useVipCredits } from '@/hooks/useVipCredits'
+import { useDialog } from '@/contexts/DialogContext'
+import { useRouter } from 'next/navigation'
 
 type Row = {
   id: string
@@ -29,6 +32,9 @@ const formatBr = (iso: string) => {
 
 export default function VipInsightsPanel(props: { onOpenReport?: (session: unknown) => void; onOpenHistory?: () => void }) {
   const supabase = useMemo(() => createClient(), [])
+  const { credits } = useVipCredits()
+  const { confirm } = useDialog()
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [rows, setRows] = useState<Row[]>([])
   const [error, setError] = useState('')
@@ -104,6 +110,21 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
     const id = String(workoutId || '').trim()
     if (!id) return
     if (busyId) return
+    const insightCredits = credits?.insights
+    if (insightCredits && insightCredits.limit !== null && insightCredits.used >= insightCredits.limit) {
+      const ok = await confirm(
+        'Seus créditos de Insights acabaram. Assine o VIP para liberar mais análises.',
+        'Créditos esgotados',
+        { confirmText: 'Assinar VIP', cancelText: 'Agora não' }
+      )
+      if (ok) {
+        try {
+          sessionStorage.setItem('irontracks_open_vip', '1')
+        } catch { }
+        router.push('/dashboard')
+      }
+      return
+    }
     setBusyId(id)
     setError('')
     setUpgradeCta(false)
@@ -114,6 +135,19 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
         setUpgradeCta(needsUpgrade)
         const msg = needsUpgrade ? 'Disponível para assinantes VIP.' : String((res as Record<string, unknown>)?.error || 'Falha ao gerar insights.')
         setError(msg)
+        if (needsUpgrade) {
+          const ok = await confirm(
+            'Esse recurso está disponível para VIP. Quer abrir a área VIP agora?',
+            'Assinar VIP',
+            { confirmText: 'Abrir VIP', cancelText: 'Agora não' }
+          )
+          if (ok) {
+            try {
+              sessionStorage.setItem('irontracks_open_vip', '1')
+            } catch { }
+            router.push('/dashboard')
+          }
+        }
         return
       }
       await load()
@@ -130,6 +164,11 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
           <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Insights</div>
           <div className="text-white font-black text-sm">Pós-treino e progressão</div>
         </div>
+        {credits?.insights ? (
+          <div className={`text-[10px] px-2 py-1 rounded font-mono ${credits.insights.limit !== null && credits.insights.used >= credits.insights.limit ? 'bg-red-500/20 text-red-300' : 'bg-neutral-800 text-neutral-300'}`}>
+            {credits.insights.used}/{credits.insights.limit == null ? '∞' : credits.insights.limit}
+          </div>
+        ) : null}
         <button
           type="button"
           onClick={load}
@@ -147,10 +186,22 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
           {upgradeCta ? (
             <button
               type="button"
-              onClick={() => (window.location.href = '/marketplace')}
+              onClick={async () => {
+                const ok = await confirm(
+                  'Esse recurso está disponível para VIP. Quer abrir a área VIP agora?',
+                  'Assinar VIP',
+                  { confirmText: 'Abrir VIP', cancelText: 'Agora não' }
+                )
+                if (ok) {
+                  try {
+                    sessionStorage.setItem('irontracks_open_vip', '1')
+                  } catch { }
+                  router.push('/dashboard')
+                }
+              }}
               className="shrink-0 rounded-xl bg-yellow-500 px-3 py-2 text-xs font-black text-black hover:bg-yellow-400"
             >
-              Ver planos
+              Assinar VIP
             </button>
           ) : null}
         </div>

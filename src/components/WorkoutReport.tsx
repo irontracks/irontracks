@@ -255,6 +255,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     });
     const [showCoachChat, setShowCoachChat] = useState(false);
     const { credits } = useVipCredits();
+    const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
+    const isInsightsExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
 
     useEffect(() => {
         if (!storiesV2Enabled) {
@@ -1228,8 +1230,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                             <div className="flex items-center gap-2">
                                 <div className="text-lg font-black text-white">Insights pós-treino</div>
                                 {credits?.insights && (
-                                    <div className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${credits.insights.used >= credits.insights.limit ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
-                                        {credits.insights.used}/{credits.insights.limit > 1000 ? '∞' : credits.insights.limit}
+                                    <div className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${isInsightsExhausted(credits.insights) ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
+                                        {credits.insights.used}/{formatLimit(credits.insights.limit)}
                                     </div>
                                 )}
                             </div>
@@ -1248,7 +1250,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                 </div>
                                 {credits?.insights && (
                                     <span className="text-[9px] font-mono opacity-80">
-                                        ({credits.insights.used}/{credits.insights.limit > 1000 ? '∞' : credits.insights.limit})
+                                        ({credits.insights.used}/{formatLimit(credits.insights.limit)})
                                     </span>
                                 )}
                             </button>
