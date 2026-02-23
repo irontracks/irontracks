@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, Sparkles } from 'lucide-react'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 export type WorkoutWizardGoal = 'hypertrophy' | 'strength' | 'conditioning' | 'maintenance'
 export type WorkoutWizardSplit = 'full_body' | 'upper_lower' | 'ppl'
@@ -113,7 +115,7 @@ export default function WorkoutWizardModal(props: Props) {
       const raw = window.localStorage.getItem('irontracks_wizard_prefill_v1')
       if (raw) {
         window.localStorage.removeItem('irontracks_wizard_prefill_v1')
-        const parsed = JSON.parse(raw)
+        const parsed = parseJsonWithSchema(raw, z.record(z.unknown()))
         const extra = parsed && typeof parsed === 'object' ? String(parsed?.constraints || '').trim() : ''
         if (extra) {
           setAnswers((prev) => ({ ...prev, constraints: prev.constraints ? `${prev.constraints}\n\n${extra}` : extra }))

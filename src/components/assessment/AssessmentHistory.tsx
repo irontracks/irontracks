@@ -24,6 +24,8 @@ import AssessmentPDFGenerator from '@/components/assessment/AssessmentPDFGenerat
 import { generateAssessmentPlanAi } from '@/actions/workout-actions';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 ChartJS.register(
   CategoryScale,
@@ -177,7 +179,7 @@ const safeJsonParse = (raw: unknown): Record<string, unknown> | null => {
     if (!raw) return null;
     if (isRecord(raw)) return raw;
     if (typeof raw !== 'string') return null;
-    const parsed: unknown = JSON.parse(raw);
+    const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()));
     return isRecord(parsed) ? parsed : null;
   } catch {
     return null;

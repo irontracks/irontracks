@@ -1,18 +1,12 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
-const safeJsonParse = (raw: string) => {
-  try {
-    const s = String(raw || '').trim()
-    if (!s) return null
-    return JSON.parse(s)
-  } catch {
-    return null
-  }
-}
+const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
 
 const normalizeText = (v: unknown) => {
   return String(v || '')

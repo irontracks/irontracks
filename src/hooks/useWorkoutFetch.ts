@@ -6,6 +6,8 @@ import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 import { cacheGetWorkouts, cacheSetWorkouts } from '@/lib/offline/offlineSync'
 import { logError, logWarn } from '@/lib/logger'
 import type { Exercise } from '@/types/app'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -460,7 +462,7 @@ export function useWorkoutFetch({
                 const k = 'workouts_cache_' + user.id
                 const cached = localStorage.getItem(k)
                 if (cached) {
-                    const arr = JSON.parse(cached)
+                    const arr = parseJsonWithSchema(cached, z.array(z.record(z.unknown())))
                     if (Array.isArray(arr) && arr.length > 0) setWorkouts(arr)
                 }
             } catch { }

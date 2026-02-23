@@ -3,6 +3,8 @@ import { Search, UserPlus, Check, X } from 'lucide-react';
 import Image from 'next/image';
 import { useDialog } from '@/contexts/DialogContext';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 interface InviteCandidate {
     id: string
@@ -52,7 +54,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                 const raw = window.localStorage.getItem('irontracks.inviteCache.v1') || '';
                 if (raw) {
                     try {
-                        const parsed = JSON.parse(raw);
+                        const parsed = parseJsonWithSchema(raw, z.record(z.unknown()));
                         let items = null;
                         if (Array.isArray(parsed)) {
                             items = parsed;

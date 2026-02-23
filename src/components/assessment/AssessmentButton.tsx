@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, TrendingUp, X, Upload } from 'lucide-react';
 import { AssessmentForm } from './AssessmentForm';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 interface AssessmentButtonProps {
   studentId: string;
@@ -90,10 +92,9 @@ export default function AssessmentButton({
       const text = await file.text();
       let parsed: unknown;
 
-      try {
-        parsed = JSON.parse(text);
-      } catch (error) {
-        logError('error', "Erro ao parsear JSON de avaliação", error);
+      parsed = parseJsonWithSchema(text, z.record(z.unknown()));
+      if (!parsed) {
+        logError('error', "Erro ao parsear JSON de avaliação", new Error('invalid_json'));
         if (typeof window !== "undefined") {
           window.alert("Arquivo JSON inválido. Verifique o conteúdo exportado.");
         }

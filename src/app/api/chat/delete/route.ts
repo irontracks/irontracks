@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +12,14 @@ const ZodBodySchema = z
     messageId: z.string().optional(),
     message_id: z.string().optional(),
     scope: z.string().optional(),
+  })
+  .strip()
+
+const ContentSchema = z
+  .object({
+    type: z.string().optional(),
+    media_url: z.string().optional(),
+    thumb_url: z.string().optional(),
   })
   .strip()
 
@@ -69,16 +77,14 @@ export async function POST(req: Request) {
 
     const content = String((msg as Record<string, unknown>).content || '').trim()
     const paths: string[] = []
-    try {
-      const payload = JSON.parse(content)
-      const type = String(payload?.type || '').toLowerCase()
-      if (type === 'image' || type === 'video') {
-        const media = extractStoragePathFromPublicUrl('chat-media', String(payload?.media_url || ''))
-        const thumb = extractStoragePathFromPublicUrl('chat-media', String(payload?.thumb_url || ''))
-        if (media) paths.push(media)
-        if (thumb) paths.push(thumb)
-      }
-    } catch {}
+    const payload = parseJsonWithSchema(content, ContentSchema)
+    const type = String(payload?.type || '').toLowerCase()
+    if (type === 'image' || type === 'video') {
+      const media = extractStoragePathFromPublicUrl('chat-media', String(payload?.media_url || ''))
+      const thumb = extractStoragePathFromPublicUrl('chat-media', String(payload?.thumb_url || ''))
+      if (media) paths.push(media)
+      if (thumb) paths.push(thumb)
+    }
 
     await admin.from('soft_delete_bin').insert({
       deleted_by: auth.user.id,

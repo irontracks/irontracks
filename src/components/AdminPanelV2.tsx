@@ -46,6 +46,8 @@ import { adminFetchJson } from '@/utils/admin/adminFetch';
 import type { Exercise } from '@/types/app';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 import { useAdminPanelController } from '@/components/admin-panel/useAdminPanelController';
 import { AdminPanelProvider } from '@/components/admin-panel/AdminPanelContext';
 import { DashboardTab } from '@/components/admin-panel/DashboardTab';
@@ -334,7 +336,8 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         try {
             setSystemImporting(true);
             const text = await file.text();
-            const data = JSON.parse(text);
+            const data = parseJsonWithSchema(text, z.record(z.unknown()));
+            if (!data) throw new Error('invalid_json');
             if (!(await confirm('Importar backup completo do sistema?', 'Importar Backup'))) return;
             const res = await importAllData(data);
             if (res?.error) throw new Error(String(res.error));
@@ -621,14 +624,16 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 try {
                     const res = await fetch('/api/admin/teachers/list', { headers: authHeaders });
                     const raw = await res.text();
-                    json = raw ? JSON.parse(raw) : null;
+                    json = raw ? parseJsonWithSchema(raw, z.record(z.unknown())) : null;
                 } catch { }
                 if (json?.ok) {
-                    const list = json.teachers || [];
+                    const list = Array.isArray((json as Record<string, unknown>)?.teachers)
+                        ? ((json as Record<string, unknown>).teachers as Record<string, unknown>[])
+                        : [];
                     const dedup: AdminTeacher[] = [];
                     const seen = new Set();
                     for (const t of list) {
-                        const key = (t.email || '').toLowerCase();
+                        const key = String(t?.email || '').toLowerCase();
                         if (!seen.has(key)) { seen.add(key); dedup.push(t as AdminTeacher); }
                     }
                     try {
@@ -942,12 +947,15 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     try {
                         const resp = await fetch('/api/admin/students/list', { headers: authHeaders });
                         const raw = await resp.text();
-                        js = raw ? JSON.parse(raw) : null;
+                        js = raw ? parseJsonWithSchema(raw, z.record(z.unknown())) : null;
                     } catch { }
                     if (js?.ok) {
-                        const row = (js.students || []).find((s: UnknownRecord) => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || (String(s.email || '').toLowerCase() === String(selectedStudent.email || '').toLowerCase()));
+                        const studentsList = Array.isArray((js as Record<string, unknown>)?.students)
+                            ? ((js as Record<string, unknown>).students as UnknownRecord[])
+                            : [];
+                        const row = studentsList.find((s: UnknownRecord) => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || (String(s.email || '').toLowerCase() === String(selectedStudent.email || '').toLowerCase()));
                         if (row) {
-                            const nextTeacher = row.teacher_id || null;
+                            const nextTeacher = row.teacher_id ? String(row.teacher_id) : null;
                             const nextUserId = row.user_id ? String(row.user_id) : '';
                             const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== String(selectedStudent.user_id || ''));
                             if (shouldUpdate) {
@@ -1698,9 +1706,14 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                                                                                         try {
                                                                                             const resp = await fetch('/api/admin/students/list', { headers: authHeaders });
                                                                                             const raw = await resp.text();
-                                                                                            js = raw ? JSON.parse(raw) : null;
+                                                                                            js = raw ? parseJsonWithSchema(raw, z.record(z.unknown())) : null;
                                                                                         } catch { }
-                                                                                        if (js?.ok) setUsersList(js.students || []);
+                                                                                        if (js?.ok) {
+                                                                                            const students = Array.isArray((js as Record<string, unknown>)?.students)
+                                                                                                ? ((js as Record<string, unknown>).students as AdminUser[])
+                                                                                                : [];
+                                                                                            setUsersList(students);
+                                                                                        }
                                                                                     } catch { }
                                                                                 } else {
                                                                                     await alert('Erro: ' + (json.error || 'Falha ao atualizar professor'));

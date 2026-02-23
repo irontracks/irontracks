@@ -1,5 +1,7 @@
 
 import { UnknownRecord, ReportHistory, ReportHistoryItem } from './types';
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
 export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
@@ -79,15 +81,7 @@ export const toNumber = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-export const safeJsonParse = (raw: unknown): unknown => {
-  try {
-    if (!raw) return null;
-    if (typeof raw === 'object') return raw;
-    return JSON.parse(String(raw));
-  } catch {
-    return null;
-  }
-};
+export const safeJsonParse = (raw: unknown): unknown => parseJsonWithSchema(raw, z.unknown())
 
 export const toDateMs = (value: unknown): number | null => {
   try {

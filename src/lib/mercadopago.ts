@@ -1,4 +1,6 @@
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 type MercadoPagoError = {
   message?: string
   error?: string
@@ -55,11 +57,7 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
 
   const text = await res.text()
   let json: unknown = null
-  try {
-    json = text ? JSON.parse(text) : null
-  } catch {
-    json = null
-  }
+  json = text ? parseJsonWithSchema(text, z.unknown()) : null
 
   if (!res.ok) {
     const err = (json || {}) as MercadoPagoError

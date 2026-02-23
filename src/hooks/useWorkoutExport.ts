@@ -3,6 +3,8 @@ import { ActiveSession, UserRecord } from '@/types/app'
 import { workoutPlanHtml } from '@/utils/report/templates'
 import { importData } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -177,14 +179,17 @@ export function useWorkoutExport({
             const reader = new FileReader()
             reader.onload = async (event: ProgressEvent<FileReader>) => {
                 try {
-                    const json = JSON.parse(String(event?.target?.result || ''))
+                    const json = parseJsonWithSchema(String(event?.target?.result || ''), z.record(z.unknown()))
+                    if (!json) throw new Error('invalid_json')
+                    const jsonObj = json && typeof json === 'object' ? (json as Record<string, unknown>) : {}
+                    const userObj = jsonObj.user && typeof jsonObj.user === 'object' ? (jsonObj.user as Record<string, unknown>) : {}
                     if (
                         await confirm(
-                            `Importar dados de ${json.user?.email || 'Unknown'}? Isso criará novos treinos.`,
+                            `Importar dados de ${String(userObj.email || 'Unknown')}? Isso criará novos treinos.`,
                             'Importar Backup'
                         )
                     ) {
-                        await importData(json)
+                        await importData(jsonObj)
                         await fetchWorkouts()
                         await alert('Dados importados com sucesso!', 'Sucesso')
                     }

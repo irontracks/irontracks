@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getInternalSecret, hasValidInternalSecret } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +47,14 @@ const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
   } catch { }
   return null
 }
+
+const ContentSchema = z
+  .object({
+    type: z.string().optional(),
+    media_url: z.string().optional(),
+    thumb_url: z.string().optional(),
+  })
+  .strip()
 
 export async function GET(req: Request) {
   try {
@@ -106,21 +116,19 @@ export async function GET(req: Request) {
       const id = String((r as Record<string, unknown>).id || '')
       if (!id) continue
       const content = String((r as Record<string, unknown>).content || '').trim()
-      try {
-        const payload = JSON.parse(content)
-        const type = String(payload?.type || '').toLowerCase()
-        if (type !== 'image' && type !== 'video') continue
+      const payload = parseJsonWithSchema(content, ContentSchema)
+      const type = String(payload?.type || '').toLowerCase()
+      if (type !== 'image' && type !== 'video') continue
 
-        const mediaUrl = String(payload?.media_url || '')
-        const thumbUrl = String(payload?.thumb_url || '')
-        const media = extractStoragePathFromPublicUrl(bucket, mediaUrl)
-        const thumb = extractStoragePathFromPublicUrl(bucket, thumbUrl)
+      const mediaUrl = String(payload?.media_url || '')
+      const thumbUrl = String(payload?.thumb_url || '')
+      const media = extractStoragePathFromPublicUrl(bucket, mediaUrl)
+      const thumb = extractStoragePathFromPublicUrl(bucket, thumbUrl)
 
-        if (!media && !thumb) continue
-        ids.push(id)
-        if (media) paths.push(media)
-        if (thumb) paths.push(thumb)
-      } catch { }
+      if (!media && !thumb) continue
+      ids.push(id)
+      if (media) paths.push(media)
+      if (thumb) paths.push(thumb)
     }
 
     if (paths.length) {

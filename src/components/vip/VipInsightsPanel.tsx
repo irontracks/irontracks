@@ -5,6 +5,8 @@ import { createClient } from '@/utils/supabase/client'
 import { Sparkles, FileText, RefreshCw, ArrowRight } from 'lucide-react'
 import { generatePostWorkoutInsights } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 type Row = {
   id: string
@@ -14,17 +16,7 @@ type Row = {
   notes: unknown
 }
 
-const safeJsonParse = (raw: unknown) => {
-  try {
-    if (!raw) return null
-    if (typeof raw === 'object') return raw
-    const s = String(raw || '').trim()
-    if (!s) return null
-    return JSON.parse(s)
-  } catch {
-    return null
-  }
-}
+const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
 
 const formatBr = (iso: string) => {
   const s = String(iso || '').trim()

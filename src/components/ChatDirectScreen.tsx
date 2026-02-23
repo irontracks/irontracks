@@ -15,6 +15,8 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 interface ChatUser {
     uid: string
@@ -605,7 +607,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                             let payload: Record<string, unknown> | null = null;
                                             try {
                                                 if (typeof message.content === 'string' && message.content.startsWith('{')) {
-                                                    const parsed: unknown = JSON.parse(message.content);
+                                                    const parsed: unknown = parseJsonWithSchema(message.content, z.record(z.unknown()));
                                                     payload = isRecord(parsed) ? parsed : null;
                                                 }
                                             } catch {}

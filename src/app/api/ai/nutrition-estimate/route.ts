@@ -4,24 +4,14 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
 const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeJsonParse = (raw: unknown) => {
-  try {
-    if (!raw) return null
-    if (typeof raw === 'object') return raw
-    const trimmed = String(raw || '').trim()
-    if (!trimmed) return null
-    return JSON.parse(trimmed)
-  } catch {
-    return null
-  }
-}
+const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
 
 const extractJsonFromModelText = (text: string) => {
   const cleaned = String(text || '').trim()
@@ -120,4 +110,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) || 'unexpected_error' }, { status: 500 })
   }
 }
-

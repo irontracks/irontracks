@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import crypto from 'crypto'
 
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
@@ -63,15 +63,9 @@ const safeNumber = (v: unknown): number | null => {
 }
 
 const parseSession = (notes: unknown): SessionData | null => {
-  try {
-    const raw = String(notes || '').trim()
-    if (!raw) return null
-    const obj = JSON.parse(raw)
-    if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj as SessionData
-    return null
-  } catch {
-    return null
-  }
+  const obj = parseJsonWithSchema(notes, z.record(z.unknown()))
+  if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj as SessionData
+  return null
 }
 
 const buildUser1rmMapFromHistory = (history: Array<{ created_at: string; notes: unknown }>) => {

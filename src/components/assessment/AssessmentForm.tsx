@@ -26,6 +26,8 @@ import { SkinfoldStep } from './SkinfoldStep';
 import PhotoUploadStep from './PhotoUploadStep';
 import ResultsPreview from './ResultsPreview';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 interface AssessmentFormProps {
   studentId: string;
@@ -117,10 +119,11 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         return base;
       }
 
-      const parsed = JSON.parse(raw);
-      const source: Record<string, unknown> = parsed?.formData && typeof parsed.formData === 'object'
-        ? parsed.formData
-        : parsed;
+      const parsed = parseJsonWithSchema(raw, z.record(z.unknown()));
+      const parsedObj = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+      const source: Record<string, unknown> = parsedObj?.formData && typeof parsedObj.formData === 'object'
+        ? (parsedObj.formData as Record<string, unknown>)
+        : parsedObj;
 
       if (!source || typeof source !== 'object') {
         return base;

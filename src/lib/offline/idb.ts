@@ -1,3 +1,6 @@
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
+
 const DB_NAME = 'irontracks'
 const DB_VERSION = 1
 const STORE_KV = 'kv'
@@ -40,7 +43,7 @@ export const kvGet = async (key: unknown): Promise<unknown | null> => {
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem(`it.kv.${k}`) || ''
-      return raw ? JSON.parse(raw) : null
+      return raw ? parseJsonWithSchema(raw, z.unknown()) : null
     } catch {
       return null
     }
@@ -79,12 +82,13 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
   const j = job && typeof job === 'object' ? (job as Record<string, unknown>) : null
   const id = String(j?.id || '').trim()
   if (!id) return false
+  const jobObj = j as Record<string, unknown>
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
-      const list = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []
+      const list = parseJsonWithSchema(raw, z.array(z.record(z.unknown()))) || []
       const next = list.filter((x: Record<string, unknown>) => String(x?.id || '') !== id)
-      next.push(j)
+      next.push(jobObj)
       window.localStorage.setItem('it.queue.v1', JSON.stringify(next))
       return true
     } catch {
@@ -93,7 +97,7 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
   }
   const db = await openDb()
   const tx = db.transaction(STORE_QUEUE, 'readwrite')
-  tx.objectStore(STORE_QUEUE).put(j)
+  tx.objectStore(STORE_QUEUE).put(jobObj)
   await txDone(tx).catch((): null => null)
   return true
 }
@@ -104,7 +108,7 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
-      const list = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []
+      const list = parseJsonWithSchema(raw, z.array(z.record(z.unknown()))) || []
       const next = list.filter((x: Record<string, unknown>) => String(x?.id || '') !== key)
       window.localStorage.setItem('it.queue.v1', JSON.stringify(next))
       return true
@@ -123,7 +127,7 @@ export const queueGetAll = async (): Promise<unknown[]> => {
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
-      const list = JSON.parse(raw)
+      const list = parseJsonWithSchema(raw, z.array(z.record(z.unknown())))
       return Array.isArray(list) ? list : []
     } catch {
       return []

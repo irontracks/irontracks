@@ -47,3 +47,19 @@ export function parseSearchParams<TSchema extends ZodTypeAny>(
   }
   return { data: parsed.data, response: null }
 }
+
+export function parseJsonWithSchema<TSchema extends ZodTypeAny>(raw: unknown, schema: TSchema): z.infer<TSchema> | null {
+  let value: unknown = raw
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    try {
+      value = JSON.parse(trimmed)
+    } catch {
+      return null
+    }
+  }
+  const parsed = schema.safeParse(value)
+  if (!parsed.success) return null
+  return parsed.data
+}

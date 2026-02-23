@@ -12,6 +12,8 @@ import { getKcalEstimate } from '@/utils/calories/kcalClient';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 type AnyObj = Record<string, unknown>
 
@@ -37,7 +39,7 @@ const parseSessionNotes = (notes: unknown): AnyObj | null => {
         if (typeof notes === 'string') {
             const trimmed = notes.trim();
             if (!trimmed) return null;
-            return JSON.parse(trimmed);
+            return parseJsonWithSchema(trimmed, z.record(z.unknown()));
         }
         if (notes && typeof notes === 'object') return notes as AnyObj;
         return null;

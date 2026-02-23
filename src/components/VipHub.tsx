@@ -8,6 +8,8 @@ import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
 import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import type { Workout } from '@/types/app'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 interface VipHubProps {
   user: {
@@ -236,8 +238,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
             const raw = String(obj.content || '')
             // Simple parsing
             if (role === 'assistant' && raw.trim().startsWith('{')) {
-              try {
-                const p = JSON.parse(raw)
+              const p = parseJsonWithSchema(raw, z.record(z.unknown()))
+              if (p) {
                 return {
                   id: String((obj.id ?? '') || String(Date.now())),
                   role,
@@ -261,7 +263,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                       .filter((a): a is ChatAction => Boolean(a))
                     : undefined,
                 } as ChatMessage
-              } catch { }
+              }
             }
             return {
               id: String((obj.id ?? '') || String(Date.now())),

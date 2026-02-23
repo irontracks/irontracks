@@ -5,7 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,15 +20,7 @@ const ZodBodySchema = z
 
 const POST_WORKOUT_MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
-const safeJsonParse = (raw: string) => {
-  try {
-    const trimmed = String(raw || '').trim()
-    if (!trimmed) return null
-    return JSON.parse(trimmed)
-  } catch {
-    return null
-  }
-}
+const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
 
 const normalizeAi = (obj: unknown) => {
   const base = obj && typeof obj === 'object' ? (obj as Record<string, unknown>) : {}

@@ -3,6 +3,8 @@
  * Tests for settings merge, cache key construction, error classification, and save payload.
  */
 import { describe, it, expect } from 'vitest'
+import { z } from 'zod'
+import { parseJsonWithSchema } from '@/utils/zod'
 
 // ─── Constants (mirrored from hook) ────────────────────────────────────────
 const STORAGE_KEY = 'irontracks.userSettings.v1'
@@ -15,11 +17,8 @@ function buildStorageKey(userId: string): string {
 }
 
 function safeJsonParse(raw: string): unknown {
-  try {
-    return JSON.parse(raw)
-  } catch {
-    return null
-  }
+  const parsed = parseJsonWithSchema(raw, z.unknown())
+  return parsed ?? null
 }
 
 function mergeSettings<T extends Record<string, unknown>>(base: T, patch: Partial<T>): T {

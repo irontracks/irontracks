@@ -8,6 +8,8 @@ import { parseExerciseNotesToSetOverrides } from '@/utils/training/notesMethodPa
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
@@ -822,20 +824,26 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
         if (!file) return;
         try {
             const text = await file.text();
-            const raw = JSON.parse(text);
-            const src = raw.workout || raw.session || raw;
-            const title = src.title || src.workoutTitle || workout.title || 'Treino Importado';
+            const raw = parseJsonWithSchema(text, z.record(z.unknown()));
+            if (!raw) throw new Error('invalid_json');
+            const rawObj = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+            const src = (rawObj.workout && typeof rawObj.workout === 'object')
+                ? (rawObj.workout as Record<string, unknown>)
+                : (rawObj.session && typeof rawObj.session === 'object')
+                    ? (rawObj.session as Record<string, unknown>)
+                    : rawObj;
+            const title = String(src.title ?? src.workoutTitle ?? workout.title ?? 'Treino Importado');
             const exs = Array.isArray(src.exercises) ? src.exercises : [];
             const mapped = exs.map((ex: Record<string, unknown>) => ({
-                name: ex.name || '',
+                name: String(ex.name || ''),
                 sets: Number(ex.sets) || (Array.isArray(ex?.setDetails) ? ex.setDetails.length : (Array.isArray(ex?.set_details) ? ex.set_details.length : (Array.isArray(ex?.sets) && ex.sets.length && typeof ex.sets[0] === 'object' ? ex.sets.length : 0))),
                 reps: String(ex.reps || ''),
                 rpe: Number(ex.rpe || ex.intensity || 8),
-                cadence: ex.cadence || '2020',
+                cadence: String(ex.cadence || '2020'),
                 restTime: Number(ex.restTime || ex.rest_time || 0),
                 method: normalizeMethod(ex.method || 'Normal'),
-                videoUrl: ex.videoUrl || ex.video_url || '',
-                notes: ex.notes || '',
+                videoUrl: String(ex.videoUrl || ex.video_url || ''),
+                notes: String(ex.notes || ''),
                 setDetails: Array.isArray(ex?.setDetails)
                     ? ex.setDetails
                     : (Array.isArray(ex?.set_details)

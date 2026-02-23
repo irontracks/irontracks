@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseJsonBody } from '@/utils/zod'
+import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
@@ -43,17 +43,7 @@ const AiExerciseMuscleMapSchema = z
 
 type AiExerciseMuscleMap = z.infer<typeof AiExerciseMuscleMapSchema>
 
-const safeJsonParse = (raw: unknown) => {
-  try {
-    if (!raw) return null
-    if (typeof raw === 'object') return raw
-    const trimmed = String(raw || '').trim()
-    if (!trimmed) return null
-    return JSON.parse(trimmed)
-  } catch {
-    return null
-  }
-}
+const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
 
 const extractJsonFromModelText = (text: string) => {
   const cleaned = String(text || '').trim()

@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { parseJsonWithSchema } from '@/utils/zod'
 import { safeRecord } from '@/utils/guards'
 
 const parseTrainingNumberOrZero = (v: unknown) => {
@@ -325,7 +326,7 @@ export async function POST(request: Request) {
               try {
                 if (row?.id && data?.id && String(row.id) === String(data.id)) continue
                 let sess: Record<string, unknown> | null = null
-                if (typeof row?.notes === 'string') sess = JSON.parse(row.notes)
+                if (typeof row?.notes === 'string') sess = parseJsonWithSchema(row.notes, z.record(z.unknown()))
                 else if (row?.notes && typeof row.notes === 'object') sess = row.notes
                 if (!sess || typeof sess !== 'object') continue
                 const best = buildBestByExerciseFromSession(sess, onlyNames)

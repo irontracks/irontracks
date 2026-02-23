@@ -90,6 +90,8 @@ import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
 import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
+import { parseJsonWithSchema } from '@/utils/zod'
+import { z } from 'zod'
 
 import {
     DirectChatState,
@@ -332,7 +334,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         try {
             const raw = localStorage.getItem(scopedKey) || localStorage.getItem('activeSession');
             if (raw) {
-                const parsed: unknown = JSON.parse(raw);
+                const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()));
                 if (isRecord(parsed) && parsed?.startedAt && parsed?.workout) {
                     localSavedAt = Number(parsed?._savedAt ?? 0) || 0;
                     setActiveSession(parsed as unknown as ActiveWorkoutSession);
