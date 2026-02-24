@@ -1,9 +1,10 @@
 import Foundation
 import Capacitor
 import AuthenticationServices
+import UIKit
 
 @objc(SignInWithApple)
-public class SignInWithApple: CAPPlugin, CAPBridgedPlugin {
+public class SignInWithApple: CAPPlugin, CAPBridgedPlugin, ASAuthorizationControllerPresentationContextProviding {
     public let identifier = "SignInWithApple" 
     public let jsName = "SignInWithApple" 
     public let pluginMethods: [CAPPluginMethod] = [
@@ -24,6 +25,7 @@ public class SignInWithApple: CAPPlugin, CAPBridgedPlugin {
 
         let authorizationController = ASAuthorizationController(authorizationRequests: [request])
         authorizationController.delegate = self
+        authorizationController.presentationContextProvider = self
         authorizationController.performRequests()
     }
 
@@ -46,6 +48,15 @@ public class SignInWithApple: CAPPlugin, CAPBridgedPlugin {
 
         return nil
     }
+    public func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        if let anchor = self.bridge?.viewController?.view.window {
+            return anchor
+        }
+        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+            return window
+        }
+        return ASPresentationAnchor()
+    }
 }
 
 extension SignInWithApple: ASAuthorizationControllerDelegate {
@@ -58,14 +69,22 @@ extension SignInWithApple: ASAuthorizationControllerDelegate {
             return
         }
 
+        let identityToken = appleIDCredential.identityToken.flatMap { String(data: $0, encoding: .utf8) }
+        let authorizationCode = appleIDCredential.authorizationCode.flatMap { String(data: $0, encoding: .utf8) }
+        if identityToken == nil || authorizationCode == nil {
+            call.reject("missing_token")
+            self.bridge?.releaseCall(call)
+            return
+        }
+
         let result = [
             "response": [
                 "user": appleIDCredential.user,
                 "email": appleIDCredential.email,
                 "givenName": appleIDCredential.fullName?.givenName,
                 "familyName": appleIDCredential.fullName?.familyName,
-                "identityToken": String(data: appleIDCredential.identityToken!, encoding: .utf8),
-                "authorizationCode": String(data: appleIDCredential.authorizationCode!, encoding: .utf8)
+                "identityToken": identityToken,
+                "authorizationCode": authorizationCode
             ]
         ]
 

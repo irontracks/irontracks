@@ -6,11 +6,13 @@ import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock,
 import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
-import { isPwaStandalone } from '@/utils/platform';
+import { isPwaStandalone, isIosNative } from '@/utils/platform';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 // Capacitor imports dinâmicos — evita quebrar o build web/Vercel
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' };
-let SignInWithApple: { authorize: (opts: { clientId: string; scopes: string }) => Promise<{ response: { identityToken: string } }> } | null = null;
+type AppleAuthorizeOptions = { clientId: string; scopes: string; state?: string; nonce?: string };
+type AppleAuthorizeResponse = { response: { identityToken?: string } };
+let SignInWithApple: { authorize: (opts: AppleAuthorizeOptions) => Promise<AppleAuthorizeResponse> } | null = null;
 if (typeof window !== 'undefined') {
     try {
         const cap = require('@capacitor/core');
@@ -86,6 +88,29 @@ const LoginScreen = () => {
         }
     };
 
+    const randomString = (length: number) => {
+        const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        try {
+            if (typeof window !== 'undefined' && window.crypto && typeof window.crypto.getRandomValues === 'function') {
+                const array = new Uint8Array(length);
+                window.crypto.getRandomValues(array);
+                return Array.from(array).map((v) => chars[v % chars.length]).join('');
+            }
+        } catch {}
+        let out = '';
+        for (let i = 0; i < length; i += 1) {
+            out += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return out;
+    };
+
+    const shouldFallbackToWeb = (error: unknown) => {
+        const rec = (error && typeof error === 'object' ? (error as Record<string, unknown>) : {}) as Record<string, unknown>;
+        const msg = String(rec.message ?? error ?? '').toLowerCase();
+        const code = String(rec.code ?? '');
+        return msg.includes('authorizationerror') || msg.includes('1000') || code === '1000';
+    };
+
     const recoverCooldownLeft = useMemo(() => {
         if (!recoverCooldownUntil) return 0;
         const now = Date.now() + cooldownTick;
@@ -119,22 +144,10 @@ const LoginScreen = () => {
         setErrorMsg('');
 
         try {
-            const isIOS = Capacitor.getPlatform() === 'ios';
-            if (isIOS && SignInWithApple) {
-                const result = await SignInWithApple.authorize({
-                    clientId: 'com.irontracks.app',
-                    scopes: 'name email',
-                });
-
-                const token = result?.response?.identityToken;
-                if (!token) throw new Error('Falha ao obter token da Apple.');
-
-                const supabase = createClient();
-                const { error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token });
-                if (error) throw error;
-
-                router.replace('/dashboard');
-                try { router.refresh(); } catch {}
+            const isIOSNative = isIosNative();
+            if (isIOSNative) {
+                const href = getOAuthHref('apple');
+                window.location.assign(href);
                 return;
             }
 
@@ -142,6 +155,13 @@ const LoginScreen = () => {
             window.location.assign(href);
         } catch (error: unknown) {
             logError('error', "Login Error:", error);
+            if (isIosNative() && shouldFallbackToWeb(error)) {
+                try {
+                    const href = getOAuthHref('apple');
+                    window.location.assign(href);
+                    return;
+                } catch {}
+            }
             setIsLoading(false);
             const msg = error instanceof Error ? error.message : 'Falha ao fazer login.';
             setErrorMsg(msg);

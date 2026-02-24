@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, TrendingUp, X, Upload } from 'lucide-react';
 import { AssessmentForm } from './AssessmentForm';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { isIosNative } from '@/utils/platform'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 
@@ -25,6 +26,7 @@ export default function AssessmentButton({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
+  const isIosNativeApp = isIosNative();
 
   const handleNewAssessment = () => {
     router.push(`/assessments/new/${studentId}`);
@@ -276,18 +278,20 @@ export default function AssessmentButton({
             <Upload className="w-4 h-4 mr-2" />
             Importar JSON
           </button>
-          <button
-            onClick={handleScanClick}
-            disabled={importing}
-            className={
-              importing
-                ? "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
-                : "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
-            }
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            {importing ? "Importando..." : "Importar Foto/PDF"}
-          </button>
+          {!isIosNativeApp ? (
+            <button
+              onClick={handleScanClick}
+              disabled={importing}
+              className={
+                importing
+                  ? "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
+                  : "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+              }
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {importing ? "Importando..." : "Importar Foto/PDF"}
+            </button>
+          ) : null}
           <input
             ref={fileInputRef}
             type="file"
@@ -345,18 +349,20 @@ export default function AssessmentButton({
         <FileText className="w-4 h-4 mr-2" />
         Histórico
       </button>
-      <button
-        onClick={handleScanClick}
-        disabled={importing}
-        className={
-          importing
-            ? "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
-            : "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
-        }
-      >
-        <Upload className="w-4 h-4 mr-2" />
-        {importing ? "Importando..." : "Importar Foto/PDF"}
-      </button>
+      {!isIosNativeApp ? (
+        <button
+          onClick={handleScanClick}
+          disabled={importing}
+          className={
+            importing
+              ? "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
+              : "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+          }
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          {importing ? "Importando..." : "Importar Foto/PDF"}
+        </button>
+      ) : null}
       <input
         ref={scanInputRef}
         type="file"

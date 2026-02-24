@@ -11,7 +11,7 @@ let package = Package(
             targets: ["CapApp-SPM"])
     ],
     dependencies: [
-        .package(path: "../../LocalPackages/capacitor-swift-pm"),
+        .package(name: "capacitor-swift-pm", path: "../../LocalPackages/capacitor-swift-pm"),
         .package(name: "CapacitorCommunityAppleSignIn", path: "../../LocalPackages/CapacitorCommunityAppleSignIn"),
         .package(name: "RevenuecatPurchasesCapacitor", path: "../../LocalPackages/RevenuecatPurchasesCapacitor")
     ],

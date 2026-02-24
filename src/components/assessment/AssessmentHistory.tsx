@@ -14,6 +14,7 @@ import {
   Filler
 } from 'chart.js';
 import { Calendar, TrendingUp, Upload, User, X } from 'lucide-react';
+import { isIosNative } from '@/utils/platform';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
@@ -314,6 +315,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
   const [importing, setImporting] = useState(false);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
   const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isIosNativeApp = isIosNative();
 
   const mergeImportedFormData = (base: Record<string, unknown>, incoming: Record<string, unknown>) => {
     const out: Record<string, unknown> = { ...(base && typeof base === 'object' ? base : {}) };
@@ -1049,20 +1051,22 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             >
               + Nova Avaliação
             </button>
-            <button
-              onClick={handleScanClick}
-              disabled={importing || !studentId}
-              className={
-                importing || !studentId
-                  ? "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 text-neutral-500 border border-dashed border-neutral-800 cursor-not-allowed font-bold"
-                  : "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-dashed border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 hover:border-yellow-500 hover:text-yellow-500 transition-all duration-300 active:scale-95"
-              }
-            >
-              <span className="inline-flex items-center justify-center gap-2">
-                <Upload className="w-4 h-4" />
-                {importing ? "Importando..." : "Importar Foto/PDF"}
-              </span>
-            </button>
+            {!isIosNativeApp ? (
+              <button
+                onClick={handleScanClick}
+                disabled={importing || !studentId}
+                className={
+                  importing || !studentId
+                    ? "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 text-neutral-500 border border-dashed border-neutral-800 cursor-not-allowed font-bold"
+                    : "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-dashed border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 hover:border-yellow-500 hover:text-yellow-500 transition-all duration-300 active:scale-95"
+                }
+              >
+                <span className="inline-flex items-center justify-center gap-2">
+                  <Upload className="w-4 h-4" />
+                  {importing ? "Importando..." : "Importar Foto/PDF"}
+                </span>
+              </button>
+            ) : null}
             <input
               ref={scanInputRef}
               type="file"
