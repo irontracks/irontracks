@@ -19,38 +19,38 @@ export default function WorkoutFooter() {
 
   return (
     <>
-      <div className="fixed right-4 bottom-24 sm:bottom-6 z-[60]">
+      <div className="fixed right-3 bottom-24 sm:bottom-5 z-[60]">
         {timerMinimized ? (
           <button
             type="button"
             onClick={() => setTimerMinimized(false)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-neutral-900/95 border border-neutral-700 px-3 py-2 text-neutral-200 shadow-xl hover:bg-neutral-800"
+            className="inline-flex items-center gap-2 rounded-2xl bg-neutral-900/95 border border-neutral-700 px-2.5 py-1.5 text-neutral-200 shadow-xl hover:bg-neutral-800"
           >
-            <Clock size={16} className="text-yellow-500" />
-            <span className="text-xs font-black">Tempo</span>
-            <span className="text-sm font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
-            <ChevronUp size={16} className="text-neutral-400" />
+            <Clock size={14} className="text-yellow-500" />
+            <span className="text-[11px] font-black">Tempo</span>
+            <span className="text-xs font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
+            <ChevronUp size={14} className="text-neutral-400" />
           </button>
         ) : (
-          <div className="w-[240px] rounded-2xl bg-neutral-900/95 border border-neutral-700 p-3 shadow-2xl">
-            <div className="flex items-start justify-between gap-3">
+          <div className="w-[200px] rounded-2xl bg-neutral-900/95 border border-neutral-700 p-2.5 shadow-2xl">
+            <div className="flex items-start justify-between gap-2.5">
               <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Timer</div>
-                <div className="text-sm font-black text-white truncate">{currentExercise?.name || 'Treino ativo'}</div>
-                <div className="text-[11px] text-neutral-500">Descanso: {currentExercise?.rest ? `${currentExercise.rest}s` : '-'}</div>
+                <div className="text-[9px] uppercase tracking-widest text-neutral-500 font-bold">Timer</div>
+                <div className="text-xs font-black text-white truncate">{currentExercise?.name || 'Treino ativo'}</div>
+                <div className="text-[10px] text-neutral-500">Descanso: {currentExercise?.rest ? `${currentExercise.rest}s` : '-'}</div>
               </div>
               <button
                 type="button"
                 onClick={() => setTimerMinimized(true)}
-                className="h-8 w-8 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
+                className="h-7 w-7 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
                 aria-label="Minimizar timer"
               >
-                <ChevronDown size={16} />
+                <ChevronDown size={14} />
               </button>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <div className="text-2xl font-black text-white font-mono">{formatElapsed(elapsedSeconds)}</div>
-              <div className="text-[10px] uppercase tracking-widest text-yellow-500 font-black">Sessão</div>
+            <div className="mt-2.5 flex items-center justify-between">
+              <div className="text-lg font-black text-white font-mono">{formatElapsed(elapsedSeconds)}</div>
+              <div className="text-[9px] uppercase tracking-widest text-yellow-500 font-black">Sessão</div>
             </div>
           </div>
         )}
