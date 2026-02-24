@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireUser } from '@/utils/auth/route'
+import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
@@ -62,9 +62,6 @@ const safeTs = (v: unknown) => {
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireUser()
-    if (!auth.ok) return auth.response
-
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
@@ -74,8 +71,13 @@ export async function POST(req: Request) {
 
     if (!events.length) return NextResponse.json({ ok: true, inserted: 0 })
 
+    const supabase = await createClient()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
+    if (!user?.id) return NextResponse.json({ ok: true, inserted: 0 })
+
     const admin = createAdminClient()
-    const uid = auth.user.id
+    const uid = user.id
 
     let displayName: string | null = null
     let role: string | null = null

@@ -14,5 +14,11 @@ export function createClient() {
         apikey: supabaseAnonKey,
       },
     },
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: 'irontracks.auth.v1',
+    },
   })
 }
