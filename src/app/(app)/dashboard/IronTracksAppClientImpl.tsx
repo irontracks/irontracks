@@ -154,6 +154,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
     const [quickViewWorkout, setQuickViewWorkout] = useState<ActiveSession | null>(null);
     const [reportData, setReportData] = useState({ current: null, previous: null });
+    const mainScrollRef = useRef<HTMLDivElement | null>(null);
     const [reportBackView, setReportBackView] = useState('dashboard');
     const inAppNotifyRef = useRef<((payload: unknown) => void) | null>(null);
     const bindInAppNotify = useCallback((fn: unknown) => {
@@ -880,6 +881,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setView('edit')
     }
 
+    useEffect(() => {
+        if (view !== 'active') return;
+        const scrollToTop = () => {
+            const node = mainScrollRef.current;
+            if (node) {
+                node.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            }
+            if (typeof window !== 'undefined') {
+                window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            }
+        };
+        const raf = requestAnimationFrame(scrollToTop);
+        const t = window.setTimeout(scrollToTop, 120);
+        return () => {
+            cancelAnimationFrame(raf);
+            window.clearTimeout(t);
+        };
+    }, [view, activeSession?.id]);
+
     if (authLoading) return <LoadingScreen />;
     if (!user?.id) return <LoadingScreen />;
 
@@ -1082,6 +1102,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                     {/* Main Content */}
                     <div
+                        ref={mainScrollRef}
                         className="flex-1 overflow-y-auto custom-scrollbar relative"
                         style={({
                             ['--dashboard-sticky-top' as unknown as keyof React.CSSProperties]: isHeaderVisible
