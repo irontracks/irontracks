@@ -11,7 +11,7 @@ import { logError, logWarn, logInfo } from '@/lib/logger'
 // Capacitor imports dinâmicos — evita quebrar o build web/Vercel
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' };
 type AppleAuthorizeOptions = { clientId: string; scopes: string; state?: string; nonce?: string };
-type AppleAuthorizeResponse = { response: { identityToken?: string } };
+type AppleAuthorizeResponse = { response: { identityToken?: string; email?: string; givenName?: string; familyName?: string } };
 let SignInWithApple: { authorize: (opts: AppleAuthorizeOptions) => Promise<AppleAuthorizeResponse> } | null = null;
 if (typeof window !== 'undefined') {
     try {
@@ -146,8 +146,49 @@ const LoginScreen = () => {
         try {
             const isIOSNative = isIosNative();
             if (isIOSNative) {
-                const href = getOAuthHref('apple');
-                window.location.assign(href);
+                if (!SignInWithApple) throw new Error('Login com Apple indisponível neste dispositivo.');
+                const clientId = String(process.env.NEXT_PUBLIC_APPLE_IOS_CLIENT_ID || 'com.irontracks.app').trim();
+                if (!clientId) throw new Error('Client ID da Apple não configurado.');
+                const nonce = randomString(32);
+                const state = randomString(16);
+                const result = await SignInWithApple.authorize({
+                    clientId,
+                    scopes: 'name email',
+                    state,
+                    nonce,
+                });
+
+                const token = result?.response?.identityToken;
+                if (!token) throw new Error('Falha ao obter token da Apple.');
+
+                const email = String(result?.response?.email || '').trim();
+                const givenName = String(result?.response?.givenName || '').trim();
+                const familyName = String(result?.response?.familyName || '').trim();
+                const fullName = String(`${givenName} ${familyName}`.trim());
+                if (email) {
+                    try {
+                        await fetch('/api/auth/apple/preflight', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email, full_name: fullName })
+                        });
+                    } catch {}
+                }
+
+                const supabase = createClient();
+                const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token });
+                if (error) throw error;
+                const session = data?.session;
+                if (session?.access_token && session?.refresh_token) {
+                    await fetch('/api/auth/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })
+                    });
+                }
+
+                router.replace('/dashboard');
+                try { router.refresh(); } catch {}
                 return;
             }
 
