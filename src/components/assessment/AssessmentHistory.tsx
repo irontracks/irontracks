@@ -13,19 +13,23 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { TrendingUp, Calendar, User, Calculator, X, Upload } from 'lucide-react';
+import { Calendar, TrendingUp, Upload, User, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import { DialogProvider } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { useAssessment } from '@/hooks/useAssessment';
-import AssessmentPDFGenerator from '@/components/assessment/AssessmentPDFGenerator';
+import dynamic from 'next/dynamic';
+import { AssessmentHeader } from '@/components/assessment/AssessmentHeader';
+import { AssessmentSummaryCards } from '@/components/assessment/AssessmentSummaryCards';
 import { generateAssessmentPlanAi } from '@/actions/workout-actions';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+
+const AssessmentPDFGenerator = dynamic(() => import('@/components/assessment/AssessmentPDFGenerator'), { ssr: false })
 
 ChartJS.register(
   CategoryScale,
@@ -1083,147 +1087,27 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
     <DialogProvider>
     <GlobalDialog />
       <div className="p-4 bg-neutral-900 text-white">
-      {/* Cabeçalho escuro com ações */}
-      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-          <div className="flex items-center">
-            <User className="w-8 h-8 text-yellow-500 mr-3" />
-            <div>
-              <h1 className="text-xl font-black">Avaliações Físicas</h1>
-              <p className="text-neutral-400 text-sm">Gerencie as avaliações e acompanhe a evolução</p>
-            </div>
-          </div>
-          <div className="w-full sm:w-auto flex items-center gap-2">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 sm:flex-none">
-              <button
-                onClick={() => setShowForm(true)}
-                className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95"
-              >
-                + Nova Avaliação
-              </button>
-              <button
-                onClick={() => setShowHistory(true)}
-                className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 transition-all duration-300 active:scale-95"
-              >
-                Ver Histórico
-              </button>
-              <button
-                onClick={handleScanClick}
-                disabled={importing || !studentId}
-                className={
-                  importing || !studentId
-                    ? "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 text-neutral-500 border border-dashed border-neutral-800 cursor-not-allowed font-bold"
-                    : "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-dashed border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 hover:border-yellow-500 hover:text-yellow-500 transition-all duration-300 active:scale-95"
-                }
-              >
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  {importing ? "Importando..." : "Importar Foto/PDF"}
-                </span>
-              </button>
-            </div>
-            {!onClose ? (
-              <button
-                onClick={() => { if (typeof window !== 'undefined') window.history.back(); }}
-                className="shrink-0 w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition-all duration-300 active:scale-95 flex items-center justify-center"
-                title="Fechar"
-                type="button"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            ) : null}
-            <input
-              ref={scanInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              multiple
-              className="hidden"
-              onChange={handleScanFileChange}
-            />
-          </div>
-        </div>
+      <AssessmentHeader
+        onCreate={() => setShowForm(true)}
+        onShowHistory={() => setShowHistory(true)}
+        onScan={handleScanClick}
+        importing={importing}
+        studentId={studentId}
+        onClose={onClose}
+        scanInputRef={scanInputRef}
+        onScanFileChange={handleScanFileChange}
+      />
         {latestAssessment && previousAssessment && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-neutral-400 font-bold uppercase">Peso</span>
-                <TrendingUp className="w-4 h-4 text-yellow-500" />
-              </div>
-              <div className="text-2xl font-bold">{(() => {
-                const v = getWeightKg(latestAssessment);
-                return v ? `${v.toFixed(1)} kg` : '-';
-              })()}</div>
-              {(() => {
-                const progress = getProgress(getWeightKg(latestAssessment), getWeightKg(previousAssessment));
-                return progress && (
-                  <div className={`text-sm ${progress.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {progress.change > 0 ? '+' : ''}{progress.change.toFixed(1)} kg ({progress.percentage.toFixed(1)}%)
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-neutral-400 font-bold uppercase">% Gordura</span>
-                <Calculator className="w-4 h-4 text-yellow-500" />
-              </div>
-              <div className="text-2xl font-bold">{(() => {
-                const bf = getBodyFatPercent(latestAssessment);
-                return bf ? `${bf.toFixed(1)}%` : '-';
-              })()}</div>
-              {(() => {
-                const progress = getProgress(
-                  getBodyFatPercent(latestAssessment),
-                  getBodyFatPercent(previousAssessment)
-                );
-                return progress && (
-                  <div className={`text-sm ${progress.change < 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {progress.change > 0 ? '+' : ''}{progress.change.toFixed(1)}% ({progress.percentage.toFixed(1)}%)
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-neutral-400 font-bold uppercase">Massa Magra</span>
-                <TrendingUp className="w-4 h-4 text-yellow-500" />
-              </div>
-              <div className="text-2xl font-bold">{(() => {
-                const lm = getLeanMassKg(latestAssessment);
-                return lm ? `${lm.toFixed(1)} kg` : '-';
-              })()}</div>
-              {(() => {
-                const currentLm = getLeanMassKg(latestAssessment);
-                const previousLm = getLeanMassKg(previousAssessment);
-                const progress = getProgress(currentLm, previousLm);
-                return progress && (
-                  <div className={`text-sm ${progress.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {progress.change > 0 ? '+' : ''}{progress.change.toFixed(1)} kg ({progress.percentage.toFixed(1)}%)
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-neutral-400 font-bold uppercase">BMR</span>
-                <Calculator className="w-4 h-4 text-yellow-500" />
-              </div>
-              <div className="text-2xl font-bold">{(() => {
-                const v = getBmrKcal(latestAssessment);
-                return v ? v.toFixed(0) : '-';
-              })()} kcal</div>
-              {(() => {
-                const progress = getProgress(getBmrKcal(latestAssessment), getBmrKcal(previousAssessment));
-                return progress && (
-                  <div className={`text-sm ${progress.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {progress.change > 0 ? '+' : ''}{progress.change.toFixed(0)} kcal ({progress.percentage.toFixed(1)}%)
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
+          <AssessmentSummaryCards
+            latestAssessment={latestAssessment}
+            previousAssessment={previousAssessment}
+            getWeightKg={getWeightKg}
+            getBodyFatPercent={getBodyFatPercent}
+            getLeanMassKg={getLeanMassKg}
+            getBmrKcal={getBmrKcal}
+            getProgress={getProgress}
+          />
         )}
-      </div>
 
       {/* Gráficos escuros */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">

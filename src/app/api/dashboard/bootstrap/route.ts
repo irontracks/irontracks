@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { errorResponse } from '@/utils/api'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,9 @@ interface DbRow {
 
 const toDbRow = (v: unknown): DbRow =>
   v && typeof v === 'object' ? (v as DbRow) : {}
+
+const isRecord = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v)
 
 const hydrateWorkouts = async (supabase: SupabaseClient, rows: unknown[]) => {
   const base = Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []
@@ -86,6 +90,12 @@ export async function GET() {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
+    const cacheKey = `dashboard:bootstrap:${user.id}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (isRecord(v) ? v : null))
+    if (cached) {
+      return NextResponse.json(cached, { headers: { 'cache-control': 'no-store, max-age=0' } })
+    }
+
     const { data: profile } = await supabase
       .from('profiles')
       .select('id, display_name, photo_url, role')
@@ -141,15 +151,16 @@ export async function GET() {
 
     const hydrated = await hydrateWorkouts(supabase, workouts)
 
-    return NextResponse.json(
-      {
-        ok: true,
-        user: { id: user.id, email: user.email ?? null },
-        profile: profile || null,
-        workouts: hydrated,
-      },
-      { headers: { 'cache-control': 'no-store, max-age=0' } },
-    )
+    const payload = {
+      ok: true,
+      user: { id: user.id, email: user.email ?? null },
+      profile: profile || null,
+      workouts: hydrated,
+    }
+
+    await cacheSet(cacheKey, payload, 60)
+
+    return NextResponse.json(payload, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {
     return errorResponse(e)
   }

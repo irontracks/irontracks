@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 export const buildCspHeader = (nonce: string, isDev: boolean) => {
   const scriptSrc = isDev
     ? `'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`
-    : `'self' 'nonce-${nonce}' 'unsafe-inline'`
+    : `'self' 'nonce-${nonce}'`
   const styleSrc = `'self' 'unsafe-inline' https://fonts.googleapis.com`
 
   return [

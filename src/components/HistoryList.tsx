@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle, Download, Loader2, Lock } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
@@ -368,6 +368,41 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
 
         return { visibleHistory: visible, blockedCount: blocked };
     }, [filteredHistory, vipLimits]);
+
+    const listRef = useRef<HTMLDivElement | null>(null);
+    const [virtualState, setVirtualState] = useState({ start: 0, end: 0, offset: 0, height: 0 });
+    const enableVirtual = visibleHistory.length > 40;
+    const updateVirtual = useCallback(() => {
+        if (!enableVirtual) return;
+        const container = listRef.current;
+        const total = visibleHistory.length;
+        const itemHeight = 140;
+        const overscan = 6;
+        if (!container || total === 0) {
+            setVirtualState({ start: 0, end: Math.min(total, 20), offset: 0, height: total * itemHeight });
+            return;
+        }
+        const rect = container.getBoundingClientRect();
+        const scrollTop = window.scrollY || window.pageYOffset || 0;
+        const top = rect.top + scrollTop;
+        const viewportHeight = window.innerHeight || 0;
+        const start = Math.max(0, Math.floor((scrollTop - top) / itemHeight) - overscan);
+        const end = Math.min(total, Math.ceil((scrollTop + viewportHeight - top) / itemHeight) + overscan);
+        setVirtualState({ start, end, offset: start * itemHeight, height: total * itemHeight });
+    }, [enableVirtual, visibleHistory.length]);
+
+    useEffect(() => {
+        if (!enableVirtual) return;
+        updateVirtual();
+        window.addEventListener('scroll', updateVirtual, { passive: true });
+        window.addEventListener('resize', updateVirtual);
+        return () => {
+            window.removeEventListener('scroll', updateVirtual);
+            window.removeEventListener('resize', updateVirtual);
+        };
+    }, [enableVirtual, updateVirtual]);
+
+    const virtualSlice = enableVirtual ? visibleHistory.slice(virtualState.start, virtualState.end) : visibleHistory;
 
     const summary = useMemo(() => {
         const totalSeconds = visibleHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
@@ -1268,68 +1303,136 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                     )}
 
                     {!loading && (visibleHistory.length > 0 || blockedCount > 0) && (
-                        <div className="space-y-3 pb-24">
-                            {visibleHistory.map((session) => {
-                                const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
-                                const isSelected = selectedIds.has(session.id);
-                                return (
-                                    <div
-                                        key={session.id}
-                                        onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
-                                        className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            {isSelectionMode && (
-                                                <div className="mt-0.5">
-                                                    {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
-                                                </div>
-                                            )}
+                        <div ref={listRef} className="space-y-3 pb-24">
+                            {enableVirtual ? (
+                                <div className="relative" style={{ height: virtualState.height }}>
+                                    <div className="space-y-3" style={{ transform: `translateY(${virtualState.offset}px)` }}>
+                                        {virtualSlice.map((session) => {
+                                            const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
+                                            const isSelected = selectedIds.has(session.id);
+                                            return (
+                                                <div
+                                                    key={session.id}
+                                                    onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
+                                                    className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        {isSelectionMode && (
+                                                            <div className="mt-0.5">
+                                                                {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
+                                                            </div>
+                                                        )}
 
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
-                                                        <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
-                                                            <span className="inline-flex items-center gap-1.5">
-                                                                <CalendarDays size={14} className="text-yellow-500/70" />
-                                                                {formatCompletedAt(session?.date)}
-                                                            </span>
-                                                            <span className="inline-flex items-center gap-1.5">
-                                                                <Clock size={14} className="text-yellow-500/70" />
-                                                                {minutes} min
-                                                            </span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
+                                                                    <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
+                                                                        <span className="inline-flex items-center gap-1.5">
+                                                                            <CalendarDays size={14} className="text-yellow-500/70" />
+                                                                            {formatCompletedAt(session?.date)}
+                                                                        </span>
+                                                                        <span className="inline-flex items-center gap-1.5">
+                                                                            <Clock size={14} className="text-yellow-500/70" />
+                                                                            {minutes} min
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+
+                                                                {!isReadOnly && !isSelectionMode && (
+                                                                    <div className="flex items-center gap-2 shrink-0">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => handleDeleteClick(e, session)}
+                                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                                            aria-label="Excluir"
+                                                                        >
+                                                                            <Trash2 size={18} className="pointer-events-none" />
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                openEdit(session);
+                                                                            }}
+                                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                                            aria-label="Editar"
+                                                                        >
+                                                                            <Edit3 size={18} className="pointer-events-none" />
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ) : (
+                                visibleHistory.map((session) => {
+                                    const minutes = Math.floor((Number(session?.totalTime) || 0) / 60);
+                                    const isSelected = selectedIds.has(session.id);
+                                    return (
+                                        <div
+                                            key={session.id}
+                                            onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
+                                            className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                {isSelectionMode && (
+                                                    <div className="mt-0.5">
+                                                        {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
+                                                    </div>
+                                                )}
 
-                                                    {!isReadOnly && !isSelectionMode && (
-                                                        <div className="flex items-center gap-2 shrink-0">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => handleDeleteClick(e, session)}
-                                                                className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
-                                                                aria-label="Excluir"
-                                                            >
-                                                                <Trash2 size={18} className="pointer-events-none" />
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    openEdit(session);
-                                                                }}
-                                                                className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
-                                                                aria-label="Editar"
-                                                            >
-                                                                <Edit3 size={18} className="pointer-events-none" />
-                                                            </button>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0">
+                                                            <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
+                                                            <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
+                                                                <span className="inline-flex items-center gap-1.5">
+                                                                    <CalendarDays size={14} className="text-yellow-500/70" />
+                                                                    {formatCompletedAt(session?.date)}
+                                                                </span>
+                                                                <span className="inline-flex items-center gap-1.5">
+                                                                    <Clock size={14} className="text-yellow-500/70" />
+                                                                    {minutes} min
+                                                                </span>
+                                                            </div>
                                                         </div>
-                                                    )}
+
+                                                        {!isReadOnly && !isSelectionMode && (
+                                                            <div className="flex items-center gap-2 shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => handleDeleteClick(e, session)}
+                                                                    className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                                    aria-label="Excluir"
+                                                                >
+                                                                    <Trash2 size={18} className="pointer-events-none" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        openEdit(session);
+                                                                    }}
+                                                                    className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                                    aria-label="Editar"
+                                                                >
+                                                                    <Edit3 size={18} className="pointer-events-none" />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })
+                            )}
 
                             {blockedCount > 0 && (
                                 <div className="bg-neutral-950/50 border border-yellow-500/20 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden group cursor-pointer" onClick={onUpgrade}>

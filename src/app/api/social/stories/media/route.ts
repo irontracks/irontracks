@@ -4,6 +4,8 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -31,6 +33,10 @@ export async function GET(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`social:stories:media:get:${auth.user.id}:${ip}`, 120, 60_000)
+    if (!rl.allowed) return new Response('rate_limited', { status: 429 })
+
     const url = new URL(req.url)
     const storyId = String(url.searchParams.get('storyId') || url.searchParams.get('story_id') || '').trim()
     const signedSeconds = Math.min(3600, Math.max(60, Number(url.searchParams.get('signedSeconds') || 600) || 600))
@@ -38,6 +44,16 @@ export async function GET(req: Request) {
 
     const userId = String(auth.user?.id || '').trim()
     if (!userId) return new Response('unauthorized', { status: 401 })
+
+    const cacheKey = `social:stories:media:${userId}:${storyId}:${signedSeconds}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached?.redirectUrl) {
+      const headers = new Headers()
+      headers.set('Location', String(cached.redirectUrl))
+      headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
+      headers.set('Content-Type', String(cached.contentType || 'application/octet-stream'))
+      return new Response(null, { status: 307, headers })
+    }
 
     const admin = createAdminClient()
 
@@ -72,6 +88,7 @@ export async function GET(req: Request) {
     headers.set('Location', String(signed.signedUrl))
     headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
     headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
+    await cacheSet(cacheKey, { redirectUrl: String(signed.signedUrl), contentType: headers.get('Content-Type') }, 30)
     return new Response(null, { status: 307, headers })
   } catch (e: unknown) {
     return new Response(getErrorMessage(e) ?? 'internal_error', { status: 500 })
@@ -82,6 +99,10 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`social:stories:media:post:${auth.user.id}:${ip}`, 60, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, PostBodySchema)
     if (parsedBody.response) return parsedBody.response

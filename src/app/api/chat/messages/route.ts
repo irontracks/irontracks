@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,10 @@ export async function GET(req: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`chat:messages:${user.id}:${ip}`, 60, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response

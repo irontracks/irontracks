@@ -3,6 +3,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +18,10 @@ export async function GET() {
       return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
     }
 
+    const cacheKey = `vip:periodization:active:${userId}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
+
     const admin = createAdminClient()
 
     const { data: program, error: pErr } = await admin
@@ -29,7 +34,11 @@ export async function GET() {
       .maybeSingle()
 
     if (pErr) return NextResponse.json({ ok: false, error: pErr.message }, { status: 400 })
-    if (!program?.id) return NextResponse.json({ ok: true, program: null, workouts: [] })
+    if (!program?.id) {
+      const payload = { ok: true, program: null, workouts: [] }
+      await cacheSet(cacheKey, payload, 60)
+      return NextResponse.json(payload)
+    }
 
     const { data: workouts, error: wErr } = await admin
       .from('vip_periodization_workouts')
@@ -74,7 +83,9 @@ export async function GET() {
       exercise_count: exerciseCountByWorkoutId.get(String(w?.workout_id || '').trim()) || 0,
     }))
 
-    return NextResponse.json({ ok: true, program, workouts: enriched })
+    const payload = { ok: true, program, workouts: enriched }
+    await cacheSet(cacheKey, payload, 60)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }

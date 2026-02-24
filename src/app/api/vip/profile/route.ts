@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,13 +27,19 @@ export async function GET() {
   if (entitlement.tier === 'free') return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
   try {
+    const cacheKey = `vip:profile:${user.id}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
+
     const { data, error } = await supabase
       .from('vip_profile')
       .select('user_id, goal, equipment, constraints, preferences, updated_at')
       .eq('user_id', user.id)
       .maybeSingle()
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
-    return NextResponse.json({ ok: true, profile: data || null })
+    const payload = { ok: true, profile: data || null }
+    await cacheSet(cacheKey, payload, 60)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
@@ -72,7 +79,9 @@ export async function PUT(req: Request) {
       .single()
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
-    return NextResponse.json({ ok: true, profile: data })
+    const payload = { ok: true, profile: data }
+    await cacheSet(`vip:profile:${user.id}`, payload, 60)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }

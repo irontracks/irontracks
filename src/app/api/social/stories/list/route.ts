@@ -4,6 +4,8 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseSearchParams } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +44,10 @@ export async function GET(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`social:stories:list:${auth.user.id}:${ip}`, 60, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
@@ -50,6 +56,10 @@ export async function GET(req: Request) {
 
     const userId = String(auth.user.id || '').trim()
     if (!userId) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const cacheKey = `social:stories:list:${userId}:${limit}:${signedSeconds}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
 
     const admin = createAdminClient()
 
@@ -190,7 +200,9 @@ export async function GET(req: Request) {
         return String(b.latestAt).localeCompare(String(a.latestAt))
       })
 
-    return NextResponse.json({ ok: true, data: groups })
+    const payload = { ok: true, data: groups }
+    await cacheSet(cacheKey, payload, 30)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }

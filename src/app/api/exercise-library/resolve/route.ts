@@ -6,10 +6,12 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 
+const NameValueSchema = z.union([z.string().min(1), z.number().min(0)])
+
 const ZodBodySchema = z
   .object({
-    names: z.unknown().optional(),
-    name: z.unknown().optional(),
+    names: z.array(NameValueSchema).optional(),
+    name: NameValueSchema.optional(),
   })
   .strip()
 
@@ -21,7 +23,7 @@ export async function POST(req: Request) {
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
-    const rawNames = (body as Record<string, unknown>)?.names ?? (body as Record<string, unknown>)?.name ?? []
+    const rawNames = body?.names ?? body?.name ?? []
     const names = Array.isArray(rawNames) ? rawNames : [rawNames]
 
     const normalized = Array.from(

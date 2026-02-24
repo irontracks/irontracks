@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
-import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response
 
     const ip = getRequestIp(req)
-    const rl = checkRateLimit(`social:like:${auth.user.id}:${ip}`, 60, 60_000)
+    const rl = await checkRateLimitAsync(`social:like:${auth.user.id}:${ip}`, 60, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, BodySchema)

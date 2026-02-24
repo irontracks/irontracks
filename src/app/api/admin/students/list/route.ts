@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,10 @@ export async function GET(req: Request) {
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
+
+    const cacheKey = `admin:students:list:${q?.teacher_id || 'all'}:${q?.status || 'all'}:${q?.limit || 50}:${q?.offset || 0}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
 
     let query = admin
       .from('students')
@@ -73,7 +78,9 @@ export async function GET(req: Request) {
       return true
     })
 
-    return NextResponse.json({ ok: true, students: filtered })
+    const payload = { ok: true, students: filtered }
+    await cacheSet(cacheKey, payload, 30)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
