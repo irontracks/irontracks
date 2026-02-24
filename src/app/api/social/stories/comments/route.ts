@@ -4,6 +4,8 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,10 +23,18 @@ export async function GET(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`social:stories:comments:list:${auth.user.id}:${ip}`, 60, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+
     const url = new URL(req.url)
     const storyId = String(url.searchParams.get('storyId') || url.searchParams.get('story_id') || '').trim()
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit') || 50) || 50))
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })
+
+    const cacheKey = `social:stories:comments:${auth.user.id}:${storyId}:${limit}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
 
     const admin = createAdminClient()
     const { data: commentsRaw, error } = await admin
@@ -47,7 +57,7 @@ export async function GET(req: Request) {
       profileById.set(id, p)
     }
 
-    return NextResponse.json({
+    const payload = {
       ok: true,
       data: comments.map((c: Record<string, unknown>) => {
         const uid = String(c?.user_id || '').trim()
@@ -63,7 +73,9 @@ export async function GET(req: Request) {
             : { id: uid, displayName: null, photoUrl: null },
         }
       }),
-    })
+    }
+    await cacheSet(cacheKey, payload, 20)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
@@ -73,6 +85,10 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`social:stories:comments:create:${auth.user.id}:${ip}`, 30, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, PostBodySchema)
     if (parsedBody.response) return parsedBody.response

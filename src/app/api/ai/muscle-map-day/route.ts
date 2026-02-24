@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
-import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
@@ -273,7 +273,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
     }
     const ip = getRequestIp(req)
-    const rl = checkRateLimit(`ai:muscle-map-day:${userId}:${ip}`, 30, 60_000)
+    const rl = await checkRateLimitAsync(`ai:muscle-map-day:${userId}:${ip}`, 30, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     const admin = createAdminClient()
 

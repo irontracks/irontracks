@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { runChatDiagnostics } from '@/lib/chatDiagnostics'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 const ZodBodySchema = z
   .object({
@@ -17,8 +18,14 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
+    const cacheKey = `diagnostics:chat:${user.id}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
+
     const report = await runChatDiagnostics(supabase, user.id)
-    return NextResponse.json(report)
+    const payload = report && typeof report === 'object' ? report : { ok: true }
+    await cacheSet(cacheKey, payload, 30)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }

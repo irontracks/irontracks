@@ -4,6 +4,7 @@ import { getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { computeWeeklyStatsFromSessions } from '@/utils/vip/periodization'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,10 @@ export async function GET() {
     if (limits.tier === 'free') {
       return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
     }
+
+    const cacheKey = `vip:periodization:stats:${userId}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
 
     const admin = createAdminClient()
     const since = daysAgoIso(7 * 14)
@@ -45,9 +50,10 @@ export async function GET() {
 
     const weekly = computeWeeklyStatsFromSessions(sessions)
 
-    return NextResponse.json({ ok: true, weekly })
+    const payload = { ok: true, weekly }
+    await cacheSet(cacheKey, payload, 120)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }
-

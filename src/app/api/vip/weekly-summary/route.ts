@@ -3,6 +3,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,6 +107,10 @@ export async function GET() {
   }
 
   try {
+    const cacheKey = `vip:weekly-summary:${user.id}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
+
     const now = Date.now()
     const startIso = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -191,7 +196,9 @@ export async function GET() {
 
     const summaryText = lines.join('\n')
 
-    return NextResponse.json({ ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText })
+    const payload = { ok: true, dataUsed, trainedDays, checkins: { energy, mood, soreness, sleep }, prs, summaryText }
+    await cacheSet(cacheKey, payload, 120)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
   }

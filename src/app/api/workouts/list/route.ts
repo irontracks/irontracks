@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +10,10 @@ export async function GET() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const cacheKey = `workouts:list:${user.id}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
 
     const query = supabase
       .from('workouts')
@@ -25,7 +30,9 @@ export async function GET() {
       user_id: string
     }
     const rows: WorkoutRow[] = (data || []) as unknown as WorkoutRow[]
-    return NextResponse.json({ ok: true, rows })
+    const payload = { ok: true, rows }
+    await cacheSet(cacheKey, payload, 60)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }

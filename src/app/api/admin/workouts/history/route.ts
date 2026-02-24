@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,10 @@ export async function GET(req: Request) {
     if (!targetUserId) return NextResponse.json({ ok: false, error: 'missing target' }, { status: 400 })
     if (!looksLikeUuid(targetUserId)) return NextResponse.json({ ok: false, error: 'invalid target' }, { status: 400 })
 
+    const cacheKey = `admin:workouts:history:${auth.role}:${auth.user.id}:${targetUserId}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
+
     if (auth.role === 'teacher') {
       const { data: links } = await supabase
         .from('students')
@@ -71,7 +76,9 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(200)
 
-    return NextResponse.json({ ok: true, rows: rows || [] })
+    const payload = { ok: true, rows: rows || [] }
+    await cacheSet(cacheKey, payload, 30)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

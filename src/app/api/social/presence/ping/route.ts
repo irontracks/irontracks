@@ -7,16 +7,21 @@ import {
   listFollowerIdsOf,
   shouldThrottleBySenderType,
 } from '@/lib/social/notifyFollowers'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
 
     const userId = String(auth.user.id || '').trim()
     if (!userId) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`social:presence:ping:${userId}:${ip}`, 30, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const throttled = await shouldThrottleBySenderType(userId, 'friend_online', 15)
     if (throttled) return NextResponse.json({ ok: true, throttled: true })
@@ -49,4 +54,3 @@ export async function POST() {
     return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }
 }
-

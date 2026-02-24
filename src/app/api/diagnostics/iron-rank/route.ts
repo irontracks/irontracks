@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 const safeJson = (v: unknown) => {
   try {
@@ -31,6 +32,10 @@ export async function GET() {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const cacheKey = `diagnostics:iron-rank:${user.id}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
 
     const admin = createAdminClient()
 
@@ -85,7 +90,7 @@ export async function GET() {
       })
       .slice(0, 10)
 
-    return NextResponse.json({
+    const payload = {
       ok: true,
       rpc: {
         error: rpcRes.error ? { message: rpcRes.error.message, code: (rpcRes.error as unknown as Record<string, unknown>).code ?? null } : null,
@@ -103,7 +108,9 @@ export async function GET() {
         recent_error: recentWorkoutsRes.error ? recentWorkoutsRes.error.message : null,
         rpc_error_raw: rpcRes.error ? safeJson(rpcRes.error) : null,
       },
-    })
+    }
+    await cacheSet(cacheKey, payload, 60)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json(
       { ok: false, error: getErrorMessage(e) ? String(getErrorMessage(e)) : String(e), where: 'api/diagnostics/iron-rank' },

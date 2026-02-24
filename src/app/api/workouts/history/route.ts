@@ -4,6 +4,7 @@ import { parseSearchParams } from '@/utils/zod'
 import { createClient } from '@/utils/supabase/server'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,15 +38,23 @@ export async function GET(req: Request) {
       query = query.gte('date', cutoff)
     }
 
+    const cacheKey = `workouts:history:${user.id}:${q.limit}:${historyDays ?? 'all'}:${tier}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
+
     const { data, error } = await query
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    return NextResponse.json({
+    const payload = {
       ok: true,
       tier,
       history_days: historyDays,
       rows: data || [],
-    })
+    }
+
+    await cacheSet(cacheKey, payload, 30)
+
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }

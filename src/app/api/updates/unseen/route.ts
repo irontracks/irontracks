@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,10 @@ export async function GET(req: Request) {
 
     const limit = q?.limit ?? 1
     const batchSize = Math.max(UPDATE_MIN_BATCH, limit * UPDATE_BATCH_SIZE_MULTIPLIER)
+
+    const cacheKey = `updates:unseen:${user.id}:${limit}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
 
     const nowIso = new Date().toISOString()
     const { data: updates, error } = await supabase
@@ -67,7 +72,9 @@ export async function GET(req: Request) {
       return true
     })
 
-    return NextResponse.json({ ok: true, updates: filtered.slice(0, limit) })
+    const payload = { ok: true, updates: filtered.slice(0, limit) }
+    await cacheSet(cacheKey, payload, 20)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })

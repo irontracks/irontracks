@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
-import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     const userId = String(auth.user.id || '').trim()
 
     const ip = getRequestIp(req)
-    const rl = checkRateLimit(`ai:chef-ia:${userId}:${ip}`, 10, 60_000)
+    const rl = await checkRateLimitAsync(`ai:chef-ia:${userId}:${ip}`, 10, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const access = await checkVipFeatureAccess(supabase, userId, 'chef_ai')

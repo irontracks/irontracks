@@ -1,3 +1,7 @@
+import bundleAnalyzer from '@next/bundle-analyzer'
+
+const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === 'true' })
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -86,11 +90,15 @@ const nextConfig = {
         headers: [{ key: 'cache-control', value: 'public, max-age=86400' }],
       },
       {
-        source: '/((?!_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml).*)',
+        source: '/api/:path*',
         headers: [{ key: 'cache-control', value: 'no-store, max-age=0' }],
+      },
+      {
+        source: '/((?!_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml).*)',
+        headers: [{ key: 'cache-control', value: 'private, max-age=0, must-revalidate' }],
       },
     ]
   },
 };
 
-export default nextConfig;
+export default withBundleAnalyzer(nextConfig);

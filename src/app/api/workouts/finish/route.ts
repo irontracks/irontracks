@@ -5,7 +5,7 @@ import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
-import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { safeRecord } from '@/utils/guards'
 import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } from '@/utils/report/reportMetrics'
@@ -129,7 +129,7 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     const userId = String(user.id || '').trim()
     const ip = getRequestIp(request)
-    const rl = checkRateLimit(`workouts:finish:${userId}:${ip}`, 10, 60_000)
+    const rl = await checkRateLimitAsync(`workouts:finish:${userId}:${ip}`, 10, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(request, BodySchema)

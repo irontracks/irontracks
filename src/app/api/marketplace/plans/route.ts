@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { cacheDelete, cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,6 +35,10 @@ export async function GET(req: Request) {
     const url = new URL(req.url)
     const teacherUserId = (url.searchParams.get('teacherUserId') || '').trim()
 
+    const cacheKey = `marketplace:plans:${teacherUserId || 'all'}`
+    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+    if (cached) return NextResponse.json(cached)
+
     let q = supabase
       .from('teacher_plans')
       .select('id, teacher_user_id, name, description, price_cents, currency, interval, status, created_at, updated_at')
@@ -43,7 +48,9 @@ export async function GET(req: Request) {
 
     const { data, error } = await q
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
-    return NextResponse.json({ ok: true, plans: data || [] })
+    const payload = { ok: true, plans: data || [] }
+    await cacheSet(cacheKey, payload, 60)
+    return NextResponse.json(payload)
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
@@ -91,6 +98,8 @@ export async function POST(req: Request) {
       .single()
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    await cacheDelete(`marketplace:plans:${user.id}`)
+    await cacheDelete('marketplace:plans:all')
     return NextResponse.json({ ok: true, plan: data })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
