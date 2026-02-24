@@ -196,13 +196,6 @@ const LoginScreen = () => {
             window.location.assign(href);
         } catch (error: unknown) {
             logError('error', "Login Error:", error);
-            if (isIosNative() && shouldFallbackToWeb(error)) {
-                try {
-                    const href = getOAuthHref('apple');
-                    window.location.assign(href);
-                    return;
-                } catch {}
-            }
             setIsLoading(false);
             const msg = error instanceof Error ? error.message : 'Falha ao fazer login.';
             setErrorMsg(msg);
