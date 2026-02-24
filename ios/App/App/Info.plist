@@ -55,5 +55,9 @@
 	<string>O IronTracks precisa acessar sua biblioteca de fotos para selecionar imagens de avaliação e vídeos de exercícios.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>O IronTracks precisa salvar fotos e vídeos na sua biblioteca.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesInDynamicIsland</key>
+	<true/>
 </dict>
 </plist>

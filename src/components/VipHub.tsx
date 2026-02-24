@@ -58,6 +58,7 @@ interface VipStatus {
 export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab, onStartSession, onOpenWizard, onOpenHistory, onOpenReport }: VipHubProps) {
   const isLocked = !!locked
   const hideVipCtas = useMemo(() => isIosNative(), [])
+  if (hideVipCtas) return null
   const name = useMemo(() => String(user?.displayName || user?.name || '').trim(), [user?.displayName, user?.name])
   const [mode, setMode] = useState('coach')
   const [draft, setDraft] = useState('')

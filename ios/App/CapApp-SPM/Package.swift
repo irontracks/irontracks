@@ -13,7 +13,8 @@ let package = Package(
     dependencies: [
         .package(name: "capacitor-swift-pm", path: "../../LocalPackages/capacitor-swift-pm"),
         .package(name: "CapacitorCommunityAppleSignIn", path: "../../LocalPackages/CapacitorCommunityAppleSignIn"),
-        .package(name: "RevenuecatPurchasesCapacitor", path: "../../LocalPackages/RevenuecatPurchasesCapacitor")
+        .package(name: "RevenuecatPurchasesCapacitor", path: "../../LocalPackages/RevenuecatPurchasesCapacitor"),
+        .package(name: "IronTracksNative", path: "../../LocalPackages/IronTracksNative")
     ],
     targets: [
         .target(
@@ -22,7 +23,8 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "CapacitorCommunityAppleSignIn", package: "CapacitorCommunityAppleSignIn"),
-                .product(name: "RevenuecatPurchasesCapacitor", package: "RevenuecatPurchasesCapacitor")
+                .product(name: "RevenuecatPurchasesCapacitor", package: "RevenuecatPurchasesCapacitor"),
+                .product(name: "IronTracksNative", package: "IronTracksNative")
             ]
         )
     ]
