@@ -111,6 +111,17 @@ const LoginScreen = () => {
         return msg.includes('authorizationerror') || msg.includes('1000') || code === '1000';
     };
 
+    const hashSha256 = async (value: string) => {
+        try {
+            if (typeof window === 'undefined' || !window.crypto?.subtle) return '';
+            const data = new TextEncoder().encode(value);
+            const digest = await window.crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+        } catch {
+            return '';
+        }
+    };
+
     const recoverCooldownLeft = useMemo(() => {
         if (!recoverCooldownUntil) return 0;
         const now = Date.now() + cooldownTick;
@@ -151,11 +162,12 @@ const LoginScreen = () => {
                 if (!clientId) throw new Error('Client ID da Apple não configurado.');
                 const nonce = randomString(32);
                 const state = randomString(16);
+                const hashedNonce = await hashSha256(nonce);
                 const result = await SignInWithApple.authorize({
                     clientId,
                     scopes: 'name email',
                     state,
-                    nonce,
+                    nonce: hashedNonce || undefined,
                 });
 
                 const token = result?.response?.identityToken;
@@ -176,7 +188,7 @@ const LoginScreen = () => {
                 }
 
                 const supabase = createClient();
-                const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token });
+                const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token, nonce });
                 if (error) throw error;
                 const session = data?.session;
                 if (session?.access_token && session?.refresh_token) {
