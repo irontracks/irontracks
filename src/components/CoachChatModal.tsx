@@ -220,11 +220,7 @@ export default function CoachChatModal({
                                             >
                                                 Ver Planos VIP
                                             </button>
-                                        ) : (
-                                            <div className="text-xs font-bold text-neutral-400">
-                                                Planos indisponíveis no iOS no momento.
-                                            </div>
-                                        )}
+                                        ) : null}
                                     </div>
                                 ) : (
                                     msg.content

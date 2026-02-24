@@ -78,6 +78,7 @@ import { usePresencePing } from '@/hooks/usePresencePing'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
+import { isIosNative } from '@/utils/platform'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
 import { useSignOut } from '@/hooks/useSignOut'
@@ -197,7 +198,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const flag = sessionStorage.getItem('irontracks_open_vip')
             if (!flag) return
             sessionStorage.removeItem('irontracks_open_vip')
-            setView('vip')
+            openVipView()
         } catch { }
     }, [])
 
@@ -913,6 +914,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     }
 
     const isHeaderVisible = view !== 'active' && view !== 'report';
+    const hideVipOnIos = isIosNative();
+
+    useEffect(() => {
+        if (!hideVipOnIos) return;
+        if (view === 'vip') setView('dashboard');
+    }, [hideVipOnIos, view]);
+
+    const openVipView = useCallback(() => {
+        if (hideVipOnIos) return;
+        setView('vip');
+    }, [hideVipOnIos]);
 
     return (
         <InAppNotificationsProvider
@@ -996,12 +1008,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
                                         {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
                                     </span>
-                                    {vipAccess?.hasVip && (
+                                    {!hideVipOnIos && vipAccess?.hasVip && (
                                         <button
                                             type="button"
                                             onClick={(e) => {
                                                 e.stopPropagation()
-                                                setView('vip')
+                                                openVipView()
                                             }}
                                             className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15"
                                         >
@@ -1080,7 +1092,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         setHasUnreadNotification(false);
                                     }}
                                     onOpenSchedule={() => router.push('/dashboard/schedule')}
-                                    onOpenWallet={() => setView('vip')}
+                                    onOpenWallet={() => openVipView()}
                                     onOpenSettings={() => setSettingsOpen(true)}
                                     onOpenTour={async () => {
                                         try {
@@ -1129,11 +1141,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 }
                                 communityContent={(user?.id || initialUserObj?.id) ? <CommunityClient embedded /> : null}
                                 vipContent={
+                                    hideVipOnIos ? null :
                                     <VipHub
                                         user={user as unknown as AdminUser}
                                         locked={!vipAccess?.hasVip}
                                         onOpenWorkoutEditor={(w: unknown) => handleEditWorkout(w)}
-                                        onOpenVipTab={() => setView('vip')}
+                                        onOpenVipTab={() => openVipView()}
                                         onStartSession={(w: unknown) => handleStartSession(w)}
                                         onOpenWizard={() => setCreateWizardOpen(true)}
                                         onOpenHistory={() => setView('history')}
@@ -1145,8 +1158,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     />
                                 }
                                 vipLabel="VIP"
-                                vipLocked={!vipAccess?.hasVip}
-                                vipEnabled={true}
+                                vipLocked={hideVipOnIos ? true : !vipAccess?.hasVip}
+                                vipEnabled={!hideVipOnIos}
                                 settings={userSettingsApi?.settings ?? null}
                                 onCreateWorkout={handleCreateWorkout}
                                 onQuickView={(w) => setQuickViewWorkout(w)}
@@ -1326,7 +1339,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     readOnly={false}
                                     title="Histórico"
                                     vipLimits={vipStatus?.limits as Record<string, unknown>}
-                                    onUpgrade={() => setView('vip')}
+                                    onUpgrade={() => openVipView()}
                                 />
                             </SectionErrorBoundary>
                         )}
@@ -1342,7 +1355,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         user={user as unknown as AdminUser}
                                         isVip={vipAccess?.hasVip}
                                         settings={userSettingsApi?.settings ?? null}
-                                        onUpgrade={() => setView('vip')}
+                                        onUpgrade={() => openVipView()}
                                         onClose={() => setView(reportBackView || 'dashboard')}
                                     />
                                 </SectionErrorBoundary>

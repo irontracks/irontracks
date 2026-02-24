@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
+import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity } from '@/utils/native/irontracksNative';
 
 interface RestTimerContext {
     kind?: string;
@@ -33,6 +34,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
     const warnedRef = useRef(false);
+    const notifyIdRef = useRef('');
     const safeSettings = settings && typeof settings === 'object' ? settings : null;
     const soundsEnabled = safeSettings ? safeSettings.enableSounds !== false : true;
     const soundVolume = (() => {
@@ -113,8 +115,28 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }, [allowVibrate, isFinished, repeatAlarm, repeatIntervalMs, soundVolume, soundsEnabled]);
 
     useEffect(() => {
-        if (!targetTime) return;
+        if (!targetTime) {
+            setIdleTimerDisabled(false);
+            if (notifyIdRef.current) {
+                cancelRestNotification(notifyIdRef.current);
+            }
+            return;
+        }
         let hasNotified = false;
+        const id = `${context?.kind || 'rest'}-${context?.exerciseId || ''}-${context?.setId || ''}-${targetTime}`;
+        notifyIdRef.current = id;
+
+        try {
+            const seconds = Math.max(1, Math.ceil((targetTime - Date.now()) / 1000));
+            if (allowNotify && seconds > 0) {
+                requestNativeNotifications().then((res) => {
+                    if (!res?.granted) return;
+                    scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!');
+                }).catch(() => {});
+            }
+            startRestLiveActivity(id, seconds, 'Descanso');
+            setIdleTimerDisabled(true);
+        } catch { }
 
         const updateTimer = () => {
             const now = Date.now();
@@ -140,8 +162,24 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
         updateTimer();
         const interval = setInterval(updateTimer, 100);
-        return () => clearInterval(interval);
-    }, [allowNotify, targetTime]);
+        return () => {
+            clearInterval(interval);
+            if (notifyIdRef.current) {
+                cancelRestNotification(notifyIdRef.current);
+                endRestLiveActivity(notifyIdRef.current);
+            }
+            setIdleTimerDisabled(false);
+        };
+    }, [allowNotify, targetTime, context?.exerciseId, context?.kind, context?.setId]);
+
+    useEffect(() => {
+        if (!isFinished) return;
+        setIdleTimerDisabled(false);
+        if (notifyIdRef.current) {
+            cancelRestNotification(notifyIdRef.current);
+            endRestLiveActivity(notifyIdRef.current);
+        }
+    }, [isFinished]);
 
     if (!targetTime) return null;
 
