@@ -166,7 +166,7 @@ const LoginScreen = () => {
             const password = emailData.password.trim();
 
             if (authMode === 'login') {
-                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
                 
                 // Salvar e-mail se rememberMe estiver ativo
@@ -176,6 +176,14 @@ const LoginScreen = () => {
                     localStorage.removeItem('it_remembered_email');
                 }
 
+                const session = data?.session;
+                if (session?.access_token && session?.refresh_token) {
+                    await fetch('/api/auth/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })
+                    });
+                }
                 holdLoading = true;
                 router.replace('/dashboard');
                 try { router.refresh(); } catch {}
@@ -270,8 +278,16 @@ const LoginScreen = () => {
                     throw new Error(json?.error || 'Código inválido.');
                 }
 
-                const { error } = await supabase.auth.signInWithPassword({ email, password });
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
+                const session = data?.session;
+                if (session?.access_token && session?.refresh_token) {
+                    await fetch('/api/auth/session', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })
+                    });
+                }
                 holdLoading = true;
                 router.replace('/dashboard');
                 try { router.refresh(); } catch {}

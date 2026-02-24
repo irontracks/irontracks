@@ -1,6 +1,14 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION:
+      process.env.NEXT_PUBLIC_APP_VERSION ||
+      process.env.VERCEL_GIT_COMMIT_SHA ||
+      process.env.VERCEL_DEPLOYMENT_ID ||
+      process.env.npm_package_version ||
+      'dev',
+  },
   images: {
     localPatterns: [
       {
@@ -83,6 +91,13 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'cache-control', value: 'public, max-age=3600' }],
       },
       {
+        source: '/sw.js',
+        headers: [
+          { key: 'cache-control', value: 'no-store, max-age=0' },
+          { key: 'service-worker-allowed', value: '/' },
+        ],
+      },
+      {
         source: '/icone.png',
         headers: [{ key: 'cache-control', value: 'public, max-age=86400' }],
       },
@@ -102,4 +117,3 @@ const nextConfig: NextConfig = {
 }
 
 export default nextConfig
-
