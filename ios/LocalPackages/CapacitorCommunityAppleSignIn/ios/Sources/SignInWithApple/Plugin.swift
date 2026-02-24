@@ -10,6 +10,7 @@ public class SignInWithApple: CAPPlugin, CAPBridgedPlugin, ASAuthorizationContro
     public let pluginMethods: [CAPPluginMethod] = [
         CAPPluginMethod(name: "authorize", returnType: CAPPluginReturnPromise),
     ] 
+    private var currentAuthorizationController: ASAuthorizationController?
 
     @objc func authorize(_ call: CAPPluginCall) {
         let appleIDProvider = ASAuthorizationAppleIDProvider()
@@ -24,9 +25,12 @@ public class SignInWithApple: CAPPlugin, CAPBridgedPlugin, ASAuthorizationContro
         self.bridge?.saveCall(call)
 
         let authorizationController = ASAuthorizationController(authorizationRequests: [request])
+        self.currentAuthorizationController = authorizationController
         authorizationController.delegate = self
         authorizationController.presentationContextProvider = self
-        authorizationController.performRequests()
+        DispatchQueue.main.async {
+            authorizationController.performRequests()
+        }
     }
 
     func getRequestedScopes(from call: CAPPluginCall) -> [ASAuthorization.Scope]? {
@@ -90,7 +94,9 @@ extension SignInWithApple: ASAuthorizationControllerDelegate {
 
         call.resolve(result)
         self.bridge?.releaseCall(call)
+        self.currentAuthorizationController = nil
     }
+
 
     public func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         let defaults = UserDefaults()
