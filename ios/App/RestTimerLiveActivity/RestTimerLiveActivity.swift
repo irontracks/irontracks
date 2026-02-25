@@ -3,6 +3,7 @@ import WidgetKit
 import SwiftUI
 import IronTracksLiveActivityShared
 
+@available(iOSApplicationExtension 16.1, *)
 struct RestTimerLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RestTimerAttributes.self) { context in
@@ -15,7 +16,6 @@ struct RestTimerLiveActivity: Widget {
             }
             .padding()
             .activityBackgroundTint(Color.black.opacity(0.9))
-            .activitySystemActionForegroundColor(.yellow)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
