@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "IronTracksNative",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v15)],
     products: [
         .library(
             name: "IronTracksNative",
@@ -21,6 +21,13 @@ let package = Package(
                 .product(name: "Cordova", package: "capacitor-swift-pm"),
                 .product(name: "IronTracksLiveActivityShared", package: "IronTracksLiveActivityShared")
             ],
-            path: "ios/Sources/IronTracksNative")
+            path: "ios/Sources/IronTracksNative",
+            linkerSettings: [
+                .linkedFramework("HealthKit"),
+                .linkedFramework("CoreMotion"),
+                .linkedFramework("LocalAuthentication"),
+                .linkedFramework("CoreSpotlight"),
+            ]
+        )
     ]
 )
