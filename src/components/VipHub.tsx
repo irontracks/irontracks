@@ -57,8 +57,7 @@ interface VipStatus {
 
 export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab, onStartSession, onOpenWizard, onOpenHistory, onOpenReport }: VipHubProps) {
   const isLocked = !!locked
-  const hideVipCtas = useMemo(() => isIosNative(), [])
-  if (hideVipCtas) return null
+  const hideVipCtas = isIosNative()
   const name = useMemo(() => String(user?.displayName || user?.name || '').trim(), [user?.displayName, user?.name])
   const [mode, setMode] = useState('coach')
   const [draft, setDraft] = useState('')
@@ -74,6 +73,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
   // Load VIP Status
   useEffect(() => {
+    if (hideVipCtas) return
     let cancelled = false
     ;(async () => {
       try {
@@ -87,7 +87,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [hideVipCtas])
 
   const [threadId, setThreadId] = useState('')
   const [chatLoaded, setChatLoaded] = useState(false)
@@ -412,6 +412,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     const cls = danger ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-neutral-800 bg-neutral-900/40 text-neutral-200'
     return <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-xl border ${cls}`}>{txt}</div>
   }
+
+  if (hideVipCtas) return null
 
   return (
     <div className="space-y-4">

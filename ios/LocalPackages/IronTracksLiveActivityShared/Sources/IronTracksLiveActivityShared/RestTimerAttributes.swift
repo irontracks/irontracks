@@ -1,3 +1,4 @@
+import Foundation
 import ActivityKit
 
 @available(iOS 16.1, *)

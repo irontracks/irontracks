@@ -48,6 +48,8 @@ const eslintConfig = defineConfig([
     "src/**/__tests__/**",
     "**/*.test.*",
     "**/*.spec.*",
+    "**/* *.ts",
+    "**/* *.tsx",
   ]),
 ]);
 

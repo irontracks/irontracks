@@ -6,10 +6,14 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>com.apple.developer.background-tasks.continued-processing.gpu</key>
+	<true/>
 	<key>com.apple.developer.healthkit</key>
 	<true/>
 	<key>com.apple.developer.healthkit.access</key>
 	<array/>
+	<key>com.apple.developer.healthkit.recalibrate-estimates</key>
+	<true/>
 	<key>com.apple.developer.siri</key>
 	<true/>
 	<key>com.apple.security.application-groups</key>

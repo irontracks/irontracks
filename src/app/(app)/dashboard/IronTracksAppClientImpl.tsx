@@ -901,6 +901,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
     }, [view, activeSession?.id]);
 
+    const hideVipOnIos = isIosNative();
+
+    useEffect(() => {
+        if (!hideVipOnIos) return;
+        if (view === 'vip') setView('dashboard');
+    }, [hideVipOnIos, view]);
+
+    const openVipView = useCallback(() => {
+        if (hideVipOnIos) return;
+        setView('vip');
+    }, [hideVipOnIos]);
+
     if (authLoading) return <LoadingScreen />;
     if (!user?.id) return <LoadingScreen />;
 
@@ -914,17 +926,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     }
 
     const isHeaderVisible = view !== 'active' && view !== 'report';
-    const hideVipOnIos = isIosNative();
-
-    useEffect(() => {
-        if (!hideVipOnIos) return;
-        if (view === 'vip') setView('dashboard');
-    }, [hideVipOnIos, view]);
-
-    const openVipView = useCallback(() => {
-        if (hideVipOnIos) return;
-        setView('vip');
-    }, [hideVipOnIos]);
 
     return (
         <InAppNotificationsProvider

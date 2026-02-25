@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const cp = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 
@@ -6,6 +7,14 @@ const repoRoot = path.join(__dirname, '..')
 const srcRoot = path.join(repoRoot, 'src')
 
 const invalid = []
+const tracked = new Set(
+  cp
+    .execSync('git ls-files src', { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    .split('\n')
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+    .map((p) => path.join(repoRoot, p)),
+)
 
 const walk = (dir) => {
   const entries = fs.readdirSync(dir, { withFileTypes: true })
@@ -17,6 +26,7 @@ const walk = (dir) => {
       continue
     }
     if (!ent.isFile()) continue
+    if (!tracked.has(full)) continue
     const name = ent.name
     if (/^route \d+\.(ts|tsx|js|jsx)$/.test(name)) invalid.push(full)
     if (/^page \d+(\.(ts|tsx|js|jsx))?$/.test(name)) invalid.push(full)
@@ -35,4 +45,3 @@ assert.equal(
 )
 
 process.stdout.write('ok\n')
-

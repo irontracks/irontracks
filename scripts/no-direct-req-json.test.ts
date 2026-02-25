@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const cp = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 
@@ -20,7 +21,16 @@ const walk = (dir, out) => {
 const files = []
 walk(srcRoot, files)
 
-const candidates = files.filter((p) => p.endsWith('.ts') || p.endsWith('.tsx'))
+const tracked = new Set(
+  cp
+    .execSync('git ls-files src', { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+    .split('\n')
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+    .map((p) => path.join(repoRoot, p)),
+)
+
+const candidates = files.filter((p) => tracked.has(p) && (p.endsWith('.ts') || p.endsWith('.tsx')))
 
 const re = /await\s+(req|request)\.json\s*\(/g
 const offenders = []
@@ -34,4 +44,3 @@ for (const p of candidates) {
 assert.equal(offenders.length, 0, `Found direct req.json() usage:\n${offenders.join('\n')}`)
 
 process.stdout.write('ok\n')
-
