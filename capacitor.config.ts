@@ -5,9 +5,8 @@ const config: CapacitorConfig = {
   appName: 'IronTracks',
   webDir: 'public',
   server: {
-    // URL de produção do seu app (Vercel).
-    // Substitua pela sua URL real, ex: https://irontracks.vercel.app
-    url: 'https://app-iron-tracks.vercel.app',
+    // URL de produção. Cookies de sessão Supabase ficam neste domínio.
+    url: 'https://irontracks.com.br',
     cleartext: true
   }
 };
