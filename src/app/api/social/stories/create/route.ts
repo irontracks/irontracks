@@ -9,8 +9,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
-
-const BodySchema = z.object({}).strip()
+const BodySchema = z.unknown()
 
 export async function POST(req: Request) {
   try {
@@ -23,8 +22,23 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const body = parsedBody.data!
-    const validation = validateStoryPayload(body)
+    const body: unknown = parsedBody.data
+
+    let validation = validateStoryPayload(body)
+
+    if (!validation.ok && String(validation.error || '') === 'media_path required') {
+      try {
+        const url = new URL(req.url)
+        const qp =
+          String(url.searchParams.get('mediaPath') || '').trim() ||
+          String(url.searchParams.get('media_path') || '').trim()
+        if (qp) {
+          const baseObj = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
+          validation = validateStoryPayload({ ...baseObj, mediaPath: qp, media_path: qp })
+        }
+      } catch {
+      }
+    }
 
     if (!validation.ok || !validation.data) {
       return NextResponse.json({ ok: false, error: validation.error || 'invalid_payload' }, { status: 400 })

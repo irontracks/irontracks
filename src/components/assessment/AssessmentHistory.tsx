@@ -1067,14 +1067,16 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                 </span>
               </button>
             ) : null}
-            <input
-              ref={scanInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              multiple
-              className="hidden"
-              onChange={handleScanFileChange}
-            />
+            {!isIosNativeApp ? (
+              <input
+                ref={scanInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                multiple
+                className="hidden"
+                onChange={handleScanFileChange}
+              />
+            ) : null}
           </div>
         </div>
 

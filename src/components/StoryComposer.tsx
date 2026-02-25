@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { isIosNative } from '@/utils/platform'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
 // --- Types ---
@@ -1195,10 +1196,11 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           }
       }
 
-      const createResp = await fetch('/api/social/stories/create', {
+      const createUrl = isIosNative() ? `/api/social/stories/create?media_path=${encodeURIComponent(path)}` : '/api/social/stories/create'
+      const createResp = await fetch(createUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ mediaPath: path, caption: String(metrics?.title || ''), meta }),
+        body: JSON.stringify({ mediaPath: path, media_path: path, caption: String(metrics?.title || ''), meta }),
       })
       const createJson = await createResp.json().catch((): null => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
