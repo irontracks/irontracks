@@ -79,6 +79,8 @@ import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { isIosNative } from '@/utils/platform'
+import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
+import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
 import { useSignOut } from '@/hooks/useSignOut'
@@ -148,6 +150,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [authLoading, setAuthLoading] = useState(false);
     const [view, setView] = useState('dashboard');
     const [directChat, setDirectChat] = useState<DirectChatState | null>(null);
+    // ── Native iOS setup (notifications + biometric lock) ─────────────────────
+    useNativeAppSetup(user?.id)
+    const userName = String(user?.displayName || user?.email || '')
+    const { isLocked, unlock } = useBiometricLock(!!user?.id)
+
     // workouts, stats, studentFolders, fetchWorkouts, isFetching — extraídos para useWorkoutFetch
     // Streak stats — extracted to useWorkoutStreak hook (userId resolved after auth)
     const { streakStats, setStreakStats } = useWorkoutStreak(user?.id);
@@ -928,6 +935,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
     return (
+        <>
+        {/* Biometric lock — shown on top of everything when app resumes from background */}
+        {isLocked && user?.id ? (
+            <BiometricLock userName={userName} onUnlocked={unlock} />
+        ) : null}
         <InAppNotificationsProvider
             userId={user?.id || undefined}
             settings={userSettingsApi?.settings ?? null}
@@ -1896,6 +1908,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 </div>
             </TeamWorkoutProvider>
         </InAppNotificationsProvider>
+        </>
     );
 }
 
