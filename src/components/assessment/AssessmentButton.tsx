@@ -299,14 +299,16 @@ export default function AssessmentButton({
             className="hidden"
             onChange={handleImportFileChange}
           />
-          <input
-            ref={scanInputRef}
-            type="file"
-            accept="image/*,application/pdf"
-            multiple
-            className="hidden"
-            onChange={handleScanFileChange}
-          />
+          {!isIosNativeApp ? (
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={handleScanFileChange}
+            />
+          ) : null}
         </div>
       </div>
     );
@@ -363,14 +365,16 @@ export default function AssessmentButton({
           {importing ? "Importando..." : "Importar Foto/PDF"}
         </button>
       ) : null}
-      <input
-        ref={scanInputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        multiple
-        className="hidden"
-        onChange={handleScanFileChange}
-      />
+      {!isIosNativeApp ? (
+        <input
+          ref={scanInputRef}
+          type="file"
+          accept="image/*,application/pdf"
+          multiple
+          className="hidden"
+          onChange={handleScanFileChange}
+        />
+      ) : null}
     </div>
   );
 }

@@ -79,14 +79,16 @@ export const AssessmentHeader = ({
               <X className="w-5 h-5" />
             </button>
           ) : null}
-          <input
-            ref={scanInputRef}
-            type="file"
-            accept="image/*,application/pdf"
-            multiple
-            className="hidden"
-            onChange={onScanFileChange}
-          />
+          {!isIosNativeApp ? (
+            <input
+              ref={scanInputRef}
+              type="file"
+              accept="image/*,application/pdf"
+              multiple
+              className="hidden"
+              onChange={onScanFileChange}
+            />
+          ) : null}
         </div>
       </div>
     </div>

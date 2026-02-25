@@ -39,7 +39,14 @@ yarn-error.log*
 # trae
 .trae
 
+# local assistants
+.claude
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# accidental duplicate files created by the editor (spaces in name)
+**/* *.ts
+**/* *.tsx

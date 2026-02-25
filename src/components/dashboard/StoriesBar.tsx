@@ -9,6 +9,7 @@ import StoryCreatorModal from '@/components/stories/StoryCreatorModal'
 import { Story, StoryGroup } from '@/types/social'
 import { parseExt, guessMediaKind, extFromMime } from '@/utils/mediaUtils'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { isIosNative } from '@/utils/platform'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
 const initials = (name: string) => {
@@ -84,11 +85,13 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
         .uploadToSignedUrl(path, String(signJson.token), file, { contentType: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg') })
       if (upErr) throw upErr
 
-      const createResp = await fetch('/api/social/stories/create', {
+      const createUrl = isIosNative() ? `/api/social/stories/create?media_path=${encodeURIComponent(path)}` : '/api/social/stories/create'
+      const createResp = await fetch(createUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ 
           mediaPath: path, 
+          media_path: path,
           caption: null, 
           meta: { 
             source: 'upload',
