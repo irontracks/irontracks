@@ -1,7 +1,12 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import { X, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert } from 'lucide-react'
+import {
+  X, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
+  Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2,
+  Bell, Timer, Lock, Smartphone, HelpCircle, Database,
+  Mail, MessageCircle, ChevronRight, ExternalLink
+} from 'lucide-react'
 import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
@@ -21,6 +26,26 @@ import {
 } from '@/utils/native/irontracksNative'
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const ToggleSwitch = ({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    disabled={disabled}
+    onClick={onChange}
+    className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${checked ? 'bg-yellow-500' : 'bg-neutral-700'}`}
+  >
+    <span className={`pointer-events-none inline-block h-[22px] w-[22px] transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+  </button>
+)
+
+const SectionHeader = ({ icon: Icon, label }: { icon: React.FC<{ size?: number; className?: string }>; label: string }) => (
+  <div className="flex items-center gap-2 mb-3">
+    <Icon size={14} className="text-yellow-500" />
+    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">{label}</div>
+  </div>
+)
 
 interface SettingsModalProps {
   isOpen?: boolean
@@ -199,15 +224,20 @@ export default function SettingsModal(props: SettingsModalProps) {
   return (
     <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe">
       <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
-          <div className="min-w-0">
-            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Personalização</div>
-            <div className="text-white font-black text-lg truncate">{title}</div>
+        <div className="p-4 border-b border-neutral-800 flex items-center justify-between bg-gradient-to-r from-neutral-900 to-neutral-900/80">
+          <div className="min-w-0 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 inline-flex items-center justify-center">
+              <Layers size={20} className="text-yellow-500" />
+            </div>
+            <div>
+              <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Personalização</div>
+              <div className="text-white font-black text-lg truncate">{title}</div>
+            </div>
           </div>
           <button
             type="button"
             onClick={() => props?.onClose?.()}
-            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center transition-colors"
             aria-label="Fechar"
           >
             <X size={18} />
@@ -216,7 +246,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 
         <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto custom-scrollbar">
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Aparência</div>
+            <SectionHeader icon={Palette} label="Aparência" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -236,7 +266,7 @@ export default function SettingsModal(props: SettingsModalProps) {
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Nomes de treinos</div>
+            <SectionHeader icon={CalendarDays} label="Nomes de treinos" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -261,7 +291,7 @@ export default function SettingsModal(props: SettingsModalProps) {
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Modo do App</div>
+            <SectionHeader icon={Layers} label="Modo do App" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -311,17 +341,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                     <div className="text-sm font-bold text-white">Check-in pré-treino</div>
                     <div className="text-xs text-neutral-400">Pergunta energia/dor/tempo antes de iniciar.</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setValue('promptPreWorkoutCheckin', !promptPreWorkoutCheckin)}
-                    className={
-                      promptPreWorkoutCheckin
-                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                    }
-                  >
-                    {promptPreWorkoutCheckin ? 'Ativo' : 'Desligado'}
-                  </button>
+                  <ToggleSwitch checked={promptPreWorkoutCheckin} onChange={() => setValue('promptPreWorkoutCheckin', !promptPreWorkoutCheckin)} />
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
@@ -329,41 +349,21 @@ export default function SettingsModal(props: SettingsModalProps) {
                     <div className="text-sm font-bold text-white">Check-in pós-treino</div>
                     <div className="text-xs text-neutral-400">Pergunta RPE/satisfação ao finalizar.</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setValue('promptPostWorkoutCheckin', !promptPostWorkoutCheckin)}
-                    className={
-                      promptPostWorkoutCheckin
-                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                    }
-                  >
-                    {promptPostWorkoutCheckin ? 'Ativo' : 'Desligado'}
-                  </button>
+                  <ToggleSwitch checked={promptPostWorkoutCheckin} onChange={() => setValue('promptPostWorkoutCheckin', !promptPostWorkoutCheckin)} />
                 </div>
               </div>
             </div>
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Ferramentas</div>
+            <SectionHeader icon={Wrench} label="Ferramentas" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-white">Novos Recordes</div>
                   <div className="text-xs text-neutral-400">Mostra o card de PRs recentes no dashboard.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('showNewRecordsCard', !showNewRecordsCard)}
-                  className={
-                    showNewRecordsCard
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {showNewRecordsCard ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={showNewRecordsCard} onChange={() => setValue('showNewRecordsCard', !showNewRecordsCard)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -371,17 +371,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Iron Rank</div>
                   <div className="text-xs text-neutral-400">Mostra o card de nível e ranking global.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('showIronRank', !showIronRank)}
-                  className={
-                    showIronRank
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {showIronRank ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={showIronRank} onChange={() => setValue('showIronRank', !showIronRank)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -389,17 +379,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Conquistas</div>
                   <div className="text-xs text-neutral-400">Mostra os badges de progresso (streak/volume).</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('showBadges', !showBadges)}
-                  className={
-                    showBadges
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {showBadges ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={showBadges} onChange={() => setValue('showBadges', !showBadges)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -407,17 +387,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Stories no Dashboard</div>
                   <div className="text-xs text-neutral-400">Mostra a barra de stories no topo do dashboard.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('showStoriesBar', !showStoriesBar)}
-                  className={
-                    showStoriesBar
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {showStoriesBar ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={showStoriesBar} onChange={() => setValue('showStoriesBar', !showStoriesBar)} />
               </div>
 
               {props?.onOpenWhatsNew ? (
@@ -441,17 +411,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Abrir novidades automaticamente</div>
                   <div className="text-xs text-neutral-400">Mostra o aviso quando existirem novas atualizações.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('whatsNewAutoOpen', !whatsNewAutoOpen)}
-                  className={
-                    whatsNewAutoOpen
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {whatsNewAutoOpen ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={whatsNewAutoOpen} onChange={() => setValue('whatsNewAutoOpen', !whatsNewAutoOpen)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -459,23 +419,13 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Repetir por 24h</div>
                   <div className="text-xs text-neutral-400">Mesmo após fechar, volta a aparecer por 24h.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('whatsNewRemind24h', !whatsNewRemind24h)}
-                  className={
-                    whatsNewRemind24h
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {whatsNewRemind24h ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={whatsNewRemind24h} onChange={() => setValue('whatsNewRemind24h', !whatsNewRemind24h)} />
               </div>
             </div>
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Treino</div>
+            <SectionHeader icon={Dumbbell} label="Treino" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -513,40 +463,20 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Auto iniciar descanso padrão</div>
                   <div className="text-xs text-neutral-400">Ao concluir série sem descanso, inicia o padrão.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('autoRestTimerWhenMissing', !autoRestTimerWhenMissing)}
-                  className={
-                    autoRestTimerWhenMissing
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {autoRestTimerWhenMissing ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={autoRestTimerWhenMissing} onChange={() => setValue('autoRestTimerWhenMissing', !autoRestTimerWhenMissing)} />
               </div>
             </div>
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Som e Convites</div>
+            <SectionHeader icon={Volume2} label="Som e Convites" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-white">Sons do App</div>
                   <div className="text-xs text-neutral-400">Notificações e feedback sonoro.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('enableSounds', !enableSounds)}
-                  className={
-                    enableSounds
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {enableSounds ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={enableSounds} onChange={() => setValue('enableSounds', !enableSounds)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -573,17 +503,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Convites de Treino em Equipe</div>
                   <div className="text-xs text-neutral-400">Permite receber convites no modal “BORA!”.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('allowTeamInvites', !allowTeamInvites)}
-                  className={
-                    allowTeamInvites
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {allowTeamInvites ? 'Ativo' : 'Bloqueado'}
-                </button>
+                <ToggleSwitch checked={allowTeamInvites} onChange={() => setValue('allowTeamInvites', !allowTeamInvites)} />
               </div>
 
               {canSeeExperimental ? (
@@ -595,17 +515,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       <div className="text-sm font-bold text-white">Kill Switch</div>
                       <div className="text-xs text-neutral-400">Desativa recursos em teste neste usuário.</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setValue('featuresKillSwitch', !featuresKillSwitch)}
-                      className={
-                        !featuresKillSwitch
-                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-red-500/30 text-red-200 font-black'
-                      }
-                    >
-                      {featuresKillSwitch ? 'Ativo' : 'Desligado'}
-                    </button>
+                    <ToggleSwitch checked={featuresKillSwitch} onChange={() => setValue('featuresKillSwitch', !featuresKillSwitch)} />
                   </div>
 
                   <div className="mt-3 flex items-center justify-between gap-3">
@@ -613,18 +523,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       <div className="text-sm font-bold text-white">Treino em Equipe V2</div>
                       <div className="text-xs text-neutral-400">Link/QR, presença e saída segura da sessão.</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setValue('featureTeamworkV2', !featureTeamworkV2)}
-                      disabled={featuresKillSwitch}
-                      className={
-                        featureTeamworkV2 && !featuresKillSwitch
-                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
-                      }
-                    >
-                      {featureTeamworkV2 ? 'Ativo' : 'Desligado'}
-                    </button>
+                    <ToggleSwitch checked={featureTeamworkV2} onChange={() => setValue('featureTeamworkV2', !featureTeamworkV2)} disabled={featuresKillSwitch} />
                   </div>
 
                   <div className="mt-3 flex items-center justify-between gap-3">
@@ -632,18 +531,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       <div className="text-sm font-bold text-white">Stories/Relatórios V2</div>
                       <div className="text-xs text-neutral-400">CTA pós-treino e melhorias de compartilhamento.</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setValue('featureStoriesV2', !featureStoriesV2)}
-                      disabled={featuresKillSwitch}
-                      className={
-                        featureStoriesV2 && !featuresKillSwitch
-                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
-                      }
-                    >
-                      {featureStoriesV2 ? 'Ativo' : 'Desligado'}
-                    </button>
+                    <ToggleSwitch checked={featureStoriesV2} onChange={() => setValue('featureStoriesV2', !featureStoriesV2)} disabled={featuresKillSwitch} />
                   </div>
 
                   <div className="mt-3 flex items-center justify-between gap-3">
@@ -651,18 +539,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       <div className="text-sm font-bold text-white">Offline Sync V2</div>
                       <div className="text-xs text-neutral-400">Fila com backoff, limites e central de pendências.</div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setValue('featureOfflineSyncV2', !featureOfflineSyncV2)}
-                      disabled={featuresKillSwitch}
-                      className={
-                        featureOfflineSyncV2 && !featuresKillSwitch
-                          ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                          : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60'
-                      }
-                    >
-                      {featureOfflineSyncV2 ? 'Ativo' : 'Desligado'}
-                    </button>
+                    <ToggleSwitch checked={featureOfflineSyncV2} onChange={() => setValue('featureOfflineSyncV2', !featureOfflineSyncV2)} disabled={featuresKillSwitch} />
                   </div>
                 </div>
               ) : null}
@@ -670,24 +547,14 @@ export default function SettingsModal(props: SettingsModalProps) {
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Notificações</div>
+            <SectionHeader icon={Bell} label="Notificações" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-white">Toasts no app</div>
                   <div className="text-xs text-neutral-400">Mensagens rápidas no topo da tela.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('inAppToasts', !inAppToasts)}
-                  className={
-                    inAppToasts
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {inAppToasts ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={inAppToasts} onChange={() => setValue('inAppToasts', !inAppToasts)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -695,17 +562,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Pedir permissão automaticamente</div>
                   <div className="text-xs text-neutral-400">Evita prompt do navegador ao iniciar treino.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('notificationPermissionPrompt', !notificationPermissionPrompt)}
-                  className={
-                    notificationPermissionPrompt
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {notificationPermissionPrompt ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={notificationPermissionPrompt} onChange={() => setValue('notificationPermissionPrompt', !notificationPermissionPrompt)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -713,17 +570,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Notificação de mensagem direta</div>
                   <div className="text-xs text-neutral-400">Aparece no centro de notificações.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('notifyDirectMessages', !notifyDirectMessages)}
-                  className={
-                    notifyDirectMessages
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {notifyDirectMessages ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={notifyDirectMessages} onChange={() => setValue('notifyDirectMessages', !notifyDirectMessages)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -731,17 +578,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Notificação de agenda</div>
                   <div className="text-xs text-neutral-400">Lembretes e eventos criados pelo coach.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('notifyAppointments', !notifyAppointments)}
-                  className={
-                    notifyAppointments
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {notifyAppointments ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={notifyAppointments} onChange={() => setValue('notifyAppointments', !notifyAppointments)} />
               </div>
 
               {isIosNative() ? (
@@ -798,8 +635,11 @@ export default function SettingsModal(props: SettingsModalProps) {
             <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
-                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Diagnóstico iOS</div>
-                  <div className="text-xs text-neutral-500">Capacitor, plugins e permissões no device.</div>
+                  <div className="flex items-center gap-2">
+                    <Smartphone size={14} className="text-yellow-500" />
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Diagnóstico iOS</div>
+                  </div>
+                  <div className="text-xs text-neutral-500 mt-0.5">Capacitor, plugins e permissões no device.</div>
                 </div>
                 <button
                   type="button"
@@ -1002,47 +842,27 @@ export default function SettingsModal(props: SettingsModalProps) {
           ) : null}
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Privacidade</div>
+            <SectionHeader icon={Lock} label="Privacidade" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-white">Mensagens diretas</div>
                   <div className="text-xs text-neutral-400">Permite iniciar e receber conversas diretas.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('allowDirectMessages', !allowDirectMessages)}
-                  className={
-                    allowDirectMessages
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {allowDirectMessages ? 'Ativo' : 'Bloqueado'}
-                </button>
+                <ToggleSwitch checked={allowDirectMessages} onChange={() => setValue('allowDirectMessages', !allowDirectMessages)} />
               </div>
             </div>
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Timer</div>
+            <SectionHeader icon={Timer} label="Timer" />
             <div className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-bold text-white">Notificar ao terminar</div>
                   <div className="text-xs text-neutral-400">Mostra notificação do navegador (se permitido).</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('restTimerNotify', !restTimerNotify)}
-                  className={
-                    restTimerNotify
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {restTimerNotify ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={restTimerNotify} onChange={() => setValue('restTimerNotify', !restTimerNotify)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -1050,17 +870,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Vibração</div>
                   <div className="text-xs text-neutral-400">Apenas em celulares compatíveis.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('restTimerVibrate', !restTimerVibrate)}
-                  className={
-                    restTimerVibrate
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {restTimerVibrate ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={restTimerVibrate} onChange={() => setValue('restTimerVibrate', !restTimerVibrate)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -1068,17 +878,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Repetir alarme</div>
                   <div className="text-xs text-neutral-400">Toca e vibra até você fechar.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('restTimerRepeatAlarm', !restTimerRepeatAlarm)}
-                  className={
-                    restTimerRepeatAlarm
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {restTimerRepeatAlarm ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={restTimerRepeatAlarm} onChange={() => setValue('restTimerRepeatAlarm', !restTimerRepeatAlarm)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -1086,17 +886,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Alarme contínuo</div>
                   <div className="text-xs text-neutral-400">Mantém tocando até abrir o app.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('restTimerContinuousAlarm', !restTimerContinuousAlarm)}
-                  className={
-                    restTimerContinuousAlarm
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {restTimerContinuousAlarm ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={restTimerContinuousAlarm} onChange={() => setValue('restTimerContinuousAlarm', !restTimerContinuousAlarm)} />
               </div>
 
               <div className="flex items-center justify-between gap-3">
@@ -1152,23 +942,61 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Tick nos últimos 5s</div>
                   <div className="text-xs text-neutral-400">Ajuda no ritmo em cluster.</div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setValue('restTimerTickCountdown', !restTimerTickCountdown)}
-                  className={
-                    restTimerTickCountdown
-                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                  }
-                >
-                  {restTimerTickCountdown ? 'Ativo' : 'Desligado'}
-                </button>
+                <ToggleSwitch checked={restTimerTickCountdown} onChange={() => setValue('restTimerTickCountdown', !restTimerTickCountdown)} />
               </div>
             </div>
           </div>
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Dados e Dispositivo</div>
+            <SectionHeader icon={HelpCircle} label="Ajuda e Suporte" />
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const subject = encodeURIComponent('Suporte IronTracks')
+                    const body = encodeURIComponent('Olá equipe IronTracks,\n\nPreciso de ajuda com:\n\n')
+                    window.open(`mailto:irontrackscompany@gmail.com?subject=${subject}&body=${body}`, '_blank')
+                  } catch { }
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600 transition-colors group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 inline-flex items-center justify-center shrink-0">
+                  <Mail size={18} className="text-yellow-500" />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="text-sm font-bold text-white">Suporte por E-mail</div>
+                  <div className="text-xs text-neutral-400 truncate">irontrackscompany@gmail.com</div>
+                </div>
+                <ExternalLink size={14} className="text-neutral-500 group-hover:text-yellow-500 transition-colors shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    window.open('https://tawk.to/chat/irontracks', '_blank')
+                  } catch { }
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 hover:border-neutral-600 transition-colors group"
+              >
+                <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 inline-flex items-center justify-center shrink-0">
+                  <MessageCircle size={18} className="text-green-500" />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="text-sm font-bold text-white">Chat em Tempo Real</div>
+                  <div className="text-xs text-neutral-400">Converse com a equipe agora</div>
+                </div>
+                <ChevronRight size={14} className="text-neutral-500 group-hover:text-green-500 transition-colors shrink-0" />
+              </button>
+            </div>
+            <div className="mt-3 text-[11px] text-neutral-500 text-center">
+              Estamos aqui para ajudar! Resposta em até 24h por e-mail.
+            </div>
+          </div>
+
+          <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
+            <SectionHeader icon={Database} label="Dados e Dispositivo" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
@@ -1358,17 +1186,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                     <div className="text-sm font-bold text-white">Social</div>
                     <div className="text-xs text-neutral-400">Stories e recursos sociais.</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setValue('moduleSocial', !moduleSocial)}
-                    className={
-                      moduleSocial
-                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                    }
-                  >
-                    {moduleSocial ? 'Ativo' : 'Desligado'}
-                  </button>
+                  <ToggleSwitch checked={moduleSocial} onChange={() => setValue('moduleSocial', !moduleSocial)} />
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
@@ -1376,17 +1194,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                     <div className="text-sm font-bold text-white">Comunidade</div>
                     <div className="text-xs text-neutral-400">Lista e interações de comunidade.</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setValue('moduleCommunity', !moduleCommunity)}
-                    className={
-                      moduleCommunity
-                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                    }
-                  >
-                    {moduleCommunity ? 'Ativo' : 'Desligado'}
-                  </button>
+                  <ToggleSwitch checked={moduleCommunity} onChange={() => setValue('moduleCommunity', !moduleCommunity)} />
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
@@ -1394,17 +1202,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                     <div className="text-sm font-bold text-white">Marketplace</div>
                     <div className="text-xs text-neutral-400">Planos e assinaturas de professores.</div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setValue('moduleMarketplace', !moduleMarketplace)}
-                    className={
-                      moduleMarketplace
-                        ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
-                        : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
-                    }
-                  >
-                    {moduleMarketplace ? 'Ativo' : 'Desligado'}
-                  </button>
+                  <ToggleSwitch checked={moduleMarketplace} onChange={() => setValue('moduleMarketplace', !moduleMarketplace)} />
                 </div>
               </div>
               <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
@@ -1432,35 +1230,38 @@ export default function SettingsModal(props: SettingsModalProps) {
           </div>
         )}
 
-        <div className="p-4 border-t border-neutral-800 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => props?.onClose?.()}
-            className="px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
-          >
-            Fechar
-          </button>
-          <button
-            type="button"
-            disabled={!canSave}
-            onClick={async () => {
-              try {
-                const ok = await props?.onSave?.(draft)
-                if (ok === false) return
-                props?.onClose?.()
-              } catch (e: unknown) {
-                await alert('Falha ao salvar: ' + (getErrorMessage(e) ?? String(e)))
+        <div className="p-4 border-t border-neutral-800 bg-neutral-900/50 flex items-center justify-between gap-2">
+          <div className="text-[10px] text-neutral-600 font-mono">IronTracks</div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => props?.onClose?.()}
+              className="px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 transition-colors"
+            >
+              Fechar
+            </button>
+            <button
+              type="button"
+              disabled={!canSave}
+              onClick={async () => {
+                try {
+                  const ok = await props?.onSave?.(draft)
+                  if (ok === false) return
+                  props?.onClose?.()
+                } catch (e: unknown) {
+                  await alert('Falha ao salvar: ' + (getErrorMessage(e) ?? String(e)))
+                }
+              }}
+              className={
+                canSave
+                  ? 'px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center gap-2 transition-colors'
+                  : 'px-4 py-3 rounded-xl bg-yellow-500/70 text-black font-black cursor-wait inline-flex items-center gap-2'
               }
-            }}
-            className={
-              canSave
-                ? 'px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center gap-2'
-                : 'px-4 py-3 rounded-xl bg-yellow-500/70 text-black font-black cursor-wait inline-flex items-center gap-2'
-            }
-          >
-            <Save size={16} />
-            {saving ? 'Salvando...' : 'Salvar'}
-          </button>
+            >
+              <Save size={16} />
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

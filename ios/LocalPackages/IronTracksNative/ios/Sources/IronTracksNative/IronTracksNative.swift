@@ -8,6 +8,7 @@ import LocalAuthentication
 import CoreSpotlight
 import CoreMotion
 import HealthKit
+import AVFoundation
 
 @objc(IronTracksNative)
 public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
@@ -29,6 +30,8 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "endRestLiveActivity", returnType: CAPPluginReturnPromise),
         // Generic app notification
         CAPPluginMethod(name: "scheduleAppNotification", returnType: CAPPluginReturnPromise),
+        // Alarm sound
+        CAPPluginMethod(name: "stopAlarmSound", returnType: CAPPluginReturnPromise),
         // Haptics
         CAPPluginMethod(name: "triggerHaptic", returnType: CAPPluginReturnPromise),
         // Biometrics
@@ -54,6 +57,13 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     private static let sharedMotionManager = CMMotionManager()
     private let healthStore = HKHealthStore()
     private var notifObserver: NSObjectProtocol?
+    private var foregroundObserver: NSObjectProtocol?
+
+    // Alarm audio
+    private var alarmPlayer: AVAudioPlayer?
+    private var silentPlayer: AVAudioPlayer?
+    private var alarmDispatchItem: DispatchWorkItem?
+    private var alarmRestId: String?
 
     public override func load() {
         super.load()
@@ -63,12 +73,22 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
             let actionId = userInfo["actionId"] as? String ?? ""
             self.notifyListeners("notificationAction", data: ["actionId": actionId], retainUntilConsumed: true)
         }
+        // Auto-stop alarm when app becomes active
+        foregroundObserver = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.alarmPlayer?.isPlaying == true else { return }
+            self.stopAlarmInternal()
+            self.notifyListeners("alarmStopped", data: [:])
+        }
     }
 
     deinit {
         if let obs = notifObserver {
             NotificationCenter.default.removeObserver(obs)
         }
+        if let obs = foregroundObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        stopAlarmInternal()
     }
 
     // MARK: - Helpers
@@ -280,6 +300,12 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
                     pushType: nil
                 )
                 Self.restActivities[id] = activity
+
+                // Start background alarm scheduler
+                await MainActor.run {
+                    self.startBackgroundAlarmScheduler(restId: id, seconds: seconds)
+                }
+
                 call.resolve()
             } catch {
                 call.reject("live_activity_error", error.localizedDescription)
@@ -310,6 +336,8 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     @available(iOS 16.2, *)
     private func endRestLiveActivityAvailable(_ call: CAPPluginCall) {
         let id = String(call.getString("id") ?? "rest_timer")
+        // Stop alarm when ending live activity
+        stopAlarmInternal()
         if let activity = Self.restActivities[id] as? Activity<RestTimerAttributes> {
             Task {
                 await activity.end(nil, dismissalPolicy: .immediate)
@@ -319,6 +347,198 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
             return
         }
         call.resolve()
+    }
+
+    // MARK: - Background Alarm Sound System
+
+    private func startBackgroundAlarmScheduler(restId: String, seconds: Double) {
+        stopAlarmInternal()
+        alarmRestId = restId
+
+        // Configure audio session for background playback
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setActive(true)
+        } catch { return }
+
+        // Play near-silent audio to keep app process alive in background
+        if let url = generateSilentWav() {
+            do {
+                silentPlayer = try AVAudioPlayer(contentsOf: url)
+                silentPlayer?.numberOfLoops = -1
+                silentPlayer?.volume = 0.01
+                silentPlayer?.play()
+            } catch {}
+        }
+
+        // Schedule the alarm to fire when rest timer ends
+        let item = DispatchWorkItem { [weak self] in
+            self?.fireAlarm()
+        }
+        alarmDispatchItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: item)
+    }
+
+    private func fireAlarm() {
+        // Stop silent player
+        silentPlayer?.stop()
+        silentPlayer = nil
+
+        // Generate and play looping alarm tone
+        if let url = generateAlarmWav() {
+            do {
+                alarmPlayer = try AVAudioPlayer(contentsOf: url)
+                alarmPlayer?.numberOfLoops = -1
+                alarmPlayer?.volume = 1.0
+                alarmPlayer?.play()
+            } catch {}
+        }
+
+        // Update Live Activity to finished state (from native, works even in background)
+        if #available(iOS 16.2, *) {
+            if let id = alarmRestId, let activity = Self.restActivities[id] as? Activity<RestTimerAttributes> {
+                Task {
+                    let current = activity.contentState
+                    let updated = RestTimerAttributes.ContentState(
+                        endTime: current.endTime,
+                        title: current.title,
+                        isFinished: true
+                    )
+                    await activity.update(using: updated)
+                }
+            }
+        }
+
+        // Trigger haptic
+        DispatchQueue.main.async {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+        }
+    }
+
+    private func stopAlarmInternal() {
+        alarmDispatchItem?.cancel()
+        alarmDispatchItem = nil
+        alarmPlayer?.stop()
+        alarmPlayer = nil
+        silentPlayer?.stop()
+        silentPlayer = nil
+        alarmRestId = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    @objc func stopAlarmSound(_ call: CAPPluginCall) {
+        DispatchQueue.main.async { [weak self] in
+            self?.stopAlarmInternal()
+            call.resolve()
+        }
+    }
+
+    // MARK: - Audio Generation
+
+    private func generateSilentWav() -> URL? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("it_silent.wav")
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+
+        let sampleRate: UInt32 = 44100
+        let numSamples: UInt32 = sampleRate // 1 second of silence
+        let dataSize = numSamples * 2
+        let fileSize = 36 + dataSize
+
+        var data = Data()
+        data.append(contentsOf: [0x52, 0x49, 0x46, 0x46]) // RIFF
+        appendUInt32(&data, fileSize)
+        data.append(contentsOf: [0x57, 0x41, 0x56, 0x45]) // WAVE
+        data.append(contentsOf: [0x66, 0x6D, 0x74, 0x20]) // fmt
+        appendUInt32(&data, 16) // chunk size
+        appendUInt16(&data, 1)  // PCM
+        appendUInt16(&data, 1)  // mono
+        appendUInt32(&data, sampleRate)
+        appendUInt32(&data, sampleRate * 2) // byte rate
+        appendUInt16(&data, 2)  // block align
+        appendUInt16(&data, 16) // bits per sample
+        data.append(contentsOf: [0x64, 0x61, 0x74, 0x61]) // data
+        appendUInt32(&data, dataSize)
+        data.append(Data(count: Int(dataSize))) // silence
+
+        try? data.write(to: url)
+        return url
+    }
+
+    private func generateAlarmWav() -> URL? {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("it_alarm.wav")
+        if FileManager.default.fileExists(atPath: url.path) { return url }
+
+        let sampleRate: Double = 44100
+        // 3 beeps: A5(880Hz) C6(1047Hz) E6(1319Hz) with gaps
+        let beepDuration: Double = 0.15
+        let gapDuration: Double = 0.08
+        let frequencies: [Double] = [880, 1047, 1319]
+        let totalDuration = Double(frequencies.count) * beepDuration + Double(frequencies.count - 1) * gapDuration + 0.4 // trailing silence
+
+        var samples = [Int16]()
+        var t: Double = 0
+
+        for (idx, freq) in frequencies.enumerated() {
+            let numBeepSamples = Int(sampleRate * beepDuration)
+            for i in 0..<numBeepSamples {
+                let s = Double(i) / sampleRate
+                // Envelope
+                let env: Double
+                if s < 0.01 { env = s / 0.01 }
+                else if s > beepDuration - 0.01 { env = (beepDuration - s) / 0.01 }
+                else { env = 1.0 }
+                let value = sin(2.0 * .pi * freq * s) * env * 0.85
+                samples.append(Int16(value * Double(Int16.max)))
+            }
+            t += beepDuration
+            // Gap (silence)
+            if idx < frequencies.count - 1 {
+                let numGapSamples = Int(sampleRate * gapDuration)
+                for _ in 0..<numGapSamples {
+                    samples.append(0)
+                }
+                t += gapDuration
+            }
+        }
+        // Trailing silence
+        let trailSamples = Int(sampleRate * 0.4)
+        for _ in 0..<trailSamples {
+            samples.append(0)
+        }
+
+        let numSamples = samples.count
+        let dataSize = UInt32(numSamples * 2)
+        let fileSize = 36 + dataSize
+
+        var data = Data()
+        data.append(contentsOf: [0x52, 0x49, 0x46, 0x46])
+        appendUInt32(&data, fileSize)
+        data.append(contentsOf: [0x57, 0x41, 0x56, 0x45])
+        data.append(contentsOf: [0x66, 0x6D, 0x74, 0x20])
+        appendUInt32(&data, 16)
+        appendUInt16(&data, 1)
+        appendUInt16(&data, 1)
+        appendUInt32(&data, 44100)
+        appendUInt32(&data, 88200)
+        appendUInt16(&data, 2)
+        appendUInt16(&data, 16)
+        data.append(contentsOf: [0x64, 0x61, 0x74, 0x61])
+        appendUInt32(&data, dataSize)
+        for sample in samples {
+            data.append(contentsOf: withUnsafeBytes(of: sample.littleEndian) { Array($0) })
+        }
+
+        try? data.write(to: url)
+        return url
+    }
+
+    private func appendUInt32(_ data: inout Data, _ value: UInt32) {
+        data.append(contentsOf: withUnsafeBytes(of: value.littleEndian) { Array($0) })
+    }
+
+    private func appendUInt16(_ data: inout Data, _ value: UInt16) {
+        data.append(contentsOf: withUnsafeBytes(of: value.littleEndian) { Array($0) })
     }
 
     // MARK: - Generic App Notification

@@ -10,79 +10,114 @@ struct RestTimerLiveActivity: Widget {
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RestTimerAttributes.self) { context in
-            let finished = context.state.isFinished || Date() >= context.state.endTime
-            if finished {
-                finishedLockScreenView(context: context)
-            } else {
-                countingLockScreenView(context: context)
+            // Use TimelineView to auto-refresh and detect when timer expires
+            TimelineView(.periodic(from: context.state.endTime, by: 1)) { timeline in
+                let finished = context.state.isFinished || timeline.date >= context.state.endTime
+                if finished {
+                    finishedLockScreenView(context: context)
+                } else {
+                    countingLockScreenView(context: context)
+                }
             }
         } dynamicIsland: { context in
-            let finished = context.state.isFinished || Date() >= context.state.endTime
-            return DynamicIsland {
-                // Expanded view
+            DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    HStack(spacing: 8) {
-                        logotypeView()
-                            .scaleEffect(0.78, anchor: .leading)
-                        Spacer(minLength: 0)
-                        pulsingDot(color: finished ? brandGreen : brandYellow)
+                    TimelineView(.periodic(from: context.state.endTime, by: 1)) { timeline in
+                        let done = context.state.isFinished || timeline.date >= context.state.endTime
+                        HStack(spacing: 4) {
+                            appLogoImage(size: 24)
+                            if done {
+                                greenPulsingDot()
+                            }
+                        }
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    if finished {
-                        // Count UP from endTime
-                        Text(timerInterval: context.state.endTime...Date.distantFuture, countsDown: false)
-                            .font(.system(size: 20, weight: .heavy, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundColor(brandGreen)
-                    } else {
-                        Text(timerInterval: context.attributes.startTime...context.state.endTime, countsDown: true)
-                            .font(.system(size: 20, weight: .heavy, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundColor(.white)
+                    TimelineView(.periodic(from: context.state.endTime, by: 1)) { timeline in
+                        let done = context.state.isFinished || timeline.date >= context.state.endTime
+                        if done {
+                            Text(timerInterval: context.state.endTime...Date.distantFuture, countsDown: false)
+                                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(brandGreen)
+                        } else {
+                            Text(timerInterval: context.attributes.startTime...context.state.endTime, countsDown: true)
+                                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundColor(.white)
+                        }
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    if finished {
-                        HStack {
-                            Text("BORAAAA!")
-                                .font(.system(size: 14, weight: .black, design: .rounded))
-                                .foregroundColor(brandGreen)
-                            Spacer()
-                            Text("Tempo extra")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-                    } else {
-                        HStack {
-                            Text("Tempo de Descanso")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.7))
-                            Spacer()
-                            Text("Recupere e volte")
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
+                    TimelineView(.periodic(from: context.state.endTime, by: 1)) { timeline in
+                        let done = context.state.isFinished || timeline.date >= context.state.endTime
+                        if done {
+                            HStack {
+                                Text("BORAAAA!")
+                                    .font(.system(size: 14, weight: .black, design: .rounded))
+                                    .foregroundColor(brandGreen)
+                                Spacer()
+                                Text("Tempo extra")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        } else {
+                            HStack {
+                                Text("Tempo de Descanso")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.7))
+                                Spacer()
+                                Text("Recupere e volte")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.4))
+                            }
                         }
                     }
                 }
             } compactLeading: {
-                compactLogo(finished: finished)
+                appLogoImage(size: 16)
             } compactTrailing: {
-                if finished {
-                    Text(timerInterval: context.state.endTime...Date.distantFuture, countsDown: false)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(brandGreen)
-                } else {
-                    Text(timerInterval: context.attributes.startTime...context.state.endTime, countsDown: true)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(.white)
+                TimelineView(.periodic(from: context.state.endTime, by: 1)) { timeline in
+                    let done = context.state.isFinished || timeline.date >= context.state.endTime
+                    if done {
+                        Text(timerInterval: context.state.endTime...Date.distantFuture, countsDown: false)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(brandGreen)
+                    } else {
+                        Text(timerInterval: context.attributes.startTime...context.state.endTime, countsDown: true)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(.white)
+                    }
                 }
             } minimal: {
-                compactLogo(finished: finished)
+                appLogoImage(size: 14)
             }
-            .keylineTint(finished ? brandGreen : brandYellow)
+        }
+    }
+
+    // MARK: - Components
+
+    @available(iOSApplicationExtension 16.1, *)
+    @ViewBuilder
+    private func appLogoImage(size: CGFloat) -> some View {
+        Image("AppLogo")
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+    }
+
+    @available(iOSApplicationExtension 16.1, *)
+    @ViewBuilder
+    private func greenPulsingDot() -> some View {
+        TimelineView(.periodic(from: .now, by: 0.6)) { timeline in
+            let on = Int(timeline.date.timeIntervalSince1970 * 10) % 6 < 3
+            Circle()
+                .fill(brandGreen)
+                .frame(width: 8, height: 8)
+                .opacity(on ? 1.0 : 0.15)
         }
     }
 
@@ -102,35 +137,19 @@ struct RestTimerLiveActivity: Widget {
         .lineLimit(1)
     }
 
-    @available(iOSApplicationExtension 16.1, *)
-    @ViewBuilder
-    private func compactLogo(finished: Bool) -> some View {
-        Text("IRON")
-            .font(.system(size: 11, weight: .black, design: .rounded))
-            .foregroundColor(finished ? brandGreen : brandYellow)
-    }
-
-    @available(iOSApplicationExtension 16.1, *)
-    @ViewBuilder
-    private func pulsingDot(color: Color) -> some View {
-        TimelineView(.periodic(from: .now, by: 0.8)) { timeline in
-            let pulse = Int(timeline.date.timeIntervalSince1970 * 10) % 2 == 0
-            Circle()
-                .fill(color)
-                .frame(width: 10, height: 10)
-                .opacity(pulse ? 1 : 0.25)
-        }
-    }
-
     // MARK: - Lock Screen Views
 
     @available(iOSApplicationExtension 16.1, *)
     @ViewBuilder
     private func countingLockScreenView(context: ActivityViewContext<RestTimerAttributes>) -> some View {
         HStack(spacing: 12) {
+            // App icon
+            appLogoImage(size: 44)
+
             VStack(alignment: .leading, spacing: 4) {
                 logotypeView()
                     .padding(.bottom, 2)
+
                 Text("TEMPO DE DESCANSO")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(.white.opacity(0.7))
@@ -148,8 +167,14 @@ struct RestTimerLiveActivity: Widget {
 
             Spacer()
 
-            pulsingDot(color: brandYellow)
-                .padding(.trailing, 4)
+            TimelineView(.periodic(from: .now, by: 0.8)) { timeline in
+                let pulse = Int(timeline.date.timeIntervalSince1970 * 10) % 8 < 4
+                Circle()
+                    .fill(brandYellow)
+                    .frame(width: 10, height: 10)
+                    .opacity(pulse ? 1.0 : 0.25)
+            }
+            .padding(.trailing, 4)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -160,9 +185,13 @@ struct RestTimerLiveActivity: Widget {
     @ViewBuilder
     private func finishedLockScreenView(context: ActivityViewContext<RestTimerAttributes>) -> some View {
         HStack(spacing: 12) {
+            // App icon
+            appLogoImage(size: 44)
+
             VStack(alignment: .leading, spacing: 4) {
                 logotypeView()
                     .padding(.bottom, 2)
+
                 Text("BORAAAA!")
                     .font(.system(size: 18, weight: .black, design: .rounded))
                     .foregroundColor(.white)
@@ -180,7 +209,7 @@ struct RestTimerLiveActivity: Widget {
 
             Spacer()
 
-            pulsingDot(color: brandGreen)
+            greenPulsingDot()
                 .padding(.trailing, 4)
         }
         .padding(.horizontal, 16)

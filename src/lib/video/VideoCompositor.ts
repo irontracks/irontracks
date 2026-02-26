@@ -23,6 +23,8 @@ export class VideoCompositor {
     private audioCtx: AudioContext | null = null; private destNode: MediaStreamAudioDestinationNode | null = null;
     private sourceNode: MediaElementAudioSourceNode | null = null; private recorder: MediaRecorder | null = null;
     private isCancelled = false; private manualTimer: number | null = null;
+    private watchdogTimer: number | null = null;
+    private lastFrameTime: number = 0;
 
     constructor() {
         if (typeof window !== 'undefined') {
@@ -38,20 +40,24 @@ export class VideoCompositor {
 
     private cleanup() {
         if (this.manualTimer !== null) {
-            try { clearTimeout(this.manualTimer); } catch {}
+            try { clearTimeout(this.manualTimer); } catch { }
+        }
+        if (this.watchdogTimer !== null) {
+            try { clearInterval(this.watchdogTimer); } catch { }
         }
         this.manualTimer = null;
+        this.watchdogTimer = null;
         if (this.sourceNode) {
-            try { this.sourceNode.disconnect(); } catch {}
+            try { this.sourceNode.disconnect(); } catch { }
         }
         if (this.destNode) {
-            try { this.destNode.disconnect(); } catch {}
+            try { this.destNode.disconnect(); } catch { }
         }
         if (this.audioCtx) {
-            try { this.audioCtx.close(); } catch {}
+            try { this.audioCtx.close(); } catch { }
         }
         if (this.recorder && this.recorder.state !== 'inactive') {
-            try { this.recorder.stop(); } catch {}
+            try { this.recorder.stop(); } catch { }
         }
         this.sourceNode = null;
         this.destNode = null;
@@ -68,19 +74,19 @@ export class VideoCompositor {
             const workerCode = `self.onmessage=(e)=>{try{const d=e.data||{};const list=Array.isArray(d.chunks)?d.chunks:[];const blob=new Blob(list,{type:d.type||''});self.postMessage({ok:true,blob});}catch(err){self.postMessage({ok:false,error:String(err&&err.message?err.message:err)});}};`;
             const url = URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' }));
             const worker = new Worker(url);
-            try { URL.revokeObjectURL(url); } catch {}
+            try { URL.revokeObjectURL(url); } catch { }
             return await new Promise<Blob>((resolve) => {
                 let settled = false;
                 const done = (blob: Blob) => {
                     if (settled) return;
                     settled = true;
-                    try { worker.terminate(); } catch {}
+                    try { worker.terminate(); } catch { }
                     resolve(blob);
                 };
                 const fallback = () => done(new Blob(safeChunks, { type: mimeType }));
                 const timer = setTimeout(() => fallback(), 3000);
                 worker.onmessage = (ev) => {
-                    try { clearTimeout(timer); } catch {}
+                    try { clearTimeout(timer); } catch { }
                     const data = ev?.data || {};
                     if (data?.ok && data?.blob) {
                         done(data.blob);
@@ -89,13 +95,13 @@ export class VideoCompositor {
                     fallback();
                 };
                 worker.onerror = () => {
-                    try { clearTimeout(timer); } catch {}
+                    try { clearTimeout(timer); } catch { }
                     fallback();
                 };
                 try {
                     worker.postMessage({ chunks: safeChunks, type: mimeType });
                 } catch {
-                    try { clearTimeout(timer); } catch {}
+                    try { clearTimeout(timer); } catch { }
                     fallback();
                 }
             });
@@ -159,9 +165,9 @@ export class VideoCompositor {
         audioBitsPerSecond: userAudioBps
     }: RenderOptions): Promise<ExportResult> {
         this.isCancelled = false;
-        
+
         if (!this.canvas || !this.ctx) throw new Error('Canvas context not initialized');
-        
+
         this.canvas.width = outputWidth;
         this.canvas.height = outputHeight;
 
@@ -170,7 +176,7 @@ export class VideoCompositor {
         if (!AudioCtxCtor) throw new Error('AudioContext not available')
         this.audioCtx = new AudioCtxCtor();
         this.destNode = this.audioCtx.createMediaStreamDestination();
-        
+
         try {
             this.sourceNode = this.audioCtx.createMediaElementSource(videoElement);
             this.sourceNode.connect(this.destNode);
@@ -199,11 +205,11 @@ export class VideoCompositor {
                 if (MediaRecorder.isTypeSupported(mimeTypeOverride)) {
                     mimeType = mimeTypeOverride;
                 }
-            } catch {}
+            } catch { }
         }
         const videoBitsPerSecond = typeof userVideoBps === 'number' && userVideoBps > 0 ? userVideoBps : 5_000_000;
         const audioBitsPerSecond = typeof userAudioBps === 'number' && userAudioBps > 0 ? userAudioBps : 128_000;
-        
+
         try {
             this.recorder = new MediaRecorder(canvasStream, {
                 mimeType,
@@ -255,31 +261,66 @@ export class VideoCompositor {
         videoElement.currentTime = trimRange[0];
 
         await new Promise<void>(resolve => {
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                logWarn('warn', 'video seeked timeout reached, proceeding anyway');
+                videoElement.removeEventListener('seeked', onSeek);
+                resolve();
+            }, 1500);
+
             const onSeek = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
                 videoElement.removeEventListener('seeked', onSeek);
                 resolve();
             };
             videoElement.addEventListener('seeked', onSeek);
             if (videoElement.readyState >= 2 && !videoElement.seeking) {
-                videoElement.removeEventListener('seeked', onSeek);
-                resolve();
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    videoElement.removeEventListener('seeked', onSeek);
+                    resolve();
+                }
             }
         });
 
         this.recorder.start(1000);
         try {
-            await videoElement.play();
+            const playPromise = videoElement.play();
+            if (playPromise !== undefined) {
+                await Promise.race([
+                    playPromise,
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('play_timeout')), 2000))
+                ]);
+            }
         } catch (e) {
+            logWarn('warn', 'Falha ao iniciar vídeo, as vezes o iOS bloqueia play(). Vamos prosseguir se possível:', e);
             try {
                 if (this.recorder && this.recorder.state === 'recording') this.recorder.stop();
-            } catch {}
-            throw e;
+            } catch { }
+            // Don't throw here, let's see if we can get anything
         }
 
         const duration = trimRange[1] - trimRange[0];
-        
+
+        // Watchdog to ensure we don't hang if requestVideoFrameCallback stops firing
+        this.lastFrameTime = Date.now();
+        this.watchdogTimer = setInterval(() => {
+            if (this.isCancelled) return;
+            const now = Date.now();
+            if (now - this.lastFrameTime > 2000) {
+                logWarn('warn', 'Watchdog detectou que processFrame travou. Forçando próximo frame.');
+                processFrame();
+            }
+        }, 1000) as unknown as number;
+
         const processFrame = () => {
             if (this.isCancelled) return;
+            this.lastFrameTime = Date.now();
 
             if (videoElement.ended || videoElement.currentTime >= trimRange[1]) {
                 if (this.recorder && this.recorder.state === 'recording') {

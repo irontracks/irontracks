@@ -9,6 +9,7 @@ import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
+import { uploadWithTus } from '@/utils/storage/tusUpload'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
 // --- Types ---
@@ -259,7 +260,7 @@ const computeLiveSizes = ({ ctx, metrics }: { ctx: CanvasRenderingContext2D | nu
     const words = title.split(/\s+/).filter(Boolean)
     const lines: string[] = []
     let line = ''
-    
+
     ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
     for (const w of words) {
       const candidate = line ? `${line} ${w}` : w
@@ -336,27 +337,27 @@ const drawStory = ({
   skipClear?: boolean
 }) => {
   if (!skipClear) ctx.clearRect(0, 0, canvasW, canvasH)
-  
+
   // Background
   if (!transparentBg) {
     ctx.fillStyle = '#000000'
     ctx.fillRect(0, 0, canvasW, canvasH)
 
     if (backgroundImage) {
-        const iw = Number(backgroundImage.naturalWidth) || 0
-        const ih = Number(backgroundImage.naturalHeight) || 0
-        const { scale: coverScale } = fitCover({ canvasW, canvasH, imageW: iw, imageH: ih })
-        const dw = iw * coverScale
-        const dh = ih * coverScale
-        const cx = (canvasW - dw) / 2
-        const cy = (canvasH - dh) / 2
-        ctx.drawImage(backgroundImage, cx, cy, dw, dh)
+      const iw = Number(backgroundImage.naturalWidth) || 0
+      const ih = Number(backgroundImage.naturalHeight) || 0
+      const { scale: coverScale } = fitCover({ canvasW, canvasH, imageW: iw, imageH: ih })
+      const dw = iw * coverScale
+      const dh = ih * coverScale
+      const cx = (canvasW - dw) / 2
+      const cy = (canvasH - dh) / 2
+      ctx.drawImage(backgroundImage, cx, cy, dw, dh)
     } else {
-        const g = ctx.createLinearGradient(0, 0, canvasW, canvasH)
-        g.addColorStop(0, '#0a0a0a')
-        g.addColorStop(1, '#111827')
-        ctx.fillStyle = g
-        ctx.fillRect(0, 0, canvasW, canvasH)
+      const g = ctx.createLinearGradient(0, 0, canvasW, canvasH)
+      g.addColorStop(0, '#0a0a0a')
+      g.addColorStop(1, '#111827')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, canvasW, canvasH)
     }
   }
 
@@ -399,7 +400,7 @@ const drawStory = ({
 
   const gap = 18
   const cardH = 130
-  
+
   // Helper to draw card
   const drawCard = (box: { x: number; y: number; w: number; h: number }, card: { label: string; value: string }) => {
     drawRoundedRect(ctx, box.x, box.y, box.w, box.h, 24)
@@ -459,9 +460,9 @@ const drawStory = ({
     const titleY = titlePos.y * CANVAS_H
     ctx.fillStyle = '#ffffff'
     ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
-    ;(sizes.titleLines ?? []).forEach((l, idx) => {
-      ctx.fillText(l, titleX, titleY + idx * 40)
-    })
+      ; (sizes.titleLines ?? []).forEach((l, idx) => {
+        ctx.fillText(l, titleX, titleY + idx * 40)
+      })
 
     const subtitleX = subtitlePos.x * CANVAS_W
     const subtitleY = subtitlePos.y * CANVAS_H
@@ -592,6 +593,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null)
   const [busy, setBusy] = useState(false)
   const [busyAction, setBusyAction] = useState<'post' | 'share' | null>(null)
+  const [busySubAction, setBusySubAction] = useState<'processing' | 'uploading' | null>(null)
   const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -603,7 +605,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const dragRef = useRef({ key: null as string | null, pointerId: null as number | null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } })
   const [mediaLoadIdRef] = useState({ current: 0 })
   const backgroundUrlRef = useRef('')
-  
+
   // Trimming State
   const [showTrimmer, setShowTrimmer] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
@@ -640,15 +642,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     if (!open) return
     if (!session) return
     let cancelled = false
-    ;(async () => {
-      try {
-        const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
-        if (cancelled) return
-        if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
-      } catch {
-        // silent fail
-      }
-    })()
+      ; (async () => {
+        try {
+          const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
+          if (cancelled) return
+          if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
+        } catch {
+          // silent fail
+        }
+      })()
     return () => {
       cancelled = true
     }
@@ -680,7 +682,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       try {
         const url = String(backgroundUrlRef.current || '')
         if (url) URL.revokeObjectURL(url)
-      } catch {}
+      } catch { }
       setBackgroundUrl('')
       setBackgroundImage(null)
       setSelectedFile(null)
@@ -695,13 +697,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
       try {
         if (inputRef?.current) inputRef.current.value = ''
-      } catch {}
+      } catch { }
       return
     }
     setError('')
     setInfo('')
     setBusy(false)
     setBusyAction(null)
+    setBusySubAction(null)
     setShowSafeGuide(true)
     setLivePositions(DEFAULT_LIVE_POSITIONS)
     setDraggingKey(null)
@@ -715,7 +718,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     setTrimRange([0, 60])
     try {
       if (inputRef?.current) inputRef.current.value = ''
-    } catch {}
+    } catch { }
   }, [open])
 
   // Lock scroll
@@ -803,14 +806,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       if (kind === 'video') {
         setBackgroundImage(null)
         setInfo('')
-        
+
         // Load video metadata to set defaults
         const v = document.createElement('video')
         v.preload = 'metadata'
         v.onloadedmetadata = () => {
-             const dur = v.duration || 0
-             setVideoDuration(dur)
-             setTrimRange([0, Math.min(dur, 60)])
+          const dur = v.duration || 0
+          setVideoDuration(dur)
+          setTrimRange([0, Math.min(dur, 60)])
         }
         v.src = url
         return
@@ -929,26 +932,26 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     // if (mediaKind === 'video') return // Removed to allow drawing overlay on video
     let raf = 0
     const draw = () => {
-      drawStory({ 
-        ctx, 
-        canvasW: CANVAS_W, 
-        canvasH: CANVAS_H, 
-        backgroundImage, 
-        metrics, 
-        layout, 
+      drawStory({
+        ctx,
+        canvasW: CANVAS_W,
+        canvasH: CANVAS_H,
+        backgroundImage,
+        metrics,
+        layout,
         livePositions,
-        transparentBg: mediaKind === 'video' 
+        transparentBg: mediaKind === 'video'
       })
     }
     if (isExporting) {
-        draw()
-        return
+      draw()
+      return
     }
     // Only animate if LIVE and dragging, otherwise draw once to save battery
     if (layout === 'live' && draggingKey) {
-        raf = requestAnimationFrame(draw)
+      raf = requestAnimationFrame(draw)
     } else {
-        draw()
+      draw()
     }
     return () => cancelAnimationFrame(raf)
   }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting])
@@ -980,47 +983,47 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     // Initialize compositor
     compositorRef.current = new VideoCompositor()
     setIsExporting(true)
-    
-    try {
-        const result = await compositorRef.current.render({
-            videoElement: videoRef.current,
-            trimRange,
-            outputWidth: CANVAS_W,
-            outputHeight: CANVAS_H,
-            fps: 30,
-            onDrawFrame: (ctx, video) => {
-                const vw = video.videoWidth
-                const vh = video.videoHeight
-                if (!vw || !vh) return
 
-                const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
-                const dw = vw * scale
-                const dh = vh * scale
-                const cx = (CANVAS_W - dw) / 2
-                const cy = (CANVAS_H - dh) / 2
-                
-                ctx.drawImage(video, cx, cy, dw, dh)
-                
-                drawStory({ 
-                    ctx, 
-                    canvasW: CANVAS_W, 
-                    canvasH: CANVAS_H, 
-                    backgroundImage: null, 
-                    metrics, 
-                    layout, 
-                    livePositions, 
-                    transparentBg: true, 
-                    skipClear: true 
-                })
-            }
-        })
-        return result
+    try {
+      const result = await compositorRef.current.render({
+        videoElement: videoRef.current,
+        trimRange,
+        outputWidth: CANVAS_W,
+        outputHeight: CANVAS_H,
+        fps: 30,
+        onDrawFrame: (ctx, video) => {
+          const vw = video.videoWidth
+          const vh = video.videoHeight
+          if (!vw || !vh) return
+
+          const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
+          const dw = vw * scale
+          const dh = vh * scale
+          const cx = (CANVAS_W - dw) / 2
+          const cy = (CANVAS_H - dh) / 2
+
+          ctx.drawImage(video, cx, cy, dw, dh)
+
+          drawStory({
+            ctx,
+            canvasW: CANVAS_W,
+            canvasH: CANVAS_H,
+            backgroundImage: null,
+            metrics,
+            layout,
+            livePositions,
+            transparentBg: true,
+            skipClear: true
+          })
+        }
+      })
+      return result
     } catch (e) {
-        logError('error', 'Render failed', e)
-        throw e
+      logError('error', 'Render failed', e)
+      throw e
     } finally {
-        compositorRef.current = null
-        setIsExporting(false)
+      compositorRef.current = null
+      setIsExporting(false)
     }
   }
 
@@ -1037,13 +1040,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
     // If image is loaded, use it
     if (mediaKind === 'image') {
-        // drawStory already handles this
+      // drawStory already handles this
     }
 
     drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: mediaKind === 'image' ? backgroundImage : null, metrics, layout, livePositions })
-    
+
     // If video, we tried to draw the frame above.
-    
+
     const mime = type === 'png' ? 'image/png' : 'image/jpeg'
     const ext = type === 'png' ? 'png' : 'jpg'
     const filename = `irontracks-story-${Date.now()}.${ext}`
@@ -1079,12 +1082,18 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const shareImage = async () => {
     setBusy(true)
     setBusyAction('share')
+    setBusySubAction('processing')
     setError('')
     setInfo('')
     try {
-      const result = await createImageBlob({ type: 'jpg' })
+      const result = await Promise.race([
+        createImageBlob({ type: 'jpg' }),
+        new Promise<{ blob: Blob; filename: string; mime: string }>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 45000)
+        )
+      ])
       const file = new File([result.blob], result.filename, { type: result.mime })
-      
+
       let shared = false
       if (typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] })) {
         try {
@@ -1094,9 +1103,9 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           const name = String((shareErr as { name?: string })?.name || '').trim()
           // If user cancelled, stop here
           if (name === 'AbortError') {
-             setBusy(false)
-             setBusyAction(null)
-             return
+            setBusy(false)
+            setBusyAction(null)
+            return
           }
           // If not allowed or other error, fall through to download
           logWarn('warn', 'Share API failed, falling back to download:', shareErr)
@@ -1115,12 +1124,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     } finally {
       setBusy(false)
       setBusyAction(null)
+      setBusySubAction(null)
     }
   }
 
   const postToIronTracks = async () => {
     setBusy(true)
     setBusyAction('post')
+    setBusySubAction('processing')
     setError('')
     setInfo('')
     try {
@@ -1131,14 +1142,19 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
       let path = ''
       let meta: Record<string, unknown> = {}
-      
+
       if (mediaKind === 'video') {
         if (!selectedFile) throw new Error('Selecione um vídeo primeiro.')
         const maxBytes = 200 * 1024 * 1024
         if (Number(selectedFile.size) > maxBytes) throw new Error('Vídeo muito grande (máx 200MB).')
-        
+
         // Renderiza vídeo com layout
-        const { blob, mime } = await createImageBlob({})
+        const { blob, mime } = await Promise.race([
+          createImageBlob({}),
+          new Promise<{ blob: Blob; mime: string }>((_, reject) =>
+            setTimeout(() => reject(new Error('timeout')), 45000)
+          )
+        ])
         if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 200MB).')
         if (String(mime || '').toLowerCase().includes('webm')) {
           const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
@@ -1148,52 +1164,46 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         const ext = mime.includes('mp4') ? '.mp4' : '.webm'
         const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
         path = `${uid}/stories/${storyId}${ext}`
-        const signResp = await fetch('/api/storage/social-stories/signed-upload', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ path }),
+
+        setBusySubAction('uploading')
+
+        // Upload via TUS
+        await uploadWithTus(blob, 'social-stories', path, mime, (uploaded, total) => {
+          // opcional: log progress or display progress to user
+          // console.log(`Uploading: ${(uploaded / total * 100).toFixed(2)}%`)
         })
-        const signJson = await signResp.json().catch((): null => null)
-        if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
-        const { error: upErr } = await supabase.storage
-          .from('social-stories')
-          .uploadToSignedUrl(path, String(signJson.token), blob, { contentType: mime })
-        if (upErr) throw upErr
-        
+
         meta = {
-            title: String(metrics?.title || ''),
-            dateText: String(metrics?.date || ''),
-            durationSeconds: Number(metrics?.totalTime || 0),
-            totalVolumeKg: Number(metrics?.volume || 0),
-            kcal: Number(metrics?.kcal || 0),
-            layout: String(layout || ''),
-            mediaKind: 'video',
+          title: String(metrics?.title || ''),
+          dateText: String(metrics?.date || ''),
+          durationSeconds: Number(metrics?.totalTime || 0),
+          totalVolumeKg: Number(metrics?.volume || 0),
+          kcal: Number(metrics?.kcal || 0),
+          layout: String(layout || ''),
+          mediaKind: 'video',
         }
       } else {
         // Image
         const result = await createImageBlob({ type: 'jpg', quality: 0.92 })
         const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
         path = `${uid}/stories/${storyId}.jpg`
-        const signResp = await fetch('/api/storage/social-stories/signed-upload', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ path }),
-          })
-          const signJson = await signResp.json().catch((): null => null)
-          if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
-          const { error: upErr } = await supabase.storage
-            .from('social-stories')
-            .uploadToSignedUrl(path, String(signJson.token), result.blob, { contentType: result.mime })
-          if (upErr) throw upErr
-          meta = {
-            title: String(metrics?.title || ''),
-            dateText: String(metrics?.date || ''),
-            durationSeconds: Number(metrics?.totalTime || 0),
-            totalVolumeKg: Number(metrics?.volume || 0),
-            kcal: Number(metrics?.kcal || 0),
-            layout: String(layout || ''),
-            mediaKind: 'image',
-          }
+
+        setBusySubAction('uploading')
+
+        // Upload via TUS
+        await uploadWithTus(result.blob, 'social-stories', path, result.mime, (uploaded, total) => {
+          // opcional: log progress or display progress to user
+          // console.log(`Uploading image: ${(uploaded / total * 100).toFixed(2)}%`)
+        })
+        meta = {
+          title: String(metrics?.title || ''),
+          dateText: String(metrics?.date || ''),
+          durationSeconds: Number(metrics?.totalTime || 0),
+          totalVolumeKg: Number(metrics?.volume || 0),
+          kcal: Number(metrics?.kcal || 0),
+          layout: String(layout || ''),
+          mediaKind: 'image',
+        }
       }
 
       const createUrl = isIosNative() ? `/api/social/stories/create?media_path=${encodeURIComponent(path)}` : '/api/social/stories/create'
@@ -1204,7 +1214,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       })
       const createJson = await createResp.json().catch((): null => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
-      
+
       setInfo('Publicado no IronTracks!')
       try {
         window.dispatchEvent(new Event('irontracks:stories:refresh'))
@@ -1212,7 +1222,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       }
       try {
         window.setTimeout(() => onClose?.(), 1000)
-      } catch {}
+      } catch { }
 
     } catch (err: unknown) {
       logError('error', err)
@@ -1221,6 +1231,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     } finally {
       setBusy(false)
       setBusyAction(null)
+      setBusySubAction(null)
     }
   }
 
@@ -1230,18 +1241,18 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
   return (
     <AnimatePresence>
-    {open && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
-    >
-        {/* Mobile Header / Close */}
-        <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-transparent border-b border-neutral-800/50">
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
+        >
+          {/* Mobile Header / Close */}
+          <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-transparent border-b border-neutral-800/50">
             <div className="text-white min-w-0 flex-1 mr-4">
-                <h3 className="font-bold text-lg truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
-                <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
+              <h3 className="font-bold text-lg truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
+              <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
             </div>
             <button
               onClick={onClose}
@@ -1249,309 +1260,307 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             >
               <X size={16} />
             </button>
-        </div>
+          </div>
 
-      <motion.div
-        initial={{ y: 20, scale: 0.95 }}
-        animate={{ y: 0, scale: 1 }}
-        exit={{ y: 20, scale: 0.95 }}
-        className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-5xl bg-black sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
-      >
-        {/* Desktop Header */}
-        <div className="hidden sm:flex px-6 py-5 border-b border-neutral-800 items-center justify-between flex-none bg-neutral-900">
-            <div>
+          <motion.div
+            initial={{ y: 20, scale: 0.95 }}
+            animate={{ y: 0, scale: 1 }}
+            exit={{ y: 20, scale: 0.95 }}
+            className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-5xl bg-black sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
+          >
+            {/* Desktop Header */}
+            <div className="hidden sm:flex px-6 py-5 border-b border-neutral-800 items-center justify-between flex-none bg-neutral-900">
+              <div>
                 <h2 className="font-bold text-white text-xl">{metrics.title || 'Story Composer'}</h2>
                 <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"
-            >
-              <X size={18} />
-            </button>
-        </div>
-
-        <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent">
-          <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
-            
-            {/* Preview Column */}
-            <div className="flex-none flex flex-col items-center gap-6">
-              <div
-                ref={previewRef}
-                className="relative w-full max-w-[300px] sm:max-w-[340px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl ring-1 ring-white/10 shrink-0"
-              >
-                {isVideo && (
-                  <video
-                    key={backgroundUrl || 'no-video'}
-                    ref={videoRef}
-                    crossOrigin="anonymous"
-                    src={backgroundUrl || undefined}
-                    className="absolute inset-0 w-full h-full object-cover bg-black"
-                    controls={false}
-                    playsInline
-                    muted
-                    autoPlay
-                    loop
-                  />
-                )}
-                
-                <canvas
-                    ref={previewCanvasRef}
-                    width={CANVAS_W}
-                    height={CANVAS_H}
-                    className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                />
-
-                {showSafeGuide && (
-                  <div className="absolute inset-0 pointer-events-none z-10">
-                    <div
-                      className="absolute border border-yellow-500/20 rounded-3xl border-dashed"
-                      style={{
-                        left: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
-                        right: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
-                        top: `${(SAFE_TOP / CANVAS_H) * 100}%`,
-                        bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
-                      }}
-                    />
-                  </div>
-                )}
-
-                {layout === 'live' && (
-                  <div className="absolute inset-0 pointer-events-none z-20">
-                    {livePieces.map((p) => {
-                      const pos = livePositions?.[p.key] ?? DEFAULT_LIVE_POSITIONS?.[p.key] ?? { x: 0.1, y: 0.1 }
-                      const isDragging = draggingKey === p.key
-                      return (
-                        <button
-                          key={p.key}
-                          type="button"
-                          className={[
-                            'absolute pointer-events-auto select-none touch-none',
-                            'px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-transform active:scale-110',
-                            isDragging
-                              ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg scale-110 z-50'
-                              : 'bg-black/60 backdrop-blur text-white border-white/20 hover:border-yellow-500/50',
-                          ].join(' ')}
-                          style={{
-                            left: `${clamp01(pos.x) * 100}%`,
-                            top: `${clamp01(pos.y) * 100}%`,
-                            cursor: 'grab'
-                          }}
-                          onPointerDown={(e) => onPiecePointerDown(p.key, e)}
-                          onPointerMove={(e) => onPiecePointerMove(p.key, e)}
-                          onPointerUp={(e) => onPiecePointerUp(p.key, e)}
-                          onPointerCancel={(e) => onPiecePointerUp(p.key, e)}
-                        >
-                          {p.label}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
+              <button
+                onClick={onClose}
+                className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-              {/* Media Controls */}
-              <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
-                <label
-                  className={[
-                    'flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]',
-                    busy ? 'opacity-50 pointer-events-none' : '',
-                  ].join(' ')}
-                >
-                  <Upload size={16} className="text-yellow-500" />
-                  {isVideo ? 'TROCAR' : 'TROCAR FOTO'}
-                  <input
-                    ref={inputRef}
-                    type="file"
-                    accept="image/*,video/*"
-                    className="sr-only"
-                    onChange={(e) => {
-                        const f = e.target.files?.[0] || null
-                        if (inputRef.current) inputRef.current.value = ''
-                        loadMedia(f)
-                    }}
-                   />
-                </label>
-                
-                {isVideo && (
-                    <button
+            <div ref={scrollAreaRef} className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent">
+              <div className="p-4 sm:p-8 flex flex-col lg:flex-row gap-8 h-full max-w-5xl mx-auto items-center lg:items-start">
+
+                {/* Preview Column */}
+                <div className="flex-none flex flex-col items-center gap-6">
+                  <div
+                    ref={previewRef}
+                    className="relative w-full max-w-[300px] sm:max-w-[340px] aspect-[9/16] rounded-3xl overflow-hidden border border-neutral-800 bg-neutral-900 shadow-2xl ring-1 ring-white/10 shrink-0"
+                  >
+                    {isVideo && (
+                      <video
+                        key={backgroundUrl || 'no-video'}
+                        ref={videoRef}
+                        crossOrigin="anonymous"
+                        src={backgroundUrl || undefined}
+                        className="absolute inset-0 w-full h-full object-cover bg-black"
+                        controls={false}
+                        playsInline
+                        muted
+                        autoPlay
+                        loop
+                      />
+                    )}
+
+                    <canvas
+                      ref={previewCanvasRef}
+                      width={CANVAS_W}
+                      height={CANVAS_H}
+                      className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                    />
+
+                    {showSafeGuide && (
+                      <div className="absolute inset-0 pointer-events-none z-10">
+                        <div
+                          className="absolute border border-yellow-500/20 rounded-3xl border-dashed"
+                          style={{
+                            left: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
+                            right: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
+                            top: `${(SAFE_TOP / CANVAS_H) * 100}%`,
+                            bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {layout === 'live' && (
+                      <div className="absolute inset-0 pointer-events-none z-20">
+                        {livePieces.map((p) => {
+                          const pos = livePositions?.[p.key] ?? DEFAULT_LIVE_POSITIONS?.[p.key] ?? { x: 0.1, y: 0.1 }
+                          const isDragging = draggingKey === p.key
+                          return (
+                            <button
+                              key={p.key}
+                              type="button"
+                              className={[
+                                'absolute pointer-events-auto select-none touch-none',
+                                'px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-widest transition-transform active:scale-110',
+                                isDragging
+                                  ? 'bg-yellow-500 text-black border-yellow-500 shadow-lg scale-110 z-50'
+                                  : 'bg-black/60 backdrop-blur text-white border-white/20 hover:border-yellow-500/50',
+                              ].join(' ')}
+                              style={{
+                                left: `${clamp01(pos.x) * 100}%`,
+                                top: `${clamp01(pos.y) * 100}%`,
+                                cursor: 'grab'
+                              }}
+                              onPointerDown={(e) => onPiecePointerDown(p.key, e)}
+                              onPointerMove={(e) => onPiecePointerMove(p.key, e)}
+                              onPointerUp={(e) => onPiecePointerUp(p.key, e)}
+                              onPointerCancel={(e) => onPiecePointerUp(p.key, e)}
+                            >
+                              {p.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Media Controls */}
+                  <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
+                    <label
+                      className={[
+                        'flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]',
+                        busy ? 'opacity-50 pointer-events-none' : '',
+                      ].join(' ')}
+                    >
+                      <Upload size={16} className="text-yellow-500" />
+                      {isVideo ? 'TROCAR' : 'TROCAR FOTO'}
+                      <input
+                        ref={inputRef}
+                        type="file"
+                        accept="image/*,video/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null
+                          if (inputRef.current) inputRef.current.value = ''
+                          loadMedia(f)
+                        }}
+                      />
+                    </label>
+
+                    {isVideo && (
+                      <button
                         type="button"
                         onClick={() => setShowTrimmer(v => !v)}
-                        className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors active:scale-[0.98] ${
-                            showTrimmer 
-                            ? 'bg-yellow-500 text-black border-yellow-500' 
-                            : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
-                        }`}
+                        className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors active:scale-[0.98] ${showTrimmer
+                          ? 'bg-yellow-500 text-black border-yellow-500'
+                          : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                          }`}
                         disabled={busy}
-                    >
+                      >
                         <Scissors size={18} />
-                    </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setShowSafeGuide((v) => !v)}
-                  className={`w-28 h-12 rounded-xl border font-bold text-[10px] uppercase tracking-wider transition-colors active:scale-[0.98] ${
-                    showSafeGuide 
-                        ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' 
-                        : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
-                  }`}
-                  disabled={busy}
-                >
-                  GUIA {showSafeGuide ? 'ON' : 'OFF'}
-                </button>
-              </div>
-            </div>
-
-            {/* Controls Column */}
-            <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
-                
-                {/* Trimmer UI */}
-                <AnimatePresence>
-                    {showTrimmer && isVideo && (
-                        <motion.div 
-                            initial={{ height: 0, opacity: 0 }} 
-                            animate={{ height: 'auto', opacity: 1 }} 
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                        >
-                            <VideoTrimmer 
-                                duration={videoDuration} 
-                                value={trimRange} 
-                                onChange={(val) => {
-                                    setTrimRange(val)
-                                    // Update preview frame if paused
-                                    if (videoRef.current && videoRef.current.paused) {
-                                        videoRef.current.currentTime = val[0]
-                                    }
-                                }}
-                                onPreview={(play) => {
-                                    if (!videoRef.current) return
-                                    if (play) {
-                                        videoRef.current.currentTime = trimRange[0]
-                                        videoRef.current.play()
-                                        const check = () => {
-                                            if (!videoRef.current) return
-                                            setPreviewTime(videoRef.current.currentTime)
-                                            if (videoRef.current.currentTime >= trimRange[1]) {
-                                                videoRef.current.pause()
-                                                videoRef.current.currentTime = trimRange[0]
-                                            } else if (!videoRef.current.paused) {
-                                                requestAnimationFrame(check)
-                                            }
-                                        }
-                                        requestAnimationFrame(check)
-                                    } else {
-                                        videoRef.current.pause()
-                                    }
-                                }}
-                                currentTime={previewTime}
-                            />
-                        </motion.div>
+                      </button>
                     )}
-                </AnimatePresence>
 
-                {/* Layout Selector */}
-                <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowSafeGuide((v) => !v)}
+                      className={`w-28 h-12 rounded-xl border font-bold text-[10px] uppercase tracking-wider transition-colors active:scale-[0.98] ${showSafeGuide
+                        ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500'
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                        }`}
+                      disabled={busy}
+                    >
+                      GUIA {showSafeGuide ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Controls Column */}
+                <div className="flex-1 w-full max-w-[360px] flex flex-col gap-6">
+
+                  {/* Trimmer UI */}
+                  <AnimatePresence>
+                    {showTrimmer && isVideo && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <VideoTrimmer
+                          duration={videoDuration}
+                          value={trimRange}
+                          onChange={(val) => {
+                            setTrimRange(val)
+                            // Update preview frame if paused
+                            if (videoRef.current && videoRef.current.paused) {
+                              videoRef.current.currentTime = val[0]
+                            }
+                          }}
+                          onPreview={(play) => {
+                            if (!videoRef.current) return
+                            if (play) {
+                              videoRef.current.currentTime = trimRange[0]
+                              videoRef.current.play()
+                              const check = () => {
+                                if (!videoRef.current) return
+                                setPreviewTime(videoRef.current.currentTime)
+                                if (videoRef.current.currentTime >= trimRange[1]) {
+                                  videoRef.current.pause()
+                                  videoRef.current.currentTime = trimRange[0]
+                                } else if (!videoRef.current.paused) {
+                                  requestAnimationFrame(check)
+                                }
+                              }
+                              requestAnimationFrame(check)
+                            } else {
+                              videoRef.current.pause()
+                            }
+                          }}
+                          currentTime={previewTime}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Layout Selector */}
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-yellow-500/80 mb-2">
-                        <Layout size={14} />
-                        ESCOLHA O LAYOUT
+                      <Layout size={14} />
+                      ESCOLHA O LAYOUT
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                        {STORY_LAYOUTS.map((l) => (
+                      {STORY_LAYOUTS.map((l) => (
                         <button
-                            key={l.id}
-                            type="button"
-                            onClick={() => onSelectLayout(l.id)}
-                            className={[
+                          key={l.id}
+                          type="button"
+                          onClick={() => onSelectLayout(l.id)}
+                          className={[
                             'h-12 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all active:scale-[0.98]',
                             layout === l.id
-                                ? 'bg-white text-black border-white shadow-lg scale-[1.02]'
-                                : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700',
+                              ? 'bg-white text-black border-white shadow-lg scale-[1.02]'
+                              : 'bg-neutral-900 text-neutral-400 border-neutral-800 hover:bg-neutral-800 hover:border-neutral-700',
                             l.id === 'live' ? 'col-span-2' : '' // LIVE spans full width
-                            ].join(' ')}
-                            disabled={busy}
+                          ].join(' ')}
+                          disabled={busy}
                         >
-                            {l.label}
+                          {l.label}
                         </button>
-                        ))}
+                      ))}
                     </div>
                     {layout === 'live' && (
-                        <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3 mt-2">
-                            <Move size={16} className="text-blue-400 mt-0.5" />
-                            <div className="flex-1">
-                                <p className="text-xs text-blue-200 font-medium">Modo LIVE ativado</p>
-                                <p className="text-[10px] text-blue-300/70 mt-1">Arraste os elementos na pré-visualização para personalizar.</p>
-                            </div>
-                            <button 
-                                onClick={() => setLivePositions(DEFAULT_LIVE_POSITIONS)}
-                                className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-300"
-                                title="Resetar posições"
-                            >
-                                <RotateCcw size={14} />
-                            </button>
+                      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3 mt-2">
+                        <Move size={16} className="text-blue-400 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-xs text-blue-200 font-medium">Modo LIVE ativado</p>
+                          <p className="text-[10px] text-blue-300/70 mt-1">Arraste os elementos na pré-visualização para personalizar.</p>
                         </div>
+                        <button
+                          onClick={() => setLivePositions(DEFAULT_LIVE_POSITIONS)}
+                          className="p-1.5 rounded-lg hover:bg-blue-500/20 text-blue-300"
+                          title="Resetar posições"
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                      </div>
                     )}
-                </div>
+                  </div>
 
-                <div className="flex-1 hidden lg:block" />
+                  <div className="flex-1 hidden lg:block" />
 
-                {/* Status Messages */}
-                <AnimatePresence mode="wait">
+                  {/* Status Messages */}
+                  <AnimatePresence mode="wait">
                     {info && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
-                            <CheckCircle2 size={18} className="text-emerald-500" />
-                            <p className="text-xs font-bold text-emerald-200">{info}</p>
-                        </motion.div>
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
+                        <CheckCircle2 size={18} className="text-emerald-500" />
+                        <p className="text-xs font-bold text-emerald-200">{info}</p>
+                      </motion.div>
                     )}
                     {error && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-red-950/40 border border-red-900/50 flex items-center gap-3">
-                            <AlertCircle size={18} className="text-red-400" />
-                            <p className="text-xs font-bold text-red-200">{error}</p>
-                        </motion.div>
+                      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-4 rounded-xl bg-red-950/40 border border-red-900/50 flex items-center gap-3">
+                        <AlertCircle size={18} className="text-red-400" />
+                        <p className="text-xs font-bold text-red-200">{error}</p>
+                      </motion.div>
                     )}
-                </AnimatePresence>
+                  </AnimatePresence>
 
-                {/* Actions */}
-                <div className="space-y-3 pt-2">
+                  {/* Actions */}
+                  <div className="space-y-3 pt-2">
                     <button
-                        onClick={postToIronTracks}
-                        disabled={busy}
-                        className="h-14 w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
+                      onClick={postToIronTracks}
+                      disabled={busy}
+                      className="h-14 w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
                     >
-                        {busyAction === 'post' ? (
-                            <>
-                                <Loader2 className="animate-spin" size={18} />
-                                PROCESSANDO...
-                            </>
-                        ) : 'POSTAR NO IRONTRACKS'}
+                      {busyAction === 'post' ? (
+                        <>
+                          <Loader2 className="animate-spin" size={18} />
+                          {busySubAction === 'processing' ? 'A PROCESSAR VÍDEO...' : 'A ENVIAR...'}
+                        </>
+                      ) : 'POSTAR NO IRONTRACKS'}
                     </button>
-                    
+
                     <button
-                        onClick={shareImage}
-                        disabled={busy}
-                        className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
+                      onClick={shareImage}
+                      disabled={busy}
+                      className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
                     >
-                        {busyAction === 'share' ? (
-                            <>
-                                <Loader2 className="animate-spin" size={14} />
-                                PROCESSANDO...
-                            </>
-                        ) : (
-                            <>
-                                <Share2 size={14} />
-                                BAIXAR / COMPARTILHAR
-                            </>
-                        )}
+                      {busyAction === 'share' ? (
+                        <>
+                          <Loader2 className="animate-spin" size={14} />
+                          {busySubAction === 'processing' ? 'A PROCESSAR...' : 'A GUARDAR...'}
+                        </>
+                      ) : (
+                        <>
+                          <Share2 size={14} />
+                          BAIXAR / COMPARTILHAR
+                        </>
+                      )}
                     </button>
+                  </div>
+
                 </div>
-
+              </div>
             </div>
-          </div>
-        </div>
-      </motion.div>
-    </motion.div>
-    )}
+          </motion.div>
+        </motion.div>
+      )}
     </AnimatePresence>
   )
 }
