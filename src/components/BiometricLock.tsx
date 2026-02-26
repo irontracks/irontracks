@@ -64,7 +64,10 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
 
   // Trigger on mount
   useEffect(() => {
-    void attemptBiometrics()
+    const t = setTimeout(() => {
+      void attemptBiometrics()
+    }, 0)
+    return () => clearTimeout(t)
   }, [attemptBiometrics])
 
   // Re-lock when app goes to background, re-trigger on foreground
@@ -144,7 +147,7 @@ export function useBiometricLock(enabled: boolean) {
     hasInitRef.current = true
 
     // Lock on first mount
-    setIsLocked(true)
+    const t = setTimeout(() => setIsLocked(true), 0)
 
     // Re-lock every time the app comes to foreground from background
     const onVisibility = () => {
@@ -153,7 +156,10 @@ export function useBiometricLock(enabled: boolean) {
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
+    return () => {
+      clearTimeout(t)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [enabled])
 
   const unlock = useCallback(() => setIsLocked(false), [])

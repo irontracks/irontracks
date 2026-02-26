@@ -135,10 +135,27 @@ export const NormalSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: n
           <button
             type="button"
             onClick={() => {
+              const nowMs = Date.now();
+              const startedRaw = (log as UnknownRecord)?.startedAtMs;
+              const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+              const executionSeconds =
+                Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
               const nextDone = !done;
-              updateLog(key, { done: nextDone, advanced_config: cfg ?? log.advanced_config ?? null });
+              updateLog(key, {
+                done: nextDone,
+                completedAtMs: nextDone ? nowMs : null,
+                executionSeconds: nextDone ? executionSeconds : null,
+                advanced_config: cfg ?? log.advanced_config ?? null,
+              });
               if (nextDone && restTime && restTime > 0) {
-                startTimer(restTime, { kind: 'rest', key });
+                const nextPlanned = getPlannedSet(ex, setIdx + 1);
+                const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+                startTimer(restTime, {
+                  kind: 'rest',
+                  key,
+                  nextKey,
+                  restStartedAtMs: nowMs,
+                });
               }
             }}
             className={
@@ -277,14 +294,30 @@ export const RestPauseSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             type="button"
             disabled={!canDone}
             onClick={() => {
+              const nowMs = Date.now();
+              const startedRaw = (log as UnknownRecord)?.startedAtMs;
+              const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+              const executionSeconds =
+                Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
               const nextDone = !done;
               updateLog(key, {
                 done: nextDone,
+                completedAtMs: nextDone ? nowMs : null,
+                executionSeconds: nextDone ? executionSeconds : null,
                 reps: String(total || ''),
                 rest_pause: { ...rp, activation_reps: activation ?? null, mini_reps: minis },
                 advanced_config: cfg ?? log.advanced_config ?? null,
               });
-              if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key });
+              if (nextDone && restTime && restTime > 0) {
+                const nextPlanned = getPlannedSet(ex, setIdx + 1);
+                const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+                startTimer(restTime, {
+                  kind: 'rest',
+                  key,
+                  nextKey,
+                  restStartedAtMs: nowMs,
+                });
+              }
             }}
             className={
               canDone
@@ -320,6 +353,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
     getLog,
     updateLog,
     getPlanConfig,
+    getPlannedSet,
     startTimer,
     setClusterModal,
     clusterRefs,
@@ -444,9 +478,16 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
             type="button"
             disabled={!canDone}
             onClick={() => {
+              const nowMs = Date.now();
+              const startedRaw = (log as UnknownRecord)?.startedAtMs;
+              const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+              const executionSeconds =
+                Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
               const nextDone = !done;
               updateLog(key, {
                 done: nextDone,
+                completedAtMs: nextDone ? nowMs : null,
+                executionSeconds: nextDone ? executionSeconds : null,
                 reps: String(total || ''),
                 cluster: {
                   planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
@@ -455,7 +496,16 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
                 },
                 advanced_config: cfg ?? log.advanced_config ?? null,
               });
-              if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key });
+              if (nextDone && restTime && restTime > 0) {
+                const nextPlanned = getPlannedSet(ex, setIdx + 1);
+                const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+                startTimer(restTime, {
+                  kind: 'rest',
+                  key,
+                  nextKey,
+                  restStartedAtMs: nowMs,
+                });
+              }
             }}
             className={
               canDone

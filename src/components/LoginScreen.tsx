@@ -8,6 +8,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
 import { isPwaStandalone, isIosNative } from '@/utils/platform';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 // Capacitor imports dinâmicos — evita quebrar o build web/Vercel
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' };
 type AppleAuthorizeOptions = { clientId: string; scopes: string; state?: string; nonce?: string };
@@ -24,6 +25,7 @@ if (typeof window !== 'undefined') {
 
 const LoginScreen = () => {
     const router = useRouter();
+    useNativeAppSetup(null)
     const appVersionLabel = useMemo(() => 'v1..0', []);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');

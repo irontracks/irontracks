@@ -93,7 +93,15 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
         setActiveSession((prev) => {
             if (!prev) return prev
             const logs = prev.logs && typeof prev.logs === 'object' ? prev.logs : {}
-            return { ...prev, logs: { ...logs, [key]: data } }
+            const next: Record<string, unknown> = { ...(prev as unknown as Record<string, unknown>), logs: { ...(logs as Record<string, unknown>), [key]: data } }
+            const dataObj = isRecord(data) ? data : null
+            const done = !!dataObj?.done
+            const ui = isRecord((prev as unknown as Record<string, unknown>).ui) ? ((prev as unknown as Record<string, unknown>).ui as Record<string, unknown>) : null
+            const activeExec = ui && isRecord(ui.activeExecution) ? (ui.activeExecution as Record<string, unknown>) : null
+            if (done && activeExec && String(activeExec.key || '').trim() === String(key || '').trim()) {
+                next.ui = { ...(ui as Record<string, unknown>), activeExecution: null }
+            }
+            return next as unknown as ActiveWorkoutSession
         })
     }, [])
 

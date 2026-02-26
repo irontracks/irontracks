@@ -32,12 +32,28 @@ export const buildFinishWorkoutPayload = ({
     })
     .filter((x) => x !== null && typeof x === 'object' && 'name' in x && String((x as { name?: unknown }).name ?? '').trim().length > 0)
 
+  const logsObj = isObject(logs) ? (logs as Record<string, unknown>) : {}
+  let executionTotalSeconds = 0
+  let restTotalSeconds = 0
+  Object.values(logsObj).forEach((v) => {
+    if (!isObject(v)) return
+    const obj = v as AnyRecord
+    const execRaw = obj.executionSeconds ?? obj.execution_seconds
+    const restRaw = obj.restSeconds ?? obj.rest_seconds
+    const exec = typeof execRaw === 'number' ? execRaw : Number(String(execRaw ?? '').trim())
+    const rest = typeof restRaw === 'number' ? restRaw : Number(String(restRaw ?? '').trim())
+    if (Number.isFinite(exec) && exec > 0) executionTotalSeconds += Math.round(exec)
+    if (Number.isFinite(rest) && rest > 0) restTotalSeconds += Math.round(rest)
+  })
+
   return {
     workoutTitle: String(w?.title || 'Treino'),
     date: new Date().toISOString(),
     totalTime: elapsedSeconds,
     realTotalTime: elapsedSeconds,
-    logs: isObject(logs) ? logs : {},
+    executionTotalSeconds,
+    restTotalSeconds,
+    logs: logsObj,
     exercises: safeExercises,
     originWorkoutId: w?.id ?? null,
     preCheckin: isObject(ui) ? (ui as Record<string, unknown>)?.preCheckin ?? null : null,

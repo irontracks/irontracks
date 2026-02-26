@@ -16,6 +16,7 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     public let pluginMethods: [CAPPluginMethod] = [
         // Screen
         CAPPluginMethod(name: "setIdleTimerDisabled", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "openAppSettings", returnType: CAPPluginReturnPromise),
         // Notifications
         CAPPluginMethod(name: "requestNotificationPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkNotificationPermission", returnType: CAPPluginReturnPromise),
@@ -49,6 +50,23 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     private static var restActivities: [String: Any] = [:]
     private static let sharedMotionManager = CMMotionManager()
     private let healthStore = HKHealthStore()
+    private var notifObserver: NSObjectProtocol?
+
+    public override func load() {
+        super.load()
+        notifObserver = NotificationCenter.default.addObserver(forName: NSNotification.Name("IronTracksNotificationAction"), object: nil, queue: .main) { [weak self] note in
+            guard let self else { return }
+            let userInfo = note.userInfo ?? [:]
+            let actionId = userInfo["actionId"] as? String ?? ""
+            self.notifyListeners("notificationAction", data: ["actionId": actionId], retainUntilConsumed: true)
+        }
+    }
+
+    deinit {
+        if let obs = notifObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+    }
 
     // MARK: - Helpers
 
@@ -66,6 +84,18 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             UIApplication.shared.isIdleTimerDisabled = enabled
             call.resolve()
+        }
+    }
+
+    @objc func openAppSettings(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = URL(string: UIApplication.openSettingsURLString) else {
+                call.resolve(["ok": false])
+                return
+            }
+            UIApplication.shared.open(url, options: [:]) { ok in
+                call.resolve(["ok": ok])
+            }
         }
     }
 

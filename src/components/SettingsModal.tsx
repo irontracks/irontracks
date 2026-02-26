@@ -6,6 +6,19 @@ import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { isIosNative } from '@/utils/platform'
+import {
+  authenticateWithBiometrics,
+  checkBiometricsAvailable,
+  checkNativeNotificationPermission,
+  endRestLiveActivity,
+  isHealthKitAvailable,
+  openAppSettings,
+  requestHealthKitPermission,
+  requestNativeNotifications,
+  startRestLiveActivity,
+  triggerHaptic,
+} from '@/utils/native/irontracksNative'
 
 const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
@@ -27,6 +40,11 @@ export default function SettingsModal(props: SettingsModalProps) {
   const base = useMemo(() => (isObject(rawSettings) ? rawSettings : {}), [rawSettings])
   const [draft, setDraft] = useState<Record<string, unknown>>(() => base)
   const [modulesModalOpen, setModulesModalOpen] = useState(false)
+  const [iosNotifStatus, setIosNotifStatus] = useState<string>('unknown')
+  const [iosNotifBusy, setIosNotifBusy] = useState(false)
+  const [iosDiag, setIosDiag] = useState<Record<string, unknown> | null>(null)
+  const [iosDiagBusy, setIosDiagBusy] = useState(false)
+  const [iosLiveTestId, setIosLiveTestId] = useState<string>('')
 
   const setValue = (key: string, value: unknown) => {
     if (!key) return
@@ -90,6 +108,88 @@ export default function SettingsModal(props: SettingsModalProps) {
       } catch { }
     }
   }, [isOpen, props])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!isIosNative()) return
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await checkNativeNotificationPermission()
+        if (!alive) return
+        const status = String((res as Record<string, unknown>)?.status ?? 'unknown')
+        setIosNotifStatus(status)
+      } catch {
+        if (!alive) return
+        setIosNotifStatus('unknown')
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    if (!isIosNative()) return
+    let alive = true
+    ;(async () => {
+      try {
+        setIosDiagBusy(true)
+        const capCore = require('@capacitor/core')
+        const appMod = require('@capacitor/app')
+        const pushMod = require('@capacitor/push-notifications')
+        const deviceMod = require('@capacitor/device')
+
+        const Capacitor = capCore?.Capacitor
+        const App = appMod?.App
+        const PushNotifications = pushMod?.PushNotifications
+        const Device = deviceMod?.Device
+
+        const capacitorPresent = !!Capacitor
+        const platform = String(Capacitor?.getPlatform?.() || 'unknown')
+        const pluginNames = Capacitor?.Plugins ? Object.keys(Capacitor.Plugins) : []
+
+        const appInfo = await App?.getInfo?.().catch(() => null)
+        const deviceInfo = await Device?.getInfo?.().catch(() => null)
+        const pushPerm = await PushNotifications?.checkPermissions?.().catch(() => null)
+
+        const biom = await checkBiometricsAvailable()
+        const healthAvailable = await isHealthKitAvailable()
+        const notif = await checkNativeNotificationPermission()
+
+        if (!alive) return
+        setIosDiag({
+          capacitorPresent,
+          platform,
+          pluginNames,
+          app: appInfo || null,
+          device: deviceInfo || null,
+          push: pushPerm || null,
+          biometrics: biom || null,
+          notifications: notif || null,
+          healthKitAvailable: healthAvailable,
+        })
+      } catch {
+        if (!alive) return
+        setIosDiag(null)
+      } finally {
+        if (!alive) return
+        setIosDiagBusy(false)
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [isOpen])
+
+  const iosDiagObj = isObject(iosDiag) ? (iosDiag as Record<string, unknown>) : null
+  const iosDiagApp = iosDiagObj && isObject(iosDiagObj.app) ? (iosDiagObj.app as Record<string, unknown>) : null
+  const iosDiagDevice = iosDiagObj && isObject(iosDiagObj.device) ? (iosDiagObj.device as Record<string, unknown>) : null
+  const iosDiagPush = iosDiagObj && isObject(iosDiagObj.push) ? (iosDiagObj.push as Record<string, unknown>) : null
+  const iosDiagNotif = iosDiagObj && isObject(iosDiagObj.notifications) ? (iosDiagObj.notifications as Record<string, unknown>) : null
+  const iosDiagBiom = iosDiagObj && isObject(iosDiagObj.biometrics) ? (iosDiagObj.biometrics as Record<string, unknown>) : null
+  const iosDiagPlugins = iosDiagObj && Array.isArray(iosDiagObj.pluginNames) ? (iosDiagObj.pluginNames as unknown[]) : []
 
   if (!isOpen) return null
 
@@ -640,8 +740,263 @@ export default function SettingsModal(props: SettingsModalProps) {
                   {notifyAppointments ? 'Ativo' : 'Desligado'}
                 </button>
               </div>
+
+              {isIosNative() ? (
+                <div className="mt-2 rounded-xl bg-neutral-900 border border-neutral-700 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-black text-white">Notificações do iOS</div>
+                      <div className="text-xs text-neutral-400">Status: {iosNotifStatus}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={iosNotifBusy}
+                        onClick={async () => {
+                          try {
+                            setIosNotifBusy(true)
+                            await requestNativeNotifications()
+                            const res = await checkNativeNotificationPermission()
+                            setIosNotifStatus(String((res as Record<string, unknown>)?.status ?? 'unknown'))
+                          } catch {
+                            setIosNotifStatus('unknown')
+                          } finally {
+                            setIosNotifBusy(false)
+                          }
+                        }}
+                        className="px-3 py-2 rounded-xl bg-yellow-500 text-black font-black disabled:opacity-60"
+                      >
+                        Solicitar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={iosNotifBusy}
+                        onClick={async () => {
+                          try {
+                            setIosNotifBusy(true)
+                            await openAppSettings()
+                          } catch {
+                          } finally {
+                            setIosNotifBusy(false)
+                          }
+                        }}
+                        className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60"
+                      >
+                        Abrir Ajustes
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
+
+          {isIosNative() ? (
+            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Diagnóstico iOS</div>
+                  <div className="text-xs text-neutral-500">Capacitor, plugins e permissões no device.</div>
+                </div>
+                <button
+                  type="button"
+                  disabled={iosDiagBusy}
+                  onClick={async () => {
+                    try {
+                      setIosDiagBusy(true)
+                      const capCore = require('@capacitor/core')
+                      const appMod = require('@capacitor/app')
+                      const pushMod = require('@capacitor/push-notifications')
+                      const deviceMod = require('@capacitor/device')
+
+                      const Capacitor = capCore?.Capacitor
+                      const App = appMod?.App
+                      const PushNotifications = pushMod?.PushNotifications
+                      const Device = deviceMod?.Device
+
+                      const capacitorPresent = !!Capacitor
+                      const platform = String(Capacitor?.getPlatform?.() || 'unknown')
+                      const pluginNames = Capacitor?.Plugins ? Object.keys(Capacitor.Plugins) : []
+
+                      const appInfo = await App?.getInfo?.().catch(() => null)
+                      const deviceInfo = await Device?.getInfo?.().catch(() => null)
+                      const pushPerm = await PushNotifications?.checkPermissions?.().catch(() => null)
+
+                      const biom = await checkBiometricsAvailable()
+                      const healthAvailable = await isHealthKitAvailable()
+                      const notif = await checkNativeNotificationPermission()
+
+                      setIosDiag({
+                        capacitorPresent,
+                        platform,
+                        pluginNames,
+                        app: appInfo || null,
+                        device: deviceInfo || null,
+                        push: pushPerm || null,
+                        biometrics: biom || null,
+                        notifications: notif || null,
+                        healthKitAvailable: healthAvailable,
+                      })
+                    } catch {
+                      setIosDiag(null)
+                    } finally {
+                      setIosDiagBusy(false)
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60"
+                >
+                  Atualizar
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3">
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Runtime</div>
+                  <div className="text-xs text-neutral-200 mt-1">
+                    {String(iosDiagObj?.platform ?? 'unknown')} · Capacitor:{' '}
+                    {Boolean(iosDiagObj?.capacitorPresent) ? 'ok' : 'não'}
+                  </div>
+                  <div className="text-[11px] text-neutral-500 mt-1">
+                    App:{' '}
+                    {String(iosDiagApp?.name ?? '') || '—'} · v{String(iosDiagApp?.version ?? '') || '—'} ({String(iosDiagApp?.build ?? '') || '—'})
+                  </div>
+                  <div className="text-[11px] text-neutral-500 mt-1">
+                    iOS:{' '}
+                    {String(iosDiagDevice?.osVersion ?? '') || '—'} · Model: {String(iosDiagDevice?.model ?? '') || '—'}
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3">
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Permissões</div>
+                  <div className="text-[11px] text-neutral-300 mt-1">
+                    Notificações: {String(iosDiagNotif?.status ?? '') || 'unknown'}
+                  </div>
+                  <div className="text-[11px] text-neutral-300 mt-1">
+                    Push: {String(iosDiagPush?.receive ?? '') || 'unknown'}
+                  </div>
+                  <div className="text-[11px] text-neutral-300 mt-1">
+                    Biometria:{' '}
+                    {Boolean(iosDiagBiom?.available) ? String(iosDiagBiom?.biometryType || 'ok') : 'não'}
+                  </div>
+                  <div className="text-[11px] text-neutral-300 mt-1">
+                    HealthKit: {Boolean(iosDiagObj?.healthKitAvailable) ? 'disponível' : 'não'}
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3">
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Plugins</div>
+                  <div className="text-[11px] text-neutral-400 mt-1 break-words">
+                    {iosDiagPlugins.length
+                      ? iosDiagPlugins.slice(0, 18).map((v) => String(v || '').trim()).filter(Boolean).join(', ')
+                      : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await triggerHaptic('success')
+                      alert('Ok', 'Haptic')
+                    } catch {
+                      alert('Falhou', 'Haptic')
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-yellow-500 text-black font-black"
+                >
+                  Testar Haptic
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await authenticateWithBiometrics('Confirmar Face ID / Touch ID')
+                      alert(res?.success ? 'Ok' : String(res?.error || 'Falhou'), 'Biometria')
+                    } catch {
+                      alert('Falhou', 'Biometria')
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black"
+                >
+                  Testar Biometria
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await requestHealthKitPermission()
+                      alert(res?.granted ? 'Permissão ok' : String(res?.error || 'Negado'), 'HealthKit')
+                    } catch {
+                      alert('Falhou', 'HealthKit')
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black"
+                >
+                  Pedir HealthKit
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const pushMod = require('@capacitor/push-notifications')
+                      const PushNotifications = pushMod?.PushNotifications
+                      if (!PushNotifications) {
+                        alert('Plugin indisponível', 'Push')
+                        return
+                      }
+                      const res = await PushNotifications.requestPermissions().catch(() => ({ receive: 'denied' }))
+                      alert(String(res?.receive || 'unknown'), 'Push')
+                    } catch {
+                      alert('Falhou', 'Push')
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black"
+                >
+                  Pedir Push
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const id = iosLiveTestId || `diagnostic-${Date.now()}`
+                      await startRestLiveActivity(id, 60, 'Diagnóstico')
+                      setIosLiveTestId(id)
+                      alert('Iniciada (60s)', 'Live Activity')
+                    } catch {
+                      alert('Falhou', 'Live Activity')
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black"
+                >
+                  Testar Live Activity
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!iosLiveTestId}
+                  onClick={async () => {
+                    try {
+                      if (!iosLiveTestId) return
+                      await endRestLiveActivity(iosLiveTestId)
+                      setIosLiveTestId('')
+                      alert('Encerrada', 'Live Activity')
+                    } catch {
+                      alert('Falhou', 'Live Activity')
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60"
+                >
+                  Encerrar Live Activity
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
             <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Privacidade</div>

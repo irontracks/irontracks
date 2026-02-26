@@ -78,6 +78,9 @@ import { usePresencePing } from '@/hooks/usePresencePing'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
+import { useNativeDeepLinks } from '@/hooks/useNativeDeepLinks'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
+import { onNativeNotificationAction } from '@/utils/native/irontracksNative'
 import { isIosNative } from '@/utils/platform'
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
@@ -190,6 +193,35 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleStartTimer,
         handleCloseTimer,
     } = useActiveSession({ userId: user?.id })
+
+    useNativeDeepLinks()
+    usePushNotifications(user?.id)
+
+    useEffect(() => {
+        const off = onNativeNotificationAction((actionId) => {
+            if (!actionId) return
+            if (actionId === 'SKIP_REST') {
+                handleCloseTimer()
+                return
+            }
+            if (actionId === 'ADD_30S') {
+                setActiveSession((prev) => {
+                    if (!prev) return prev
+                    const base = prev as unknown as Record<string, unknown>
+                    const ctx = isRecord(base.timerContext) ? (base.timerContext as Record<string, unknown>) : null
+                    const kind = String(ctx?.kind || '').trim()
+                    const t = Number(base.timerTargetTime)
+                    if (kind !== 'rest' || !Number.isFinite(t) || t <= 0) return prev
+                    return { ...base, timerTargetTime: t + 30_000 } as unknown as ActiveWorkoutSession
+                })
+            }
+        })
+        return () => {
+            try {
+                off()
+            } catch { }
+        }
+    }, [handleCloseTimer, setActiveSession])
 
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [isCoach, setIsCoach] = useState(false);
@@ -919,6 +951,48 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (hideVipOnIos) return;
         setView('vip');
     }, [hideVipOnIos]);
+
+    const handleStartFromRestTimer = useCallback(
+        (ctx?: unknown) => {
+            const nowMs = Date.now()
+            const ctxObj = isRecord(ctx) ? (ctx as Record<string, unknown>) : null
+            const prevKey = ctxObj ? String(ctxObj.key ?? '').trim() : ''
+            const nextKey = ctxObj ? String(ctxObj.nextKey ?? '').trim() : ''
+            const restStartedRaw = ctxObj ? ctxObj.restStartedAtMs : null
+            const restStartedAtMs = typeof restStartedRaw === 'number' ? restStartedRaw : Number(String(restStartedRaw ?? '').trim())
+
+            if (prevKey) {
+                const logsObj = isRecord(activeSession?.logs) ? (activeSession?.logs as Record<string, unknown>) : {}
+                const prevLog = logsObj[prevKey]
+                const prevLogObj = isRecord(prevLog) ? (prevLog as Record<string, unknown>) : {}
+                const completedRaw = prevLogObj.completedAtMs
+                const completedAtMs = typeof completedRaw === 'number' ? completedRaw : Number(String(completedRaw ?? '').trim())
+                const base = restStartedAtMs > 0 ? restStartedAtMs : completedAtMs > 0 ? completedAtMs : 0
+                const restSeconds = base > 0 ? Math.max(0, Math.round((nowMs - base) / 1000)) : null
+                if (restSeconds != null) {
+                    handleUpdateSessionLog(prevKey, { ...prevLogObj, restSeconds })
+                }
+            }
+
+            if (nextKey) {
+                const logsObj = isRecord(activeSession?.logs) ? (activeSession?.logs as Record<string, unknown>) : {}
+                const nextLog = logsObj[nextKey]
+                const nextLogObj = isRecord(nextLog) ? (nextLog as Record<string, unknown>) : {}
+                if (!Boolean(nextLogObj.done)) {
+                    handleUpdateSessionLog(nextKey, { ...nextLogObj, startedAtMs: nowMs })
+                    setActiveSession((prev) => {
+                        if (!prev) return prev
+                        const base = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}
+                        const ui = isRecord(base.ui) ? (base.ui as Record<string, unknown>) : {}
+                        return { ...(prev as Record<string, unknown>), ui: { ...ui, activeExecution: { key: nextKey, startedAtMs: nowMs } } } as unknown as ActiveWorkoutSession
+                    })
+                }
+            }
+
+            handleCloseTimer()
+        },
+        [activeSession?.logs, handleCloseTimer, handleUpdateSessionLog, setActiveSession]
+    )
 
     if (authLoading) return <LoadingScreen />;
     if (!user?.id) return <LoadingScreen />;
@@ -1661,6 +1735,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             settings={userSettingsApi?.settings ?? null}
                             onClose={handleCloseTimer}
                             onFinish={handleCloseTimer}
+                            onStart={handleStartFromRestTimer}
                         />
                     )}
 

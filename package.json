@@ -27,8 +27,11 @@
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
     "@capacitor/cli": "^8.0.2",
+    "@capacitor/app": "^8.0.0",
     "@capacitor/core": "^8.0.2",
+    "@capacitor/device": "^8.0.0",
     "@capacitor/ios": "^8.0.2",
+    "@capacitor/push-notifications": "^8.0.0",
     "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-primitive": "^2.1.4",
     "@radix-ui/react-use-callback-ref": "^1.1.1",
