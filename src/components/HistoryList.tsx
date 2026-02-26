@@ -13,6 +13,7 @@ import { adminFetchJson } from '@/utils/admin/adminFetch';
 import { PeriodStats } from '@/types/workout';
 import { z } from 'zod';
 import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
 const REPORT_DAYS_WEEK = 7;
@@ -1263,16 +1264,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                         </div>
                     )}
 
-                    {loading && (
-                        <div className="grid gap-3">
-                            {Array.from({ length: 4 }).map((_, idx) => (
-                                <div key={idx} className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 animate-pulse">
-                                    <div className="h-4 bg-neutral-800 rounded w-2/3" />
-                                    <div className="mt-3 h-3 bg-neutral-800 rounded w-1/2" />
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                    {loading && <SkeletonList count={4} />}
 
                     {!loading && historyItems.length === 0 && (
                         <div className="text-center py-10 border border-neutral-800 bg-neutral-900 rounded-2xl">

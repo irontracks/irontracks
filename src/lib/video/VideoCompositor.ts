@@ -168,6 +168,21 @@ export class VideoCompositor {
 
         if (!this.canvas || !this.ctx) throw new Error('Canvas context not initialized');
 
+        // GESTURE-DEPENDENT SETUP MUST BE SYNCHRONOUS AT THE TOP OF THE FUNCTION
+        const originalMuted = videoElement.muted;
+        const originalCurrentTime = videoElement.currentTime;
+        const originalVolume = videoElement.volume;
+        const originalLoop = videoElement.loop;
+
+        // "Bless" the video element for unmuted playback and WebAudioContext resuming
+        videoElement.muted = false;
+        videoElement.volume = 1.0;
+        videoElement.loop = false;
+        const initialPlayPromise = videoElement.play();
+        if (initialPlayPromise !== undefined) {
+            initialPlayPromise.catch(() => { }); // Ignore potential error initially
+        }
+
         this.canvas.width = outputWidth;
         this.canvas.height = outputHeight;
 
@@ -175,6 +190,9 @@ export class VideoCompositor {
         const AudioCtxCtor = w.AudioContext || w.webkitAudioContext
         if (!AudioCtxCtor) throw new Error('AudioContext not available')
         this.audioCtx = new AudioCtxCtor();
+        if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
         this.destNode = this.audioCtx.createMediaStreamDestination();
 
         try {
@@ -250,14 +268,7 @@ export class VideoCompositor {
             this.recorder.onerror = (e) => reject(e);
         });
 
-        const originalMuted = videoElement.muted;
-        const originalCurrentTime = videoElement.currentTime;
-        const originalVolume = videoElement.volume;
-        const originalLoop = videoElement.loop;
-
-        videoElement.muted = false;
-        videoElement.volume = 1.0;
-        videoElement.loop = false;
+        // Now we can set the time and wait for it to be ready
         videoElement.currentTime = trimRange[0];
 
         await new Promise<void>(resolve => {
@@ -307,13 +318,17 @@ export class VideoCompositor {
 
         const duration = trimRange[1] - trimRange[0];
 
-        // Watchdog to ensure we don't hang if requestVideoFrameCallback stops firing
+        // Watchdog to ensure we don't hang if requestVideoFrameCallback stops firing or if video freezes
         this.lastFrameTime = Date.now();
         this.watchdogTimer = setInterval(() => {
             if (this.isCancelled) return;
             const now = Date.now();
             if (now - this.lastFrameTime > 2000) {
                 logWarn('warn', 'Watchdog detectou que processFrame travou. Forçando próximo frame.');
+                if (videoElement.paused) {
+                    // Manually simulate time passing if the video is completely blocked
+                    videoElement.currentTime += 0.05;
+                }
                 processFrame();
             }
         }, 1000) as unknown as number;

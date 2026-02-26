@@ -1,3 +1,5 @@
+import { escapeHtml } from '@/utils/escapeHtml'
+
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 const formatDate = (ts: unknown): string => {
@@ -31,19 +33,6 @@ const formatDuration = (s: unknown): string => {
   const mins = Math.floor(safe / 60)
   const secs = Math.floor(safe % 60)
   return `${mins}:${secs < 10 ? '0' : ''}${secs}`
-}
-
-const escapeHtml = (v: unknown): string => {
-  try {
-    return String(v ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;')
-  } catch {
-    return ''
-  }
 }
 
 const normalizeExerciseKey = (v: unknown): string => {

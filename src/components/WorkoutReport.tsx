@@ -14,6 +14,7 @@ import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { escapeHtml } from '@/utils/escapeHtml'
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
 import { ReportMetricsPanel } from '@/components/workout-report/ReportMetricsPanel'
 import { MuscleTrendPanel } from '@/components/workout-report/MuscleTrendPanel'
@@ -61,18 +62,6 @@ const normalizeExerciseKey = (v: unknown): string => {
     }
 };
 
-const escapeHtml = (value: unknown): string => {
-    try {
-        return String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    } catch {
-        return '';
-    }
-};
 
 const remapPrevLogsByCanonical = (prevLogsByExercise: unknown, canonicalMap: unknown): Record<string, unknown> => {
     try {

@@ -100,15 +100,32 @@ const computeWorkoutStreak = (dateRows: unknown[]) => {
   return streak
 }
 
+const LogEntrySchema = z
+  .object({
+    done: z.boolean().optional(),
+    weight: z.union([z.string(), z.number()]).optional(),
+    reps: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough()
+
+const ExerciseSchema = z
+  .object({
+    name: z.string().optional(),
+    sets: z.union([z.string(), z.number()]).optional(),
+    setDetails: z.array(z.record(z.unknown())).optional(),
+    set_details: z.array(z.record(z.unknown())).optional(),
+  })
+  .passthrough()
+
 const SessionSchema = z
   .object({
-    workoutTitle: z.unknown().optional(),
-    workout_title: z.unknown().optional(),
-    date: z.unknown().optional(),
-    exercises: z.array(z.unknown()).optional(),
-    logs: z.record(z.unknown()).optional(),
-    idempotencyKey: z.unknown().optional(),
-    finishIdempotencyKey: z.unknown().optional(),
+    workoutTitle: z.string().optional(),
+    workout_title: z.string().optional(),
+    date: z.string().optional(),
+    exercises: z.array(ExerciseSchema).optional(),
+    logs: z.record(LogEntrySchema).optional(),
+    idempotencyKey: z.string().optional(),
+    finishIdempotencyKey: z.string().optional(),
   })
   .passthrough()
 

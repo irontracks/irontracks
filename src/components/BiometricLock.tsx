@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import { isIosNative } from '@/utils/platform'
 import { authenticateWithBiometrics, checkBiometricsAvailable } from '@/utils/native/irontracksNative'
 
@@ -88,11 +89,12 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
     <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-neutral-950 gap-8 px-6">
       {/* Logo / App Name */}
       <div className="flex flex-col items-center gap-3 mb-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src="/icone.png"
           alt="IronTracks"
-          className="w-20 h-20 rounded-2xl shadow-lg"
+          width={80}
+          height={80}
+          className="rounded-2xl shadow-lg"
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
         />
         <h1 className="text-2xl font-black text-white tracking-tight">IronTracks</h1>

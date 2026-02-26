@@ -18,7 +18,6 @@ export function createClient() {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'irontracks.auth.v1',
     },
   })
 }

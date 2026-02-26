@@ -48,6 +48,8 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { escapeHtml } from '@/utils/escapeHtml'
+import { useDebounce } from '@/hooks/useDebounce'
 import { useAdminPanelController } from '@/components/admin-panel/useAdminPanelController';
 import { AdminPanelProvider } from '@/components/admin-panel/AdminPanelContext';
 import { DashboardTab } from '@/components/admin-panel/DashboardTab';
@@ -240,18 +242,6 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         return 0;
     };
 
-    const escapeHtml = (value: unknown): string => {
-        try {
-            return String(value ?? '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        } catch {
-            return '';
-        }
-    };
 
     const router = useRouter();
     const executionVideoEnabled = (() => {
@@ -279,10 +269,11 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     }, [moreTabsOpen, setMoreTabsOpen]);
 
     const normalizeText = useCallback((value: unknown) => String(value || '').toLowerCase(), []);
+    const debouncedErrorsQuery = useDebounce(errorsQuery, 300);
 
     const errorsFiltered = useMemo<UnknownRecord[]>(() => {
         const list = Array.isArray(errorReports) ? errorReports : [];
-        const q = normalizeText(errorsQuery).trim();
+        const q = normalizeText(debouncedErrorsQuery).trim();
         return list
             .filter((r) => {
                 if (!errorsStatusFilter || errorsStatusFilter === 'all') return true;
@@ -295,7 +286,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                 const path = normalizeText(r?.pathname || '');
                 return msg.includes(q) || email.includes(q) || path.includes(q);
             });
-    }, [errorReports, errorsQuery, errorsStatusFilter, normalizeText]);
+    }, [errorReports, debouncedErrorsQuery, errorsStatusFilter, normalizeText]);
 
     // coachInboxItems — from ctrl (useAdminPanelController)
 
