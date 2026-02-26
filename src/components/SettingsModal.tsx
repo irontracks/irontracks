@@ -75,6 +75,8 @@ export default function SettingsModal(props: SettingsModalProps) {
   const restTimerVibrate = Boolean(draft?.restTimerVibrate ?? true)
   const restTimerRepeatAlarm = Boolean(draft?.restTimerRepeatAlarm ?? true)
   const restTimerRepeatIntervalMs = Math.max(600, Math.min(6000, Number(draft?.restTimerRepeatIntervalMs ?? 1500) || 1500))
+  const restTimerRepeatMaxSeconds = Math.max(10, Math.min(900, Number(draft?.restTimerRepeatMaxSeconds ?? 180) || 180))
+  const restTimerRepeatMaxCount = Math.max(1, Math.min(120, Number(draft?.restTimerRepeatMaxCount ?? 60) || 60))
   const restTimerTickCountdown = Boolean(draft?.restTimerTickCountdown ?? true)
   const restTimerDefaultSeconds = Math.max(15, Math.min(600, Number(draft?.restTimerDefaultSeconds ?? 90) || 90))
   const autoRestTimerWhenMissing = Boolean(draft?.autoRestTimerWhenMissing ?? false)
@@ -1090,6 +1092,38 @@ export default function SettingsModal(props: SettingsModalProps) {
                 >
                   {[1000, 1500, 2000, 2500, 3000].map((v) => (
                     <option key={v} value={String(v)}>{(v / 1000).toFixed(1)}s</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Duração do alarme</div>
+                  <div className="text-xs text-neutral-400">Tempo total tocando até abrir o app.</div>
+                </div>
+                <select
+                  value={String(restTimerRepeatMaxSeconds)}
+                  onChange={(e) => setValue('restTimerRepeatMaxSeconds', Number(e.target.value))}
+                  className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  {[30, 60, 90, 120, 180, 240, 300, 420, 600].map((v) => (
+                    <option key={v} value={String(v)}>{v}s</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Quantidade máxima</div>
+                  <div className="text-xs text-neutral-400">Limite de repetições do aviso.</div>
+                </div>
+                <select
+                  value={String(restTimerRepeatMaxCount)}
+                  onChange={(e) => setValue('restTimerRepeatMaxCount', Number(e.target.value))}
+                  className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                >
+                  {[3, 5, 10, 15, 20, 30, 45, 60, 90, 120].map((v) => (
+                    <option key={v} value={String(v)}>{v}x</option>
                   ))}
                 </select>
               </div>
