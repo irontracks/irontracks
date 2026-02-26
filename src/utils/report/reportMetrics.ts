@@ -58,6 +58,25 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
   return { volumeKg: Math.round(volume * 10) / 10, sets, reps, avgWeight }
 }
 
+const buildLogTimes = (logs: UnknownRecord, exerciseIndex: number) => {
+  let executionSeconds = 0
+  let restSeconds = 0
+  Object.entries(logs).forEach(([key, value]) => {
+    const parts = String(key || '').split('-')
+    const eIdx = Number(parts[0])
+    if (!Number.isFinite(eIdx) || eIdx !== exerciseIndex) return
+    if (!isObject(value)) return
+    const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
+    const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
+    if (!done) return
+    const exec = toNumber((value as UnknownRecord).executionSeconds ?? (value as UnknownRecord).execution_seconds)
+    const rest = toNumber((value as UnknownRecord).restSeconds ?? (value as UnknownRecord).rest_seconds)
+    if (exec > 0) executionSeconds += Math.round(exec)
+    if (rest > 0) restSeconds += Math.round(rest)
+  })
+  return { executionSeconds, restSeconds }
+}
+
 const buildPrevByExercise = (prevSession: UnknownRecord) => {
   const exercises = Array.isArray(prevSession.exercises) ? (prevSession.exercises as unknown[]) : []
   const logs = isObject(prevSession.logs) ? (prevSession.logs as UnknownRecord) : {}
@@ -145,6 +164,8 @@ export type ReportExerciseMetrics = {
   name: string
   order: number
   restTimePlannedSec: number | null
+  executionMinutes?: number
+  restMinutes?: number
   setsPlanned: number
   repsPlanned: string | null
   volumeKg: number
@@ -166,7 +187,10 @@ export type ReportMetrics = {
     repsDone: number
     exercisesCount: number
     durationMinutes: number
+    executionMinutes?: number
+    restMinutes?: number
     densityKgPerMin: number
+    densityKgPerMinExec?: number
   }
   rest: {
     avgPlannedRestSec: number | null
@@ -197,6 +221,9 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
     const plannedSets = resolvePlannedSets(raw)
     const plannedReps = resolvePlannedReps(raw)
     const logVolume = buildLogVolume(logs, index)
+    const logTimes = buildLogTimes(logs, index)
+    const executionMinutes = logTimes.executionSeconds > 0 ? Math.round((logTimes.executionSeconds / 60) * 10) / 10 : null
+    const restMinutes = logTimes.restSeconds > 0 ? Math.round((logTimes.restSeconds / 60) * 10) / 10 : null
     exerciseOrder.push(name)
     if (rest != null) {
       restSum += rest
@@ -216,6 +243,8 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       name,
       order: index + 1,
       restTimePlannedSec: rest,
+      executionMinutes: executionMinutes != null && executionMinutes > 0 ? executionMinutes : undefined,
+      restMinutes: restMinutes != null && restMinutes > 0 ? restMinutes : undefined,
       setsPlanned: plannedSets,
       repsPlanned: plannedReps,
       volumeKg: logVolume.volumeKg,
@@ -323,12 +352,20 @@ export const applyDurationToReport = (report: ReportMetrics, session: UnknownRec
   const rawSeconds = toNumber(session.totalTime ?? session.realTotalTime ?? session.elapsedSeconds ?? 0)
   const minutes = rawSeconds > 0 ? Math.round((rawSeconds / 60) * 10) / 10 : 0
   const density = minutes > 0 ? Math.round((report.totals.volumeKg / minutes) * 10) / 10 : 0
+  const execSeconds = toNumber(session.executionTotalSeconds ?? session.execution_total_seconds ?? 0)
+  const restSeconds = toNumber(session.restTotalSeconds ?? session.rest_total_seconds ?? 0)
+  const executionMinutes = execSeconds > 0 ? Math.round((execSeconds / 60) * 10) / 10 : 0
+  const restMinutes = restSeconds > 0 ? Math.round((restSeconds / 60) * 10) / 10 : 0
+  const densityExec = executionMinutes > 0 ? Math.round((report.totals.volumeKg / executionMinutes) * 10) / 10 : 0
   return {
     ...report,
     totals: {
       ...report.totals,
       durationMinutes: minutes,
+      executionMinutes: executionMinutes > 0 ? executionMinutes : undefined,
+      restMinutes: restMinutes > 0 ? restMinutes : undefined,
       densityKgPerMin: density,
+      densityKgPerMinExec: densityExec > 0 ? densityExec : undefined,
     },
   }
 }

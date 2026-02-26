@@ -357,6 +357,8 @@ export function buildReportData(
       endAt: null as string | null,
       totalTimeSeconds,
       realTimeSeconds: realTotalTimeSeconds,
+      executionTotalSeconds: Number(sessionObj?.executionTotalSeconds ?? sessionObj?.execution_total_seconds ?? 0) || 0,
+      restTotalSeconds: Number(sessionObj?.restTotalSeconds ?? sessionObj?.rest_total_seconds ?? 0) || 0,
       status: 'completed',
       isTeamSession: false,
       notes: null as string | null,
@@ -595,6 +597,53 @@ export function buildReportHTML(
   const logoUrl = String(reportData?.brand?.logoUrl || '')
   const safeLogoUrl = /^https?:\/\//i.test(logoUrl) ? escapeHtml(logoUrl) : ''
   const aiSectionHtml = buildAiSection()
+  const detailByExerciseHtml = (() => {
+    const sessionObj = isRecord(session) ? (session as Record<string, unknown>) : {}
+    const reportMeta = isRecord(sessionObj.reportMeta) ? (sessionObj.reportMeta as Record<string, unknown>) : null
+    const list = reportMeta && Array.isArray(reportMeta.exercises) ? (reportMeta.exercises as unknown[]) : []
+    if (!list.length) return ''
+    const rows = list
+      .map((raw, idx) => {
+        const ex = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
+        if (!ex) return ''
+        const order = Number(ex.order || idx + 1)
+        const name = escapeHtml(String(ex.name || '').trim() || '—')
+        const execMin = Number(ex.executionMinutes || 0)
+        const restMin = Number(ex.restMinutes || 0)
+        const restPlan = Number(ex.restTimePlannedSec || 0)
+        return `
+          <tr style="border-bottom:1px solid #262626">
+            <td style="padding:10px 12px; font-family: ui-monospace; color:#a3a3a3">${Number.isFinite(order) ? order : idx + 1}</td>
+            <td style="padding:10px 12px; font-weight:900; color:#f5f5f5">${name}</td>
+            <td style="padding:10px 12px; text-align:center; font-family: ui-monospace; color:#e5e7eb">${Number.isFinite(execMin) && execMin > 0 ? `${execMin.toFixed(1)} min` : '—'}</td>
+            <td style="padding:10px 12px; text-align:center; font-family: ui-monospace; color:#e5e7eb">${Number.isFinite(restMin) && restMin > 0 ? `${restMin.toFixed(1)} min` : '—'}</td>
+            <td style="padding:10px 12px; text-align:center; font-family: ui-monospace; color:#a3a3a3">${Number.isFinite(restPlan) && restPlan > 0 ? `${Math.round(restPlan)}s` : '—'}</td>
+          </tr>
+        `
+      })
+      .filter(Boolean)
+      .join('')
+    if (!rows) return ''
+    return `
+      <div style="margin: 12px 0 24px">
+        <div class="muted" style="margin-bottom:8px">Detalhe por exercício</div>
+        <div class="card" style="padding:0; overflow:hidden">
+          <table style="width:100%; border-collapse:collapse; font-size:13px">
+            <thead>
+              <tr style="background:#0b0b0c; color:#a3a3a3; text-transform:uppercase; letter-spacing:.12em; font-size:10px">
+                <th style="padding:10px 12px; text-align:left; width:44px">#</th>
+                <th style="padding:10px 12px; text-align:left">Exercício</th>
+                <th style="padding:10px 12px; text-align:center; width:110px">Execução</th>
+                <th style="padding:10px 12px; text-align:center; width:130px">Descanso real</th>
+                <th style="padding:10px 12px; text-align:center; width:120px">Descanso plan</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>
+    `
+  })()
   const workoutTitleSafe = escapeHtml(reportData?.session?.workoutTitle || 'Treino')
   const studentNameSafe = escapeHtml(reportData?.athlete?.name || '')
 
@@ -705,6 +754,18 @@ export function buildReportHTML(
             <div class="muted" style="margin-bottom:4px">Tempo Real</div>
             <div class="value">${formatDuration(reportData?.session?.realTimeSeconds || 0)}</div>
           </div>
+          ${Number(reportData?.session?.executionTotalSeconds || 0) > 0
+            ? `<div class="card">
+            <div class="muted" style="margin-bottom:4px">Execução</div>
+            <div class="value">${formatDuration(Number(reportData?.session?.executionTotalSeconds || 0))}</div>
+          </div>`
+            : ''}
+          ${Number(reportData?.session?.restTotalSeconds || 0) > 0
+            ? `<div class="card">
+            <div class="muted" style="margin-bottom:4px">Descanso</div>
+            <div class="value">${formatDuration(Number(reportData?.session?.restTotalSeconds || 0))}</div>
+          </div>`
+            : ''}
           <div class="card">
             <div class="muted" style="margin-bottom:4px">Séries</div>
             <div class="value-row">
@@ -742,6 +803,8 @@ export function buildReportHTML(
         ${buildBikeCards()}
 
         ${aiSectionHtml}
+
+        ${detailByExerciseHtml}
 
         ${exercisesHtml}
 

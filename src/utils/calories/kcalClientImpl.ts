@@ -39,7 +39,9 @@ export const computeFallbackKcal = ({ session, volume }: { session: unknown; vol
     const outdoorBike = s.outdoorBike && typeof s.outdoorBike === 'object' ? (s.outdoorBike as UnknownRecord) : null
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    const durationMinutes = (Number(s.totalTime) || 0) / 60
+    const execSeconds = Number(s.executionTotalSeconds ?? (s as UnknownRecord).execution_total_seconds ?? 0) || 0
+    const restSeconds = Number(s.restTotalSeconds ?? (s as UnknownRecord).rest_total_seconds ?? 0) || 0
+    const durationMinutes = execSeconds + restSeconds > 0 ? (execSeconds + restSeconds) / 60 : (Number(s.totalTime) || 0) / 60
     return Math.round(volume * 0.02 + durationMinutes * 4)
   } catch {
     return 0

@@ -27,12 +27,32 @@ export const ReportMetricsPanel = ({
           <div className="text-xs text-neutral-300">Volume, densidade e diagnóstico da sessão.</div>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-6 gap-3">
         <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
           <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Duração</div>
           <div className="text-lg font-mono font-bold text-white">
             {(() => {
               const v = formatNumber(reportTotals?.durationMinutes)
+              if (v == null || v <= 0) return '—'
+              return `${v.toFixed(1)} min`
+            })()}
+          </div>
+        </div>
+        <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+          <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Execução</div>
+          <div className="text-lg font-mono font-bold text-white">
+            {(() => {
+              const v = formatNumber(reportTotals?.executionMinutes)
+              if (v == null || v <= 0) return '—'
+              return `${v.toFixed(1)} min`
+            })()}
+          </div>
+        </div>
+        <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
+          <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Descanso</div>
+          <div className="text-lg font-mono font-bold text-white">
+            {(() => {
+              const v = formatNumber(reportTotals?.restMinutes)
               if (v == null || v <= 0) return '—'
               return `${v.toFixed(1)} min`
             })()}
@@ -49,20 +69,20 @@ export const ReportMetricsPanel = ({
           </div>
         </div>
         <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
-          <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Descanso médio</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Dens. Exec</div>
           <div className="text-lg font-mono font-bold text-white">
             {(() => {
-              const v = formatNumber(reportRest?.avgPlannedRestSec)
+              const v = formatNumber(reportTotals?.densityKgPerMinExec)
               if (v == null || v <= 0) return '—'
-              return `${Math.round(v)} s`
+              return `${v.toFixed(1)} kg/min`
             })()}
           </div>
         </div>
         <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
-          <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Descanso máximo</div>
+          <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Descanso médio</div>
           <div className="text-lg font-mono font-bold text-white">
             {(() => {
-              const v = formatNumber(reportRest?.maxPlannedRestSec)
+              const v = formatNumber(reportRest?.avgPlannedRestSec)
               if (v == null || v <= 0) return '—'
               return `${Math.round(v)} s`
             })()}

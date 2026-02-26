@@ -60,7 +60,9 @@ const computeFallbackKcal = ({ session, volume }: { session: Record<string, unkn
       session?.outdoorBike && typeof session.outdoorBike === 'object' ? (session.outdoorBike as Record<string, unknown>) : null
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    const durationMinutes = (Number(session?.totalTime) || 0) / 60
+    const execSeconds = Number(session?.executionTotalSeconds ?? session?.execution_total_seconds ?? 0) || 0
+    const restSeconds = Number(session?.restTotalSeconds ?? session?.rest_total_seconds ?? 0) || 0
+    const durationMinutes = execSeconds + restSeconds > 0 ? (execSeconds + restSeconds) / 60 : (Number(session?.totalTime) || 0) / 60
     return Math.round(volume * 0.02 + durationMinutes * 4)
   } catch {
     return 0
@@ -148,7 +150,11 @@ export async function POST(request: Request) {
     const logs = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {}
     const volume = calculateTotalVolume(logs)
     const totalTimeSeconds = Number(session?.totalTime) || 0
-    const minutes = totalTimeSeconds > 0 ? totalTimeSeconds / 60 : 0
+    const execSeconds = Number(session?.executionTotalSeconds ?? session?.execution_total_seconds ?? 0) || 0
+    const restSeconds = Number(session?.restTotalSeconds ?? session?.rest_total_seconds ?? 0) || 0
+    const executionMinutes = execSeconds > 0 ? execSeconds / 60 : 0
+    const restMinutes = restSeconds > 0 ? restSeconds / 60 : 0
+    const minutes = executionMinutes + restMinutes > 0 ? executionMinutes + restMinutes : totalTimeSeconds > 0 ? totalTimeSeconds / 60 : 0
 
     const fallback = computeFallbackKcal({ session, volume })
     if (!(minutes > 0)) return NextResponse.json({ ok: true, kcal: fallback, source: 'fallback' })
@@ -170,7 +176,8 @@ export async function POST(request: Request) {
       '\n\nTREINO (JSON):\n' +
       JSON.stringify({
         title: safeString(session?.workoutTitle || session?.name || ''),
-        minutes: Math.round(minutes * 10) / 10,
+        minutes: Math.round((executionMinutes > 0 ? executionMinutes : minutes) * 10) / 10,
+        restMinutes: Math.round(restMinutes * 10) / 10,
         weightKg,
         volumeKg: Math.round(volume),
         exercises: Array.isArray(session?.exercises)
@@ -213,9 +220,11 @@ export async function POST(request: Request) {
 
     if (!met) return NextResponse.json({ ok: true, kcal: fallback, source: 'fallback' })
 
-    const hours = minutes / 60
-    const kcalMin = Math.round(met.metMin * weightKg * hours)
-    const kcalMax = Math.round(met.metMax * weightKg * hours)
+    const metRest = 1.5
+    const execHours = (executionMinutes > 0 ? executionMinutes : minutes) / 60
+    const restHours = restMinutes / 60
+    const kcalMin = Math.round(met.metMin * weightKg * execHours + metRest * weightKg * restHours)
+    const kcalMax = Math.round(met.metMax * weightKg * execHours + metRest * weightKg * restHours)
     const kcal = Math.round((kcalMin + kcalMax) / 2)
 
     const safeKcalMin = Math.max(0, kcalMin)

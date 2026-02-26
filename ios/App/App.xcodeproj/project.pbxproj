@@ -521,10 +521,12 @@
 /* Begin XCSwiftPackageProductDependency section */
 		9AC44B8D2F4E1487005050C6 /* CapApp-SPM */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = 9AC44B8C2F4E1487005050C6 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
 		};
 		B10000000000000000000062 /* IronTracksLiveActivityShared */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = B10000000000000000000061 /* XCLocalSwiftPackageReference "IronTracksLiveActivityShared" */;
 			productName = "IronTracksLiveActivityShared";
 		};
 /* End XCSwiftPackageProductDependency section */

@@ -20,5 +20,7 @@
 	<array>
 		<string>group.com.irontracks.app</string>
 	</array>
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

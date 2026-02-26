@@ -6,6 +6,7 @@ import { isIosNative } from '@/utils/platform'
 type IronTracksNativePlugin = {
   // Screen
   setIdleTimerDisabled: (opts: { enabled: boolean }) => Promise<void>
+  openAppSettings: () => Promise<{ ok: boolean }>
   // Notifications
   requestNotificationPermission: () => Promise<{ granted: boolean }>
   checkNotificationPermission: () => Promise<{ status: string }>
@@ -74,6 +75,15 @@ export const setIdleTimerDisabled = async (enabled: boolean) => {
   } catch {}
 }
 
+export const openAppSettings = async () => {
+  try {
+    if (!isIosNative()) return { ok: false }
+    return await Native.openAppSettings()
+  } catch {
+    return { ok: false }
+  }
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export const requestNativeNotifications = async () => {
@@ -99,6 +109,37 @@ export const setupNativeNotificationActions = async () => {
     if (!isIosNative()) return
     await Native.setupNotificationActions()
   } catch {}
+}
+
+export const onNativeNotificationAction = (handler: (actionId: string) => void) => {
+  if (!isIosNative()) return () => {}
+  type ListenerHandle = { remove: () => void }
+  type MaybePromise<T> = T | Promise<T>
+  const isPromise = (v: unknown): v is Promise<ListenerHandle> => {
+    if (!v || typeof v !== 'object') return false
+    const then = (v as { then?: unknown }).then
+    return typeof then === 'function'
+  }
+  const plugin = Native as unknown as {
+    addListener?: (name: string, cb: (data: unknown) => void) => MaybePromise<ListenerHandle>
+  }
+  const listener = plugin.addListener?.('notificationAction', (payload: unknown) => {
+    try {
+      const obj = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+      const actionId = String(obj.actionId ?? '').trim()
+      if (actionId) handler(actionId)
+    } catch {}
+  })
+  return () => {
+    try {
+      if (!listener) return
+      if (isPromise(listener)) {
+        listener.then((x) => x?.remove?.()).catch(() => {})
+      } else {
+        listener.remove()
+      }
+    } catch {}
+  }
 }
 
 export const scheduleRestNotification = async (id: string, seconds: number, title?: string, body?: string) => {
