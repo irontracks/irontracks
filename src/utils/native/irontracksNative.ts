@@ -19,6 +19,8 @@ type IronTracksNativePlugin = {
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
   // Generic app notification
   scheduleAppNotification: (opts: { id?: string; title: string; body: string; delaySeconds?: number }) => Promise<{ id: string }>
+  // Alarm sound
+  stopAlarmSound: () => Promise<void>
   // Haptics
   triggerHaptic: (opts: { style: HapticStyle }) => Promise<void>
   // Biometrics
@@ -56,6 +58,7 @@ const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
     updateRestLiveActivity: async () => {},
     endRestLiveActivity: async () => {},
     scheduleAppNotification: async () => ({ id: '' }),
+    stopAlarmSound: async () => {},
     triggerHaptic: async () => {},
     checkBiometricsAvailable: async () => ({ available: false, biometryType: 'none' as const }),
     authenticateWithBiometrics: async () => ({ success: false, error: 'Not available on web' }),
@@ -224,6 +227,15 @@ export const scheduleAppNotification = async (opts: {
   } catch {
     return null
   }
+}
+
+// ─── Alarm Sound ─────────────────────────────────────────────────────────────
+
+export const stopAlarmSound = async () => {
+  try {
+    if (!isIosNative()) return
+    await Native.stopAlarmSound()
+  } catch {}
 }
 
 // ─── Haptics ──────────────────────────────────────────────────────────────────

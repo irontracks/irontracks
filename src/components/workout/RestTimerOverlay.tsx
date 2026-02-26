@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isIosNative } from '@/utils/platform';
-import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
+import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
 
 interface RestTimerContext {
     kind?: string;
@@ -90,6 +90,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         if (cancelNative && notifyIdRef.current) {
             cancelRestNotification(notifyIdRef.current);
         }
+        // Stop native background alarm sound
+        stopAlarmSound();
     };
 
     useEffect(() => {
