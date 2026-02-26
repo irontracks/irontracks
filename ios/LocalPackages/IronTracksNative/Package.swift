@@ -10,7 +10,7 @@ let package = Package(
             targets: ["IronTracksNative"])
     ],
     dependencies: [
-        .package(path: "../capacitor-swift-pm"),
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", "7.0.0"..<"9.0.0"),
         .package(path: "../IronTracksLiveActivityShared")
     ],
     targets: [

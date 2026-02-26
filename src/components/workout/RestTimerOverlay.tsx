@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
-import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity } from '@/utils/native/irontracksNative';
+import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
 
 interface RestTimerContext {
     kind?: string;
@@ -36,6 +36,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const [isFinished, setIsFinished] = useState(false);
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
+    const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const vibrateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const alarmActiveRef = useRef(false);
     const safeSettings = settings && typeof settings === 'object' ? settings : null;
     const soundsEnabled = safeSettings ? safeSettings.enableSounds !== false : true;
     const soundVolume = (() => {
@@ -57,6 +60,21 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         const mins = Math.floor(s / 60);
         const secs = Math.floor(s % 60);
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    };
+
+    const stopAlarm = (cancelNative: boolean) => {
+        alarmActiveRef.current = false;
+        if (soundIntervalRef.current) {
+            clearInterval(soundIntervalRef.current);
+            soundIntervalRef.current = null;
+        }
+        if (vibrateIntervalRef.current) {
+            clearInterval(vibrateIntervalRef.current);
+            vibrateIntervalRef.current = null;
+        }
+        if (cancelNative && notifyIdRef.current) {
+            cancelRestNotification(notifyIdRef.current);
+        }
     };
 
     useEffect(() => {
@@ -82,26 +100,28 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }, [allowTickCountdown, context?.kind, isFinished, soundVolume, soundsEnabled, timeLeft]);
 
     useEffect(() => {
-        let soundInterval: NodeJS.Timeout | undefined;
-        let vibrateInterval: NodeJS.Timeout | undefined;
-
         if (isFinished) {
+            alarmActiveRef.current = true;
             if (soundsEnabled) {
                 playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
                 if (repeatAlarm) {
-                    soundInterval = setInterval(() => {
+                    if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+                    soundIntervalRef.current = setInterval(() => {
+                        if (!alarmActiveRef.current) return;
                         playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
                     }, repeatIntervalMs);
                 }
             }
 
             try {
-                if (allowVibrate && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-                    navigator.vibrate([220, 90, 220]);
+                if (allowVibrate) {
+                    triggerHaptic('success');
                     if (repeatAlarm) {
-                        vibrateInterval = setInterval(() => {
+                        if (vibrateIntervalRef.current) clearInterval(vibrateIntervalRef.current);
+                        vibrateIntervalRef.current = setInterval(() => {
+                            if (!alarmActiveRef.current) return;
                             try {
-                                navigator.vibrate([220, 90, 220]);
+                                triggerHaptic('warning');
                             } catch { }
                         }, repeatIntervalMs);
                     }
@@ -110,10 +130,38 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         }
 
         return () => {
-            if (soundInterval) clearInterval(soundInterval);
-            if (vibrateInterval) clearInterval(vibrateInterval);
+            if (!isFinished) return;
+            stopAlarm(false);
         };
     }, [allowVibrate, isFinished, repeatAlarm, repeatIntervalMs, soundVolume, soundsEnabled]);
+
+    useEffect(() => {
+        if (!isFinished) return;
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') {
+                stopAlarm(true);
+            }
+        };
+        document.addEventListener('visibilitychange', onVisible);
+        let handle: { remove: () => void } | null = null;
+        try {
+            const appMod = require('@capacitor/app');
+            const App = appMod?.App;
+            if (App?.addListener) {
+                App.addListener('appStateChange', (state: { isActive?: boolean }) => {
+                    if (state?.isActive) stopAlarm(true);
+                }).then((h: { remove: () => void }) => {
+                    handle = h;
+                }).catch(() => {});
+            }
+        } catch { }
+        return () => {
+            document.removeEventListener('visibilitychange', onVisible);
+            if (handle) {
+                try { handle.remove(); } catch { }
+            }
+        };
+    }, [isFinished]);
 
     useEffect(() => {
         if (!targetTime) {
@@ -132,7 +180,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (allowNotify && seconds > 0) {
                 requestNativeNotifications().then((res) => {
                     if (!res?.granted) return;
-                    scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!');
+                    const notifyEverySeconds = Math.max(3, Math.min(30, Math.round(repeatIntervalMs / 1000) || 5));
+                    const notifyCount = repeatAlarm ? 60 : 0;
+                    scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!', notifyCount, notifyEverySeconds);
                 }).catch(() => {});
             }
             startRestLiveActivity(id, seconds, 'Descanso');
@@ -169,15 +219,17 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 cancelRestNotification(notifyIdRef.current);
                 endRestLiveActivity(notifyIdRef.current);
             }
+            stopAlarm(false);
             setIdleTimerDisabled(false);
         };
-    }, [allowNotify, targetTime, context?.exerciseId, context?.kind, context?.setId]);
+    }, [allowNotify, repeatAlarm, repeatIntervalMs, targetTime, context?.exerciseId, context?.kind, context?.setId]);
 
     useEffect(() => {
         if (!isFinished) return;
         if (notifyIdRef.current) {
             cancelRestNotification(notifyIdRef.current);
-            endRestLiveActivity(notifyIdRef.current);
+            // Update Live Activity to finished state (green "BORAAAA" + count up)
+            updateRestLiveActivity(notifyIdRef.current, true);
         }
     }, [isFinished]);
 
@@ -185,6 +237,11 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     const handleStart = () => {
         try {
+            // End the Live Activity when user starts next set
+            if (notifyIdRef.current) {
+                endRestLiveActivity(notifyIdRef.current);
+            }
+            stopAlarm(true);
             if (typeof onStart === 'function') onStart(context);
             else if (typeof onFinish === 'function') onFinish(context);
         } catch {
@@ -234,6 +291,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                         <button
                             onClick={() => {
                                 try {
+                                    stopAlarm(true);
                                     if (typeof onClose === 'function') onClose();
                                 } catch { }
                             }}

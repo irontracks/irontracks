@@ -20,7 +20,8 @@
     "deploy": "npm run lint --silent && npm run test:unit && npm run test:smoke && npm run build && git add -A && (git diff --cached --quiet && echo 'Nenhuma mudança para commitar.' || git commit -m \"deploy: $(date +%Y-%m-%d-%H%M)\") && git push origin main",
     "e2e:deload": "tsx scripts/e2e/deload.e2e.ts",
     "postversion": "git push && git push --tags",
-    "cap:sync": "npx cap sync",
+    "postinstall": "node scripts/patch-ios.mjs",
+    "cap:sync": "npx cap sync && node scripts/patch-ios.mjs",
     "cap:open": "npx cap open ios",
     "analyze": "ANALYZE=true npm run build"
   },

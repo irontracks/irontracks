@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonBody } from '@/utils/zod'
+import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
+
+const BodySchema = z.object({
+  token: z.string().min(1),
+  platform: z.string().optional(),
+  deviceId: z.string().optional(),
+}).strip()
 
 const normalizeToken = (v: unknown) => String(v ?? '').trim()
 const normalizePlatform = (v: unknown) => {
@@ -19,12 +27,14 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = (await req.json().catch((): null => null)) as Record<string, unknown> | null
-    const token = normalizeToken(body?.token)
+    const parsed = await parseJsonBody(req, BodySchema)
+    if (parsed.response) return parsed.response
+    const body = parsed.data!
+    const token = normalizeToken((body as Record<string, unknown>)?.token)
     if (!token) return NextResponse.json({ ok: false, error: 'missing_token' }, { status: 400 })
 
-    const platform = normalizePlatform(body?.platform)
-    const deviceId = normalizeToken(body?.deviceId) || null
+    const platform = normalizePlatform((body as Record<string, unknown>)?.platform)
+    const deviceId = normalizeToken((body as Record<string, unknown>)?.deviceId) || null
 
     const { error } = await supabase
       .from('device_push_tokens')
@@ -55,8 +65,10 @@ export async function DELETE(req: Request) {
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const body = (await req.json().catch((): null => null)) as Record<string, unknown> | null
-    const token = normalizeToken(body?.token)
+    const parsed = await parseJsonBody(req, BodySchema)
+    if (parsed.response) return parsed.response
+    const body = parsed.data!
+    const token = normalizeToken((body as Record<string, unknown>)?.token)
     if (!token) return NextResponse.json({ ok: false, error: 'missing_token' }, { status: 400 })
 
     const { error } = await supabase.from('device_push_tokens').delete().eq('user_id', user.id).eq('token', token)
@@ -66,4 +78,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 400 })
   }
 }
-

@@ -18,6 +18,8 @@
 		B10000000000000000000013 /* RestTimerLiveActivity.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* RestTimerLiveActivity.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B10000000000000000000011 /* RestTimerLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* RestTimerLiveActivity.swift */; };
 		B10000000000000000000012 /* IronTracksLiveActivityShared in Frameworks */ = {isa = PBXBuildFile; productRef = B10000000000000000000062 /* IronTracksLiveActivityShared */; };
+		C10000000000000000000003 /* IronTracksNative in Frameworks */ = {isa = PBXBuildFile; productRef = C10000000000000000000002 /* IronTracksNative */; };
+		C10000000000000000000005 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000004 /* ViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -35,6 +37,7 @@
 		B10000000000000000000001 /* RestTimerLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerLiveActivity.swift; sourceTree = "<group>"; };
 		B10000000000000000000002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10000000000000000000003 /* RestTimerLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = RestTimerLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C10000000000000000000004 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -43,6 +46,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				9AC44B8E2F4E1487005050C6 /* CapApp-SPM in Frameworks */,
+				C10000000000000000000003 /* IronTracksNative in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,6 +100,7 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				C10000000000000000000004 /* ViewController.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -142,6 +147,7 @@
 			name = App;
 			packageProductDependencies = (
 				9AC44B8D2F4E1487005050C6 /* CapApp-SPM */,
+				C10000000000000000000002 /* IronTracksNative */,
 			);
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
@@ -199,6 +205,7 @@
 			packageReferences = (
 				9AC44B8C2F4E1487005050C6 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
 				B10000000000000000000061 /* XCLocalSwiftPackageReference "IronTracksLiveActivityShared" */,
+				C10000000000000000000001 /* XCLocalSwiftPackageReference "IronTracksNative" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
@@ -239,6 +246,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				C10000000000000000000005 /* ViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -516,6 +524,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../LocalPackages/IronTracksLiveActivityShared";
 		};
+		C10000000000000000000001 /* XCLocalSwiftPackageReference "IronTracksNative" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../LocalPackages/IronTracksNative";
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -528,6 +540,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B10000000000000000000061 /* XCLocalSwiftPackageReference "IronTracksLiveActivityShared" */;
 			productName = "IronTracksLiveActivityShared";
+		};
+		C10000000000000000000002 /* IronTracksNative */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C10000000000000000000001 /* XCLocalSwiftPackageReference "IronTracksNative" */;
+			productName = "IronTracksNative";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

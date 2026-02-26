@@ -8,8 +8,40 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Set up notification delegate for action handling
-        UNUserNotificationCenter.current().delegate = self
+        let center = UNUserNotificationCenter.current()
+        center.delegate = self
+
+        // Register notification categories with actions (rest timer)
+        let skipAction = UNNotificationAction(
+            identifier: "SKIP_REST",
+            title: "Pular",
+            options: [.foreground]
+        )
+        let add30Action = UNNotificationAction(
+            identifier: "ADD_30S",
+            title: "+30s",
+            options: []
+        )
+        let restCategory = UNNotificationCategory(
+            identifier: "REST_TIMER",
+            actions: [skipAction, add30Action],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([restCategory])
+
+        // Request notification permissions on first launch
+        // This ensures the app appears in iOS Settings > Notifications
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if granted {
+                DispatchQueue.main.async {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
+            }
+            if let error = error {
+                print("[IronTracks] Notification auth error: \(error.localizedDescription)")
+            }
+        }
         return true
     }
 

@@ -11,11 +11,14 @@ type IronTracksNativePlugin = {
   requestNotificationPermission: () => Promise<{ granted: boolean }>
   checkNotificationPermission: () => Promise<{ status: string }>
   setupNotificationActions: () => Promise<void>
-  scheduleRestTimer: (opts: { id: string; seconds: number; title?: string; body?: string }) => Promise<void>
+  scheduleRestTimer: (opts: { id: string; seconds: number; title?: string; body?: string; repeatCount?: number; repeatEverySeconds?: number }) => Promise<void>
   cancelRestTimer: (opts: { id: string }) => Promise<void>
   // Live Activity
   startRestLiveActivity: (opts: { id: string; seconds: number; title?: string }) => Promise<void>
+  updateRestLiveActivity: (opts: { id: string; isFinished: boolean }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
+  // Generic app notification
+  scheduleAppNotification: (opts: { id?: string; title: string; body: string; delaySeconds?: number }) => Promise<{ id: string }>
   // Haptics
   triggerHaptic: (opts: { style: HapticStyle }) => Promise<void>
   // Biometrics
@@ -50,7 +53,9 @@ const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
     scheduleRestTimer: async () => {},
     cancelRestTimer: async () => {},
     startRestLiveActivity: async () => {},
+    updateRestLiveActivity: async () => {},
     endRestLiveActivity: async () => {},
+    scheduleAppNotification: async () => ({ id: '' }),
     triggerHaptic: async () => {},
     checkBiometricsAvailable: async () => ({ available: false, biometryType: 'none' as const }),
     authenticateWithBiometrics: async () => ({ success: false, error: 'Not available on web' }),
@@ -142,13 +147,29 @@ export const onNativeNotificationAction = (handler: (actionId: string) => void) 
   }
 }
 
-export const scheduleRestNotification = async (id: string, seconds: number, title?: string, body?: string) => {
+export const scheduleRestNotification = async (
+  id: string,
+  seconds: number,
+  title?: string,
+  body?: string,
+  repeatCount?: number,
+  repeatEverySeconds?: number
+) => {
   try {
     if (!isIosNative()) return
     const safeSeconds = Math.max(1, Math.round(Number(seconds) || 0))
     if (!safeSeconds) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
-    await Native.scheduleRestTimer({ id: safeId, seconds: safeSeconds, title, body })
+    const safeRepeatCount = Math.max(0, Math.min(120, Math.round(Number(repeatCount) || 0)))
+    const safeRepeatEverySeconds = Math.max(2, Math.min(30, Math.round(Number(repeatEverySeconds) || 5)))
+    await Native.scheduleRestTimer({
+      id: safeId,
+      seconds: safeSeconds,
+      title,
+      body,
+      repeatCount: safeRepeatCount,
+      repeatEverySeconds: safeRepeatEverySeconds,
+    })
   } catch {}
 }
 
@@ -172,12 +193,37 @@ export const startRestLiveActivity = async (id: string, seconds: number, title?:
   } catch {}
 }
 
+export const updateRestLiveActivity = async (id: string, isFinished: boolean) => {
+  try {
+    if (!isIosNative()) return
+    const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
+    await Native.updateRestLiveActivity({ id: safeId, isFinished })
+  } catch {}
+}
+
 export const endRestLiveActivity = async (id: string) => {
   try {
     if (!isIosNative()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     await Native.endRestLiveActivity({ id: safeId })
   } catch {}
+}
+
+// ─── Generic App Notification ────────────────────────────────────────────────
+
+export const scheduleAppNotification = async (opts: {
+  id?: string
+  title: string
+  body: string
+  delaySeconds?: number
+}) => {
+  try {
+    if (!isIosNative()) return null
+    const result = await Native.scheduleAppNotification(opts)
+    return result?.id || null
+  } catch {
+    return null
+  }
 }
 
 // ─── Haptics ──────────────────────────────────────────────────────────────────
