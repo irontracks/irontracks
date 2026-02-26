@@ -106,7 +106,11 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
 
     @objc func requestNotificationPermission(_ call: CAPPluginCall) {
         let center = UNUserNotificationCenter.current()
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+        var options: UNAuthorizationOptions = [.alert, .sound, .badge]
+        if #available(iOS 12.0, *) {
+            options.insert(.criticalAlert)
+        }
+        center.requestAuthorization(options: options) { granted, _ in
             call.resolve(["granted": granted])
         }
     }
@@ -157,18 +161,22 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
 
         let title = String(call.getString("title") ?? "⏰ Tempo Esgotado!")
         let body = String(call.getString("body") ?? "Hora de voltar para o treino!")
-        let repeatCount = max(0, min(60, call.getInt("repeatCount") ?? 0))
+        let repeatCount = max(0, min(120, call.getInt("repeatCount") ?? 0))
         let repeatEverySeconds = max(2.0, min(30.0, Double(call.getInt("repeatEverySeconds") ?? 5)))
 
         let mkContent = { () -> UNMutableNotificationContent in
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
-            content.sound = .default
+            if #available(iOS 12.0, *) {
+                content.sound = UNNotificationSound.defaultCriticalSound(withAudioVolume: 1.0)
+            } else {
+                content.sound = .default
+            }
             content.categoryIdentifier = "REST_TIMER"
             content.threadIdentifier = "REST_TIMER"
             if #available(iOS 15.0, *) {
-                content.interruptionLevel = .timeSensitive
+                content.interruptionLevel = .critical
                 content.relevanceScore = 1.0
             }
             return content
