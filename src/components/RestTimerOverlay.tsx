@@ -19,6 +19,8 @@ interface RestTimerSettings {
     restTimerVibrate?: boolean;
     restTimerRepeatAlarm?: boolean;
     restTimerRepeatIntervalMs?: number;
+    restTimerRepeatMaxSeconds?: number;
+    restTimerRepeatMaxCount?: number;
     restTimerTickCountdown?: boolean;
 }
 
@@ -49,6 +51,16 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         const raw = Number(safeSettings?.restTimerRepeatIntervalMs ?? 1500);
         if (!Number.isFinite(raw)) return 1500;
         return Math.max(600, Math.min(6000, Math.round(raw)));
+    })();
+    const repeatMaxSeconds = (() => {
+        const raw = Number(safeSettings?.restTimerRepeatMaxSeconds ?? 180);
+        if (!Number.isFinite(raw)) return 180;
+        return Math.max(10, Math.min(900, Math.round(raw)));
+    })();
+    const repeatMaxCount = (() => {
+        const raw = Number(safeSettings?.restTimerRepeatMaxCount ?? 60);
+        if (!Number.isFinite(raw)) return 60;
+        return Math.max(1, Math.min(120, Math.round(raw)));
     })();
     const allowTickCountdown = safeSettings ? safeSettings.restTimerTickCountdown !== false : true;
 
@@ -131,7 +143,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (allowNotify && seconds > 0) {
                 requestNativeNotifications().then((res) => {
                     if (!res?.granted) return;
-                    scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!');
+                    const notifyEverySeconds = Math.max(3, Math.min(30, Math.round(repeatIntervalMs / 1000) || 5));
+                    const byDuration = Math.ceil(repeatMaxSeconds / notifyEverySeconds);
+                    const notifyCount = repeatAlarm ? Math.max(0, Math.min(repeatMaxCount, byDuration)) : 0;
+                    scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!', notifyCount, notifyEverySeconds);
                 }).catch(() => {});
             }
             startRestLiveActivity(id, seconds, 'Descanso');
@@ -170,7 +185,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
             setIdleTimerDisabled(false);
         };
-    }, [allowNotify, targetTime, context?.exerciseId, context?.kind, context?.setId]);
+    }, [allowNotify, repeatAlarm, repeatIntervalMs, repeatMaxCount, repeatMaxSeconds, targetTime, context?.exerciseId, context?.kind, context?.setId]);
 
     useEffect(() => {
         if (!isFinished) return;

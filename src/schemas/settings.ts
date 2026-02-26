@@ -37,6 +37,8 @@ export const UserSettingsSchema = z
     restTimerVibrate: z.boolean().default(true),
     restTimerRepeatAlarm: z.boolean().default(true),
     restTimerRepeatIntervalMs: z.number().default(1500),
+    restTimerRepeatMaxSeconds: z.number().default(180),
+    restTimerRepeatMaxCount: z.number().default(60),
     restTimerTickCountdown: z.boolean().default(true),
     restTimerDefaultSeconds: z.number().default(90),
     autoRestTimerWhenMissing: z.boolean().default(false),
@@ -51,4 +53,3 @@ export const UserSettingsSchema = z
 export type UserSettings = z.infer<typeof UserSettingsSchema>
 
 export const DEFAULT_USER_SETTINGS = UserSettingsSchema.parse({}) as UserSettings
-
