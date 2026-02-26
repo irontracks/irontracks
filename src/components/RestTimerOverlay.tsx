@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, ArrowLeft } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
+import { isIosNative } from '@/utils/platform';
 import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity } from '@/utils/native/irontracksNative';
 
 interface RestTimerContext {
@@ -140,7 +141,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
         try {
             const seconds = Math.max(1, Math.ceil((targetTime - Date.now()) / 1000));
-            if (allowNotify && seconds > 0) {
+            const shouldNotify = (allowNotify || (isIosNative() && soundsEnabled)) && seconds > 0;
+            if (shouldNotify) {
                 requestNativeNotifications().then((res) => {
                     if (!res?.granted) return;
                     const notifyEverySeconds = Math.max(3, Math.min(30, Math.round(repeatIntervalMs / 1000) || 5));
@@ -185,7 +187,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
             setIdleTimerDisabled(false);
         };
-    }, [allowNotify, repeatAlarm, repeatIntervalMs, repeatMaxCount, repeatMaxSeconds, targetTime, context?.exerciseId, context?.kind, context?.setId]);
+    }, [allowNotify, repeatAlarm, repeatIntervalMs, repeatMaxCount, repeatMaxSeconds, soundsEnabled, targetTime, context?.exerciseId, context?.kind, context?.setId]);
 
     useEffect(() => {
         if (!isFinished) return;
