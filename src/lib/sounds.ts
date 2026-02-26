@@ -119,20 +119,28 @@ export const playTimerFinishSound = (opts?: SoundOpts) => {
         if (!enabled || volume <= 0) return;
         const ctx = ensureCtx(null);
         if (!ctx) return;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.type = 'square';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
-        osc.frequency.setValueAtTime(0, ctx.currentTime + 0.11);
-        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
-        osc.frequency.setValueAtTime(0, ctx.currentTime + 0.31);
-        gain.gain.setValueAtTime(0.3 * volume, ctx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.5);
+        const now = ctx.currentTime;
+        const vol = 0.35 * volume;
+
+        // Three-tone ascending alarm: beep-beep-BEEEP
+        const tones: [number, number, number][] = [
+            [880,  now,       0.12],  // A5 short
+            [1047, now + 0.15, 0.12], // C6 short
+            [1319, now + 0.30, 0.25], // E6 long (resolving)
+        ];
+        for (const [freq, start, dur] of tones) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, start);
+            gain.gain.setValueAtTime(vol, start);
+            gain.gain.setValueAtTime(vol, start + dur * 0.7);
+            gain.gain.exponentialRampToValueAtTime(0.01, start + dur);
+            osc.start(start);
+            osc.stop(start + dur);
+        }
     } catch (e) {
         logError('error', "Erro ao tocar som do timer:", e);
     }

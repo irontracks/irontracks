@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { RealtimeChannel } from '@supabase/supabase-js'
+import { scheduleAppNotification } from '@/utils/native/irontracksNative'
 
 interface RealtimeNotificationBridgeProps {
   userId: string | number | null
@@ -77,6 +78,19 @@ const RealtimeNotificationBridge = ({ userId, setNotification }: RealtimeNotific
                   senderName: title,
                   type: rawType || 'broadcast',
                 })
+
+                // Also schedule a local iOS notification so it appears on lock screen
+                try {
+                  const notifId = (n as Record<string, unknown>)?.id
+                    ? `notif-${String((n as Record<string, unknown>).id)}`
+                    : `notif-${Date.now()}`
+                  scheduleAppNotification({
+                    id: notifId,
+                    title,
+                    body: message,
+                    delaySeconds: 1,
+                  })
+                } catch { }
               } catch {
                 return
               }

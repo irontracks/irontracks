@@ -25,7 +25,10 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "cancelRestTimer", returnType: CAPPluginReturnPromise),
         // Live Activity
         CAPPluginMethod(name: "startRestLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateRestLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endRestLiveActivity", returnType: CAPPluginReturnPromise),
+        // Generic app notification
+        CAPPluginMethod(name: "scheduleAppNotification", returnType: CAPPluginReturnPromise),
         // Haptics
         CAPPluginMethod(name: "triggerHaptic", returnType: CAPPluginReturnPromise),
         // Biometrics
@@ -154,19 +157,45 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
 
         let title = String(call.getString("title") ?? "⏰ Tempo Esgotado!")
         let body = String(call.getString("body") ?? "Hora de voltar para o treino!")
+        let repeatCount = max(0, min(60, call.getInt("repeatCount") ?? 0))
+        let repeatEverySeconds = max(2.0, min(30.0, Double(call.getInt("repeatEverySeconds") ?? 5)))
 
-        let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
-        content.sound = .default
-        content.categoryIdentifier = "REST_TIMER"
-
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
-        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        let mkContent = { () -> UNMutableNotificationContent in
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            content.sound = .default
+            content.categoryIdentifier = "REST_TIMER"
+            content.threadIdentifier = "REST_TIMER"
+            if #available(iOS 15.0, *) {
+                content.interruptionLevel = .timeSensitive
+                content.relevanceScore = 1.0
+            }
+            return content
+        }
 
         let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [id])
-        center.add(request) { _ in
+        center.getPendingNotificationRequests { pending in
+            let toRemove = pending
+                .map(\.identifier)
+                .filter { $0 == id || $0.hasPrefix("\(id)_alarm_") }
+            if !toRemove.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: toRemove)
+            }
+
+            let baseTrigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
+            let baseRequest = UNNotificationRequest(identifier: id, content: mkContent(), trigger: baseTrigger)
+            center.add(baseRequest) { _ in }
+
+            if repeatCount > 0 {
+                for i in 1...repeatCount {
+                    let alarmId = "\(id)_alarm_\(String(format: "%03d", i))"
+                    let t = seconds + (Double(i) * repeatEverySeconds)
+                    let trig = UNTimeIntervalNotificationTrigger(timeInterval: t, repeats: false)
+                    let req = UNNotificationRequest(identifier: alarmId, content: mkContent(), trigger: trig)
+                    center.add(req) { _ in }
+                }
+            }
             call.resolve()
         }
     }
@@ -174,8 +203,19 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     @objc func cancelRestTimer(_ call: CAPPluginCall) {
         let id = String(call.getString("id") ?? "rest_timer")
         let center = UNUserNotificationCenter.current()
-        center.removePendingNotificationRequests(withIdentifiers: [id])
-        call.resolve()
+        center.getPendingNotificationRequests { pending in
+            let toRemove = pending
+                .map(\.identifier)
+                .filter { $0 == id || $0.hasPrefix("\(id)_alarm_") }
+            if !toRemove.isEmpty {
+                center.removePendingNotificationRequests(withIdentifiers: toRemove)
+            } else {
+                center.removePendingNotificationRequests(withIdentifiers: [id])
+            }
+            let deliveredIds = !toRemove.isEmpty ? toRemove : [id]
+            center.removeDeliveredNotifications(withIdentifiers: deliveredIds)
+            call.resolve()
+        }
     }
 
     // MARK: - Live Activities
@@ -183,6 +223,14 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     @objc func startRestLiveActivity(_ call: CAPPluginCall) {
         if #available(iOS 16.2, *) {
             startRestLiveActivityAvailable(call)
+            return
+        }
+        call.resolve()
+    }
+
+    @objc func updateRestLiveActivity(_ call: CAPPluginCall) {
+        if #available(iOS 16.2, *) {
+            updateRestLiveActivityAvailable(call)
             return
         }
         call.resolve()
@@ -232,6 +280,26 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     }
 
     @available(iOS 16.2, *)
+    private func updateRestLiveActivityAvailable(_ call: CAPPluginCall) {
+        let id = String(call.getString("id") ?? "rest_timer")
+        let isFinished = call.getBool("isFinished") ?? false
+        if let activity = Self.restActivities[id] as? Activity<RestTimerAttributes> {
+            Task {
+                let current = activity.contentState
+                let updated = RestTimerAttributes.ContentState(
+                    endTime: current.endTime,
+                    title: current.title,
+                    isFinished: isFinished
+                )
+                await activity.update(using: updated)
+                call.resolve()
+            }
+            return
+        }
+        call.resolve()
+    }
+
+    @available(iOS 16.2, *)
     private func endRestLiveActivityAvailable(_ call: CAPPluginCall) {
         let id = String(call.getString("id") ?? "rest_timer")
         if let activity = Self.restActivities[id] as? Activity<RestTimerAttributes> {
@@ -243,6 +311,40 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
             return
         }
         call.resolve()
+    }
+
+    // MARK: - Generic App Notification
+
+    @objc func scheduleAppNotification(_ call: CAPPluginCall) {
+        let id = String(call.getString("id") ?? UUID().uuidString)
+        let title = String(call.getString("title") ?? "IronTracks")
+        let body = String(call.getString("body") ?? "")
+        let delaySeconds = Double(call.getInt("delaySeconds") ?? 1)
+
+        if body.isEmpty {
+            call.resolve()
+            return
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        if #available(iOS 15.0, *) {
+            content.interruptionLevel = .timeSensitive
+        }
+
+        let trigger: UNNotificationTrigger?
+        if delaySeconds > 1 {
+            trigger = UNTimeIntervalNotificationTrigger(timeInterval: delaySeconds, repeats: false)
+        } else {
+            trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        }
+
+        let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request) { _ in
+            call.resolve(["id": id])
+        }
     }
 
     // MARK: - Haptics
