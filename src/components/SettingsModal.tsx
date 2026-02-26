@@ -77,6 +77,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const restTimerRepeatIntervalMs = Math.max(600, Math.min(6000, Number(draft?.restTimerRepeatIntervalMs ?? 1500) || 1500))
   const restTimerRepeatMaxSeconds = Math.max(10, Math.min(900, Number(draft?.restTimerRepeatMaxSeconds ?? 180) || 180))
   const restTimerRepeatMaxCount = Math.max(1, Math.min(120, Number(draft?.restTimerRepeatMaxCount ?? 60) || 60))
+  const restTimerContinuousAlarm = Boolean(draft?.restTimerContinuousAlarm ?? false)
   const restTimerTickCountdown = Boolean(draft?.restTimerTickCountdown ?? true)
   const restTimerDefaultSeconds = Math.max(15, Math.min(600, Number(draft?.restTimerDefaultSeconds ?? 90) || 90))
   const autoRestTimerWhenMissing = Boolean(draft?.autoRestTimerWhenMissing ?? false)
@@ -1077,6 +1078,24 @@ export default function SettingsModal(props: SettingsModalProps) {
                   }
                 >
                   {restTimerRepeatAlarm ? 'Ativo' : 'Desligado'}
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-white">Alarme contínuo</div>
+                  <div className="text-xs text-neutral-400">Mantém tocando até abrir o app.</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setValue('restTimerContinuousAlarm', !restTimerContinuousAlarm)}
+                  className={
+                    restTimerContinuousAlarm
+                      ? 'px-3 py-2 rounded-xl bg-yellow-500 text-black font-black'
+                      : 'px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black'
+                  }
+                >
+                  {restTimerContinuousAlarm ? 'Ativo' : 'Desligado'}
                 </button>
               </div>
 

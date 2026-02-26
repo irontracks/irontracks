@@ -22,6 +22,7 @@ interface RestTimerSettings {
     restTimerRepeatIntervalMs?: number;
     restTimerRepeatMaxSeconds?: number;
     restTimerRepeatMaxCount?: number;
+    restTimerContinuousAlarm?: boolean;
     restTimerTickCountdown?: boolean;
 }
 
@@ -67,6 +68,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         if (!Number.isFinite(raw)) return 60;
         return Math.max(1, Math.min(120, Math.round(raw)));
     })();
+    const continuousAlarm = safeSettings ? safeSettings.restTimerContinuousAlarm === true : false;
     const allowTickCountdown = safeSettings ? safeSettings.restTimerTickCountdown !== false : true;
 
     const formatDuration = (s: number) => {
@@ -195,8 +197,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 requestNativeNotifications().then((res) => {
                     if (!res?.granted) return;
                     const notifyEverySeconds = Math.max(3, Math.min(30, Math.round(repeatIntervalMs / 1000) || 5));
-                    const byDuration = Math.ceil(repeatMaxSeconds / notifyEverySeconds);
-                    const notifyCount = repeatAlarm ? Math.max(0, Math.min(repeatMaxCount, byDuration)) : 0;
+                    const maxSeconds = continuousAlarm ? 900 : repeatMaxSeconds;
+                    const maxCount = continuousAlarm ? 120 : repeatMaxCount;
+                    const byDuration = Math.ceil(maxSeconds / notifyEverySeconds);
+                    const notifyCount = repeatAlarm ? Math.max(0, Math.min(maxCount, byDuration)) : 0;
                     scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!', notifyCount, notifyEverySeconds);
                 }).catch(() => {});
             }
@@ -237,7 +241,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             stopAlarm(false);
             setIdleTimerDisabled(false);
         };
-    }, [allowNotify, repeatAlarm, repeatIntervalMs, repeatMaxCount, repeatMaxSeconds, soundsEnabled, targetTime, context?.exerciseId, context?.kind, context?.setId]);
+    }, [allowNotify, repeatAlarm, repeatIntervalMs, repeatMaxCount, repeatMaxSeconds, continuousAlarm, soundsEnabled, targetTime, context?.exerciseId, context?.kind, context?.setId]);
 
     useEffect(() => {
         if (!isFinished) return;
