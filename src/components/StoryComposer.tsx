@@ -58,8 +58,8 @@ interface LayoutOption {
 
 // --- Constants ---
 
-const CANVAS_W = 1080
-const CANVAS_H = 1920
+const CANVAS_W = 720
+const CANVAS_H = 1280
 const SAFE_TOP = 250
 const SAFE_BOTTOM = 420
 const SAFE_SIDE = 90
@@ -594,6 +594,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const [busy, setBusy] = useState(false)
   const [busyAction, setBusyAction] = useState<'post' | 'share' | null>(null)
   const [busySubAction, setBusySubAction] = useState<'processing' | 'uploading' | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
@@ -1089,7 +1090,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       const result = await Promise.race([
         createImageBlob({ type: 'jpg' }),
         new Promise<{ blob: Blob; filename: string; mime: string }>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 45000)
+          setTimeout(() => reject(new Error('timeout_rendering_5m')), 300000)
         )
       ])
       const file = new File([result.blob], result.filename, { type: result.mime })
@@ -1114,7 +1115,12 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
       if (!shared) {
         downloadBlob(result.blob, result.filename)
-        setInfo('Baixado com sucesso!')
+        // iOS PWA only supports saving blobs to Files (Downloads) natively unless user shares to Photos
+        if (mediaKind === 'video') {
+          setInfo('Salvo em Arquivos/Downloads do iOS!')
+        } else {
+          setInfo('Baixado com sucesso!')
+        }
       }
     } catch (e: unknown) {
       const name = String(e instanceof Error ? e.name : (e !== null && typeof e === 'object' ? (e as Record<string, unknown>).name : '')).trim()
@@ -1152,7 +1158,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         const { blob, mime } = await Promise.race([
           createImageBlob({}),
           new Promise<{ blob: Blob; mime: string }>((_, reject) =>
-            setTimeout(() => reject(new Error('timeout')), 45000)
+            setTimeout(() => reject(new Error('timeout_rendering_5m')), 300000)
           )
         ])
         if (blob.size > maxBytes) throw new Error('Vídeo renderizado muito grande (máx 200MB).')
@@ -1166,12 +1172,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         path = `${uid}/stories/${storyId}${ext}`
 
         setBusySubAction('uploading')
+        setUploadProgress(0)
 
         // Upload via TUS
         await uploadWithTus(blob, 'social-stories', path, mime, (uploaded, total) => {
-          // opcional: log progress or display progress to user
-          // console.log(`Uploading: ${(uploaded / total * 100).toFixed(2)}%`)
+          if (total > 0) setUploadProgress(Math.round((uploaded / total) * 100))
         })
+        setUploadProgress(100)
 
         meta = {
           title: String(metrics?.title || ''),
@@ -1189,12 +1196,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         path = `${uid}/stories/${storyId}.jpg`
 
         setBusySubAction('uploading')
+        setUploadProgress(0)
 
         // Upload via TUS
         await uploadWithTus(result.blob, 'social-stories', path, result.mime, (uploaded, total) => {
-          // opcional: log progress or display progress to user
-          // console.log(`Uploading image: ${(uploaded / total * 100).toFixed(2)}%`)
+          if (total > 0) setUploadProgress(Math.round((uploaded / total) * 100))
         })
+        setUploadProgress(100)
         meta = {
           title: String(metrics?.title || ''),
           dateText: String(metrics?.date || ''),
@@ -1232,6 +1240,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       setBusy(false)
       setBusyAction(null)
       setBusySubAction(null)
+      setUploadProgress(0)
     }
   }
 
@@ -1526,6 +1535,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                     <button
                       onClick={postToIronTracks}
                       disabled={busy}
+                      aria-label="Postar story no IronTracks"
+                      aria-busy={busyAction === 'post'}
                       className="h-14 w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
                     >
                       {busyAction === 'post' ? (
@@ -1535,6 +1546,18 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         </>
                       ) : 'POSTAR NO IRONTRACKS'}
                     </button>
+
+                    {busyAction === 'post' && busySubAction === 'uploading' && (
+                      <div className="space-y-1" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do upload">
+                        <div className="w-full bg-neutral-800 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-yellow-500 h-1.5 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${uploadProgress}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-neutral-500 text-right font-mono">{uploadProgress}%</p>
+                      </div>
+                    )}
 
                     <button
                       onClick={shareImage}

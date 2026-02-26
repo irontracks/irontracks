@@ -13,6 +13,7 @@ const MAX_VIDEO_SECONDS = 60
 const PHOTO_SECONDS = 15
 const MIN_VIDEO_SECONDS = 3
 const STALL_THRESHOLD_MS = 2500
+const INITIAL_STALL_THRESHOLD_MS = 15000
 const STALL_CHECK_MS = 1200
 
 const initials = (name: string) => {
@@ -39,7 +40,7 @@ const isIOSUserAgent = (ua: string) => {
   try {
     const nav = typeof navigator !== 'undefined' ? navigator as unknown as Record<string, unknown> : null
     if (nav && nav.platform === 'MacIntel' && Number(nav.maxTouchPoints || 0) > 1) return true
-  } catch {}
+  } catch { }
   return false
 }
 
@@ -63,20 +64,20 @@ export default function StoryViewer({
   const stories = useMemo(() => (Array.isArray(group.stories) ? group.stories : []), [group.stories])
   const [idx, setIdx] = useState(0)
   const story = stories[idx] || null
-  
+
   // Estados de UI
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [commentsError, setCommentsError] = useState('')
   const [comments, setComments] = useState<unknown[]>([])
   const [commentText, setCommentText] = useState('')
-  
+
   const [viewersOpen, setViewersOpen] = useState(false)
   const [viewersLoading, setViewersLoading] = useState(false)
   const [viewersError, setViewersError] = useState('')
   const [viewers, setViewers] = useState<unknown[]>([])
   const viewersStoryIdRef = useRef<string>('')
-  
+
   const [deleting, setDeleting] = useState(false)
   const [progress, setProgress] = useState(0)
   const [holding, setHolding] = useState(false)
@@ -84,7 +85,7 @@ export default function StoryViewer({
   const [durationMs, setDurationMs] = useState(5000)
   const [muted, setMuted] = useState(true)
   const [videoError, setVideoError] = useState('')
-  
+
   const rafRef = useRef<number | null>(null)
   const lastTsRef = useRef<number>(0)
   const elapsedRef = useRef<number>(0)
@@ -110,7 +111,7 @@ export default function StoryViewer({
     return mediaKindFromUrl(storyMediaUrl || null)
   }, [storyMediaKind, storyMediaUrl])
   const isVideo = mediaKind === 'video'
-  
+
   const videoSrc = useMemo(() => {
     const sid = String(storyId || '').trim()
     const direct = String(storyMediaUrl || '').trim()
@@ -149,7 +150,7 @@ export default function StoryViewer({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ storyId }),
-    }).catch(() => {})
+    }).catch(() => { })
   }, [storyId, storyViewed, onStoryUpdated])
 
   // Navegação e Timer
@@ -190,7 +191,7 @@ export default function StoryViewer({
         el.muted = next
         if (!next) {
           const p = el.play()
-          if (p) p.catch(() => {})
+          if (p) p.catch(() => { })
         }
       }
       return next
@@ -206,7 +207,7 @@ export default function StoryViewer({
     for (const a of preloadRef.current.aborts) {
       try {
         a.abort()
-      } catch {}
+      } catch { }
     }
     preloadRef.current.aborts = []
 
@@ -216,7 +217,7 @@ export default function StoryViewer({
       if (!url) continue
       const a = new AbortController()
       preloadRef.current.aborts.push(a)
-      fetch(url, { headers: { Range: 'bytes=0-0' }, signal: a.signal }).catch(() => {})
+      fetch(url, { headers: { Range: 'bytes=0-0' }, signal: a.signal }).catch(() => { })
     }
   }, [idx, stories])
 
@@ -234,12 +235,12 @@ export default function StoryViewer({
     const tick = (ts: number) => {
       rafRef.current = requestAnimationFrame(tick)
       const paused = holding || commentsOpen || viewersOpen || hidden || deleting
-      
+
       if (!lastTsRef.current) { lastTsRef.current = ts; return }
       const delta = ts - lastTsRef.current
       lastTsRef.current = ts
       if (paused) return
-      
+
       elapsedRef.current += delta
       const next = Math.max(0, Math.min(1, elapsedRef.current / durationMs))
       if (next >= 1) {
@@ -270,7 +271,7 @@ export default function StoryViewer({
       const end = Math.max(start + MIN_VIDEO_SECONDS, Math.min(d, maxEnd))
       const ct = Number(v.currentTime || 0)
       if (Number.isFinite(start) && ct < start) {
-        try { v.currentTime = start } catch {}
+        try { v.currentTime = start } catch { }
       }
       const effective = Math.max(0.1, end - start)
       const clamped = Math.min(end, Math.max(start, ct))
@@ -300,7 +301,7 @@ export default function StoryViewer({
     if (!v) return
     const paused = holding || commentsOpen || viewersOpen || hidden || deleting
     if (paused) v.pause()
-    else v.play().catch(() => {})
+    else v.play().catch(() => { })
   }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
 
   useEffect(() => {
@@ -326,7 +327,11 @@ export default function StoryViewer({
         return
       }
       if (Math.abs(current - last) < 0.01) {
-        if (now - lastTs >= STALL_THRESHOLD_MS) {
+        // If it's the very beginning and hasn't started playing yet, give it more time finding the first frame
+        const isInitialLoad = current === 0 && v.readyState < 3;
+        const threshold = isInitialLoad ? INITIAL_STALL_THRESHOLD_MS : STALL_THRESHOLD_MS;
+
+        if (now - lastTs >= threshold) {
           stallRef.current.lastTs = now
           stallRef.current.attempts += 1
           if (stallRef.current.attempts >= 2) {
@@ -335,11 +340,11 @@ export default function StoryViewer({
           }
           try {
             v.load()
-          } catch {}
+          } catch { }
           try {
             const p = v.play()
-            if (p) p.catch(() => {})
-          } catch {}
+            if (p) p.catch(() => { })
+          } catch { }
         }
       } else {
         stallRef.current.lastTime = current
@@ -348,7 +353,7 @@ export default function StoryViewer({
     }, STALL_CHECK_MS)
     return () => {
       mounted = false
-      try { window.clearInterval(timer) } catch {}
+      try { window.clearInterval(timer) } catch { }
     }
   }, [commentsOpen, deleting, hidden, holding, isVideo, storyId, viewersOpen])
 
@@ -415,7 +420,7 @@ export default function StoryViewer({
         setComments((prev) => [...prev, json.data])
         onStoryUpdated(story.id, { commentCount: story.commentCount + 1 })
       }
-    } catch {}
+    } catch { }
   }
 
   const handleDelete = async () => {
@@ -533,7 +538,7 @@ export default function StoryViewer({
                           const maxEnd = Math.min(rawEnd, start + MAX_VIDEO_SECONDS)
                           const end = Math.max(start + MIN_VIDEO_SECONDS, Math.min(d, maxEnd))
                           if (d > 0) setDurationMs(Math.max(MIN_VIDEO_SECONDS * 1000, Math.min(MAX_VIDEO_SECONDS * 1000, (end - start) * 1000)))
-                          try { if (Number.isFinite(start) && start > 0) e.currentTarget.currentTime = start } catch {}
+                          try { if (Number.isFinite(start) && start > 0) e.currentTarget.currentTime = start } catch { }
                         }}
                         onEnded={() => {
                           if (advanceLockRef.current !== String(story?.id || '')) {
@@ -587,7 +592,7 @@ export default function StoryViewer({
                   <span className="text-[10px] font-bold text-white drop-shadow">{viewCount}</span>
                 </div>
               )}
-              
+
               <div className="flex flex-col items-center">
                 <button onClick={toggleLike} className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${story.hasLiked ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-neutral-900/80 border-neutral-800 text-white'}`}>
                   <Heart size={20} className={story.hasLiked ? 'fill-current' : ''} />
@@ -609,13 +614,13 @@ export default function StoryViewer({
             <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="mt-3 bg-neutral-900/95 border border-neutral-800 rounded-2xl overflow-hidden backdrop-blur-sm">
               <div className="max-h-[30vh] overflow-y-auto custom-scrollbar p-3 space-y-3">
                 {viewersOpen && viewers.map((v) => (
-                   <div key={String((v as Record<string, unknown>).viewerId ?? "")} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden">
-                        {(v as Record<string, unknown>).photoUrl ? <Image src={String((v as Record<string, unknown>).photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(String((v as Record<string, unknown>).displayName || ""))}</div>}
-                      </div>
-                      <span className="text-xs font-bold text-white flex-1">{String((v as Record<string, unknown>).displayName || 'Usuário')}</span>
-                      <span className="text-[10px] text-neutral-400">{formatAgo((v as Record<string, unknown>).viewedAt as string)}</span>
-                   </div>
+                  <div key={String((v as Record<string, unknown>).viewerId ?? "")} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-neutral-800 overflow-hidden">
+                      {(v as Record<string, unknown>).photoUrl ? <Image src={String((v as Record<string, unknown>).photoUrl)} width={32} height={32} alt="" /> : <div className="w-full h-full flex items-center justify-center text-xs text-yellow-500">{initials(String((v as Record<string, unknown>).displayName || ""))}</div>}
+                    </div>
+                    <span className="text-xs font-bold text-white flex-1">{String((v as Record<string, unknown>).displayName || 'Usuário')}</span>
+                    <span className="text-[10px] text-neutral-400">{formatAgo((v as Record<string, unknown>).viewedAt as string)}</span>
+                  </div>
                 ))}
                 {commentsOpen && comments.map((c) => (
                   <div key={String((c as Record<string, unknown>).id ?? "")} className="flex gap-3">
@@ -632,7 +637,7 @@ export default function StoryViewer({
                   <div className="text-center text-xs text-neutral-500 py-2">Nada por aqui ainda.</div>
                 )}
               </div>
-              
+
               {commentsOpen && (
                 <div className="p-2 border-t border-neutral-800 flex gap-2">
                   <input value={commentText} onChange={e => setCommentText(e.target.value)} className="flex-1 bg-black/40 border border-neutral-700 rounded-xl px-3 text-xs text-white" placeholder="Escreva..." />

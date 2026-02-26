@@ -1,15 +1,4 @@
-const escapeHtml = (v: unknown) => {
-  try {
-    return String(v ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#39;')
-  } catch {
-    return ''
-  }
-}
+import { escapeHtml } from '@/utils/escapeHtml'
 
 const formatDate = (v: unknown) => {
   try {

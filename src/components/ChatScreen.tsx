@@ -219,10 +219,13 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         if (!activeChannel) return;
 
         setMessages([]);
+        const abortCtrl = new AbortController();
+        const { signal } = abortCtrl;
+
         const loadMessages = async () => {
-            if (!visibilityRef.current) return;
+            if (!visibilityRef.current || signal.aborted) return;
             try {
-                const res = await fetch(`/api/chat/messages?channel_id=${activeChannel.id}`);
+                const res = await fetch(`/api/chat/messages?channel_id=${activeChannel.id}`, { signal });
                 const ct = res.headers.get('content-type') || '';
                 let json;
                 if (ct.includes('application/json')) {
@@ -232,7 +235,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     logWarn('ChatScreen', 'Non-JSON response from messages endpoint', { status: res.status, body: txt.slice(0,200) });
                     return;
                 }
-                
+
                 if (json.ok && json.data) {
                     const rows = Array.isArray(json.data) ? json.data : []
                     setMessages(rows.reverse().map((row: Record<string, unknown>) => formatMessage(isRecord(row) ? row : {})));
@@ -240,6 +243,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                     logError('error', "API returned error or no data:", json);
                 }
             } catch (e) {
+                if (e instanceof Error && e.name === 'AbortError') return;
                 logError('error', "Error loading messages:", e);
             }
         };
@@ -275,7 +279,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             if (!visibilityRef.current) return;
             loadMessages();
         }, 5000);
-        return () => { supabase.removeChannel(channel); clearInterval(poll); };
+        return () => { abortCtrl.abort(); supabase.removeChannel(channel); clearInterval(poll); };
     }, [activeChannel, formatMessage, supabase]);
 
     useEffect(() => {

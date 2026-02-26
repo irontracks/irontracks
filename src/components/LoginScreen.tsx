@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar } from 'lucide-react';
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
@@ -20,7 +21,7 @@ if (typeof window !== 'undefined') {
         if (cap?.Capacitor) Capacitor = cap.Capacitor;
         const appleSignIn = require('@capacitor-community/apple-sign-in');
         if (appleSignIn?.SignInWithApple) SignInWithApple = appleSignIn.SignInWithApple;
-    } catch {}
+    } catch { }
 }
 
 const LoginScreen = () => {
@@ -33,15 +34,15 @@ const LoginScreen = () => {
     const [cooldownTick, setCooldownTick] = useState(0);
     const [recoveryCode, setRecoveryCode] = useState('');
     const [recoveryPassword2, setRecoveryPassword2] = useState('');
-    
+
     // Auth Mode: 'login', 'signup', 'recover', 'recover_code'
     // Default to 'login' to skip menu if Google is removed
     const [authMode, setAuthMode] = useState('login');
-    
+
     // Email Auth State
-    const [emailData, setEmailData] = useState({ 
-        email: '', 
-        password: '', 
+    const [emailData, setEmailData] = useState({
+        email: '',
+        password: '',
         confirmPassword: '',
         fullName: '',
         phone: '',
@@ -51,8 +52,34 @@ const LoginScreen = () => {
     });
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(true);
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-    // Carregar e-mail salvo
+    const fieldSchemas = useMemo(() => ({
+        email: z.string().min(1, 'E-mail obrigatório').email('E-mail inválido'),
+        password: z.string().min(6, 'Mínimo 6 caracteres'),
+        confirmPassword: z.string(),
+        fullName: z.string().min(2, 'Mínimo 2 caracteres'),
+        phone: z.string().refine(v => v.replace(/\D/g, '').length >= 10, 'Mínimo 10 dígitos com DDD'),
+        cref: z.string().min(3, 'CREF inválido'),
+    }), []);
+
+    const validateField = useCallback((field: string, value: string): string => {
+        const schema = fieldSchemas[field as keyof typeof fieldSchemas];
+        if (!schema) return '';
+        let error = '';
+        if (field === 'confirmPassword') {
+            error = value !== emailData.password ? 'As senhas não coincidem' : '';
+        } else {
+            const result = schema.safeParse(value);
+            error = result.success ? '' : (result.error.issues[0]?.message ?? '');
+        }
+        setValidationErrors(prev => ({ ...prev, [field]: error }));
+        return error;
+    }, [fieldSchemas, emailData.password]);
+
+    const clearValidation = useCallback(() => setValidationErrors({}), []);
+
+    // Carregar e-mail salvo e tentar restaurar sessão de backup (iOS PWA Killed State)
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const savedEmail = localStorage.getItem('it_remembered_email');
@@ -60,8 +87,38 @@ const LoginScreen = () => {
                 setEmailData(prev => ({ ...prev, email: savedEmail }));
                 setRememberMe(true);
             }
+
+            // Tentar restaurar a sessão do localStorage (fallback para cookies dropados pela Apple)
+            try {
+                const backupRaw = localStorage.getItem('it.session.backup')
+                if (backupRaw) {
+                    const backup = JSON.parse(backupRaw)
+                    if (backup?.access_token && backup?.refresh_token) {
+                        setIsLoading(true)
+                        const supabase = createClient()
+                        supabase.auth.setSession({
+                            access_token: backup.access_token,
+                            refresh_token: backup.refresh_token
+                        }).then(({ error, data }) => {
+                            if (!error && data?.session) {
+                                // Restore na API de cookies Nextjs
+                                fetch('/api/auth/session', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
+                                }).then(() => {
+                                    router.replace('/dashboard')
+                                    try { router.refresh() } catch { }
+                                }).catch(() => setIsLoading(false))
+                            } else {
+                                setIsLoading(false)
+                            }
+                        }).catch(() => setIsLoading(false))
+                    }
+                }
+            } catch { }
         }
-    }, []);
+    }, [router]);
 
     // Request Access State
     const [showRequestModal, setShowRequestModal] = useState(false);
@@ -98,7 +155,7 @@ const LoginScreen = () => {
                 window.crypto.getRandomValues(array);
                 return Array.from(array).map((v) => chars[v % chars.length]).join('');
             }
-        } catch {}
+        } catch { }
         let out = '';
         for (let i = 0; i < length; i += 1) {
             out += chars[Math.floor(Math.random() * chars.length)];
@@ -186,7 +243,7 @@ const LoginScreen = () => {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ email, full_name: fullName })
                         });
-                    } catch {}
+                    } catch { }
                 }
 
                 const supabase = createClient();
@@ -202,7 +259,7 @@ const LoginScreen = () => {
                 }
 
                 router.replace('/dashboard');
-                try { router.refresh(); } catch {}
+                try { router.refresh(); } catch { }
                 return;
             }
 
@@ -236,7 +293,7 @@ const LoginScreen = () => {
             if (authMode === 'login') {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password });
                 if (error) throw error;
-                
+
                 // Salvar e-mail se rememberMe estiver ativo
                 if (rememberMe) {
                     localStorage.setItem('it_remembered_email', email);
@@ -254,8 +311,8 @@ const LoginScreen = () => {
                 }
                 holdLoading = true;
                 router.replace('/dashboard');
-                try { router.refresh(); } catch {}
-            } 
+                try { router.refresh(); } catch { }
+            }
             else if (authMode === 'signup') {
                 if (password !== emailData.confirmPassword) {
                     throw new Error('As senhas não coincidem.');
@@ -266,7 +323,7 @@ const LoginScreen = () => {
                 if (isTeacher && !cref) {
                     throw new Error('CREF é obrigatório para cadastro de professor.');
                 }
-                
+
                 const cleanPhone = emailData.phone.replace(/\D/g, '');
                 if (cleanPhone.length < 10) {
                     throw new Error('Telefone inválido (mínimo 10 dígitos com DDD).');
@@ -276,8 +333,8 @@ const LoginScreen = () => {
                     const res = await fetch('/api/access-request/create', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            email, 
+                        body: JSON.stringify({
+                            email,
                             full_name: emailData.fullName,
                             phone: emailData.phone,
                             birth_date: emailData.birthDate,
@@ -318,7 +375,7 @@ const LoginScreen = () => {
                 // Auto login usually happens, or check email confirmation
                 holdLoading = true;
                 router.replace('/wait-approval');
-                try { router.refresh(); } catch {}
+                try { router.refresh(); } catch { }
             }
             else if (authMode === 'recover') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -358,7 +415,7 @@ const LoginScreen = () => {
                 }
                 holdLoading = true;
                 router.replace('/dashboard');
-                try { router.refresh(); } catch {}
+                try { router.refresh(); } catch { }
             }
         } catch (err: unknown) {
             logError('error', "Auth Error:", err);
@@ -394,11 +451,11 @@ const LoginScreen = () => {
         // Clean phone for validation check (remove non-digits)
         const cleanPhone = formData.phone.replace(/\D/g, '');
         if (cleanPhone.length < 10 || cleanPhone.length > 11) {
-             setReqError('Telefone inválido (DDD + Número).');
-             setReqLoading(false);
-             return;
+            setReqError('Telefone inválido (DDD + Número).');
+            setReqLoading(false);
+            return;
         }
-        
+
         const payload = {
             ...formData,
             role_requested: formData.is_teacher ? 'teacher' : 'student',
@@ -411,13 +468,13 @@ const LoginScreen = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            
+
             const json = await res.json();
-            
+
             if (!res.ok || !json.ok) {
                 throw new Error(json.error || 'Erro ao enviar solicitação.');
             }
-            
+
             setReqSuccess(true);
         } catch (err: unknown) {
             setReqError(err instanceof Error ? err.message : 'Erro de conexão.');
@@ -442,7 +499,7 @@ const LoginScreen = () => {
 
             {/* Glassmorphism Card */}
             <div className="relative z-10 w-full max-w-sm p-8 rounded-[2rem] border border-white/5 bg-neutral-900/40 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500">
-                
+
                 <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-3xl shadow-[0_0_40px_-10px_rgba(245,158,11,0.5)] ring-1 ring-white/20 animate-pulse-slow">
                     <Dumbbell size={48} className="text-black drop-shadow-md" />
                 </div>
@@ -450,11 +507,11 @@ const LoginScreen = () => {
                 <h1 className="text-4xl font-black mb-2 tracking-tighter italic text-center drop-shadow-lg">
                     IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
                 </h1>
-                
+
                 <p className="text-zinc-500 mb-8 text-center text-[10px] uppercase tracking-[0.3em] font-bold">
                     Sistema de Alta Performance • {appVersionLabel}
                 </p>
-                
+
                 {authMode === 'menu' && (
                     <div className="w-full space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {/* Google button removed */}
@@ -472,9 +529,10 @@ const LoginScreen = () => {
                 {(authMode === 'login' || authMode === 'signup' || authMode === 'recover' || authMode === 'recover_code') && (
                     <form onSubmit={handleEmailAuth} className="w-full space-y-4 animate-in fade-in slide-in-from-right-8 duration-300">
                         <div className="flex items-center mb-2">
-                            <button 
-                                type="button" 
-                                onClick={() => { setAuthMode('login'); setErrorMsg(''); }}
+                            <button
+                                type="button"
+                                aria-label="Voltar"
+                                onClick={() => { setAuthMode('login'); setErrorMsg(''); clearValidation(); }}
                                 className="p-2 -ml-2 text-neutral-400 hover:text-white transition-colors"
                             >
                                 <ArrowLeft size={20} />
@@ -495,10 +553,16 @@ const LoginScreen = () => {
                                         required
                                         type="text"
                                         placeholder="Nome Completo"
+                                        aria-label="Nome completo"
+                                        aria-required="true"
+                                        aria-invalid={!!validationErrors.fullName}
+                                        aria-describedby={validationErrors.fullName ? 'error-fullName' : undefined}
                                         value={emailData.fullName}
-                                        onChange={e => setEmailData({...emailData, fullName: e.target.value})}
-                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                        onChange={e => setEmailData({ ...emailData, fullName: e.target.value })}
+                                        onBlur={e => validateField('fullName', e.target.value)}
+                                        className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${validationErrors.fullName ? 'border-red-500/60' : 'border-neutral-800'}`}
                                     />
+                                    {validationErrors.fullName && <p id="error-fullName" className="mt-1 text-xs text-red-400">{validationErrors.fullName}</p>}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -507,8 +571,10 @@ const LoginScreen = () => {
                                         <input
                                             required
                                             type="date"
+                                            aria-label="Data de nascimento"
+                                            aria-required="true"
                                             value={emailData.birthDate}
-                                            onChange={e => setEmailData({...emailData, birthDate: e.target.value})}
+                                            onChange={e => setEmailData({ ...emailData, birthDate: e.target.value })}
                                             className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs"
                                         />
                                     </div>
@@ -518,16 +584,22 @@ const LoginScreen = () => {
                                             required
                                             type="tel"
                                             placeholder="(DDD) 99999-9999"
+                                            aria-label="Telefone com DDD"
+                                            aria-required="true"
+                                            aria-invalid={!!validationErrors.phone}
+                                            aria-describedby={validationErrors.phone ? 'error-phone' : undefined}
                                             value={emailData.phone}
                                             onChange={e => {
                                                 let val = e.target.value.replace(/\D/g, '');
                                                 if (val.length > 11) val = val.slice(0, 11);
                                                 if (val.length > 2) val = `(${val.slice(0, 2)}) ${val.slice(2)}`;
                                                 if (val.length > 9) val = `${val.slice(0, 10)}-${val.slice(10)}`;
-                                                setEmailData({...emailData, phone: val});
+                                                setEmailData({ ...emailData, phone: val });
                                             }}
-                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs"
+                                            onBlur={e => validateField('phone', e.target.value)}
+                                            className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs ${validationErrors.phone ? 'border-red-500/60' : 'border-neutral-800'}`}
                                         />
+                                        {validationErrors.phone && <p id="error-phone" className="mt-1 text-xs text-red-400">{validationErrors.phone}</p>}
                                     </div>
                                 </div>
                                 <div className="pt-2">
@@ -552,11 +624,17 @@ const LoginScreen = () => {
                                             <input
                                                 required
                                                 name="cref"
+                                                aria-label="Número do CREF"
+                                                aria-required="true"
+                                                aria-invalid={!!validationErrors.cref}
+                                                aria-describedby={validationErrors.cref ? 'error-cref' : undefined}
                                                 value={emailData.cref}
                                                 onChange={e => setEmailData({ ...emailData, cref: e.target.value })}
-                                                className="w-full bg-neutral-950 border border-yellow-500/50 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                                onBlur={e => validateField('cref', e.target.value)}
+                                                className={`w-full bg-neutral-950 border rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${validationErrors.cref ? 'border-red-500/60' : 'border-yellow-500/50'}`}
                                                 placeholder="Ex: 000000-G/SP"
                                             />
+                                            {validationErrors.cref && <p id="error-cref" className="mt-1 text-xs text-red-400">{validationErrors.cref}</p>}
                                         </div>
                                     )}
                                 </div>
@@ -567,69 +645,91 @@ const LoginScreen = () => {
                             <div className="relative">
                                 <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                                 <input
-                                        required
-                                        type="email"
-                                        placeholder="seu@email.com"
-                                        autoComplete="username"
-                                        value={emailData.email}
-                                        onChange={e => setEmailData({...emailData, email: e.target.value})}
-                                        className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
-                                    />
-                                </div>
+                                    required
+                                    type="email"
+                                    placeholder="seu@email.com"
+                                    aria-label="E-mail"
+                                    aria-required="true"
+                                    aria-invalid={!!validationErrors.email}
+                                    aria-describedby={validationErrors.email ? 'error-email' : undefined}
+                                    autoComplete="username"
+                                    value={emailData.email}
+                                    onChange={e => setEmailData({ ...emailData, email: e.target.value })}
+                                    onBlur={e => validateField('email', e.target.value)}
+                                    className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${validationErrors.email ? 'border-red-500/60' : 'border-neutral-800'}`}
+                                />
                             </div>
+                            {validationErrors.email && <p id="error-email" className="mt-1 text-xs text-red-400">{validationErrors.email}</p>}
+                        </div>
 
-                            {authMode !== 'recover' && (
-                                <div className="space-y-4">
+                        {authMode !== 'recover' && (
+                            <div className="space-y-4">
+                                <div>
                                     <div className="relative">
                                         <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                                         <input
                                             required
                                             type={showPassword ? "text" : "password"}
                                             placeholder="Senha"
+                                            aria-label="Senha"
+                                            aria-required="true"
+                                            aria-invalid={!!validationErrors.password}
+                                            aria-describedby={validationErrors.password ? 'error-password' : undefined}
                                             autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
                                             value={emailData.password}
-                                            onChange={e => setEmailData({...emailData, password: e.target.value})}
-                                            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                            onChange={e => setEmailData({ ...emailData, password: e.target.value })}
+                                            onBlur={e => authMode !== 'login' && validateField('password', e.target.value)}
+                                            className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${validationErrors.password ? 'border-red-500/60' : 'border-neutral-800'}`}
                                         />
                                     </div>
-                                    
-                                    {authMode === 'signup' && (
+                                    {validationErrors.password && <p id="error-password" className="mt-1 text-xs text-red-400">{validationErrors.password}</p>}
+                                </div>
+
+                                {authMode === 'signup' && (
+                                    <div>
                                         <div className="relative">
                                             <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                                             <input
                                                 required
                                                 type={showPassword ? "text" : "password"}
                                                 placeholder="Confirmar Senha"
+                                                aria-label="Confirmar senha"
+                                                aria-required="true"
+                                                aria-invalid={!!validationErrors.confirmPassword}
+                                                aria-describedby={validationErrors.confirmPassword ? 'error-confirmPassword' : undefined}
                                                 autoComplete="new-password"
                                                 value={emailData.confirmPassword}
-                                                onChange={e => setEmailData({...emailData, confirmPassword: e.target.value})}
-                                                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                                onChange={e => setEmailData({ ...emailData, confirmPassword: e.target.value })}
+                                                onBlur={e => validateField('confirmPassword', e.target.value)}
+                                                className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${validationErrors.confirmPassword ? 'border-red-500/60' : 'border-neutral-800'}`}
                                             />
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                        {validationErrors.confirmPassword && <p id="error-confirmPassword" className="mt-1 text-xs text-red-400">{validationErrors.confirmPassword}</p>}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-                            {authMode === 'login' && (
-                                <div className="flex items-center px-1">
-                                    <label className="flex items-center gap-2 cursor-pointer group">
-                                        <div className="relative flex items-center justify-center w-5 h-5">
-                                            <input
-                                                type="checkbox"
-                                                checked={rememberMe}
-                                                onChange={(e) => setRememberMe(e.target.checked)}
-                                                className="peer appearance-none w-5 h-5 bg-neutral-950 border border-neutral-800 rounded-md checked:bg-yellow-500 checked:border-yellow-500 transition-all cursor-pointer"
-                                            />
-                                            <div className="absolute opacity-0 peer-checked:opacity-100 pointer-events-none text-black">
-                                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                                </svg>
-                                            </div>
+                        {authMode === 'login' && (
+                            <div className="flex items-center px-1">
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <div className="relative flex items-center justify-center w-5 h-5">
+                                        <input
+                                            type="checkbox"
+                                            checked={rememberMe}
+                                            onChange={(e) => setRememberMe(e.target.checked)}
+                                            className="peer appearance-none w-5 h-5 bg-neutral-950 border border-neutral-800 rounded-md checked:bg-yellow-500 checked:border-yellow-500 transition-all cursor-pointer"
+                                        />
+                                        <div className="absolute opacity-0 peer-checked:opacity-100 pointer-events-none text-black">
+                                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12"></polyline>
+                                            </svg>
                                         </div>
-                                        <span className="text-[11px] font-bold text-neutral-500 group-hover:text-neutral-300 transition-colors uppercase tracking-wider">Lembrar meu e-mail</span>
-                                    </label>
-                                </div>
-                            )}
+                                    </div>
+                                    <span className="text-[11px] font-bold text-neutral-500 group-hover:text-neutral-300 transition-colors uppercase tracking-wider">Lembrar meu e-mail</span>
+                                </label>
+                            </div>
+                        )}
 
                         {authMode === 'recover_code' && (
                             <>
@@ -638,6 +738,8 @@ const LoginScreen = () => {
                                         required
                                         type={showPassword ? "text" : "password"}
                                         placeholder="Confirmar senha"
+                                        aria-label="Confirmar nova senha"
+                                        aria-required="true"
                                         value={recoveryPassword2}
                                         onChange={e => setRecoveryPassword2(e.target.value)}
                                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
@@ -649,6 +751,8 @@ const LoginScreen = () => {
                                         required
                                         type="text"
                                         placeholder="Código de recuperação (ex: ABCD-EF12-...)"
+                                        aria-label="Código de recuperação"
+                                        aria-required="true"
                                         value={recoveryCode}
                                         onChange={e => setRecoveryCode(e.target.value)}
                                         className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
@@ -661,11 +765,17 @@ const LoginScreen = () => {
                         <button
                             type="submit"
                             disabled={isLoading || (authMode === 'recover' && recoverCooldownLeft > 0)}
+                            aria-label={
+                                authMode === 'login' ? 'Entrar na conta' :
+                                authMode === 'signup' ? 'Criar conta' :
+                                authMode === 'recover_code' ? 'Redefinir senha' : 'Enviar link de recuperação'
+                            }
+                            aria-busy={isLoading}
                             className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-6 py-3.5 rounded-xl font-black text-lg shadow-lg hover:shadow-yellow-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
-                                authMode === 'login' ? 'ENTRAR' : 
-                                authMode === 'signup' ? 'CADASTRAR' : authMode === 'recover_code' ? 'REDEFINIR SENHA' : recoverCooldownLeft > 0 ? `AGUARDE ${recoverCooldownLeft}s` : 'ENVIAR LINK'
+                                authMode === 'login' ? 'ENTRAR' :
+                                    authMode === 'signup' ? 'CADASTRAR' : authMode === 'recover_code' ? 'REDEFINIR SENHA' : recoverCooldownLeft > 0 ? `AGUARDE ${recoverCooldownLeft}s` : 'ENVIAR LINK'
                             )}
                         </button>
 
@@ -689,16 +799,16 @@ const LoginScreen = () => {
                         {authMode === 'login' && (
                             <>
                                 <div className="flex justify-between items-center text-xs mt-4 px-1 relative z-20">
-                                    <button 
-                                        type="button" 
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('recover'); setErrorMsg(''); }} 
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('recover'); setErrorMsg(''); }}
                                         className="text-neutral-400 hover:text-yellow-500 transition-colors cursor-pointer p-2"
                                     >
                                         Esqueci a senha
                                     </button>
-                                    <button 
-                                        type="button" 
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('signup'); setErrorMsg(''); }} 
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('signup'); setErrorMsg(''); }}
                                         className="text-white font-bold hover:underline cursor-pointer p-2"
                                     >
                                         Criar conta
@@ -710,8 +820,8 @@ const LoginScreen = () => {
                                     <p className="text-[11px] text-neutral-400 mb-2">
                                         Já usava com Google?
                                     </p>
-                                    <button 
-                                        type="button" 
+                                    <button
+                                        type="button"
                                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('recover'); setErrorMsg(''); }}
                                         className="text-xs font-bold text-yellow-500 hover:text-yellow-400 underline decoration-yellow-500/30 underline-offset-2 cursor-pointer p-1"
                                     >
@@ -780,7 +890,7 @@ const LoginScreen = () => {
                     </button>
                 )}
             </div>
-            
+
             <div className="absolute bottom-6 text-[10px] text-zinc-700 font-mono tracking-widest uppercase opacity-50">
                 Exclusive Access Only
             </div>
@@ -795,7 +905,7 @@ const LoginScreen = () => {
                                 <X size={20} />
                             </button>
                         </div>
-                        
+
                         <div className="p-6">
                             {reqSuccess ? (
                                 <div className="text-center py-8">
@@ -807,7 +917,7 @@ const LoginScreen = () => {
                                         Recebemos seus dados. Se aprovado, você receberá um e-mail com as instruções de acesso.
                                     </p>
                                     <button
-                                        onClick={() => { setShowRequestModal(false); setReqSuccess(false); setFormData((prev) => ({ ...prev, full_name:'', email:'', phone:'', birth_date:'' })); }}
+                                        onClick={() => { setShowRequestModal(false); setReqSuccess(false); setFormData((prev) => ({ ...prev, full_name: '', email: '', phone: '', birth_date: '' })); }}
                                         className="w-full py-3 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl font-bold transition-colors"
                                     >
                                         Fechar

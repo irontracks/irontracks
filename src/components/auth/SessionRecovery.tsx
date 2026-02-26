@@ -23,7 +23,7 @@ const readLastRefresh = () => {
 const writeLastRefresh = (ts: number) => {
   try {
     if (typeof window !== 'undefined') window.localStorage.setItem(LAST_REFRESH_KEY, String(ts))
-  } catch {}
+  } catch { }
 }
 
 const isOnline = () => {
@@ -42,6 +42,29 @@ export default function SessionRecovery() {
   const supabase = useMemo(() => createClient(), [])
   const refreshingRef = useRef(false)
 
+  // Sincronizador de Backup de Sessão para iOS Nativo / PWA WKWebView
+  // A Apple apaga cookies ao matar o app. O localStorage sobrevive.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      try {
+        if (typeof window === 'undefined') return
+        const key = 'it.session.backup'
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.access_token && session?.refresh_token) {
+          window.localStorage.setItem(key, JSON.stringify({
+            access_token: session.access_token,
+            refresh_token: session.refresh_token,
+            expires_at: session.expires_at || 0
+          }))
+        } else if (event === 'SIGNED_OUT') {
+          window.localStorage.removeItem(key)
+        }
+      } catch { }
+    })
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [supabase])
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null
     let mounted = true
@@ -54,7 +77,7 @@ export default function SessionRecovery() {
         if (sync && typeof sync.register === 'function') {
           await sync.register('it-auth-refresh')
         }
-      } catch {}
+      } catch { }
     }
 
     const refresh = async (reason: string) => {
