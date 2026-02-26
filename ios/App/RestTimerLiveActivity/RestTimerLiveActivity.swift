@@ -18,7 +18,7 @@ struct RestTimerLiveActivity: Widget {
             }
         } dynamicIsland: { context in
             let finished = context.state.isFinished || Date() >= context.state.endTime
-            DynamicIsland {
+            return DynamicIsland {
                 // Expanded view
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 8) {
@@ -66,7 +66,7 @@ struct RestTimerLiveActivity: Widget {
                     }
                 }
             } compactLeading: {
-                pulsingDot(color: finished ? brandGreen : brandYellow)
+                compactLogo(finished: finished)
             } compactTrailing: {
                 if finished {
                     Text(timerInterval: context.state.endTime...Date.distantFuture, countsDown: false)
@@ -80,7 +80,7 @@ struct RestTimerLiveActivity: Widget {
                         .foregroundColor(.white)
                 }
             } minimal: {
-                pulsingDot(color: finished ? brandGreen : brandYellow)
+                compactLogo(finished: finished)
             }
             .keylineTint(finished ? brandGreen : brandYellow)
         }
@@ -100,6 +100,14 @@ struct RestTimerLiveActivity: Widget {
                 .foregroundColor(brandYellow)
         }
         .lineLimit(1)
+    }
+
+    @available(iOSApplicationExtension 16.1, *)
+    @ViewBuilder
+    private func compactLogo(finished: Bool) -> some View {
+        Text("IRON")
+            .font(.system(size: 11, weight: .black, design: .rounded))
+            .foregroundColor(finished ? brandGreen : brandYellow)
     }
 
     @available(iOSApplicationExtension 16.1, *)
