@@ -191,15 +191,15 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
             let content = UNMutableNotificationContent()
             content.title = title
             content.body = body
-            if #available(iOS 12.0, *) {
-                content.sound = UNNotificationSound.defaultCriticalSound(withAudioVolume: 1.0)
-            } else {
-                content.sound = .default
-            }
+            // .defaultCriticalSound requer entitlement especial da Apple — sem ela a
+            // notificação falha silenciosamente. Usamos .default que sempre funciona e
+            // acende a tela mesmo com iPhone bloqueado.
+            content.sound = UNNotificationSound.default
             content.categoryIdentifier = "REST_TIMER"
             content.threadIdentifier = "REST_TIMER"
             if #available(iOS 15.0, *) {
-                content.interruptionLevel = .critical
+                // .timeSensitive fura o Focus Mode sem precisar de entitlement especial
+                content.interruptionLevel = .timeSensitive
                 content.relevanceScore = 1.0
             }
             return content
@@ -328,7 +328,22 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
                     title: current.title,
                     isFinished: isFinished
                 )
-                await activity.update(using: updated)
+                if isFinished {
+                    // AlertConfiguration acorda a tela bloqueada (Apple docs)
+                    let alertConfig = AlertConfiguration(
+                        title: "⏰ Tempo Esgotado!",
+                        body: "Hora de voltar para o treino!",
+                        sound: .default
+                    )
+                    let content = ActivityContent(
+                        state: updated,
+                        staleDate: nil,
+                        relevanceScore: 1.0
+                    )
+                    await activity.update(content, alertConfiguration: alertConfig)
+                } else {
+                    await activity.update(using: updated)
+                }
                 call.resolve()
             }
             return
@@ -398,7 +413,8 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
             } catch {}
         }
 
-        // Update Live Activity to finished state (from native, works even in background)
+        // Atualiza Live Activity com AlertConfiguration — acorda a tela bloqueada.
+        // Apple documenta: "To wake the device's screen, use the AlertConfiguration object."
         if #available(iOS 16.2, *) {
             if let id = alarmRestId, let activity = Self.restActivities[id] as? Activity<RestTimerAttributes> {
                 Task {
@@ -408,7 +424,17 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
                         title: current.title,
                         isFinished: true
                     )
-                    await activity.update(using: updated)
+                    let alertConfig = AlertConfiguration(
+                        title: "⏰ Tempo Esgotado!",
+                        body: "Hora de voltar para o treino!",
+                        sound: .default
+                    )
+                    let content = ActivityContent(
+                        state: updated,
+                        staleDate: nil,
+                        relevanceScore: 1.0
+                    )
+                    await activity.update(content, alertConfiguration: alertConfig)
                 }
             }
         }
