@@ -32,7 +32,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         // Request notification permissions on first launch
         // This ensures the app appears in iOS Settings > Notifications
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+        var authOptions: UNAuthorizationOptions = [.alert, .sound, .badge]
+        if #available(iOS 15.0, *) {
+            authOptions.insert(.timeSensitive) // fura Focus Mode sem entitlement especial
+        }
+        center.requestAuthorization(options: authOptions) { granted, error in
             if granted {
                 DispatchQueue.main.async {
                     UIApplication.shared.registerForRemoteNotifications()
@@ -83,6 +87,17 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        let categoryId = notification.request.content.categoryIdentifier
+        let appState = UIApplication.shared.applicationState
+
+        // REST_TIMER: se o app não está visível (ex: áudio em background com tela bloqueada),
+        // retorna [] para que o iOS entregue a notificação na lock screen e acorde a tela.
+        // Se o app está ativo (visível), mostra como banner in-app normalmente.
+        if categoryId == "REST_TIMER" && appState != .active {
+            completionHandler([])
+            return
+        }
+
         completionHandler([.banner, .sound, .badge])
     }
 
@@ -99,7 +114,7 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         NotificationCenter.default.post(
             name: NSNotification.Name("IronTracksNotificationAction"),
             object: nil,
-            userInfo: ["action": actionIdentifier, "notificationId": notificationId]
+            userInfo: ["actionId": actionIdentifier, "notificationId": notificationId]
         )
         completionHandler()
     }
