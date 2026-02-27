@@ -132,6 +132,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const [clusterModal, setClusterModal] = useState<UnknownRecord | null>(null);
   const [restPauseModal, setRestPauseModal] = useState<UnknownRecord | null>(null);
   const [dropSetModal, setDropSetModal] = useState<UnknownRecord | null>(null);
+  const [strippingModal, setStrippingModal] = useState<UnknownRecord | null>(null);
+  const [fst7Modal, setFst7Modal] = useState<UnknownRecord | null>(null);
+  const [heavyDutyModal, setHeavyDutyModal] = useState<UnknownRecord | null>(null);
+  const [pontoZeroModal, setPontoZeroModal] = useState<UnknownRecord | null>(null);
+  const [forcedRepsModal, setForcedRepsModal] = useState<UnknownRecord | null>(null);
+  const [negativeRepsModal, setNegativeRepsModal] = useState<UnknownRecord | null>(null);
+  const [partialRepsModal, setPartialRepsModal] = useState<UnknownRecord | null>(null);
+  const [sistema21Modal, setSistema21Modal] = useState<UnknownRecord | null>(null);
+  const [waveModal, setWaveModal] = useState<UnknownRecord | null>(null);
+  const [groupMethodModal, setGroupMethodModal] = useState<UnknownRecord | null>(null);
   const [postCheckinOpen, setPostCheckinOpen] = useState<boolean>(false);
   const [postCheckinDraft, setPostCheckinDraft] = useState<PostCheckinDraft>({ rpe: '', satisfaction: '', soreness: '', notes: '' });
   const postCheckinResolveRef = useRef<((value: unknown) => void) | null>(null);
@@ -1625,6 +1635,370 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     } catch {}
   };
 
+  const saveStrippingModal = () => {
+    try {
+      const m = strippingModal && typeof strippingModal === 'object' ? strippingModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setStrippingModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const stagesRaw = Array.isArray(m?.stages) ? m.stages : [];
+      if (stagesRaw.length < 2) {
+        setStrippingModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Defina pelo menos 2 etapas.' } : prev));
+        return;
+      }
+      const stages: { weight: string; reps: number }[] = [];
+      let total = 0;
+      for (let i = 0; i < stagesRaw.length; i += 1) {
+        const s = stagesRaw[i] && typeof stagesRaw[i] === 'object' ? stagesRaw[i] : {};
+        const weight = String(s?.weight ?? '').trim();
+        const reps = parseTrainingNumber(s?.reps);
+        if (!weight) {
+          setStrippingModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg) em todas as etapas.' } : prev));
+          return;
+        }
+        if (!reps || reps <= 0) {
+          setStrippingModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps em todas as etapas.' } : prev));
+          return;
+        }
+        stages.push({ weight, reps });
+        total += reps;
+      }
+      const firstWeight = String(stages[0]?.weight ?? '').trim();
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight: firstWeight,
+        reps: String(total || ''),
+        stripping: { stages },
+      });
+      setStrippingModal(null);
+    } catch {}
+  };
+
+  const saveFst7Modal = () => {
+    try {
+      const m = fst7Modal && typeof fst7Modal === 'object' ? fst7Modal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setFst7Modal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const blocksRaw = Array.isArray(m?.blocks) ? m.blocks : [];
+      if (blocksRaw.length !== 7) {
+        setFst7Modal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'FST-7 requer exatamente 7 blocos.' } : prev));
+        return;
+      }
+      const blocks: { weight: string; reps: number }[] = [];
+      let total = 0;
+      for (let i = 0; i < blocksRaw.length; i += 1) {
+        const b = blocksRaw[i] && typeof blocksRaw[i] === 'object' ? blocksRaw[i] : {};
+        const weight = String(b?.weight ?? '').trim();
+        const reps = parseTrainingNumber(b?.reps);
+        if (!weight) {
+          setFst7Modal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso em todos os blocos.' } : prev));
+          return;
+        }
+        if (!reps || reps <= 0) {
+          setFst7Modal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps em todos os blocos.' } : prev));
+          return;
+        }
+        blocks.push({ weight, reps });
+        total += reps;
+      }
+      const intra_sec = parseTrainingNumber(m?.intra_sec) ?? 30;
+      const firstWeight = String(blocks[0]?.weight ?? '').trim();
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight: firstWeight,
+        reps: String(total || ''),
+        fst7: { blocks, intra_sec },
+      });
+      setFst7Modal(null);
+    } catch {}
+  };
+
+  const saveHeavyDutyModal = () => {
+    try {
+      const m = heavyDutyModal && typeof heavyDutyModal === 'object' ? heavyDutyModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setHeavyDutyModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const reps_failure = parseTrainingNumber(m?.reps_failure);
+      if (!weight) {
+        setHeavyDutyModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (!reps_failure || reps_failure <= 0) {
+        setHeavyDutyModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps até a falha.' } : prev));
+        return;
+      }
+      const forced_count = parseTrainingNumber(m?.forced_count) ?? undefined;
+      const negatives_count = parseTrainingNumber(m?.negatives_count) ?? undefined;
+      const eccentric_sec = parseTrainingNumber(m?.eccentric_sec) ?? undefined;
+      const rpe = String(m?.rpe ?? '').trim();
+      const heavy_duty: UnknownRecord = { weight, reps_failure, rpe };
+      if (forced_count != null) heavy_duty.forced_count = forced_count;
+      if (negatives_count != null) heavy_duty.negatives_count = negatives_count;
+      if (eccentric_sec != null) heavy_duty.eccentric_sec = eccentric_sec;
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(reps_failure),
+        rpe,
+        heavy_duty,
+      });
+      setHeavyDutyModal(null);
+    } catch {}
+  };
+
+  const savePontoZeroModal = () => {
+    try {
+      const m = pontoZeroModal && typeof pontoZeroModal === 'object' ? pontoZeroModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setPontoZeroModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const reps = parseTrainingNumber(m?.reps);
+      if (!weight) {
+        setPontoZeroModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (!reps || reps <= 0) {
+        setPontoZeroModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps.' } : prev));
+        return;
+      }
+      const holdRaw = parseTrainingNumber(m?.hold_sec);
+      const hold_sec = holdRaw === 3 || holdRaw === 4 || holdRaw === 5 ? holdRaw : 4;
+      const rpe = String(m?.rpe ?? '').trim();
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(reps),
+        rpe,
+        ponto_zero: { weight, reps, hold_sec, rpe },
+      });
+      setPontoZeroModal(null);
+    } catch {}
+  };
+
+  const saveForcedRepsModal = () => {
+    try {
+      const m = forcedRepsModal && typeof forcedRepsModal === 'object' ? forcedRepsModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setForcedRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const reps_failure = parseTrainingNumber(m?.reps_failure);
+      const forced_count = parseTrainingNumber(m?.forced_count);
+      if (!weight) {
+        setForcedRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (!reps_failure || reps_failure <= 0) {
+        setForcedRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps até a falha.' } : prev));
+        return;
+      }
+      if (!forced_count || forced_count <= 0) {
+        setForcedRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps forçadas.' } : prev));
+        return;
+      }
+      const rpe = String(m?.rpe ?? '').trim();
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(reps_failure),
+        rpe,
+        forced_reps: { weight, reps_failure, forced_count, rpe },
+      });
+      setForcedRepsModal(null);
+    } catch {}
+  };
+
+  const saveNegativeRepsModal = () => {
+    try {
+      const m = negativeRepsModal && typeof negativeRepsModal === 'object' ? negativeRepsModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setNegativeRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const reps = parseTrainingNumber(m?.reps);
+      const eccentric_sec = parseTrainingNumber(m?.eccentric_sec);
+      if (!weight) {
+        setNegativeRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (!reps || reps <= 0) {
+        setNegativeRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps.' } : prev));
+        return;
+      }
+      if (!eccentric_sec || eccentric_sec <= 0) {
+        setNegativeRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o tempo excêntrico (seg).' } : prev));
+        return;
+      }
+      const rpe = String(m?.rpe ?? '').trim();
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(reps),
+        rpe,
+        negative_reps: { weight, reps, eccentric_sec, rpe },
+      });
+      setNegativeRepsModal(null);
+    } catch {}
+  };
+
+  const savePartialRepsModal = () => {
+    try {
+      const m = partialRepsModal && typeof partialRepsModal === 'object' ? partialRepsModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setPartialRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const full_reps = parseTrainingNumber(m?.full_reps);
+      const partial_count = parseTrainingNumber(m?.partial_count);
+      if (!weight) {
+        setPartialRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (!full_reps || full_reps <= 0) {
+        setPartialRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps completas.' } : prev));
+        return;
+      }
+      if (!partial_count || partial_count <= 0) {
+        setPartialRepsModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps parciais.' } : prev));
+        return;
+      }
+      const rpe = String(m?.rpe ?? '').trim();
+      const total = full_reps + partial_count;
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(total),
+        rpe,
+        partial_reps: { weight, full_reps, partial_count, rpe },
+      });
+      setPartialRepsModal(null);
+    } catch {}
+  };
+
+  const saveSistema21Modal = () => {
+    try {
+      const m = sistema21Modal && typeof sistema21Modal === 'object' ? sistema21Modal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setSistema21Modal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const phase1 = parseTrainingNumber(m?.phase1);
+      const phase2 = parseTrainingNumber(m?.phase2);
+      const phase3 = parseTrainingNumber(m?.phase3);
+      if (!weight) {
+        setSistema21Modal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (!phase1 || phase1 <= 0 || !phase2 || phase2 <= 0 || !phase3 || phase3 <= 0) {
+        setSistema21Modal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps de todas as fases.' } : prev));
+        return;
+      }
+      const rpe = String(m?.rpe ?? '').trim();
+      const total = phase1 + phase2 + phase3;
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(total),
+        rpe,
+        sistema21: { weight, phase1, phase2, phase3, rpe },
+      });
+      setSistema21Modal(null);
+    } catch {}
+  };
+
+  const saveWaveModal = () => {
+    try {
+      const m = waveModal && typeof waveModal === 'object' ? waveModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setWaveModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const wavesRaw = Array.isArray(m?.waves) ? m.waves : [];
+      if (!weight) {
+        setWaveModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (wavesRaw.length < 1) {
+        setWaveModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Defina pelo menos 1 onda.' } : prev));
+        return;
+      }
+      const waves: { heavy: number; medium: number; ultra: number }[] = [];
+      let total = 0;
+      for (let i = 0; i < wavesRaw.length; i += 1) {
+        const w = wavesRaw[i] && typeof wavesRaw[i] === 'object' ? wavesRaw[i] : {};
+        const heavy = parseTrainingNumber(w?.heavy);
+        const medium = parseTrainingNumber(w?.medium);
+        const ultra = parseTrainingNumber(w?.ultra);
+        if (!heavy || !medium || !ultra) {
+          setWaveModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha todas as reps de cada onda.' } : prev));
+          return;
+        }
+        waves.push({ heavy, medium, ultra });
+        total += heavy + medium + ultra;
+      }
+      const rpe = String(m?.rpe ?? '').trim();
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(total),
+        rpe,
+        wave: { weight, waves, rpe },
+      });
+      setWaveModal(null);
+    } catch {}
+  };
+
+  const saveGroupMethodModal = () => {
+    try {
+      const m = groupMethodModal && typeof groupMethodModal === 'object' ? groupMethodModal : null;
+      const key = String(m?.key || '').trim();
+      if (!key) {
+        setGroupMethodModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Série inválida. Feche e abra novamente.' } : prev));
+        return;
+      }
+      const weight = String(m?.weight ?? '').trim();
+      const reps = parseTrainingNumber(m?.reps);
+      if (!weight) {
+        setGroupMethodModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha o peso (kg).' } : prev));
+        return;
+      }
+      if (!reps || reps <= 0) {
+        setGroupMethodModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps.' } : prev));
+        return;
+      }
+      const rpe = String(m?.rpe ?? '').trim();
+      updateLog(key, {
+        done: !!getLog(key)?.done,
+        weight,
+        reps: String(reps),
+        rpe,
+      });
+      setGroupMethodModal(null);
+    } catch {}
+  };
+
   const currentExercise = exercises[currentExerciseIdx] ?? null;
 
   const elapsedSeconds = useMemo(() => {
@@ -1674,6 +2048,26 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     setRestPauseModal,
     dropSetModal,
     setDropSetModal,
+    strippingModal,
+    setStrippingModal,
+    fst7Modal,
+    setFst7Modal,
+    heavyDutyModal,
+    setHeavyDutyModal,
+    pontoZeroModal,
+    setPontoZeroModal,
+    forcedRepsModal,
+    setForcedRepsModal,
+    negativeRepsModal,
+    setNegativeRepsModal,
+    partialRepsModal,
+    setPartialRepsModal,
+    sistema21Modal,
+    setSistema21Modal,
+    waveModal,
+    setWaveModal,
+    groupMethodModal,
+    setGroupMethodModal,
     postCheckinOpen,
     setPostCheckinOpen,
     postCheckinDraft,
@@ -1723,6 +2117,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     saveClusterModal,
     saveRestPauseModal,
     saveDropSetModal,
+    saveStrippingModal,
+    saveFst7Modal,
+    saveHeavyDutyModal,
+    savePontoZeroModal,
+    saveForcedRepsModal,
+    saveNegativeRepsModal,
+    savePartialRepsModal,
+    saveSistema21Modal,
+    saveWaveModal,
+    saveGroupMethodModal,
     applyDeloadToExercise,
     updateDeloadModalFromPercent,
     updateDeloadModalFromWeight,
