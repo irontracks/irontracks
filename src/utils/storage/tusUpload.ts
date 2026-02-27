@@ -1,6 +1,9 @@
 import * as tus from 'tus-js-client'
 import { createClient } from '@/utils/supabase/client'
-import { logInfo, logError } from '@/lib/logger'
+import { logInfo, logError, logWarn } from '@/lib/logger'
+
+// 2-minute hard timeout — prevents hanging forever on bad network / iOS WKWebView quirks
+const TUS_TIMEOUT_MS = 120_000
 
 export async function uploadWithTus(
   file: Blob | File,
@@ -16,8 +19,7 @@ export async function uploadWithTus(
     throw new Error('User must be logged in to upload')
   }
 
-  return new Promise((resolve, reject) => {
-    // Determine endpoints from env
+  const uploadPromise = new Promise<void>((resolve, reject) => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
     if (!supabaseUrl) {
       return reject(new Error('NEXT_PUBLIC_SUPABASE_URL is missing'))
@@ -26,7 +28,7 @@ export async function uploadWithTus(
 
     const upload = new tus.Upload(file, {
       endpoint,
-      retryDelays: [0, 3000, 5000, 10000, 20000],
+      retryDelays: [0, 3000, 5000, 10000],
       headers: {
         authorization: `Bearer ${session.access_token}`,
         'x-upsert': 'true',
@@ -40,28 +42,35 @@ export async function uploadWithTus(
       },
       chunkSize: 6 * 1024 * 1024, // 6MB
       onError: (error) => {
-        logError('error', 'TUS upload error:', error)
+        logError('TUS', 'Upload error', error)
         reject(error)
       },
       onProgress: (bytesUploaded, bytesTotal) => {
-        if (onProgress) {
-          onProgress(bytesUploaded, bytesTotal)
-        }
+        onProgress?.(bytesUploaded, bytesTotal)
       },
       onSuccess: () => {
-        logInfo('info', `TUS upload success: ${fileName}`)
+        logInfo('TUS', `Upload success: ${fileName}`)
         resolve()
       },
     })
 
+    // findPreviousUploads uses IndexedDB which can hang in some WKWebView setups.
+    // If it fails, just start fresh — don't reject.
     upload.findPreviousUploads().then((previousUploads) => {
       if (previousUploads.length) {
         upload.resumeFromPreviousUpload(previousUploads[0])
       }
       upload.start()
-    }).catch((error) => {
-      logError('error', 'Failed to find previous TUS uploads:', error)
-      reject(error)
+    }).catch((err) => {
+      logWarn('TUS', 'findPreviousUploads failed, starting fresh', err)
+      upload.start()
     })
   })
+
+  return Promise.race([
+    uploadPromise,
+    new Promise<void>((_, reject) =>
+      setTimeout(() => reject(new Error(`Upload timeout after ${TUS_TIMEOUT_MS / 1000}s`)), TUS_TIMEOUT_MS)
+    ),
+  ])
 }
