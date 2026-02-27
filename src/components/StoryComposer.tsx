@@ -60,9 +60,11 @@ interface LayoutOption {
 
 const CANVAS_W = 720
 const CANVAS_H = 1280
-const SAFE_TOP = 250
-const SAFE_BOTTOM = 420
-const SAFE_SIDE = 90
+// Instagram Stories safe zone scaled to 720x1280:
+// top/bottom: 250/1920 * 1280 ≈ 167px; sides: 60/1080 * 720 ≈ 40px
+const SAFE_TOP = 168
+const SAFE_BOTTOM = 200
+const SAFE_SIDE = 56
 
 const STORY_LAYOUTS: LayoutOption[] = [
   { id: 'bottom-row', label: 'Normal' },
@@ -1095,11 +1097,22 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       ])
       const file = new File([result.blob], result.filename, { type: result.mime })
 
+      const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
+      const isIOS = isIOSUserAgent(ua)
+
       let shared = false
-      if (typeof navigator.share === 'function' && navigator.canShare && navigator.canShare({ files: [file] })) {
+      if (typeof navigator.share === 'function') {
         try {
-          await navigator.share({ files: [file], title: 'Story IronTracks' })
-          shared = true
+          const shareData = { files: [file], title: 'Story IronTracks' }
+          const canShare = navigator.canShare ? navigator.canShare(shareData) : true
+          if (canShare) {
+            await navigator.share(shareData)
+            shared = true
+            // On iOS the share sheet opens — instruct user to save to camera roll
+            if (isIOS) {
+              setInfo('Toque em "Salvar Imagem" na janela de compartilhamento para salvar no rolo do iPhone.')
+            }
+          }
         } catch (shareErr: unknown) {
           const name = String((shareErr as { name?: string })?.name || '').trim()
           // If user cancelled, stop here
@@ -1114,12 +1127,15 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       }
 
       if (!shared) {
+        // On iOS, <a download> saves to Files app — NOT the camera roll.
+        // Trigger the download as fallback but guide the user.
         downloadBlob(result.blob, result.filename)
-        // iOS PWA only supports saving blobs to Files (Downloads) natively unless user shares to Photos
-        if (mediaKind === 'video') {
-          setInfo('Salvo em Arquivos/Downloads do iOS!')
+        if (isIOS) {
+          setInfo('Arquivo salvo em Arquivos > Downloads. Para salvar direto no rolo: use Compartilhar e toque "Salvar Imagem".')
+        } else if (mediaKind === 'video') {
+          setInfo('Vídeo salvo em Downloads!')
         } else {
-          setInfo('Baixado com sucesso!')
+          setInfo('Imagem salva em Downloads!')
         }
       }
     } catch (e: unknown) {
