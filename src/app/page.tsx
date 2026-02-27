@@ -1,7 +1,7 @@
-import LoginScreen from '@/components/LoginScreen'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import RecoveryBridgeClient from './recovery-bridge-client'
+import LoginGate from './login-gate'
 
 type SP = Record<string, string | string[] | undefined>
 
@@ -42,7 +42,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   return (
     <>
       <RecoveryBridgeClient />
-      <LoginScreen />
+      <LoginGate />
     </>
   )
 }
