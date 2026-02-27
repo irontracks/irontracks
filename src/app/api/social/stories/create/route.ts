@@ -56,11 +56,14 @@ export async function POST(req: Request) {
     const pathParts = mediaPath.split('/')
     const fileName = pathParts.at(-1) ?? ''
     const folderPath = pathParts.slice(0, -1).join('/')
-    const { data: objects } = await mimeAdmin.storage
-      .from('social-stories')
-      .list(folderPath, { search: fileName, limit: 1 })
-    const storageMime = String(objects?.[0]?.metadata?.mimetype || '').toLowerCase()
-    if (!storageMime || !ALLOWED_MIME_PREFIXES.some((m) => storageMime.startsWith(m))) {
+    // Timeout the storage list — if metadata isn't ready yet (e.g. just uploaded), skip MIME check
+    const listResult = await Promise.race([
+      mimeAdmin.storage.from('social-stories').list(folderPath, { search: fileName, limit: 1 }),
+      new Promise<{ data: null; error: null }>((resolve) => setTimeout(() => resolve({ data: null, error: null }), 8_000)),
+    ])
+    const storageMime = String(listResult.data?.[0]?.metadata?.mimetype || '').toLowerCase()
+    // Only block if we got a MIME and it's explicitly disallowed; skip check if list timed out / returned empty
+    if (storageMime && !ALLOWED_MIME_PREFIXES.some((m) => storageMime.startsWith(m))) {
       return NextResponse.json({ ok: false, error: 'Tipo de arquivo não permitido.' }, { status: 400 })
     }
 
@@ -77,31 +80,39 @@ export async function POST(req: Request) {
 
     if (error || !data?.id) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'failed' }, { status: 400 })
 
-    try {
-      const throttled = await shouldThrottleBySenderType(auth.user.id, 'story_posted', 5)
-      if (!throttled) {
-        const followerIds = await listFollowerIdsOf(auth.user.id)
-        const recipients = await filterRecipientsByPreference(followerIds, 'notifySocialFollows')
-        if (recipients.length) {
-          const admin = createAdminClient()
-          const { data: authorProfile } = await admin.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle()
-          const authorName = String(authorProfile?.display_name || '').trim() || 'Seu amigo'
-          await insertNotifications(
-            recipients.map((uid) => ({
-              user_id: uid,
-              recipient_id: uid,
-              sender_id: auth.user.id,
-              type: 'story_posted',
-              title: 'Novo story',
-              message: `${authorName} postou um story.`,
-              read: false,
-              is_read: false,
-              metadata: { author_id: auth.user.id, story_id: data.id },
-            }))
-          )
+    // Fire-and-forget notifications — must not block the response
+    const storyId = data.id
+    const authorId = auth.user.id
+    void Promise.race([
+      (async () => {
+        const throttled = await shouldThrottleBySenderType(authorId, 'story_posted', 5)
+        if (!throttled) {
+          const followerIds = await listFollowerIdsOf(authorId)
+          const recipients = await filterRecipientsByPreference(followerIds, 'notifySocialFollows')
+          if (recipients.length) {
+            const admin = createAdminClient()
+            const { data: authorProfile } = await admin.from('profiles').select('display_name').eq('id', authorId).maybeSingle()
+            const authorName = String(authorProfile?.display_name || '').trim() || 'Seu amigo'
+            await insertNotifications(
+              recipients.map((uid) => ({
+                user_id: uid,
+                recipient_id: uid,
+                sender_id: authorId,
+                type: 'story_posted',
+                title: 'Novo story',
+                message: `${authorName} postou um story.`,
+                read: false,
+                is_read: false,
+                metadata: { author_id: authorId, story_id: storyId },
+              }))
+            )
+          }
         }
-      }
-    } catch { }
+      })(),
+      // Hard cap: notifications must finish in 5s or be abandoned
+      new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+    ]).catch(() => {})
+
     return NextResponse.json({ ok: true, data })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

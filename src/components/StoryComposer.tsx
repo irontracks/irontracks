@@ -1261,11 +1261,19 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       }
 
       const createUrl = isIosNative() ? `/api/social/stories/create?media_path=${encodeURIComponent(path)}` : '/api/social/stories/create'
-      const createResp = await fetch(createUrl, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ mediaPath: path, media_path: path, caption: String(metrics?.title || ''), meta }),
-      })
+      const fetchController = new AbortController()
+      const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000)
+      let createResp: Response
+      try {
+        createResp = await fetch(createUrl, {
+          method: 'POST',
+          signal: fetchController.signal,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ mediaPath: path, media_path: path, caption: String(metrics?.title || ''), meta }),
+        })
+      } finally {
+        clearTimeout(fetchTimeout)
+      }
       const createJson = await createResp.json().catch((): null => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
 
