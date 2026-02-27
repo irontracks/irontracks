@@ -190,7 +190,14 @@ export const NormalSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: n
 
 // --- Rest Pause Set ---
 
-export const RestPauseSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
+export const RestPauseSet = ({
+  ex, exIdx, setIdx, sstOverride,
+}: {
+  ex: WorkoutExercise;
+  exIdx: number;
+  setIdx: number;
+  sstOverride?: { restSec: number; miniCount: number } | null;
+}) => {
   const {
     getLog,
     updateLog,
@@ -213,22 +220,27 @@ export const RestPauseSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight} kg` : 'kg';
 
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;
-  const modeLabel = String(auto?.label || '').trim() || (String(auto?.kind || '') === 'sst' ? 'SST' : 'Rest-P');
+  // SST override takes priority for the label
+  const modeLabel = sstOverride
+    ? 'SST'
+    : String(auto?.label || '').trim() || (String(auto?.kind || '') === 'sst' ? 'SST' : 'Rest-P');
 
-  const pauseSec = parseTrainingNumber(cfg?.rest_time_sec) ?? 15;
-  const miniSets = Math.max(0, Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0));
+  // SST override takes priority for config values
+  const pauseSec = sstOverride ? sstOverride.restSec : (parseTrainingNumber(cfg?.rest_time_sec) ?? 15);
+  const miniSets = sstOverride
+    ? sstOverride.miniCount
+    : Math.max(0, Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0));
 
   const rp = isObject(log.rest_pause) ? (log.rest_pause as UnknownRecord) : ({} as UnknownRecord);
-  const activation = parseTrainingNumber(rp?.activation_reps) ?? null;
   const minisArrRaw: unknown[] = Array.isArray(rp?.mini_reps) ? (rp.mini_reps as unknown[]) : [];
   const minis: Array<number | null> = Array.from({ length: miniSets }).map((_, idx) => {
     const v = minisArrRaw[idx];
     return parseTrainingNumber(v);
   });
 
-  const total = (activation ?? 0) + minis.reduce<number>((acc, v) => acc + (typeof v === 'number' ? v : 0), 0);
+  const total = minis.reduce<number>((acc, v) => acc + (typeof v === 'number' ? v : 0), 0);
   const done = !!log.done;
-  const canDone = (activation ?? 0) > 0 && (miniSets === 0 || minis.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
+  const canDone = miniSets > 0 && minis.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
 
   const notesValue = String(log.notes ?? '');
 
@@ -252,8 +264,7 @@ export const RestPauseSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             onClick={() => {
               const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
               const baseRpe = String(log?.rpe ?? '').trim();
-              const nextMiniCount = Math.max(0, Math.floor(miniSets));
-              const minisInput = Array.from({ length: nextMiniCount }).map((_, idx) => {
+              const minisInput = Array.from({ length: miniSets }).map((_, idx) => {
                 const v = minisArrRaw?.[idx];
                 const n = parseTrainingNumber(v);
                 return n != null && n > 0 ? n : null;
@@ -262,9 +273,9 @@ export const RestPauseSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 key,
                 label: modeLabel,
                 pauseSec,
-                miniSets: nextMiniCount,
+                miniSets,
                 weight: baseWeight,
-                activationReps: activation != null && activation > 0 ? activation : null,
+                activationReps: null,
                 minis: minisInput,
                 rpe: baseRpe,
                 cfg: cfg ?? null,
@@ -305,7 +316,7 @@ export const RestPauseSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 completedAtMs: nextDone ? nowMs : null,
                 executionSeconds: nextDone ? executionSeconds : null,
                 reps: String(total || ''),
-                rest_pause: { ...rp, activation_reps: activation ?? null, mini_reps: minis },
+                rest_pause: { ...rp, activation_reps: 0, mini_reps: minis },
                 advanced_config: cfg ?? log.advanced_config ?? null,
               });
               if (nextDone && restTime && restTime > 0) {
