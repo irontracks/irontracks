@@ -9,6 +9,7 @@ import CoreSpotlight
 import CoreMotion
 import HealthKit
 import AVFoundation
+import Photos
 
 @objc(IronTracksNative)
 public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
@@ -49,6 +50,8 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestHealthKitPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveWorkoutToHealth", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getHealthSteps", returnType: CAPPluginReturnPromise),
+        // Photos
+        CAPPluginMethod(name: "saveImageToPhotos", returnType: CAPPluginReturnPromise),
     ]
 
     // MARK: - State
@@ -808,5 +811,35 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["steps": Int(steps)])
         }
         healthStore.execute(query)
+    }
+
+    // MARK: - Photos
+
+    @objc func saveImageToPhotos(_ call: CAPPluginCall) {
+        guard let base64 = call.getString("base64"),
+              let data = Data(base64Encoded: base64),
+              let image = UIImage(data: data) else {
+            call.resolve(["saved": false, "error": "Dados de imagem inválidos"])
+            return
+        }
+
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            switch status {
+            case .authorized, .limited:
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAsset(from: image)
+                }) { success, error in
+                    if success {
+                        call.resolve(["saved": true, "error": ""])
+                    } else {
+                        call.resolve(["saved": false, "error": error?.localizedDescription ?? "Falha ao salvar"])
+                    }
+                }
+            case .denied, .restricted:
+                call.resolve(["saved": false, "error": "permissionDenied"])
+            default:
+                call.resolve(["saved": false, "error": "Permissão não concedida"])
+            }
+        }
     }
 }

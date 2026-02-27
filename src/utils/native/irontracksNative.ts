@@ -38,6 +38,8 @@ type IronTracksNativePlugin = {
   requestHealthKitPermission: () => Promise<{ granted: boolean; error: string }>
   saveWorkoutToHealth: (opts: { startMs: number; endMs: number; calories?: number }) => Promise<{ saved: boolean; error: string }>
   getHealthSteps: () => Promise<{ steps: number }>
+  // Photos
+  saveImageToPhotos: (opts: { base64: string }) => Promise<{ saved: boolean; error: string }>
 }
 
 export type HapticStyle =
@@ -71,6 +73,7 @@ const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
     requestHealthKitPermission: async () => ({ granted: false, error: 'Not available on web' }),
     saveWorkoutToHealth: async () => ({ saved: false, error: 'Not available on web' }),
     getHealthSteps: async () => ({ steps: 0 }),
+    saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   },
 })
 
@@ -352,5 +355,16 @@ export const getHealthSteps = async () => {
     return steps
   } catch {
     return 0
+  }
+}
+
+// ─── Photos ───────────────────────────────────────────────────────────────────
+
+export const saveImageToPhotos = async (base64: string) => {
+  try {
+    if (!isIosNative()) return { saved: false, error: 'Not iOS native' }
+    return await Native.saveImageToPhotos({ base64 })
+  } catch {
+    return { saved: false, error: 'Save failed' }
   }
 }

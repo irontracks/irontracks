@@ -9,6 +9,7 @@ import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
+import { saveImageToPhotos, openAppSettings } from '@/utils/native/irontracksNative'
 import { uploadWithTus } from '@/utils/storage/tusUpload'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
@@ -1098,8 +1099,39 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           setTimeout(() => reject(new Error('timeout_rendering_5m')), 300000)
         )
       ])
-      const file = new File([result.blob], result.filename, { type: result.mime })
 
+      // ── iOS native (Capacitor): save directly to camera roll via native bridge ──
+      if (isIosNative()) {
+        // Convert blob → base64 string
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => {
+            const dataUrl = String(reader.result || '')
+            const b64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl
+            if (b64) resolve(b64)
+            else reject(new Error('base64_empty'))
+          }
+          reader.onerror = () => reject(new Error('reader_error'))
+          reader.readAsDataURL(result.blob)
+        })
+
+        const saveResult = await saveImageToPhotos(base64)
+        if (saveResult.saved) {
+          setInfo('Salvo no rolo do iPhone!')
+          return
+        }
+        // Permission denied → offer to open settings
+        if (saveResult.error === 'permissionDenied') {
+          setError('Permissão de Fotos negada. Vá em Ajustes > IronTracks > Fotos.')
+          await openAppSettings()
+          return
+        }
+        // Other error → fall through to Web Share API
+        logWarn('StoryComposer', 'Native save failed, trying share API', saveResult.error)
+      }
+
+      // ── Web Share API (iOS PWA / non-native / fallback) ──────────────────────
+      const file = new File([result.blob], result.filename, { type: result.mime })
       const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
       const isIOS = isIOSUserAgent(ua) || isIosNative()
 
@@ -1111,9 +1143,8 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           if (canShare) {
             await navigator.share(shareData)
             shared = true
-            // Share sheet opened — guide iOS user to tap "Save Image"
             if (isIOS) {
-              setInfo('Na janela que abriu, toque em "Salvar Imagem" para guardar no rolo do iPhone.')
+              setInfo('Na janela que abriu, toque em "Salvar Imagem" para guardar no rolo.')
             }
           }
         } catch (shareErr: unknown) {
@@ -1123,14 +1154,13 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             setBusyAction(null)
             return
           }
-          logWarn('StoryComposer', 'Share API failed, trying save panel', shareErr)
+          logWarn('StoryComposer', 'Share API failed', shareErr)
         }
       }
 
       if (!shared) {
         if (isIOS) {
-          // On iOS, <a download> goes to Files app, not camera roll.
-          // Show the image full-screen so user can long-press → "Adicionar à Fotos".
+          // Last resort: show image full-screen (long-press may work in Safari PWA)
           const objUrl = URL.createObjectURL(result.blob)
           setSaveImageUrl(objUrl)
         } else {
