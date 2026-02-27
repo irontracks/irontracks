@@ -18,6 +18,23 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set('content-security-policy', csp)
   requestHeaders.set('x-nonce', nonce)
 
+  // Fast-path: se o usuário já tem cookie de sessão e está na raiz, redireciona
+  // direto para /dashboard sem esperar getUser() — elimina o flash da tela de login.
+  if (request.nextUrl.pathname === '/') {
+    try {
+      const hasSession = request.cookies.getAll().some((c) => {
+        const n = String(c?.name || '')
+        return n.startsWith('sb-') || n.includes('supabase')
+      })
+      if (hasSession) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/dashboard'
+        const redirectRes = NextResponse.redirect(url)
+        return applySecurityHeaders(redirectRes, nonce, isDev)
+      }
+    } catch {}
+  }
+
   const response = await updateSession(request, requestHeaders)
   return applySecurityHeaders(response, nonce, isDev)
 }
