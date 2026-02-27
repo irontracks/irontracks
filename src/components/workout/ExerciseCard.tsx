@@ -54,12 +54,47 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
   const videoUrl = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
   const isReportLoading = reportHistoryStatus?.status === 'loading' && reportHistoryLoadingRef.current;
 
+  // Parse SST config from exercise description (e.g. "SST na última: Falha > 10s > Falha > 10s > Falha")
+  const parsedSSTConfig = (() => {
+    const notes = String(ex?.notes || '');
+    // Detect "SST na última" or "SST na Nª série" patterns
+    const lastMatch = /SST\s+na\s+(última|ult\.)/i.exec(notes);
+    const nthMatch = /SST\s+na\s+(\d+)[ªa°.]?\s*série/i.exec(notes);
+    if (!lastMatch && !nthMatch) return null;
+
+    // Parse the rest of the pattern after ":" to get mini count and rest time
+    const colonIdx = notes.indexOf(':');
+    const pattern = colonIdx >= 0 ? notes.slice(colonIdx + 1) : notes;
+    const restMatch = /(\d+)\s*s/i.exec(pattern);
+    const restSec = restMatch ? parseInt(restMatch[1]) : 10;
+    const miniCount = Math.max(2, (pattern.match(/Falha/gi) ?? []).length) || 3;
+
+    const targetSetIdx = nthMatch
+      ? parseInt(nthMatch[1]) - 1  // "SST na 3ª série" → index 2
+      : setsCount - 1;              // "SST na última" → last set
+
+    return { restSec, miniCount, targetSetIdx };
+  })();
+
   const renderSet = (setIdx: number) => {
     const plannedSet = getPlannedSet(ex, setIdx);
     const rawCfg = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const method = String(ex?.method || '').trim();
+
+    // SST from description: override the method on the specific target set
+    if (parsedSSTConfig && setIdx === parsedSSTConfig.targetSetIdx) {
+      return (
+        <RestPauseSet
+          key={key}
+          ex={ex}
+          exIdx={exIdx}
+          setIdx={setIdx}
+          sstOverride={{ restSec: parsedSSTConfig.restSec, miniCount: parsedSSTConfig.miniCount }}
+        />
+      );
+    }
 
     // Drop-Set: array config or saved drop stages
     const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;

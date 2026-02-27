@@ -906,10 +906,10 @@ export default function Modals() {
           onClick={() => setRestPauseModal(null)}
         >
           <div
-            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3 flex-shrink-0">
               <div className="min-w-0">
                 <div className="text-xs font-black uppercase tracking-widest text-yellow-500">{String(restPauseModal?.label || '').trim() === 'SST' ? 'SST' : 'Rest-P'}</div>
                 <div className="text-white font-black text-lg truncate">Preencher minis</div>
@@ -927,7 +927,7 @@ export default function Modals() {
               </button>
             </div>
 
-            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
               {restPauseModal?.error ? (
                 <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">
                   {String(restPauseModal.error)}
@@ -988,35 +988,6 @@ export default function Modals() {
                   >
                     Gerar minis
                   </button>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Ativação</div>
-                  <div className="text-[10px] font-mono text-neutral-500">{Number(restPauseModal?.activationReps || 0)} reps</div>
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <input
-                    inputMode="decimal"
-                    value={String(restPauseModal?.weight ?? '')}
-                    onChange={(e) => {
-                      const v = e?.target?.value ?? '';
-                      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, weight: v, error: '' } : prev));
-                    }}
-                    placeholder="kg"
-                    className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                  />
-                  <input
-                    inputMode="decimal"
-                    value={String(restPauseModal?.activationReps ?? '')}
-                    onChange={(e) => {
-                      const v = parseTrainingNumber(e?.target?.value);
-                      setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, activationReps: v ?? null, error: '' } : prev));
-                    }}
-                    placeholder="Reps ativação"
-                    className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                  />
                 </div>
               </div>
 
@@ -1094,7 +1065,7 @@ export default function Modals() {
               </div>
             </div>
 
-            <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
+            <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setRestPauseModal(null)}

@@ -1552,14 +1552,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         return;
       }
 
-      const activationReps = parseTrainingNumber(m?.activationReps);
-      if (!activationReps || activationReps <= 0) {
-        setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Preencha as reps de ativação.' } : prev));
-        return;
-      }
-
       const minisRaw = m?.minis ?? null;
       const minis: unknown[] = Array.isArray(minisRaw) ? minisRaw : [];
+      if (minis.length === 0) {
+        setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, error: 'Gere e preencha os minis antes de salvar.' } : prev));
+        return;
+      }
       const miniRepsParsed = minis.map((v) => {
         const n = parseTrainingNumber(v);
         return n != null && n > 0 ? n : null;
@@ -1574,14 +1572,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const rpe = String(m?.rpe ?? '').trim();
       const cfg = m?.cfg ?? getLog(key)?.advanced_config ?? null;
 
-      const total = activationReps + miniReps.reduce((acc, v) => acc + v, 0);
+      const total = miniReps.reduce((acc, v) => acc + v, 0);
       updateLog(key, {
         done: !!getLog(key)?.done,
         weight,
         reps: String(total || ''),
         rpe: rpe || '',
         rest_pause: {
-          activation_reps: activationReps,
+          activation_reps: 0,
           mini_reps: miniReps,
           rest_time_sec: pauseSec,
           planned_mini_sets: miniReps.length,
