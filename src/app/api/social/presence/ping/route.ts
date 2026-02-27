@@ -8,6 +8,7 @@ import {
   shouldThrottleBySenderType,
 } from '@/lib/social/notifyFollowers'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { getUpstashConfig } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,22 @@ export async function POST(req: Request) {
     const ip = getRequestIp(req)
     const rl = await checkRateLimitAsync(`social:presence:ping:${userId}:${ip}`, 30, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+
+    const cfg = getUpstashConfig()
+    if (cfg) {
+      const now = Date.now()
+      const fiveMinsAgo = now - 5 * 60 * 1000
+      try {
+        await Promise.all([
+          fetch(`${cfg.url}/zremrangebyscore/online_users/-inf/${fiveMinsAgo}`, {
+            headers: { Authorization: `Bearer ${cfg.token}` },
+          }),
+          fetch(`${cfg.url}/zadd/online_users/${now}/${userId}`, {
+            headers: { Authorization: `Bearer ${cfg.token}` },
+          }),
+        ])
+      } catch { }
+    }
 
     const throttled = await shouldThrottleBySenderType(userId, 'friend_online', 15)
     if (throttled) return NextResponse.json({ ok: true, throttled: true })

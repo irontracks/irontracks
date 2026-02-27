@@ -156,7 +156,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // ── Native iOS setup (notifications + biometric lock) ─────────────────────
     useNativeAppSetup(user?.id)
     const userName = String(user?.displayName || user?.email || '')
-    const { isLocked, unlock } = useBiometricLock(!!user?.id)
 
     // workouts, stats, studentFolders, fetchWorkouts, isFetching — extraídos para useWorkoutFetch
     // Streak stats — extracted to useWorkoutStreak hook (userId resolved after auth)
@@ -262,6 +261,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     });
 
     const userSettingsApi = useUserSettings(user?.id)
+    const { isLocked, unlock } = useBiometricLock(
+        !!user?.id && Boolean(userSettingsApi?.settings?.requireBiometricsOnStartup)
+    )
     // Offline sync state — extracted to useOfflineSync hook
     const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
         userId: user?.id,
@@ -1010,979 +1012,979 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     return (
         <>
-        {/* Biometric lock — shown on top of everything when app resumes from background */}
-        {isLocked && user?.id ? (
-            <BiometricLock userName={userName} onUnlocked={unlock} />
-        ) : null}
-        <InAppNotificationsProvider
-            userId={user?.id || undefined}
-            settings={userSettingsApi?.settings ?? null}
-            onOpenMessages={() => setView('chat')}
-            onOpenNotifications={() => {
-                setShowNotifCenter(true);
-                setHasUnreadNotification(false);
-            }}
-        >
-            <InAppNotifyBinder bind={bindInAppNotify} />
-            <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
-                <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
-                    <IncomingInviteModal onStartSession={handleStartSession} />
-                    <InviteAcceptedModal />
-                    <GuidedTour
-                        open={Boolean(tourOpen)}
-                        steps={getTourSteps({
-                            role: user?.role,
-                            hasCommunity: (userSettingsApi?.settings?.moduleCommunity !== false),
-                        })}
-                        actions={{
-                            openAdminPanel: (tab: unknown) => {
-                                try {
-                                    const safe = String(tab || 'dashboard').trim() || 'dashboard'
-                                    openAdminPanel(safe)
-                                } catch { }
-                            },
-                        }}
-                        onEvent={(name: unknown, payload: unknown) => {
-                            logTourEvent(name, payload)
-                        }}
-                        onComplete={async () => {
-                            setTourOpen(false)
-                            setTourBoot((prev) => ({ ...prev, completed: true, skipped: false }))
-                            try { writeLocalTourDismissal(user?.id, 'completed') } catch { }
-                            const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
-                            if (!res?.ok) {
-                                logWarn('warn', 'Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
-                            }
-                            await logTourEvent('tour_completed', { version: TOUR_VERSION })
-                        }}
-                        onSkip={async () => {
-                            setTourOpen(false)
-                            setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
-                            try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
-                            const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
-                            if (!res?.ok) {
-                                logWarn('warn', 'Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
-                            }
-                            await logTourEvent('tour_skipped', { version: TOUR_VERSION })
-                        }}
-                        onCancel={async () => {
-                            setTourOpen(false)
-                            setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
-                            try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
-                            const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
-                            if (!res?.ok) {
-                                logWarn('warn', 'Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
-                            }
-                            await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
-                        }}
-                    />
+            {/* Biometric lock — shown on top of everything when app resumes from background */}
+            {isLocked && user?.id ? (
+                <BiometricLock userName={userName} onUnlocked={unlock} />
+            ) : null}
+            <InAppNotificationsProvider
+                userId={user?.id || undefined}
+                settings={userSettingsApi?.settings ?? null}
+                onOpenMessages={() => setView('chat')}
+                onOpenNotifications={() => {
+                    setShowNotifCenter(true);
+                    setHasUnreadNotification(false);
+                }}
+            >
+                <InAppNotifyBinder bind={bindInAppNotify} />
+                <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
+                    <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
+                        <IncomingInviteModal onStartSession={handleStartSession} />
+                        <InviteAcceptedModal />
+                        <GuidedTour
+                            open={Boolean(tourOpen)}
+                            steps={getTourSteps({
+                                role: user?.role,
+                                hasCommunity: (userSettingsApi?.settings?.moduleCommunity !== false),
+                            })}
+                            actions={{
+                                openAdminPanel: (tab: unknown) => {
+                                    try {
+                                        const safe = String(tab || 'dashboard').trim() || 'dashboard'
+                                        openAdminPanel(safe)
+                                    } catch { }
+                                },
+                            }}
+                            onEvent={(name: unknown, payload: unknown) => {
+                                logTourEvent(name, payload)
+                            }}
+                            onComplete={async () => {
+                                setTourOpen(false)
+                                setTourBoot((prev) => ({ ...prev, completed: true, skipped: false }))
+                                try { writeLocalTourDismissal(user?.id, 'completed') } catch { }
+                                const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
+                                if (!res?.ok) {
+                                    logWarn('warn', 'Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
+                                }
+                                await logTourEvent('tour_completed', { version: TOUR_VERSION })
+                            }}
+                            onSkip={async () => {
+                                setTourOpen(false)
+                                setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
+                                try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
+                                const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                                if (!res?.ok) {
+                                    logWarn('warn', 'Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
+                                }
+                                await logTourEvent('tour_skipped', { version: TOUR_VERSION })
+                            }}
+                            onCancel={async () => {
+                                setTourOpen(false)
+                                setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
+                                try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
+                                const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+                                if (!res?.ok) {
+                                    logWarn('warn', 'Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
+                                }
+                                await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
+                            }}
+                        />
 
-                    {/* Header */}
-                    {isHeaderVisible && (
-                        <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
-                            <div
-                                className="flex items-center cursor-pointer group"
-                                onClick={() => setView('dashboard')}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Dumbbell size={18} className="text-yellow-500 opacity-25" />
-                                    <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
-                                        IRON<span className="text-yellow-500">TRACKS</span>
-                                    </h1>
-                                </div>
-                                <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50"></div>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
-                                        {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
-                                    </span>
-                                    {!hideVipOnIos && vipAccess?.hasVip && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                openVipView()
-                                            }}
-                                            className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15"
-                                        >
-                                            <Crown size={11} className="text-yellow-500 fill-yellow-500" />
-                                            <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                                {(() => {
-                                    const pending = Number(syncState?.pending || 0)
-                                    const failed = Number(syncState?.failed || 0)
-                                    const online = syncState?.online !== false
-                                    const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
-                                    const offlineSyncV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true
-                                    if (!online) {
-                                        return (
-                                            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-black uppercase tracking-widest">
-                                                Offline
-                                            </div>
-                                        )
-                                    }
-                                    if (offlineSyncV2Enabled && (pending > 0 || failed > 0)) {
-                                        return (
+                        {/* Header */}
+                        {isHeaderVisible && (
+                            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
+                                <div
+                                    className="flex items-center cursor-pointer group"
+                                    onClick={() => setView('dashboard')}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Dumbbell size={18} className="text-yellow-500 opacity-25" />
+                                        <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
+                                            IRON<span className="text-yellow-500">TRACKS</span>
+                                        </h1>
+                                    </div>
+                                    <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50"></div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
+                                            {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
+                                        </span>
+                                        {!hideVipOnIos && vipAccess?.hasVip && (
                                             <button
                                                 type="button"
-                                                onClick={() => setOfflineSyncOpen(true)}
-                                                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest hover:bg-yellow-500/15"
-                                                title="Abrir central de pendências"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    openVipView()
+                                                }}
+                                                className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15"
                                             >
-                                                {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}{failed > 0 ? ` • Falhas: ${failed}` : ''}
+                                                <Crown size={11} className="text-yellow-500 fill-yellow-500" />
+                                                <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
                                             </button>
-                                        )
-                                    }
-                                    if (pending > 0) {
-                                        return (
-                                            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest">
-                                                {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}
-                                            </div>
-                                        )
-                                    }
-                                    return null
-                                })()}
-                                <HeaderActionsMenu
-                                    user={user as unknown as AdminUser}
-                                    isCoach={isCoach}
-                                    hasUnreadChat={hasUnreadChat}
-                                    hasUnreadNotification={hasUnreadNotification}
-                                    onOpenAdmin={() => {
-                                        if (typeof window !== 'undefined') {
-                                            const url = new URL(window.location.href);
-                                            url.searchParams.delete('view');
-                                            window.history.replaceState({}, '', url);
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-4">
+                                    {(() => {
+                                        const pending = Number(syncState?.pending || 0)
+                                        const failed = Number(syncState?.failed || 0)
+                                        const online = syncState?.online !== false
+                                        const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
+                                        const offlineSyncV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true
+                                        if (!online) {
+                                            return (
+                                                <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-black uppercase tracking-widest">
+                                                    Offline
+                                                </div>
+                                            )
                                         }
-                                        const tab = (() => {
-                                            try {
-                                                const url = new URL(window.location.href);
-                                                const current = String(url.searchParams.get('tab') || '').trim();
-                                                if (current) return current;
-                                            } catch { }
-                                            try {
-                                                const stored = String(sessionStorage.getItem('irontracks_admin_panel_tab') || '').trim();
-                                                if (stored) return stored;
-                                            } catch { }
-                                            return 'dashboard';
-                                        })();
-                                        openAdminPanel(tab);
-                                    }}
-                                    onOpenChatList={() => setView('chatList')}
-                                    onOpenGlobalChat={() => setView('globalChat')}
-                                    onOpenHistory={() => setView('history')}
-                                    onOpenNotifications={() => {
-                                        setShowNotifCenter(true);
-                                        setHasUnreadNotification(false);
-                                    }}
-                                    onOpenSchedule={() => router.push('/dashboard/schedule')}
-                                    onOpenWallet={() => openVipView()}
-                                    onOpenSettings={() => setSettingsOpen(true)}
-                                    onOpenTour={async () => {
-                                        try {
-                                            await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
-                                        } catch { }
-                                        setTourOpen(true)
-                                    }}
-                                    onLogout={handleLogout}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {isCoach && coachPending && (
-                        <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center">
-                            Sua conta de Professor está pendente. <button className="underline" onClick={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!'); } else { await alert('Falha ao ativar: ' + (j.error || '')); } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m); } }}>Aceitar</button>
-                        </div>
-                    )}
-
-                    {/* Main Content */}
-                    <div
-                        ref={mainScrollRef}
-                        className="flex-1 overflow-y-auto custom-scrollbar relative"
-                        style={({
-                            ['--dashboard-sticky-top' as unknown as keyof React.CSSProperties]: isHeaderVisible
-                                ? 'calc(4rem + env(safe-area-inset-top))'
-                                : '0px',
-                            paddingTop: isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : undefined,
-                        } as React.CSSProperties)}
-                    >
-                        {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
-                            <StudentDashboard
-                                workouts={Array.isArray(workouts) ? workouts : []}
-                                profileIncomplete={Boolean(profileIncomplete)}
-                                onOpenCompleteProfile={() => setShowCompleteProfile(true)}
-                                view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
-                                onChangeView={(next: string) => setView(next)}
-                                assessmentsContent={
-                                    (user?.id || initialUserObj?.id) ? (
-                                        <ErrorBoundary>
-                                            <Suspense fallback={<div className="p-4 text-neutral-400">Carregando…</div>}>
-                                                <AssessmentHistory studentId={String(user?.id || initialUserObj?.id || '')} onClose={() => setView('dashboard')} />
-                                            </Suspense>
-                                        </ErrorBoundary>
-                                    ) : null
-                                }
-                                communityContent={(user?.id || initialUserObj?.id) ? <CommunityClient embedded /> : null}
-                                vipContent={
-                                    hideVipOnIos ? null :
-                                    <VipHub
+                                        if (offlineSyncV2Enabled && (pending > 0 || failed > 0)) {
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setOfflineSyncOpen(true)}
+                                                    className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest hover:bg-yellow-500/15"
+                                                    title="Abrir central de pendências"
+                                                >
+                                                    {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}{failed > 0 ? ` • Falhas: ${failed}` : ''}
+                                                </button>
+                                            )
+                                        }
+                                        if (pending > 0) {
+                                            return (
+                                                <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest">
+                                                    {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}
+                                                </div>
+                                            )
+                                        }
+                                        return null
+                                    })()}
+                                    <HeaderActionsMenu
                                         user={user as unknown as AdminUser}
-                                        locked={!vipAccess?.hasVip}
-                                        onOpenWorkoutEditor={(w: unknown) => handleEditWorkout(w)}
-                                        onOpenVipTab={() => openVipView()}
-                                        onStartSession={(w: unknown) => handleStartSession(w)}
-                                        onOpenWizard={() => setCreateWizardOpen(true)}
-                                        onOpenHistory={() => setView('history')}
-                                        onOpenReport={(s: unknown) => {
-                                            setReportBackView('vip');
-                                            setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]);
-                                            setView('report');
+                                        isCoach={isCoach}
+                                        hasUnreadChat={hasUnreadChat}
+                                        hasUnreadNotification={hasUnreadNotification}
+                                        onOpenAdmin={() => {
+                                            if (typeof window !== 'undefined') {
+                                                const url = new URL(window.location.href);
+                                                url.searchParams.delete('view');
+                                                window.history.replaceState({}, '', url);
+                                            }
+                                            const tab = (() => {
+                                                try {
+                                                    const url = new URL(window.location.href);
+                                                    const current = String(url.searchParams.get('tab') || '').trim();
+                                                    if (current) return current;
+                                                } catch { }
+                                                try {
+                                                    const stored = String(sessionStorage.getItem('irontracks_admin_panel_tab') || '').trim();
+                                                    if (stored) return stored;
+                                                } catch { }
+                                                return 'dashboard';
+                                            })();
+                                            openAdminPanel(tab);
                                         }}
+                                        onOpenChatList={() => setView('chatList')}
+                                        onOpenGlobalChat={() => setView('globalChat')}
+                                        onOpenHistory={() => setView('history')}
+                                        onOpenNotifications={() => {
+                                            setShowNotifCenter(true);
+                                            setHasUnreadNotification(false);
+                                        }}
+                                        onOpenSchedule={() => router.push('/dashboard/schedule')}
+                                        onOpenWallet={() => openVipView()}
+                                        onOpenSettings={() => setSettingsOpen(true)}
+                                        onOpenTour={async () => {
+                                            try {
+                                                await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
+                                            } catch { }
+                                            setTourOpen(true)
+                                        }}
+                                        onLogout={handleLogout}
                                     />
-                                }
-                                vipLabel="VIP"
-                                vipLocked={hideVipOnIos ? true : !vipAccess?.hasVip}
-                                vipEnabled={!hideVipOnIos}
-                                settings={userSettingsApi?.settings ?? null}
-                                onCreateWorkout={handleCreateWorkout}
-                                onQuickView={(w) => setQuickViewWorkout(w)}
-                                onStartSession={(w) => handleStartSession(w)}
-                                onRestoreWorkout={(w) => handleRestoreWorkout(w)}
-                                onShareWorkout={(w) => handleShareWorkout(w)}
-                                onEditWorkout={(w) => handleEditWorkout(w)}
-                                onDeleteWorkout={(id, title) => {
-                                    if (id) handleDeleteWorkout(id, String(title || ''))
-                                }}
-                                onBulkEditWorkouts={handleBulkEditWorkouts}
-                                currentUserId={String(user?.id || initialUserObj?.id || '')}
-                                exportingAll={Boolean(exportingAll)}
-                                onExportAll={handleExportAllWorkouts}
-                                streakStats={streakStats}
-                                onOpenJsonImport={() => setShowJsonImportModal(true)}
-                                onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
-                                onNormalizeExercises={handleNormalizeExercises}
-                                onApplyTitleRule={handleApplyTitleRule}
-                                onOpenIronScanner={async () => {
-                                    try {
-                                        openManualWorkoutEditor()
-                                        await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
-                                    } catch { }
-                                }}
-                            />
+                                </div>
+                            </div>
                         )}
 
-                        <WorkoutWizardModal
-                            isOpen={createWizardOpen}
-                            onClose={() => setCreateWizardOpen(false)}
-                            onManual={() => openManualWorkoutEditor()}
-                            onGenerate={async (answers, options) => {
-                                const mode = String(options?.mode || 'single').trim().toLowerCase();
-                                try {
-                                    const res = await fetch('/api/ai/workout-wizard', {
-                                        method: 'POST',
-                                        headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ answers, mode }),
-                                    })
-                                    const data = await res.json().catch((): unknown => null)
-                                    if (!res.ok) {
-                                        const msg = data?.error ? String(data.error) : 'Falha ao gerar treino com IA.'
-                                        throw new Error(msg)
-                                    }
-                                    if (mode === 'program') {
-                                        const drafts = Array.isArray(data?.drafts) ? data.drafts : null
-                                        if (drafts && drafts.length) return { drafts }
-                                        if (data?.ok === false && Array.isArray(data?.drafts) && data.drafts.length) return { drafts: data.drafts }
-                                        throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
-                                    }
-                                    const draft = data?.draft && typeof data.draft === 'object' ? data.draft : null
-                                    if (draft?.exercises && Array.isArray(draft.exercises) && draft.exercises.length > 0) return draft
-                                    if (data?.ok === false && data?.draft) return data.draft
-                                    throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
-                                } catch (e: unknown) {
-                                    const msg = getErrorMessage(e)
-                                    const lower = msg.toLowerCase()
-                                    const isConfig = lower.includes('api de ia não configurada') || lower.includes('google_generative_ai_api_key')
-                                    if (isConfig) throw e
-                                    if (mode === 'program') {
-                                        const days = Math.max(2, Math.min(6, Number(answers?.daysPerWeek || 3) || 3))
-                                        const drafts: Array<Record<string, unknown>> = [];
-                                        for (let i = 0; i < days; i++) {
-                                            drafts.push(generateWorkoutFromWizard(answers, i))
-                                        }
-                                        return { drafts }
-                                    }
-                                    return generateWorkoutFromWizard(answers, 0)
-                                }
-                            }}
-                            onSaveDrafts={async (drafts) => {
-                                const list = Array.isArray(drafts) ? drafts : []
-                                if (!list.length) return
-                                try {
-                                    for (let i = 0; i < list.length; i += 1) {
-                                        const d = list[i]
-                                        const baseTitle = String(d?.title || 'Treino').trim() || 'Treino'
-                                        const finalTitle = formatProgramWorkoutTitle(baseTitle, i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
-                                        const exercises = Array.isArray(d?.exercises) ? d.exercises : []
-                                        const res = await createWorkout({ title: finalTitle, exercises })
-                                        if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino'))
-                                    }
-                                    try {
-                                        await fetchWorkouts()
-                                    } catch { }
-                                    setCreateWizardOpen(false)
-                                    await alert(`Plano salvo: ${list.length} treinos criados.`)
-                                } catch (e: unknown) {
-                                    const msg = getErrorMessage(e)
-                                    await alert('Erro ao salvar plano: ' + msg)
-                                }
-                            }}
-                            onUseDraft={(draft) => {
-                                try {
-                                    const title = String(draft?.title || '').trim() || 'Treino'
-                                    const exercises = (Array.isArray(draft?.exercises) ? draft.exercises : []) as import('@/types/app').Exercise[]
-                                    setCurrentWorkout({ title, exercises })
-                                    setView('edit')
-                                } finally {
-                                    setCreateWizardOpen(false)
-                                }
-                            }}
-                        />
+                        {isCoach && coachPending && (
+                            <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center">
+                                Sua conta de Professor está pendente. <button className="underline" onClick={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!'); } else { await alert('Falha ao ativar: ' + (j.error || '')); } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m); } }}>Aceitar</button>
+                            </div>
+                        )}
 
-                        {view === 'edit' && (
-                            <SectionErrorBoundary section="Editor de Treino" fullScreen onReset={() => setView('dashboard')}>
-                                <ExerciseEditor
-                                    workout={currentWorkout as unknown as Workout}
-                                    onCancel={() => setView('dashboard')}
-                                    onChange={(w) => setCurrentWorkout(w as unknown as ActiveSession)}
-                                    onSave={handleSaveWorkout}
-                                    onSaved={() => {
-                                        fetchWorkouts().catch(() => { });
-                                        setView('dashboard');
+                        {/* Main Content */}
+                        <div
+                            ref={mainScrollRef}
+                            className="flex-1 overflow-y-auto custom-scrollbar relative"
+                            style={({
+                                ['--dashboard-sticky-top' as unknown as keyof React.CSSProperties]: isHeaderVisible
+                                    ? 'calc(4rem + env(safe-area-inset-top))'
+                                    : '0px',
+                                paddingTop: isHeaderVisible ? 'calc(4rem + env(safe-area-inset-top))' : undefined,
+                            } as React.CSSProperties)}
+                        >
+                            {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
+                                <StudentDashboard
+                                    workouts={Array.isArray(workouts) ? workouts : []}
+                                    profileIncomplete={Boolean(profileIncomplete)}
+                                    onOpenCompleteProfile={() => setShowCompleteProfile(true)}
+                                    view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
+                                    onChangeView={(next: string) => setView(next)}
+                                    assessmentsContent={
+                                        (user?.id || initialUserObj?.id) ? (
+                                            <ErrorBoundary>
+                                                <Suspense fallback={<div className="p-4 text-neutral-400">Carregando…</div>}>
+                                                    <AssessmentHistory studentId={String(user?.id || initialUserObj?.id || '')} onClose={() => setView('dashboard')} />
+                                                </Suspense>
+                                            </ErrorBoundary>
+                                        ) : null
+                                    }
+                                    communityContent={(user?.id || initialUserObj?.id) ? <CommunityClient embedded /> : null}
+                                    vipContent={
+                                        hideVipOnIos ? null :
+                                            <VipHub
+                                                user={user as unknown as AdminUser}
+                                                locked={!vipAccess?.hasVip}
+                                                onOpenWorkoutEditor={(w: unknown) => handleEditWorkout(w)}
+                                                onOpenVipTab={() => openVipView()}
+                                                onStartSession={(w: unknown) => handleStartSession(w)}
+                                                onOpenWizard={() => setCreateWizardOpen(true)}
+                                                onOpenHistory={() => setView('history')}
+                                                onOpenReport={(s: unknown) => {
+                                                    setReportBackView('vip');
+                                                    setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]);
+                                                    setView('report');
+                                                }}
+                                            />
+                                    }
+                                    vipLabel="VIP"
+                                    vipLocked={hideVipOnIos ? true : !vipAccess?.hasVip}
+                                    vipEnabled={!hideVipOnIos}
+                                    settings={userSettingsApi?.settings ?? null}
+                                    onCreateWorkout={handleCreateWorkout}
+                                    onQuickView={(w) => setQuickViewWorkout(w)}
+                                    onStartSession={(w) => handleStartSession(w)}
+                                    onRestoreWorkout={(w) => handleRestoreWorkout(w)}
+                                    onShareWorkout={(w) => handleShareWorkout(w)}
+                                    onEditWorkout={(w) => handleEditWorkout(w)}
+                                    onDeleteWorkout={(id, title) => {
+                                        if (id) handleDeleteWorkout(id, String(title || ''))
+                                    }}
+                                    onBulkEditWorkouts={handleBulkEditWorkouts}
+                                    currentUserId={String(user?.id || initialUserObj?.id || '')}
+                                    exportingAll={Boolean(exportingAll)}
+                                    onExportAll={handleExportAllWorkouts}
+                                    streakStats={streakStats}
+                                    onOpenJsonImport={() => setShowJsonImportModal(true)}
+                                    onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
+                                    onNormalizeExercises={handleNormalizeExercises}
+                                    onApplyTitleRule={handleApplyTitleRule}
+                                    onOpenIronScanner={async () => {
+                                        try {
+                                            openManualWorkoutEditor()
+                                            await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
+                                        } catch { }
                                     }}
                                 />
-                            </SectionErrorBoundary>
-                        )}
+                            )}
 
-                        {view === 'active' && activeSession && (
-                            <ActiveWorkout
-                                session={activeSession as Record<string, unknown>}
-                                user={user as unknown as AdminUser}
-                                settings={userSettingsApi?.settings ?? null}
-                                onUpdateLog={handleUpdateSessionLog}
-                                onFinish={handleFinishSession}
-                                onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
-                                onBack={() => setView('dashboard')}
-                                onStartTimer={handleStartTimer}
-                                isCoach={isCoach}
-                                onUpdateSession={(updates: unknown) =>
-                                    setActiveSession((prev) => {
-                                        if (!prev) return prev
-                                        const u = updates && typeof updates === 'object' ? (updates as Record<string, unknown>) : {}
-                                        return { ...prev, ...(u as Partial<ActiveWorkoutSession>) }
-                                    })
-                                }
-                                nextWorkout={nextWorkout}
-                                onEditWorkout={() => handleOpenActiveWorkoutEditor()}
-                                onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
+                            <WorkoutWizardModal
+                                isOpen={createWizardOpen}
+                                onClose={() => setCreateWizardOpen(false)}
+                                onManual={() => openManualWorkoutEditor()}
+                                onGenerate={async (answers, options) => {
+                                    const mode = String(options?.mode || 'single').trim().toLowerCase();
+                                    try {
+                                        const res = await fetch('/api/ai/workout-wizard', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ answers, mode }),
+                                        })
+                                        const data = await res.json().catch((): unknown => null)
+                                        if (!res.ok) {
+                                            const msg = data?.error ? String(data.error) : 'Falha ao gerar treino com IA.'
+                                            throw new Error(msg)
+                                        }
+                                        if (mode === 'program') {
+                                            const drafts = Array.isArray(data?.drafts) ? data.drafts : null
+                                            if (drafts && drafts.length) return { drafts }
+                                            if (data?.ok === false && Array.isArray(data?.drafts) && data.drafts.length) return { drafts: data.drafts }
+                                            throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
+                                        }
+                                        const draft = data?.draft && typeof data.draft === 'object' ? data.draft : null
+                                        if (draft?.exercises && Array.isArray(draft.exercises) && draft.exercises.length > 0) return draft
+                                        if (data?.ok === false && data?.draft) return data.draft
+                                        throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
+                                    } catch (e: unknown) {
+                                        const msg = getErrorMessage(e)
+                                        const lower = msg.toLowerCase()
+                                        const isConfig = lower.includes('api de ia não configurada') || lower.includes('google_generative_ai_api_key')
+                                        if (isConfig) throw e
+                                        if (mode === 'program') {
+                                            const days = Math.max(2, Math.min(6, Number(answers?.daysPerWeek || 3) || 3))
+                                            const drafts: Array<Record<string, unknown>> = [];
+                                            for (let i = 0; i < days; i++) {
+                                                drafts.push(generateWorkoutFromWizard(answers, i))
+                                            }
+                                            return { drafts }
+                                        }
+                                        return generateWorkoutFromWizard(answers, 0)
+                                    }
+                                }}
+                                onSaveDrafts={async (drafts) => {
+                                    const list = Array.isArray(drafts) ? drafts : []
+                                    if (!list.length) return
+                                    try {
+                                        for (let i = 0; i < list.length; i += 1) {
+                                            const d = list[i]
+                                            const baseTitle = String(d?.title || 'Treino').trim() || 'Treino'
+                                            const finalTitle = formatProgramWorkoutTitle(baseTitle, i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
+                                            const exercises = Array.isArray(d?.exercises) ? d.exercises : []
+                                            const res = await createWorkout({ title: finalTitle, exercises })
+                                            if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino'))
+                                        }
+                                        try {
+                                            await fetchWorkouts()
+                                        } catch { }
+                                        setCreateWizardOpen(false)
+                                        await alert(`Plano salvo: ${list.length} treinos criados.`)
+                                    } catch (e: unknown) {
+                                        const msg = getErrorMessage(e)
+                                        await alert('Erro ao salvar plano: ' + msg)
+                                    }
+                                }}
+                                onUseDraft={(draft) => {
+                                    try {
+                                        const title = String(draft?.title || '').trim() || 'Treino'
+                                        const exercises = (Array.isArray(draft?.exercises) ? draft.exercises : []) as import('@/types/app').Exercise[]
+                                        setCurrentWorkout({ title, exercises })
+                                        setView('edit')
+                                    } finally {
+                                        setCreateWizardOpen(false)
+                                    }
+                                }}
                             />
-                        )}
 
-                        {editActiveOpen && view === 'active' && editActiveDraft && (
-                            <div
-                                className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
-                                onClick={() => handleCloseActiveWorkoutEditor()}
-                            >
-                                <div
-                                    className="w-full max-w-5xl h-[92vh] bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
-                                    onClick={(e) => e.stopPropagation()}
-                                >
+                            {view === 'edit' && (
+                                <SectionErrorBoundary section="Editor de Treino" fullScreen onReset={() => setView('dashboard')}>
                                     <ExerciseEditor
-                                        workout={editActiveDraft}
-                                        onCancel={() => handleCloseActiveWorkoutEditor()}
-                                        onChange={(w: unknown) => setEditActiveDraft(normalizeWorkoutForEditor(w))}
-                                        onSave={handleSaveActiveWorkoutEditor}
+                                        workout={currentWorkout as unknown as Workout}
+                                        onCancel={() => setView('dashboard')}
+                                        onChange={(w) => setCurrentWorkout(w as unknown as ActiveSession)}
+                                        onSave={handleSaveWorkout}
                                         onSaved={() => {
                                             fetchWorkouts().catch(() => { });
-                                            handleCloseActiveWorkoutEditor();
+                                            setView('dashboard');
                                         }}
                                     />
-                                </div>
-                            </div>
-                        )}
+                                </SectionErrorBoundary>
+                            )}
 
-                        {view === 'history' && (
-                            <SectionErrorBoundary section="Histórico" fullScreen onReset={() => setView('dashboard')}>
-                                <HistoryList
+                            {view === 'active' && activeSession && (
+                                <ActiveWorkout
+                                    session={activeSession as Record<string, unknown>}
                                     user={user as unknown as AdminUser}
                                     settings={userSettingsApi?.settings ?? null}
-                                    onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]); setView('report'); }}
+                                    onUpdateLog={handleUpdateSessionLog}
+                                    onFinish={handleFinishSession}
+                                    onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
                                     onBack={() => setView('dashboard')}
-                                    targetId={user?.id || ''}
-                                    targetEmail={user?.email ? String(user.email) : ''}
-                                    readOnly={false}
-                                    title="Histórico"
-                                    vipLimits={vipStatus?.limits as Record<string, unknown>}
-                                    onUpgrade={() => openVipView()}
-                                />
-                            </SectionErrorBoundary>
-                        )}
-
-                        {/* Evolução removida conforme solicitação */}
-
-                        {view === 'report' && reportData.current && (
-                            <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe">
-                                <SectionErrorBoundary section="Relatório" fullScreen onReset={() => setView(reportBackView || 'dashboard')}>
-                                    <WorkoutReport
-                                        session={reportData.current}
-                                        previousSession={reportData.previous}
-                                        user={user as unknown as AdminUser}
-                                        isVip={vipAccess?.hasVip}
-                                        settings={userSettingsApi?.settings ?? null}
-                                        onUpgrade={() => openVipView()}
-                                        onClose={() => setView(reportBackView || 'dashboard')}
-                                    />
-                                </SectionErrorBoundary>
-                            </div>
-                        )}
-
-                        {showExportModal && exportWorkout && (
-                            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
-                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                    <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                        <h3 className="font-bold text-white">Como deseja exportar?</h3>
-                                        <BackButton onClick={() => setShowExportModal(false)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
-                                    </div>
-                                    <div className="p-4 space-y-3">
-                                        <button onClick={handleExportPdf} className="w-full px-4 py-3 bg-yellow-500 text-black font-bold rounded-xl">Baixar PDF</button>
-                                        <button onClick={handleExportJson} className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl">Baixar JSON</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {openStudent && (
-                            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpenStudent(null)}>
-                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                    <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                        <h3 className="font-bold text-white">Treinos de {String((isRecord(openStudent) ? openStudent.name : '') ?? '')}</h3>
-                                        <BackButton onClick={() => setOpenStudent(null)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
-                                    </div>
-                                    <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto">
-                                        {(() => {
-                                            const s = isRecord(openStudent) ? openStudent : {}
-                                            const list = Array.isArray(s.workouts) ? s.workouts : []
-                                            if (list.length !== 0) return null
-                                            return (
-                                                <p className="text-neutral-500 text-sm">Nenhum treino encontrado.</p>
-                                            )
-                                        })()}
-                                        {(() => {
-                                            const s = isRecord(openStudent) ? openStudent : {}
-                                            const list = Array.isArray(s.workouts) ? s.workouts : []
-                                            return list.map((w: unknown, idx: number) => {
-                                                const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                                const id = String(wo?.id || '').trim() || `w-${idx}`
-                                                const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
-                                                return (
-                                                    <div key={id} className="p-3 rounded-xl border border-neutral-700 bg-neutral-800">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-white font-bold text-sm">{String(wo?.title || '')}</span>
-                                                            <span className="text-xs text-neutral-400">{exCount} exercícios</span>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })
-                                        })()}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'chat' && (
-                            <div className="absolute inset-0 z-50 bg-neutral-900">
-                                <SectionErrorBoundary section="Chat" fullScreen onReset={() => setView('dashboard')}>
-                                    <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
-                                </SectionErrorBoundary>
-                            </div>
-                        )}
-
-                        {view === 'globalChat' && (
-                            <div className="absolute inset-0 z-50 bg-neutral-900">
-                                <SectionErrorBoundary section="Chat Global" fullScreen onReset={() => setView('dashboard')}>
-                                    <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
-                                </SectionErrorBoundary>
-                            </div>
-                        )}
-
-                        {view === 'chatList' && (
-                            <div className="absolute inset-0 z-50 bg-neutral-900">
-                                <ChatListScreen
-                                    user={user as unknown as AdminUser}
-                                    onClose={() => setView('dashboard')}
-                                    onSelectUser={() => { }}
-                                    onSelectChannel={(c: unknown) => {
-                                        const ch = isRecord(c) ? c : {}
-                                        const channelId = String(ch.channel_id ?? ch.channelId ?? '')
-                                        const otherUserId = String(ch.other_user_id ?? ch.otherUserId ?? ch.user_id ?? ch.userId ?? '')
-                                        const otherUserName = String(ch.other_user_name ?? ch.otherUserName ?? ch.displayName ?? '')
-                                        const photoUrlRaw = ch.other_user_photo ?? ch.otherUserPhoto ?? ch.photoUrl ?? null
-                                        const photoUrl = photoUrlRaw != null ? String(photoUrlRaw) : null
-                                        setDirectChat({
-                                            channelId,
-                                            userId: otherUserId,
-                                            displayName: otherUserName || undefined,
-                                            photoUrl,
-                                            other_user_id: otherUserId,
-                                            other_user_name: otherUserName || undefined,
-                                            other_user_photo: photoUrl,
+                                    onStartTimer={handleStartTimer}
+                                    isCoach={isCoach}
+                                    onUpdateSession={(updates: unknown) =>
+                                        setActiveSession((prev) => {
+                                            if (!prev) return prev
+                                            const u = updates && typeof updates === 'object' ? (updates as Record<string, unknown>) : {}
+                                            return { ...prev, ...(u as Partial<ActiveWorkoutSession>) }
                                         })
-                                        setView('directChat')
-                                    }}
+                                    }
+                                    nextWorkout={nextWorkout}
+                                    onEditWorkout={() => handleOpenActiveWorkoutEditor()}
+                                    onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
                                 />
-                            </div>
-                        )}
+                            )}
 
-                        {view === 'directChat' && directChat && (
-                            <div className="absolute inset-0 z-50 bg-neutral-900">
-                                <ChatDirectScreen
-                                    user={user as unknown as AdminUser}
-                                    targetUser={directChat}
-                                    otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
-                                    otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
-                                    otherUserPhoto={directChat.other_user_photo ?? directChat.photoUrl ?? null}
-                                    onClose={() => setView('chatList')}
-                                />
-                            </div>
-                        )}
-
-                        {view === 'admin' && (
-                            <div className="fixed inset-0 z-[60]">
-                                <SectionErrorBoundary section="Painel Admin" fullScreen onReset={() => setView('dashboard')}>
-                                    <AdminPanelV2 user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
-                                </SectionErrorBoundary>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Modals & Overlays */}
-                    {showCompleteProfile && (
-                        <div className="fixed inset-0 z-[85] bg-black/80 flex items-center justify-center p-4">
-                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
-                                <div className="flex items-center justify-between gap-3 mb-4">
-                                    <h3 className="font-black text-white">Completar Perfil</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowCompleteProfile(false)}
-                                        className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
-                                        aria-label="Fechar"
+                            {editActiveOpen && view === 'active' && editActiveDraft && (
+                                <div
+                                    className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
+                                    onClick={() => handleCloseActiveWorkoutEditor()}
+                                >
+                                    <div
+                                        className="w-full max-w-5xl h-[92vh] bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+                                        onClick={(e) => e.stopPropagation()}
                                     >
-                                        <X size={18} />
-                                    </button>
-                                </div>
-
-                                <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">
-                                    Nome de Exibição
-                                </label>
-                                <input
-                                    value={profileDraftName}
-                                    onChange={(e) => setProfileDraftName(e.target.value)}
-                                    placeholder="Ex: João Silva"
-                                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
-                                />
-
-                                <div className="flex gap-2 mt-5">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowCompleteProfile(false)}
-                                        disabled={savingProfile}
-                                        className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleSaveProfile}
-                                        disabled={savingProfile}
-                                        className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50"
-                                    >
-                                        {savingProfile ? 'Salvando...' : 'Salvar'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    {showImportModal && (
-                        <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
-                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
-                                <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
-                                <input
-                                    value={importCode}
-                                    onChange={e => setImportCode(e.target.value)}
-                                    placeholder="Cole o código do treino aqui"
-                                    className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase"
-                                />
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
-                                    <button onClick={handleImportWorkout} className="flex-1 p-3 bg-blue-600 rounded-xl font-bold text-white">Importar</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {showJsonImportModal && (
-                        <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
-                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
-                                <Upload size={48} className="mx-auto text-blue-500 mb-4" />
-                                <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
-                                <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
-
-                                <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
-                                    Selecionar Arquivo
-                                    <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
-                                </label>
-
-                                <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {shareCode && (
-                        <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
-                            <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
-                                <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black"><Check size={32} /></div>
-                                <h3 className="font-bold text-white mb-2">Link Gerado!</h3>
-                                <p className="text-neutral-400 text-sm mb-6">Envie este código para seu aluno ou amigo.</p>
-                                <div className="bg-black p-4 rounded-xl font-mono text-yellow-500 text-xl mb-4 tracking-widest select-all">
-                                    {shareCode}
-                                </div>
-                                <button onClick={() => setShareCode(null)} className="w-full p-3 bg-neutral-800 rounded-xl font-bold text-white">Fechar</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {quickViewWorkout && (
-                        <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQuickViewWorkout(null)}>
-                            <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                <div className="p-4 flex justify-between items-center border-b border-neutral-800">
-                                    <h3 className="font-bold text-white">{String(quickViewWorkout?.title || '')}</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => setQuickViewWorkout(null)}
-                                        className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors py-2 px-3 rounded-xl hover:bg-neutral-800 active:opacity-70"
-                                        aria-label="Voltar"
-                                    >
-                                        <ArrowLeft size={20} />
-                                        <span className="font-semibold text-sm">Voltar</span>
-                                    </button>
-                                </div>
-                                <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
-                                    {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex: unknown, idx: number) => {
-                                        const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                        return (
-                                            <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
-                                                <div className="flex justify-between items-center">
-                                                    <h4 className="font-bold text-white text-sm">{String(e?.name || '—')}</h4>
-                                                    <span className="text-xs text-neutral-400">{(parseInt(String(e?.sets ?? '')) || 0)} x {String(e?.reps || '-')}</span>
-                                                </div>
-                                                <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
-                                                    <Clock size={14} className="text-yellow-500" /><span>Descanso: {e?.restTime ? `${parseInt(String(e.restTime))}s` : '-'}</span>
-                                                </div>
-                                                {!!e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
-                                            </div>
-                                        )
-                                    })}
-                                    {(!Array.isArray(quickViewWorkout?.exercises) || quickViewWorkout.exercises.length === 0) && (
-                                        <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
-                                    )}
-                                </div>
-                                <div className="p-4 border-t border-neutral-800 flex gap-2">
-                                    <button onClick={() => { const w = quickViewWorkout; setQuickViewWorkout(null); handleStartSession(w); }} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl">Iniciar Treino</button>
-                                    <button onClick={() => setQuickViewWorkout(null)} className="flex-1 p-3 bg-neutral-800 text-white font-bold rounded-xl">Fechar</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {showNotifCenter && (
-                        <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setShowNotifCenter(false)}>
-                            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                <div className="p-4 flex justify-between items-center border-b border-neutral-800">
-                                    <h3 className="font-bold text-white">Notificações</h3>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowNotifCenter(false)}
-                                        className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
-                                        aria-label="Fechar"
-                                    >
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                                <div className="p-4 relative">
-                                    <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeSession?.timerTargetTime && (
-                        <RestTimerOverlay
-                            targetTime={activeSession.timerTargetTime}
-                            context={activeSession.timerContext as unknown as Parameters<typeof import('@/components/RestTimerOverlay').default>[0]['context']}
-                            settings={userSettingsApi?.settings ?? null}
-                            onClose={handleCloseTimer}
-                            onFinish={handleCloseTimer}
-                            onStart={handleStartFromRestTimer}
-                        />
-                    )}
-
-                    {activeSession && view !== 'active' && (
-                        <div className="fixed bottom-0 left-0 right-0 z-[1100]">
-                            <div className="bg-neutral-900/95 backdrop-blur border-t border-neutral-800 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
-                                <div className="flex items-center gap-4">
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-white truncate">{activeSession.workout?.title || 'Treino em andamento'}</h3>
-                                        <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
-                                            <span className="font-mono text-yellow-500">{(() => { const startMs = parseStartedAtMs(activeSession.startedAt); const endMs = sessionTicker || startMs; const s = startMs > 0 ? Math.max(0, Math.floor((endMs - startMs) / 1000)) : 0; const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
-                                            <span className="text-neutral-500">tempo atual</span>
-                                            <span className="opacity-30">•</span>
-                                            <span className="font-mono text-neutral-200">{(() => { const list = Array.isArray(activeSession.workout?.exercises) ? activeSession.workout.exercises : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>
-                                            <span className="text-neutral-500">estimado total</span>
-                                        </div>
-                                        <div className="h-1 bg-neutral-700 rounded-full overflow-hidden mt-2">
-                                            {(() => {
-                                                const exCount = (activeSession.workout?.exercises || []).length;
-                                                let percent = 0;
-                                                if (exCount) {
-                                                    const done = new Set();
-                                                    if (activeSession.logs) {
-                                                        Object.keys(activeSession.logs).forEach(k => {
-                                                            const i = parseInt(k.split('-')[0]) || 0;
-                                                            done.add(i);
-                                                        });
-                                                    }
-                                                    const current = Math.min(done.size, exCount);
-                                                    percent = Math.round((current / exCount) * 100);
-                                                }
-                                                return <div className="h-full bg-yellow-500" style={{ width: `${percent}%` }}></div>
-                                            })()}
-                                        </div>
-                                    </div>
-                                    <button className="shrink-0 px-4 py-2 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400" onClick={() => setView('active')}>Voltar pro treino</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Admin Panel Modal controlled by State */}
-                    {showAdminPanel && (
-                        <SectionErrorBoundary section="Painel Admin" fullScreen onReset={closeAdminPanel}>
-                            <AdminPanelV2 user={user as unknown as AdminUser} onClose={closeAdminPanel} />
-                        </SectionErrorBoundary>
-                    )}
-
-                    {whatsNewOpen && (
-                        <WhatsNewModal
-                            isOpen={whatsNewOpen}
-                            entry={pendingUpdate ? null : getLatestWhatsNew()}
-                            update={pendingUpdate ? {
-                                id: String(pendingUpdate?.id || ''),
-                                version: pendingUpdate?.version || null,
-                                title: String(pendingUpdate?.title || ''),
-                                description: String(pendingUpdate?.description || ''),
-                                release_date: String(pendingUpdate?.release_date || pendingUpdate?.releaseDate || '') || null,
-                            } : null}
-                            onClose={closeWhatsNew}
-                        />
-                    )}
-
-                    {preCheckinOpen && (
-                        <div
-                            className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-                            onClick={() => {
-                                setPreCheckinOpen(false)
-                                const r = preCheckinResolveRef.current
-                                preCheckinResolveRef.current = null
-                                if (typeof r === 'function') r(null)
-                            }}
-                        >
-                            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
-                                        <div className="text-white font-black text-lg truncate">Pré-treino</div>
-                                        <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setPreCheckinOpen(false)
-                                            const r = preCheckinResolveRef.current
-                                            preCheckinResolveRef.current = null
-                                            if (typeof r === 'function') r(null)
-                                        }}
-                                        className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-                                        aria-label="Fechar"
-                                    >
-                                        <X size={18} />
-                                    </button>
-                                </div>
-                                <div className="p-4 space-y-4">
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Energia (1–5)</div>
-                                        <div className="grid grid-cols-5 gap-2">
-                                            {[1, 2, 3, 4, 5].map((n) => (
-                                                <button
-                                                    key={n}
-                                                    type="button"
-                                                    onClick={() => setPreCheckinDraft((prev) => ({ ...prev, energy: String(n) }))}
-                                                    className={
-                                                        String(preCheckinDraft?.energy || '') === String(n)
-                                                            ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                                                            : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                                                    }
-                                                >
-                                                    {n}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
-                                        <select
-                                            value={String(preCheckinDraft?.soreness ?? '')}
-                                            onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
-                                            className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
-                                        >
-                                            <option value="">Não informar</option>
-                                            {Array.from({ length: 11 }).map((_, i) => (
-                                                <option key={i} value={String(i)}>
-                                                    {i}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tempo disponível</div>
-                                        <div className="grid grid-cols-5 gap-2">
-                                            {[30, 45, 60, 90, 120].map((n) => (
-                                                <button
-                                                    key={n}
-                                                    type="button"
-                                                    onClick={() => setPreCheckinDraft((prev) => ({ ...prev, timeMinutes: String(n) }))}
-                                                    className={
-                                                        String(preCheckinDraft?.timeMinutes || '') === String(n)
-                                                            ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                                                            : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                                                    }
-                                                >
-                                                    {n}m
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
-                                        <textarea
-                                            value={String(preCheckinDraft?.notes || '')}
-                                            onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
-                                            className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                                            placeholder="Ex.: pouco sono, dor no joelho, viagem…"
+                                        <ExerciseEditor
+                                            workout={editActiveDraft}
+                                            onCancel={() => handleCloseActiveWorkoutEditor()}
+                                            onChange={(w: unknown) => setEditActiveDraft(normalizeWorkoutForEditor(w))}
+                                            onSave={handleSaveActiveWorkoutEditor}
+                                            onSaved={() => {
+                                                fetchWorkouts().catch(() => { });
+                                                handleCloseActiveWorkoutEditor();
+                                            }}
                                         />
                                     </div>
                                 </div>
-                                <div className="p-4 border-t border-neutral-800 flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setPreCheckinOpen(false)
-                                            const r = preCheckinResolveRef.current
-                                            preCheckinResolveRef.current = null
-                                            if (typeof r === 'function') r(null)
+                            )}
+
+                            {view === 'history' && (
+                                <SectionErrorBoundary section="Histórico" fullScreen onReset={() => setView('dashboard')}>
+                                    <HistoryList
+                                        user={user as unknown as AdminUser}
+                                        settings={userSettingsApi?.settings ?? null}
+                                        onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]); setView('report'); }}
+                                        onBack={() => setView('dashboard')}
+                                        targetId={user?.id || ''}
+                                        targetEmail={user?.email ? String(user.email) : ''}
+                                        readOnly={false}
+                                        title="Histórico"
+                                        vipLimits={vipStatus?.limits as Record<string, unknown>}
+                                        onUpgrade={() => openVipView()}
+                                    />
+                                </SectionErrorBoundary>
+                            )}
+
+                            {/* Evolução removida conforme solicitação */}
+
+                            {view === 'report' && reportData.current && (
+                                <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe">
+                                    <SectionErrorBoundary section="Relatório" fullScreen onReset={() => setView(reportBackView || 'dashboard')}>
+                                        <WorkoutReport
+                                            session={reportData.current}
+                                            previousSession={reportData.previous}
+                                            user={user as unknown as AdminUser}
+                                            isVip={vipAccess?.hasVip}
+                                            settings={userSettingsApi?.settings ?? null}
+                                            onUpgrade={() => openVipView()}
+                                            onClose={() => setView(reportBackView || 'dashboard')}
+                                        />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
+
+                            {showExportModal && exportWorkout && (
+                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
+                                    <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                        <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                                            <h3 className="font-bold text-white">Como deseja exportar?</h3>
+                                            <BackButton onClick={() => setShowExportModal(false)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
+                                        </div>
+                                        <div className="p-4 space-y-3">
+                                            <button onClick={handleExportPdf} className="w-full px-4 py-3 bg-yellow-500 text-black font-bold rounded-xl">Baixar PDF</button>
+                                            <button onClick={handleExportJson} className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl">Baixar JSON</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {openStudent && (
+                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpenStudent(null)}>
+                                    <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                        <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                                            <h3 className="font-bold text-white">Treinos de {String((isRecord(openStudent) ? openStudent.name : '') ?? '')}</h3>
+                                            <BackButton onClick={() => setOpenStudent(null)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
+                                        </div>
+                                        <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto">
+                                            {(() => {
+                                                const s = isRecord(openStudent) ? openStudent : {}
+                                                const list = Array.isArray(s.workouts) ? s.workouts : []
+                                                if (list.length !== 0) return null
+                                                return (
+                                                    <p className="text-neutral-500 text-sm">Nenhum treino encontrado.</p>
+                                                )
+                                            })()}
+                                            {(() => {
+                                                const s = isRecord(openStudent) ? openStudent : {}
+                                                const list = Array.isArray(s.workouts) ? s.workouts : []
+                                                return list.map((w: unknown, idx: number) => {
+                                                    const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                                    const id = String(wo?.id || '').trim() || `w-${idx}`
+                                                    const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
+                                                    return (
+                                                        <div key={id} className="p-3 rounded-xl border border-neutral-700 bg-neutral-800">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-white font-bold text-sm">{String(wo?.title || '')}</span>
+                                                                <span className="text-xs text-neutral-400">{exCount} exercícios</span>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {view === 'chat' && (
+                                <div className="absolute inset-0 z-50 bg-neutral-900">
+                                    <SectionErrorBoundary section="Chat" fullScreen onReset={() => setView('dashboard')}>
+                                        <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
+
+                            {view === 'globalChat' && (
+                                <div className="absolute inset-0 z-50 bg-neutral-900">
+                                    <SectionErrorBoundary section="Chat Global" fullScreen onReset={() => setView('dashboard')}>
+                                        <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
+
+                            {view === 'chatList' && (
+                                <div className="absolute inset-0 z-50 bg-neutral-900">
+                                    <ChatListScreen
+                                        user={user as unknown as AdminUser}
+                                        onClose={() => setView('dashboard')}
+                                        onSelectUser={() => { }}
+                                        onSelectChannel={(c: unknown) => {
+                                            const ch = isRecord(c) ? c : {}
+                                            const channelId = String(ch.channel_id ?? ch.channelId ?? '')
+                                            const otherUserId = String(ch.other_user_id ?? ch.otherUserId ?? ch.user_id ?? ch.userId ?? '')
+                                            const otherUserName = String(ch.other_user_name ?? ch.otherUserName ?? ch.displayName ?? '')
+                                            const photoUrlRaw = ch.other_user_photo ?? ch.otherUserPhoto ?? ch.photoUrl ?? null
+                                            const photoUrl = photoUrlRaw != null ? String(photoUrlRaw) : null
+                                            setDirectChat({
+                                                channelId,
+                                                userId: otherUserId,
+                                                displayName: otherUserName || undefined,
+                                                photoUrl,
+                                                other_user_id: otherUserId,
+                                                other_user_name: otherUserName || undefined,
+                                                other_user_photo: photoUrl,
+                                            })
+                                            setView('directChat')
                                         }}
-                                        className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
-                                    >
-                                        Pular
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setPreCheckinOpen(false)
-                                            const r = preCheckinResolveRef.current
-                                            preCheckinResolveRef.current = null
-                                            if (typeof r === 'function') r(preCheckinDraft)
-                                        }}
-                                        className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
-                                    >
-                                        Continuar
-                                    </button>
+                                    />
+                                </div>
+                            )}
+
+                            {view === 'directChat' && directChat && (
+                                <div className="absolute inset-0 z-50 bg-neutral-900">
+                                    <ChatDirectScreen
+                                        user={user as unknown as AdminUser}
+                                        targetUser={directChat}
+                                        otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
+                                        otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
+                                        otherUserPhoto={directChat.other_user_photo ?? directChat.photoUrl ?? null}
+                                        onClose={() => setView('chatList')}
+                                    />
+                                </div>
+                            )}
+
+                            {view === 'admin' && (
+                                <div className="fixed inset-0 z-[60]">
+                                    <SectionErrorBoundary section="Painel Admin" fullScreen onReset={() => setView('dashboard')}>
+                                        <AdminPanelV2 user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modals & Overlays */}
+                        {showCompleteProfile && (
+                            <div className="fixed inset-0 z-[85] bg-black/80 flex items-center justify-center p-4">
+                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
+                                    <div className="flex items-center justify-between gap-3 mb-4">
+                                        <h3 className="font-black text-white">Completar Perfil</h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCompleteProfile(false)}
+                                            className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                                            aria-label="Fechar"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+
+                                    <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">
+                                        Nome de Exibição
+                                    </label>
+                                    <input
+                                        value={profileDraftName}
+                                        onChange={(e) => setProfileDraftName(e.target.value)}
+                                        placeholder="Ex: João Silva"
+                                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
+                                    />
+
+                                    <div className="flex gap-2 mt-5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowCompleteProfile(false)}
+                                            disabled={savingProfile}
+                                            className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveProfile}
+                                            disabled={savingProfile}
+                                            className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50"
+                                        >
+                                            {savingProfile ? 'Salvando...' : 'Salvar'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        )}
+                        {showImportModal && (
+                            <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
+                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
+                                    <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
+                                    <input
+                                        value={importCode}
+                                        onChange={e => setImportCode(e.target.value)}
+                                        placeholder="Cole o código do treino aqui"
+                                        className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase"
+                                    />
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
+                                        <button onClick={handleImportWorkout} className="flex-1 p-3 bg-blue-600 rounded-xl font-bold text-white">Importar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                    {settingsOpen && (
-                        <SettingsModal
-                            isOpen={settingsOpen}
-                            onClose={() => setSettingsOpen(false)}
-                            settings={userSettingsApi?.settings ?? null}
-                            userRole={user?.role || ''}
-                            saving={Boolean(userSettingsApi?.saving)}
-                            onOpenWhatsNew={async () => {
-                                setSettingsOpen(false)
-                                if (!pendingUpdate) {
+                        {showJsonImportModal && (
+                            <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
+                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
+                                    <Upload size={48} className="mx-auto text-blue-500 mb-4" />
+                                    <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
+                                    <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
+
+                                    <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
+                                        Selecionar Arquivo
+                                        <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
+                                    </label>
+
+                                    <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {shareCode && (
+                            <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
+                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
+                                    <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black"><Check size={32} /></div>
+                                    <h3 className="font-bold text-white mb-2">Link Gerado!</h3>
+                                    <p className="text-neutral-400 text-sm mb-6">Envie este código para seu aluno ou amigo.</p>
+                                    <div className="bg-black p-4 rounded-xl font-mono text-yellow-500 text-xl mb-4 tracking-widest select-all">
+                                        {shareCode}
+                                    </div>
+                                    <button onClick={() => setShareCode(null)} className="w-full p-3 bg-neutral-800 rounded-xl font-bold text-white">Fechar</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {quickViewWorkout && (
+                            <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQuickViewWorkout(null)}>
+                                <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="p-4 flex justify-between items-center border-b border-neutral-800">
+                                        <h3 className="font-bold text-white">{String(quickViewWorkout?.title || '')}</h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuickViewWorkout(null)}
+                                            className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors py-2 px-3 rounded-xl hover:bg-neutral-800 active:opacity-70"
+                                            aria-label="Voltar"
+                                        >
+                                            <ArrowLeft size={20} />
+                                            <span className="font-semibold text-sm">Voltar</span>
+                                        </button>
+                                    </div>
+                                    <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
+                                        {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex: unknown, idx: number) => {
+                                            const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
+                                            return (
+                                                <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
+                                                    <div className="flex justify-between items-center">
+                                                        <h4 className="font-bold text-white text-sm">{String(e?.name || '—')}</h4>
+                                                        <span className="text-xs text-neutral-400">{(parseInt(String(e?.sets ?? '')) || 0)} x {String(e?.reps || '-')}</span>
+                                                    </div>
+                                                    <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
+                                                        <Clock size={14} className="text-yellow-500" /><span>Descanso: {e?.restTime ? `${parseInt(String(e.restTime))}s` : '-'}</span>
+                                                    </div>
+                                                    {!!e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
+                                                </div>
+                                            )
+                                        })}
+                                        {(!Array.isArray(quickViewWorkout?.exercises) || quickViewWorkout.exercises.length === 0) && (
+                                            <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
+                                        )}
+                                    </div>
+                                    <div className="p-4 border-t border-neutral-800 flex gap-2">
+                                        <button onClick={() => { const w = quickViewWorkout; setQuickViewWorkout(null); handleStartSession(w); }} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl">Iniciar Treino</button>
+                                        <button onClick={() => setQuickViewWorkout(null)} className="flex-1 p-3 bg-neutral-800 text-white font-bold rounded-xl">Fechar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {showNotifCenter && (
+                            <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setShowNotifCenter(false)}>
+                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="p-4 flex justify-between items-center border-b border-neutral-800">
+                                        <h3 className="font-bold text-white">Notificações</h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNotifCenter(false)}
+                                            className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                                            aria-label="Fechar"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+                                    <div className="p-4 relative">
+                                        <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeSession?.timerTargetTime && (
+                            <RestTimerOverlay
+                                targetTime={activeSession.timerTargetTime}
+                                context={activeSession.timerContext as unknown as Parameters<typeof import('@/components/RestTimerOverlay').default>[0]['context']}
+                                settings={userSettingsApi?.settings ?? null}
+                                onClose={handleCloseTimer}
+                                onFinish={handleCloseTimer}
+                                onStart={handleStartFromRestTimer}
+                            />
+                        )}
+
+                        {activeSession && view !== 'active' && (
+                            <div className="fixed bottom-0 left-0 right-0 z-[1100]">
+                                <div className="bg-neutral-900/95 backdrop-blur border-t border-neutral-800 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-white truncate">{activeSession.workout?.title || 'Treino em andamento'}</h3>
+                                            <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
+                                                <span className="font-mono text-yellow-500">{(() => { const startMs = parseStartedAtMs(activeSession.startedAt); const endMs = sessionTicker || startMs; const s = startMs > 0 ? Math.max(0, Math.floor((endMs - startMs) / 1000)) : 0; const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
+                                                <span className="text-neutral-500">tempo atual</span>
+                                                <span className="opacity-30">•</span>
+                                                <span className="font-mono text-neutral-200">{(() => { const list = Array.isArray(activeSession.workout?.exercises) ? activeSession.workout.exercises : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>
+                                                <span className="text-neutral-500">estimado total</span>
+                                            </div>
+                                            <div className="h-1 bg-neutral-700 rounded-full overflow-hidden mt-2">
+                                                {(() => {
+                                                    const exCount = (activeSession.workout?.exercises || []).length;
+                                                    let percent = 0;
+                                                    if (exCount) {
+                                                        const done = new Set();
+                                                        if (activeSession.logs) {
+                                                            Object.keys(activeSession.logs).forEach(k => {
+                                                                const i = parseInt(k.split('-')[0]) || 0;
+                                                                done.add(i);
+                                                            });
+                                                        }
+                                                        const current = Math.min(done.size, exCount);
+                                                        percent = Math.round((current / exCount) * 100);
+                                                    }
+                                                    return <div className="h-full bg-yellow-500" style={{ width: `${percent}%` }}></div>
+                                                })()}
+                                            </div>
+                                        </div>
+                                        <button className="shrink-0 px-4 py-2 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400" onClick={() => setView('active')}>Voltar pro treino</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Admin Panel Modal controlled by State */}
+                        {showAdminPanel && (
+                            <SectionErrorBoundary section="Painel Admin" fullScreen onReset={closeAdminPanel}>
+                                <AdminPanelV2 user={user as unknown as AdminUser} onClose={closeAdminPanel} />
+                            </SectionErrorBoundary>
+                        )}
+
+                        {whatsNewOpen && (
+                            <WhatsNewModal
+                                isOpen={whatsNewOpen}
+                                entry={pendingUpdate ? null : getLatestWhatsNew()}
+                                update={pendingUpdate ? {
+                                    id: String(pendingUpdate?.id || ''),
+                                    version: pendingUpdate?.version || null,
+                                    title: String(pendingUpdate?.title || ''),
+                                    description: String(pendingUpdate?.description || ''),
+                                    release_date: String(pendingUpdate?.release_date || pendingUpdate?.releaseDate || '') || null,
+                                } : null}
+                                onClose={closeWhatsNew}
+                            />
+                        )}
+
+                        {preCheckinOpen && (
+                            <div
+                                className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+                                onClick={() => {
+                                    setPreCheckinOpen(false)
+                                    const r = preCheckinResolveRef.current
+                                    preCheckinResolveRef.current = null
+                                    if (typeof r === 'function') r(null)
+                                }}
+                            >
+                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                                            <div className="text-white font-black text-lg truncate">Pré-treino</div>
+                                            <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPreCheckinOpen(false)
+                                                const r = preCheckinResolveRef.current
+                                                preCheckinResolveRef.current = null
+                                                if (typeof r === 'function') r(null)
+                                            }}
+                                            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                                            aria-label="Fechar"
+                                        >
+                                            <X size={18} />
+                                        </button>
+                                    </div>
+                                    <div className="p-4 space-y-4">
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Energia (1–5)</div>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {[1, 2, 3, 4, 5].map((n) => (
+                                                    <button
+                                                        key={n}
+                                                        type="button"
+                                                        onClick={() => setPreCheckinDraft((prev) => ({ ...prev, energy: String(n) }))}
+                                                        className={
+                                                            String(preCheckinDraft?.energy || '') === String(n)
+                                                                ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
+                                                                : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
+                                                        }
+                                                    >
+                                                        {n}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
+                                            <select
+                                                value={String(preCheckinDraft?.soreness ?? '')}
+                                                onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
+                                                className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                                            >
+                                                <option value="">Não informar</option>
+                                                {Array.from({ length: 11 }).map((_, i) => (
+                                                    <option key={i} value={String(i)}>
+                                                        {i}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tempo disponível</div>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {[30, 45, 60, 90, 120].map((n) => (
+                                                    <button
+                                                        key={n}
+                                                        type="button"
+                                                        onClick={() => setPreCheckinDraft((prev) => ({ ...prev, timeMinutes: String(n) }))}
+                                                        className={
+                                                            String(preCheckinDraft?.timeMinutes || '') === String(n)
+                                                                ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
+                                                                : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
+                                                        }
+                                                    >
+                                                        {n}m
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
+                                            <textarea
+                                                value={String(preCheckinDraft?.notes || '')}
+                                                onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
+                                                className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
+                                                placeholder="Ex.: pouco sono, dor no joelho, viagem…"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="p-4 border-t border-neutral-800 flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPreCheckinOpen(false)
+                                                const r = preCheckinResolveRef.current
+                                                preCheckinResolveRef.current = null
+                                                if (typeof r === 'function') r(null)
+                                            }}
+                                            className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+                                        >
+                                            Pular
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPreCheckinOpen(false)
+                                                const r = preCheckinResolveRef.current
+                                                preCheckinResolveRef.current = null
+                                                if (typeof r === 'function') r(preCheckinDraft)
+                                            }}
+                                            className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
+                                        >
+                                            Continuar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {settingsOpen && (
+                            <SettingsModal
+                                isOpen={settingsOpen}
+                                onClose={() => setSettingsOpen(false)}
+                                settings={userSettingsApi?.settings ?? null}
+                                userRole={user?.role || ''}
+                                saving={Boolean(userSettingsApi?.saving)}
+                                onOpenWhatsNew={async () => {
+                                    setSettingsOpen(false)
+                                    if (!pendingUpdate) {
+                                        try {
+                                            const res = await fetch(`/api/updates/unseen?limit=1`)
+                                            const data = await res.json().catch(() => ({}))
+                                            const updates = Array.isArray(data?.updates) ? data.updates : []
+                                            const first = updates[0] || null
+                                            if (first) {
+                                                try {
+                                                    await fetch('/api/updates/mark-prompted', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ updateId: String(first.id) })
+                                                    })
+                                                } catch { }
+                                                setPendingUpdate(first)
+                                            }
+                                        } catch { }
+                                    }
+                                    setWhatsNewOpen(true)
+                                }}
+                                onSave={async (next: unknown) => {
                                     try {
-                                        const res = await fetch(`/api/updates/unseen?limit=1`)
-                                        const data = await res.json().catch(() => ({}))
-                                        const updates = Array.isArray(data?.updates) ? data.updates : []
-                                        const first = updates[0] || null
-                                        if (first) {
-                                            try {
-                                                await fetch('/api/updates/mark-prompted', {
-                                                    method: 'POST',
-                                                    headers: { 'Content-Type': 'application/json' },
-                                                    body: JSON.stringify({ updateId: String(first.id) })
-                                                })
-                                            } catch { }
-                                            setPendingUpdate(first)
+                                        const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})
+                                        const res = await userSettingsApi?.save?.(safeNext)
+                                        if (!res?.ok) {
+                                            await alert('Falha ao salvar: ' + (res?.error || ''))
+                                            return false
                                         }
-                                    } catch { }
-                                }
-                                setWhatsNewOpen(true)
-                            }}
-                            onSave={async (next: unknown) => {
-                                try {
-                                    const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})
-                                    const res = await userSettingsApi?.save?.(safeNext)
-                                    if (!res?.ok) {
-                                        await alert('Falha ao salvar: ' + (res?.error || ''))
+                                        return true
+                                    } catch (e: unknown) {
+                                        await alert('Falha ao salvar: ' + getErrorMessage(e))
                                         return false
                                     }
-                                    return true
-                                } catch (e: unknown) {
-                                    await alert('Falha ao salvar: ' + getErrorMessage(e))
-                                    return false
-                                }
-                            }}
+                                }}
+                            />
+                        )}
+
+                        <OfflineSyncModal
+                            open={offlineSyncOpen}
+                            onClose={() => setOfflineSyncOpen(false)}
+                            userId={user?.id}
                         />
-                    )}
 
-                    <OfflineSyncModal
-                        open={offlineSyncOpen}
-                        onClose={() => setOfflineSyncOpen(false)}
-                        userId={user?.id}
-                    />
-
-                    <WelcomeFloatingWindow user={user as unknown as AdminUser} onClose={() => { }} />
-                </div>
-            </TeamWorkoutProvider>
-        </InAppNotificationsProvider>
+                        <WelcomeFloatingWindow user={user as unknown as AdminUser} onClose={() => { }} />
+                    </div>
+                </TeamWorkoutProvider>
+            </InAppNotificationsProvider>
         </>
     );
 }

@@ -44,7 +44,7 @@ const isPublicPath = (pathname: string): boolean => {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const nonce = crypto.randomUUID()
   const isDev = process.env.NODE_ENV === 'development'
   const csp = buildCspHeader(nonce, isDev)

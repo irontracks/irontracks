@@ -97,7 +97,24 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   type InputRefMap = Record<string, Array<HTMLInputElement | null>>;
 
   const [ticker, setTicker] = useState<number>(Date.now());
-  const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set<number>());
+
+  // Persist collapsed card indices across app restarts
+  const collapsedKey = (() => {
+    const id = String(session?.id || (session as Record<string, unknown>)?.startedAt || '').trim();
+    return id ? `irontracks.collapsed.v1.${id}` : null;
+  })();
+  const [collapsed, setCollapsed] = useState<Set<number>>(() => {
+    if (!collapsedKey) return new Set<number>();
+    try {
+      if (typeof window === 'undefined') return new Set<number>();
+      const raw = window.localStorage.getItem(collapsedKey);
+      if (!raw) return new Set<number>();
+      const arr: unknown = JSON.parse(raw);
+      return new Set<number>(Array.isArray(arr) ? arr.filter((n): n is number => typeof n === 'number') : []);
+    } catch {
+      return new Set<number>();
+    }
+  });
   const [finishing, setFinishing] = useState<boolean>(false);
   const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(() => new Set<string>());
   const [inviteOpen, setInviteOpen] = useState<boolean>(false);
@@ -142,6 +159,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const reportHistoryUpdatedAtRef = useRef<number>(0);
   const deloadAiCacheRef = useRef<Record<string, unknown>>({});
   const supabase = useStableSupabaseClient();
+
+  // Persist collapsed indices whenever they change
+  useEffect(() => {
+    if (!collapsedKey) return;
+    try {
+      if (typeof window === 'undefined') return;
+      window.localStorage.setItem(collapsedKey, JSON.stringify([...collapsed]));
+    } catch { }
+  }, [collapsed, collapsedKey]);
+
   const MAX_EXTRA_SETS_PER_EXERCISE = 50;
   const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
   const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;

@@ -69,7 +69,10 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       const signResp = await fetch('/api/storage/social-stories/signed-upload', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify({
+          path,
+          contentType: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg'),
+        }),
       })
       const signJson = await signResp.json().catch((): null => null)
       if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))

@@ -4,6 +4,18 @@ import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import type { ActionResult } from '@/types/actions'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { cacheDeletePattern } from '@/utils/cache'
+
+const invalidateWorkoutCaches = async (userId: string) => {
+  if (!userId) return
+  try {
+    await Promise.all([
+      cacheDeletePattern(`workouts:list:${userId}*`),
+      cacheDeletePattern(`workouts:history:${userId}:*`),
+      cacheDeletePattern(`dashboard:bootstrap:${userId}`),
+    ])
+  } catch { }
+}
 
 const safeString = (v: unknown): string => {
   const s = String(v ?? '').trim()
@@ -80,7 +92,7 @@ export async function createWorkout(workout: Record<string, unknown>): Promise<A
     const notes = workout?.notes != null ? safeString(workout.notes) : ''
     try {
       trackUserEvent('workout_create', { type: 'workout', metadata: { title, exercisesCount: exercisesPayload.length } })
-    } catch {}
+    } catch { }
 
     const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', {
       p_workout_id: null,
@@ -95,13 +107,16 @@ export async function createWorkout(workout: Record<string, unknown>): Promise<A
     if (!workoutId) return { ok: false, error: 'Falha ao criar treino' }
     try {
       trackUserEvent('workout_create_ok', { type: 'workout', metadata: { id: workoutId, title } })
-    } catch {}
+    } catch { }
+
+    await invalidateWorkoutCaches(user.id)
+
     return { ok: true, data: { id: String(workoutId) } }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     try {
       trackUserEvent('workout_create_error', { type: 'workout', metadata: { message } })
-    } catch {}
+    } catch { }
     return { ok: false, error: message }
   }
 }
@@ -122,7 +137,7 @@ export async function updateWorkout(id: string, workout: Record<string, unknown>
     const notes = workout?.notes != null ? safeString(workout.notes) : ''
     try {
       trackUserEvent('workout_update', { type: 'workout', metadata: { id: workoutId, title, exercisesCount: exercisesPayload.length } })
-    } catch {}
+    } catch { }
 
     const { data: savedId, error } = await supabase.rpc('save_workout_atomic', {
       p_workout_id: workoutId,
@@ -136,13 +151,16 @@ export async function updateWorkout(id: string, workout: Record<string, unknown>
     if (error) return { ok: false, error: error.message }
     try {
       trackUserEvent('workout_update_ok', { type: 'workout', metadata: { id: savedId || workoutId, title } })
-    } catch {}
+    } catch { }
+
+    await invalidateWorkoutCaches(user.id)
+
     return { ok: true, data: { id: String(savedId || workoutId) } }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     try {
       trackUserEvent('workout_update_error', { type: 'workout', metadata: { message } })
-    } catch {}
+    } catch { }
     return { ok: false, error: message }
   }
 }
@@ -150,22 +168,26 @@ export async function updateWorkout(id: string, workout: Record<string, unknown>
 export async function deleteWorkout(id: string): Promise<ActionResult> {
   try {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     const workoutId = safeString(id)
     if (!workoutId) return { ok: false, error: 'missing id' }
     try {
       trackUserEvent('workout_delete', { type: 'workout', metadata: { id: workoutId } })
-    } catch {}
+    } catch { }
     const { error } = await supabase.from('workouts').delete().eq('id', workoutId)
     if (error) return { ok: false, error: error.message }
     try {
       trackUserEvent('workout_delete_ok', { type: 'workout', metadata: { id: workoutId } })
-    } catch {}
+    } catch { }
+
+    if (user?.id) await invalidateWorkoutCaches(user.id)
+
     return { ok: true, data: undefined }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     try {
       trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message } })
-    } catch {}
+    } catch { }
     return { ok: false, error: message }
   }
 }
@@ -173,12 +195,16 @@ export async function deleteWorkout(id: string): Promise<ActionResult> {
 export async function setWorkoutArchived(id: string, archived = true): Promise<ActionResult> {
   try {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     const workoutId = safeString(id)
     if (!workoutId) return { ok: false, error: 'missing id' }
     const archivedAt = archived ? new Date().toISOString() : null
     const { error } = await supabase.from('workouts').update({ archived_at: archivedAt }).eq('id', workoutId)
     if (error) return { ok: false, error: error.message }
     void archivedAt
+
+    if (user?.id) await invalidateWorkoutCaches(user.id)
+
     return { ok: true, data: undefined }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
@@ -189,12 +215,16 @@ export async function setWorkoutArchived(id: string, archived = true): Promise<A
 export async function setWorkoutSortOrder(ids: string[]): Promise<ActionResult> {
   try {
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     const list = (Array.isArray(ids) ? ids : []).map((x) => safeString(x)).filter(Boolean)
     for (let i = 0; i < list.length; i += 1) {
       const workoutId = list[i]
       const { error } = await supabase.from('workouts').update({ sort_order: i }).eq('id', workoutId)
       if (error) return { ok: false, error: error.message }
     }
+
+    if (user?.id) await invalidateWorkoutCaches(user.id)
+
     return { ok: true, data: undefined }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
@@ -573,7 +603,7 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
     try {
       const { data: vol, error: vErr } = await supabase.rpc('iron_rank_my_total_volume')
       if (!vErr) totalVolumeKg = Math.round(Number(String(vol ?? 0).replace(',', '.')) || 0)
-    } catch {}
+    } catch { }
 
     const badges: Array<Record<string, unknown>> = []
     if (totalWorkouts > 0) badges.push({ id: 'first_workout', label: 'Primeiro treino', kind: 'milestone' })

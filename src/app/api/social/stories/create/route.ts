@@ -48,6 +48,22 @@ export async function POST(req: Request) {
 
     if (!isAllowedStoryPath(auth.user.id, mediaPath)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
+    const ALLOWED_MIME_PREFIXES = [
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+      'video/mp4', 'video/quicktime', 'video/webm',
+    ]
+    const mimeAdmin = createAdminClient()
+    const pathParts = mediaPath.split('/')
+    const fileName = pathParts.at(-1) ?? ''
+    const folderPath = pathParts.slice(0, -1).join('/')
+    const { data: objects } = await mimeAdmin.storage
+      .from('social-stories')
+      .list(folderPath, { search: fileName, limit: 1 })
+    const storageMime = String(objects?.[0]?.metadata?.mimetype || '').toLowerCase()
+    if (!storageMime || !ALLOWED_MIME_PREFIXES.some((m) => storageMime.startsWith(m))) {
+      return NextResponse.json({ ok: false, error: 'Tipo de arquivo não permitido.' }, { status: 400 })
+    }
+
     const { data, error } = await auth.supabase
       .from('social_stories')
       .insert({

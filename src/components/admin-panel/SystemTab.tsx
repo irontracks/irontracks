@@ -15,9 +15,7 @@ export const SystemTab: React.FC = () => {
         dangerWorkoutsConfirm,
         setDangerWorkoutsConfirm,
         systemExporting,
-        setSystemExporting,
         systemImporting,
-        setSystemImporting,
         systemFileInputRef,
         broadcastTitle,
         setBroadcastTitle,
@@ -32,10 +30,9 @@ export const SystemTab: React.FC = () => {
         exerciseAliasesNotice,
         usersList,
         getAdminAuthHeaders,
-        // Funções que adicionei ao hook (vou assumir que estão lá, se não tiver, adicionarei)
-        // handleExportSystem, handleImportSystem, handleBackfillAliases, handleDeleteAliases
-        // Preciso verificar se adicionei essas funções ao hook.
-        // Se não adicionei, vou adicionar placeholders ou usar a lógica inline se for simples.
+        handleExportSystem,
+        handleImportSystem,
+        runDangerAction,
     } = useAdminPanel();
 
     const [grantEmail, setGrantEmail] = useState('');
@@ -207,18 +204,9 @@ export const SystemTab: React.FC = () => {
         };
     }, [grantUserId, grantEmail, loadVipStatus]);
 
-    // Lógica inline para Backup/Restore se não estiver no hook
-    const handleExportSystem = async () => {
-        alert('Funcionalidade de backup em implementação (mover lógica do AdminPanelV2 para hook)');
-    };
-
-    const handleImportSystem = async (e: React.ChangeEvent<HTMLInputElement>) => {
-         alert('Funcionalidade de restore em implementação (mover lógica do AdminPanelV2 para hook)');
-    };
-
-    // Lógica para aliases
+    // handleUpdateAliases placeholder (aliases backfill not yet implemented in controller)
     const handleUpdateAliases = async () => {
-         alert('Funcionalidade de aliases em implementação');
+        alert('Funcionalidade de aliases em implementação');
     };
 
     if (!isAdmin) return <div className="p-4 text-red-500">Acesso negado.</div>;

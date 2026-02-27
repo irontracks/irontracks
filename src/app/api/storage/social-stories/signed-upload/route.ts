@@ -7,9 +7,15 @@ import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
+const ALLOWED_CONTENT_TYPES = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+  'video/mp4', 'video/quicktime', 'video/webm',
+]
+
 const BodySchema = z
   .object({
     path: z.string().min(1),
+    contentType: z.string().min(1),
   })
   .strip()
 
@@ -31,7 +37,13 @@ export async function POST(request: Request) {
 
     const parsedBody = await parseJsonBody(request, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { path } = parsedBody.data!
+    const { path, contentType } = parsedBody.data!
+
+    const normalizedMime = contentType.toLowerCase().split(';')[0].trim()
+    if (!ALLOWED_CONTENT_TYPES.includes(normalizedMime)) {
+      return NextResponse.json({ ok: false, error: 'Tipo de arquivo não permitido.' }, { status: 400 })
+    }
+
     const bucket = 'social-stories'
 
     const safe = isSafeStoragePath(path)

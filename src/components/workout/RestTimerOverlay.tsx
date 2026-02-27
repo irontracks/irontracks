@@ -43,6 +43,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const vibrateIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const alarmActiveRef = useRef(false);
+    const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
     const safeSettings = settings && typeof settings === 'object' ? settings : null;
     const soundsEnabled = safeSettings ? safeSettings.enableSounds !== false : true;
     const soundVolume = (() => {
@@ -253,6 +254,37 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             updateRestLiveActivity(notifyIdRef.current, true);
         }
     }, [isFinished]);
+
+    // Wake Lock: keep screen on while timer is running, re-acquire on page visible
+    useEffect(() => {
+        if (!targetTime) return;
+        type WLSentinel = { release: () => Promise<void> };
+        type WLNavigator = Navigator & { wakeLock: { request: (type: 'screen') => Promise<WLSentinel> } };
+
+        const acquire = async () => {
+            try {
+                if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+                    const lock = await (navigator as WLNavigator).wakeLock.request('screen');
+                    wakeLockRef.current = lock;
+                }
+            } catch { }
+        };
+
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') acquire();
+        };
+
+        acquire();
+        document.addEventListener('visibilitychange', onVisible);
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisible);
+            try {
+                wakeLockRef.current?.release().catch(() => { });
+                wakeLockRef.current = null;
+            } catch { }
+        };
+    }, [targetTime]);
 
     if (!targetTime) return null;
 

@@ -8,6 +8,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { safeRecord } from '@/utils/guards'
+import { cacheSetNx, cacheDeletePattern } from '@/utils/cache'
 import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } from '@/utils/report/reportMetrics'
 
 const parseTrainingNumberOrZero = (v: unknown) => {
@@ -82,7 +83,7 @@ const computeWorkoutStreak = (dateRows: unknown[]) => {
       if (!d || Number.isNaN(d.getTime())) return
       const day = d.toISOString().slice(0, 10)
       daySet.add(day)
-    } catch {}
+    } catch { }
   })
   if (!daySet.size) return 0
 
@@ -170,10 +171,10 @@ export async function POST(request: Request) {
         const parsed = parseJsonWithSchema(prevRow.notes, z.record(z.unknown()))
         if (parsed && typeof parsed === 'object') previousSessionObj = parsed
       }
-    } catch {}
+    } catch { }
     try {
       sessionObj.reportMeta = buildReportMetrics(sessionObj, previousSessionObj)
-    } catch {}
+    } catch { }
     try {
       const baseDate = new Date(String(sessionObj?.date ?? new Date().toISOString()))
       const start = new Date(baseDate)
@@ -198,14 +199,14 @@ export async function POST(request: Request) {
       const weekly = buildWeeklyVolumeStats(sessionObj, historySessions)
       const loadFlags = buildTrainingLoadFlags(sessionObj, historySessions, weekly)
       sessionObj.reportMeta = { ...reportMeta, weekly, loadFlags }
-    } catch {}
+    } catch { }
     if (!Object.keys(sessionObj).length) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
     const idempotencyKey = String((body as Record<string, unknown>)?.idempotencyKey || sessionObj?.idempotencyKey || sessionObj?.finishIdempotencyKey || '').trim()
     const reqId =
       (() => {
         try {
           if (typeof crypto !== 'undefined' && 'randomUUID' in crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-        } catch {}
+        } catch { }
         return `${Date.now()}-${Math.random().toString(16).slice(2)}`
       })()
 
@@ -225,7 +226,7 @@ export async function POST(request: Request) {
         client_ts: sessionObj?.date ? new Date(String(sessionObj.date)).toISOString() : null,
         user_agent: request.headers.get('user-agent') || null,
       })
-    } catch {}
+    } catch { }
 
     const baseInsert = {
       user_id: user.id,
@@ -237,8 +238,31 @@ export async function POST(request: Request) {
       notes: JSON.stringify(session),
     } as Record<string, unknown>
 
-    let saved: { id: string; [key: string]: unknown } | null = null
+    let saved: { id: string;[key: string]: unknown } | null = null
     let idempotent = false
+
+    if (idempotencyKey) {
+      const isFirst = await cacheSetNx(`workouts:finish:v2:lock:${idempotencyKey}`, '1', 300)
+      if (!isFirst) {
+        // Bloqueado pelo Redis. Alguém já está salvando ou salvou recentemente.
+        try {
+          const { data: existing } = await supabase
+            .from('workouts')
+            .select('id, created_at')
+            .eq('user_id', user.id)
+            .eq('is_template', false)
+            .eq('finish_idempotency_key', idempotencyKey)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (existing?.id) {
+            return NextResponse.json({ ok: true, saved: existing, idempotent: true })
+          }
+        } catch { }
+        return NextResponse.json({ ok: false, error: 'concurrent_request_detected' }, { status: 429 })
+      }
+    }
 
     const tryInsert = async (withIdempotencyKey: boolean) => {
       const payload = withIdempotencyKey && idempotencyKey ? { ...baseInsert, finish_idempotency_key: idempotencyKey } : baseInsert
@@ -261,24 +285,24 @@ export async function POST(request: Request) {
             .limit(1)
             .maybeSingle()
           if (existing?.id) {
-            saved = existing as { id: string; [key: string]: unknown }
+            saved = existing as { id: string;[key: string]: unknown }
             idempotent = true
             insertRes = { data: existing, error: null } as unknown as typeof insertRes
           }
-        } catch {}
+        } catch { }
       } else if (msg.toLowerCase().includes('finish_idempotency_key') && msg.toLowerCase().includes('does not exist')) {
         insertRes = await tryInsert(false)
       }
     }
 
     const { data, error } = insertRes
-    saved = saved || (data as { id: string; [key: string]: unknown } | null)
+    saved = saved || (data as { id: string;[key: string]: unknown } | null)
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     try {
       await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)
-    } catch {}
+    } catch { }
 
     try {
       const admin = createAdminClient()
@@ -338,7 +362,7 @@ export async function POST(request: Request) {
             }
           }
         }
-      } catch {}
+      } catch { }
 
       try {
         const throttleGoals = await shouldThrottleBySenderType(user.id, 'friend_goal', 12 * 60)
@@ -368,7 +392,7 @@ export async function POST(request: Request) {
             }
           }
         }
-      } catch {}
+      } catch { }
 
       try {
         const throttlePr = await shouldThrottleBySenderType(user.id, 'friend_pr', 60)
@@ -401,7 +425,7 @@ export async function POST(request: Request) {
                     volume: Math.max(prev.volume, v.volume),
                   })
                 })
-              } catch {}
+              } catch { }
             }
 
             const prs: { exercise: string; label: string; value: string; score: number }[] = []
@@ -460,8 +484,17 @@ export async function POST(request: Request) {
             }
           }
         }
-      } catch {}
-    } catch {}
+      } catch { }
+    } catch { }
+
+    // Limpar os caches de listagem de histórico e dashboard ao finalizar o treino
+    try {
+      await Promise.all([
+        cacheDeletePattern(`workouts:list:${user.id}*`),
+        cacheDeletePattern(`workouts:history:${user.id}:*`),
+        cacheDeletePattern(`dashboard:bootstrap:${user.id}`),
+      ])
+    } catch { }
 
     try {
       const admin = createAdminClient()
@@ -478,7 +511,7 @@ export async function POST(request: Request) {
         },
         user_agent: request.headers.get('user-agent') || null,
       })
-    } catch {}
+    } catch { }
 
     return NextResponse.json({ ok: true, saved, idempotent })
   } catch (e: unknown) {

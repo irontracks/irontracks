@@ -5,7 +5,7 @@ type CacheEntry = {
 
 const localStore = new Map<string, CacheEntry>()
 
-const getUpstashConfig = () => {
+export const getUpstashConfig = () => {
   try {
     const url = String(process.env.UPSTASH_REDIS_REST_URL || '').trim()
     const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim()
@@ -88,7 +88,7 @@ export const cacheSet = async (key: string, value: unknown, ttlSeconds: number):
       },
       body: payload,
     })
-  } catch {}
+  } catch { }
 }
 
 export const cacheDelete = async (key: string): Promise<void> => {
@@ -100,5 +100,75 @@ export const cacheDelete = async (key: string): Promise<void> => {
       method: 'POST',
       headers: { Authorization: `Bearer ${cfg.token}` },
     })
-  } catch {}
+  } catch { }
+}
+
+export const cacheDeletePattern = async (pattern: string): Promise<void> => {
+  try {
+    const keysToDelete: string[] = []
+    const isPrefix = pattern.endsWith('*')
+    const prefix = isPrefix ? pattern.slice(0, -1) : pattern
+
+    for (const k of localStore.keys()) {
+      if (isPrefix ? k.startsWith(prefix) : k === pattern) {
+        keysToDelete.push(k)
+      }
+    }
+    for (const k of keysToDelete) {
+      localStore.delete(k)
+    }
+  } catch { }
+
+  const cfg = getUpstashConfig()
+  if (!cfg) return
+
+  try {
+    const body = {
+      script: `
+        local cursor = "0"
+        local deleted = 0
+        repeat
+            local result = redis.call("SCAN", cursor, "MATCH", ARGV[1], "COUNT", 100)
+            cursor = result[1]
+            local keys = result[2]
+            if #keys > 0 then
+                redis.call("DEL", unpack(keys))
+                deleted = deleted + #keys
+            end
+        until cursor == "0"
+        return deleted
+      `,
+      keys: [],
+      args: [pattern],
+    }
+    await fetch(`${cfg.url}/eval`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${cfg.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+  } catch { }
+}
+
+export const cacheSetNx = async (key: string, value: string, ttlSeconds: number): Promise<boolean> => {
+  const cfg = getUpstashConfig()
+  if (!cfg) return true // Fallback to allowing if Upstash is offline
+
+  try {
+    const res = await fetch(
+      `${cfg.url}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?NX=true&EX=${Math.max(1, Math.floor(ttlSeconds))}`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${cfg.token}` },
+      }
+    )
+    if (!res.ok) return true
+    const json = await res.json().catch(() => null)
+    const result = json && typeof json === 'object' ? (json as Record<string, unknown>).result : null
+    return result === 'OK'
+  } catch {
+    return true
+  }
 }
