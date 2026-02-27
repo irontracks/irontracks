@@ -336,6 +336,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // View + activeSession local persistence — extracted to useLocalPersistence hook
     useLocalPersistence({ userId: user?.id, view, setView, activeSession })
 
+    // Safety net: views that require companion state render nothing if that state is null.
+    // If we detect this situation, reset to 'dashboard' to prevent a permanent black screen.
+    useEffect(() => {
+        if (view === 'directChat' && !directChat) { setView('dashboard'); return }
+        if (view === 'report' && !reportData.current) { setView('dashboard'); return }
+        if (view === 'active' && !activeSession) { setView('dashboard'); return }
+    }, [view, directChat, activeSession, reportData])
+
     useEffect(() => {
         if (authLoading) return;
         if (user) return;

@@ -44,8 +44,14 @@ export function useLocalPersistence({
         return
       }
 
-      // Never restore to 'active' without a real session — go to dashboard instead
-      if (savedView === 'active') {
+      // Only restore views that don't require companion state.
+      // 'active' needs activeSession, 'report' needs reportData.current,
+      // 'directChat' needs directChat object — all would render nothing (black screen).
+      const SAFE_VIEWS = new Set([
+        'dashboard', 'history', 'edit', 'assessments',
+        'community', 'vip', 'chat', 'chatList', 'globalChat', 'admin',
+      ])
+      if (!SAFE_VIEWS.has(savedView)) {
         setView('dashboard')
         return
       }
