@@ -548,7 +548,6 @@ export default function StoryViewer({
                           }
                         }}
                         onError={() => setVideoError('Não foi possível reproduzir este vídeo.')}
-                        onStalled={() => setVideoError('Este vídeo não carregou no seu dispositivo.')}
                       />
                     ) : (
                       <div className="px-6 text-center">

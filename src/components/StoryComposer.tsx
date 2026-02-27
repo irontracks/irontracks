@@ -1117,7 +1117,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
         const saveResult = await saveImageToPhotos(base64)
         if (saveResult.saved) {
-          setInfo('Salvo no rolo do iPhone!')
+          setInfo(mediaKind === 'video' ? 'Vídeo salvo no rolo!' : 'Imagem salva no rolo!')
           return
         }
         // Permission denied → offer to open settings
@@ -1144,7 +1144,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             await navigator.share(shareData)
             shared = true
             if (isIOS) {
-              setInfo('Na janela que abriu, toque em "Salvar Imagem" para guardar no rolo.')
+              setInfo(mediaKind === 'video' ? 'Vídeo salvo no rolo!' : 'Imagem salva no rolo!')
             }
           }
         } catch (shareErr: unknown) {

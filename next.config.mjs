@@ -112,6 +112,11 @@ const nextConfig = {
         source: '/((?!_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml).*)',
         headers: [{ key: 'cache-control', value: 'private, max-age=0, must-revalidate' }],
       },
+      // Raiz: nunca cachear — evita o WKWebView mostrar a tela de login stale ao abrir o app
+      {
+        source: '/',
+        headers: [{ key: 'cache-control', value: 'no-store, max-age=0' }],
+      },
     ]
   },
 };
