@@ -3,6 +3,9 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { cacheSetNx } from '@/utils/cache'
+import { createAdminClient } from '@/utils/supabase/admin'
+import { insertNotifications } from '@/lib/social/notifyFollowers'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +39,32 @@ export async function POST(req: Request) {
       if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
         return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
       }
+
+      try {
+        const isNew = await cacheSetNx(`social:like:push:${storyId}:${auth.user.id}`, '1', 300)
+        if (isNew) {
+          const admin = createAdminClient()
+          const { data: story } = await admin.from('social_stories').select('user_id').eq('id', storyId).maybeSingle()
+
+          if (story?.user_id && story.user_id !== auth.user.id) {
+            const { data: me } = await admin.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle()
+            const name = String(me?.display_name || '').trim() || 'Alguém'
+
+            await insertNotifications([{
+              user_id: story.user_id,
+              recipient_id: story.user_id,
+              sender_id: auth.user.id,
+              type: 'story_like',
+              title: 'Nova curtida',
+              message: `${name} curtiu seu story.`,
+              read: false,
+              is_read: false,
+              metadata: { story_id: storyId, sender_id: auth.user.id },
+            }])
+          }
+        }
+      } catch { }
+
       return NextResponse.json({ ok: true, liked: true })
     }
     if (shouldLike === false) {
@@ -61,6 +90,32 @@ export async function POST(req: Request) {
     if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     }
+
+    try {
+      const isNew = await cacheSetNx(`social:like:push:${storyId}:${auth.user.id}`, '1', 300)
+      if (isNew) {
+        const admin = createAdminClient()
+        const { data: story } = await admin.from('social_stories').select('user_id').eq('id', storyId).maybeSingle()
+
+        if (story?.user_id && story.user_id !== auth.user.id) {
+          const { data: me } = await admin.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle()
+          const name = String(me?.display_name || '').trim() || 'Alguém'
+
+          await insertNotifications([{
+            user_id: story.user_id,
+            recipient_id: story.user_id,
+            sender_id: auth.user.id,
+            type: 'story_like',
+            title: 'Nova curtida',
+            message: `${name} curtiu seu story.`,
+            read: false,
+            is_read: false,
+            metadata: { story_id: storyId, sender_id: auth.user.id },
+          }])
+        }
+      }
+    } catch { }
+
     return NextResponse.json({ ok: true, liked: true })
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e)

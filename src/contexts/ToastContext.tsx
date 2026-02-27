@@ -42,7 +42,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       <div
         aria-live="polite"
         aria-atomic="false"
-        className="fixed bottom-4 right-4 z-[999998] flex flex-col gap-2 pointer-events-none"
+        className="fixed top-4 right-4 z-[999998] flex flex-col gap-2 pointer-events-none"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
       >
         {toasts.map((t) => (
           <ActionToast key={t.id} item={t} onDismiss={dismiss} />

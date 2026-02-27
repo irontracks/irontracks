@@ -21,7 +21,6 @@ export const ExerciseSet: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
   const hasDropStages = dropStages.length > 0;
 
   if (Array.isArray(rawCfg) || hasDropStages) {
-    // TODO: Implement DropSetSet
     return <SetInputRow ex={ex} exIdx={exIdx} setIdx={setIdx} />;
   }
 
@@ -31,11 +30,9 @@ export const ExerciseSet: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
   const isRestPause = method === 'Rest-Pause' || isRestPauseConfig(cfg);
 
   if (isCluster) {
-    // TODO: Implement ClusterSet
     return <SetInputRow ex={ex} exIdx={exIdx} setIdx={setIdx} />;
   }
   if (isRestPause) {
-    // TODO: Implement RestPauseSet
     return <SetInputRow ex={ex} exIdx={exIdx} setIdx={setIdx} />;
   }
 

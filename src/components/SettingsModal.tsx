@@ -111,6 +111,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const moduleSocial = Boolean(draft?.moduleSocial ?? true)
   const moduleCommunity = Boolean(draft?.moduleCommunity ?? true)
   const moduleMarketplace = Boolean(draft?.moduleMarketplace ?? true)
+  const requireBiometricsOnStartup = Boolean(draft?.requireBiometricsOnStartup ?? false)
   const promptPreWorkoutCheckin = Boolean(draft?.promptPreWorkoutCheckin ?? true)
   const promptPostWorkoutCheckin = Boolean(draft?.promptPostWorkoutCheckin ?? true)
   const userRole = String(props?.userRole || '')
@@ -141,17 +142,17 @@ export default function SettingsModal(props: SettingsModalProps) {
     if (!isOpen) return
     if (!isIosNative()) return
     let alive = true
-    ;(async () => {
-      try {
-        const res = await checkNativeNotificationPermission()
-        if (!alive) return
-        const status = String((res as Record<string, unknown>)?.status ?? 'unknown')
-        setIosNotifStatus(status)
-      } catch {
-        if (!alive) return
-        setIosNotifStatus('unknown')
-      }
-    })()
+      ; (async () => {
+        try {
+          const res = await checkNativeNotificationPermission()
+          if (!alive) return
+          const status = String((res as Record<string, unknown>)?.status ?? 'unknown')
+          setIosNotifStatus(status)
+        } catch {
+          if (!alive) return
+          setIosNotifStatus('unknown')
+        }
+      })()
     return () => {
       alive = false
     }
@@ -161,51 +162,51 @@ export default function SettingsModal(props: SettingsModalProps) {
     if (!isOpen) return
     if (!isIosNative()) return
     let alive = true
-    ;(async () => {
-      try {
-        setIosDiagBusy(true)
-        const capCore = require('@capacitor/core')
-        const appMod = require('@capacitor/app')
-        const pushMod = require('@capacitor/push-notifications')
-        const deviceMod = require('@capacitor/device')
+      ; (async () => {
+        try {
+          setIosDiagBusy(true)
+          const capCore = require('@capacitor/core')
+          const appMod = require('@capacitor/app')
+          const pushMod = require('@capacitor/push-notifications')
+          const deviceMod = require('@capacitor/device')
 
-        const Capacitor = capCore?.Capacitor
-        const App = appMod?.App
-        const PushNotifications = pushMod?.PushNotifications
-        const Device = deviceMod?.Device
+          const Capacitor = capCore?.Capacitor
+          const App = appMod?.App
+          const PushNotifications = pushMod?.PushNotifications
+          const Device = deviceMod?.Device
 
-        const capacitorPresent = !!Capacitor
-        const platform = String(Capacitor?.getPlatform?.() || 'unknown')
-        const pluginNames = Capacitor?.Plugins ? Object.keys(Capacitor.Plugins) : []
+          const capacitorPresent = !!Capacitor
+          const platform = String(Capacitor?.getPlatform?.() || 'unknown')
+          const pluginNames = Capacitor?.Plugins ? Object.keys(Capacitor.Plugins) : []
 
-        const appInfo = await App?.getInfo?.().catch(() => null)
-        const deviceInfo = await Device?.getInfo?.().catch(() => null)
-        const pushPerm = await PushNotifications?.checkPermissions?.().catch(() => null)
+          const appInfo = await App?.getInfo?.().catch(() => null)
+          const deviceInfo = await Device?.getInfo?.().catch(() => null)
+          const pushPerm = await PushNotifications?.checkPermissions?.().catch(() => null)
 
-        const biom = await checkBiometricsAvailable()
-        const healthAvailable = await isHealthKitAvailable()
-        const notif = await checkNativeNotificationPermission()
+          const biom = await checkBiometricsAvailable()
+          const healthAvailable = await isHealthKitAvailable()
+          const notif = await checkNativeNotificationPermission()
 
-        if (!alive) return
-        setIosDiag({
-          capacitorPresent,
-          platform,
-          pluginNames,
-          app: appInfo || null,
-          device: deviceInfo || null,
-          push: pushPerm || null,
-          biometrics: biom || null,
-          notifications: notif || null,
-          healthKitAvailable: healthAvailable,
-        })
-      } catch {
-        if (!alive) return
-        setIosDiag(null)
-      } finally {
-        if (!alive) return
-        setIosDiagBusy(false)
-      }
-    })()
+          if (!alive) return
+          setIosDiag({
+            capacitorPresent,
+            platform,
+            pluginNames,
+            app: appInfo || null,
+            device: deviceInfo || null,
+            push: pushPerm || null,
+            biometrics: biom || null,
+            notifications: notif || null,
+            healthKitAvailable: healthAvailable,
+          })
+        } catch {
+          if (!alive) return
+          setIosDiag(null)
+        } finally {
+          if (!alive) return
+          setIosDiagBusy(false)
+        }
+      })()
     return () => {
       alive = false
     }
@@ -630,6 +631,24 @@ export default function SettingsModal(props: SettingsModalProps) {
               ) : null}
             </div>
           </div>
+
+          {isIosNative() ? (
+            <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">
+              <SectionHeader icon={Lock} label="Segurança" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-bold text-white">Solicitar Biometria</div>
+                    <div className="text-xs text-neutral-400">Exige Face ID ou Touch ID ao abrir o app.</div>
+                  </div>
+                  <ToggleSwitch
+                    checked={requireBiometricsOnStartup}
+                    onChange={() => setValue('requireBiometricsOnStartup', !requireBiometricsOnStartup)}
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {isIosNative() ? (
             <div className="bg-neutral-800 border border-neutral-700 rounded-xl p-4">

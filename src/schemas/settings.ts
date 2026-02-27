@@ -48,6 +48,7 @@ export const UserSettingsSchema = z
     featureTeamworkV2: z.boolean().default(false),
     featureStoriesV2: z.boolean().default(false),
     featureOfflineSyncV2: z.boolean().default(false),
+    requireBiometricsOnStartup: z.boolean().default(false),
   })
   .passthrough()
 

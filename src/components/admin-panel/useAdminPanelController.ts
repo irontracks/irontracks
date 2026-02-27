@@ -1,12 +1,18 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminUser, AdminTeacher, ErrorReport, ExecutionVideo, AdminWorkoutTemplate } from '@/types/admin';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import { useDialog } from '@/contexts/DialogContext';
-import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin-actions';
+import { sendBroadcastMessage, addTeacher, updateTeacher, exportAllData, importAllData } from '@/actions/admin-actions';
 import { workoutTitleKey, normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { workoutPlanHtml } from '@/utils/report/templates';
+import { adminFetchJson } from '@/utils/admin/adminFetch';
+import { parseJsonWithSchema } from '@/utils/zod';
+import { z } from 'zod';
+import { escapeHtml } from '@/utils/escapeHtml';
+import type { Exercise } from '@/types/app';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -191,6 +197,9 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     const [systemExporting, setSystemExporting] = useState<boolean>(false);
     const [systemImporting, setSystemImporting] = useState<boolean>(false);
     const systemFileInputRef = useRef<HTMLInputElement | null>(null);
+
+    // Debug / Diagnostic
+    const [debugError, setDebugError] = useState<string | null>(null);
 
     // Loading State (Global)
     const [loading, setLoading] = useState<boolean>(false);
@@ -896,6 +905,1027 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         };
     }, [isAdmin, tab, userActivityQuery, userActivityRole, loadUserActivityUsers]);
 
+    // ─── Utility helpers ───────────────────────────────────────────────────────
+
+    const getSetsCount = useCallback((value: unknown): number => {
+        if (Array.isArray(value)) return value.length;
+        if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+        if (typeof value === 'string') {
+            const n = Number(value);
+            return Number.isFinite(n) ? n : 0;
+        }
+        return 0;
+    }, []);
+
+    // ─── System handlers ───────────────────────────────────────────────────────
+
+    const handleExportSystem = useCallback(async () => {
+        try {
+            setSystemExporting(true);
+            const res = await exportAllData();
+            if (res?.error) throw new Error(String(res.error));
+            const json = JSON.stringify(res.data || {}, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `irontracks_full_backup_${new Date().toISOString()}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+            await alert('Erro ao exportar: ' + msg);
+        } finally {
+            setSystemExporting(false);
+        }
+    }, [alert, setSystemExporting]);
+
+    const handleImportSystemClick = useCallback(() => {
+        systemFileInputRef.current?.click();
+    }, [systemFileInputRef]);
+
+    const handleImportSystem = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            setSystemImporting(true);
+            const text = await file.text();
+            const data = parseJsonWithSchema(text, z.record(z.unknown()));
+            if (!data) throw new Error('invalid_json');
+            if (!(await confirm('Importar backup completo do sistema?', 'Importar Backup'))) return;
+            const res = await importAllData(data);
+            if (res?.error) throw new Error(String(res.error));
+            await alert('Backup importado com sucesso!');
+        } catch (err: unknown) {
+            const msg = err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string' ? (err as { message: string }).message : String(err);
+            await alert('Erro ao importar: ' + msg);
+        } finally {
+            setSystemImporting(false);
+            e.target.value = '';
+        }
+    }, [alert, confirm, setSystemImporting]);
+
+    const handleExportPdf = useCallback(async () => {
+        try {
+            const safeWorkout = {
+                title: escapeHtml(viewWorkout?.name || ''),
+                exercises: (Array.isArray(viewWorkout?.exercises) ? viewWorkout.exercises : []).map((ex: UnknownRecord) => ({
+                    name: escapeHtml(ex?.name),
+                    sets: getSetsCount(ex?.sets),
+                    reps: escapeHtml(ex?.reps ?? '10'),
+                    rpe: escapeHtml(ex?.rpe ?? 8),
+                    cadence: escapeHtml(ex?.cadence || '2020'),
+                    restTime: escapeHtml(ex?.rest_time ?? ex?.restTime),
+                    method: escapeHtml(ex?.method),
+                    notes: escapeHtml(ex?.notes)
+                }))
+            };
+            const baseUser: UnknownRecord = user && typeof user === 'object' ? user : {};
+            const safeUser = {
+                ...baseUser,
+                displayName: escapeHtml(baseUser.displayName ?? baseUser.name ?? ''),
+                name: escapeHtml(baseUser.name ?? baseUser.displayName ?? ''),
+                email: escapeHtml(baseUser.email ?? '')
+            };
+            const html = workoutPlanHtml(safeWorkout, safeUser);
+            const win = window.open('', '_blank');
+            if (!win) return;
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+            setTimeout(() => { try { win.print(); } catch { } }, 300);
+            setExportOpen(false);
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+            await alert('Erro ao gerar PDF: ' + msg);
+        }
+    }, [alert, viewWorkout, user, getSetsCount, setExportOpen]);
+
+    const handleExportJson = useCallback(() => {
+        if (!viewWorkout) return;
+        const json = JSON.stringify({
+            workout: {
+                title: String(viewWorkout.name || ''),
+                exercises: (Array.isArray(viewWorkout.exercises) ? viewWorkout.exercises : []).map((ex: UnknownRecord) => ({
+                    name: String(ex.name || ''),
+                    sets: getSetsCount(ex?.sets),
+                    reps: ex.reps,
+                    rpe: ex.rpe,
+                    cadence: ex.cadence,
+                    restTime: ex.rest_time ?? ex.restTime,
+                    method: ex.method,
+                    videoUrl: ex.video_url || ex.videoUrl,
+                    notes: ex.notes
+                }))
+            }
+        }, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${String(viewWorkout.name || 'treino').replace(/\s+/g, '_')}.json`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        setExportOpen(false);
+    }, [viewWorkout, getSetsCount, setExportOpen]);
+
+    const openEditWorkout = useCallback((e: React.MouseEvent, w: UnknownRecord) => {
+        try {
+            e?.stopPropagation?.();
+        } catch { }
+        setEditingStudentWorkout({
+            id: w.id,
+            title: w.name || w.title,
+            exercises: (Array.isArray(w.exercises) ? w.exercises : []).map((ex: UnknownRecord) => ({
+                name: ex.name || '',
+                sets: getSetsCount(ex?.sets) || 4,
+                reps: ex.reps ?? '10',
+                rpe: ex.rpe ?? 8,
+                cadence: ex.cadence || '2020',
+                restTime: ex.rest_time ?? 60,
+                method: ex.method || 'Normal',
+                videoUrl: ex.video_url || '',
+                notes: ex.notes || ''
+            }))
+        });
+    }, [getSetsCount, setEditingStudentWorkout]);
+
+    const openEditTemplate = useCallback((t: UnknownRecord) => {
+        setEditingTemplate({
+            id: String(t.id || t.uuid || ''),
+            title: String(t.name || t.title || ''),
+            created_at: String(t.created_at || new Date().toISOString()),
+            exercises: (Array.isArray(t.exercises) ? t.exercises : []).map((ex: UnknownRecord) => ({
+                name: String(ex.name || ''),
+                sets: getSetsCount(ex?.sets) || 4,
+                reps: String(ex.reps ?? '10'),
+                rpe: Number(ex.rpe ?? 8),
+                cadence: String(ex.cadence || '2020'),
+                restTime: Number(ex.rest_time ?? 60),
+                method: String(ex.method || 'Normal'),
+                videoUrl: String(ex.video_url || ''),
+                notes: String(ex.notes || '')
+            }))
+        });
+    }, [getSetsCount, setEditingTemplate]);
+
+    const handleAddTemplateToStudent = useCallback(async (template: UnknownRecord) => {
+        if (!selectedStudent) return;
+        const targetUserId = selectedStudent.user_id || '';
+        if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
+        if (!(await confirm(`Adicionar treino "${template?.name || 'Treino'}" para ${selectedStudent.name || selectedStudent.email}?`))) return;
+        try {
+            const templateExercises: UnknownRecord[] = Array.isArray(template.exercises) ? (template.exercises as UnknownRecord[]) : [];
+            const payload = {
+                user_id: targetUserId,
+                created_by: user?.id,
+                is_template: true,
+                name: template?.name || '',
+                notes: template?.notes || ''
+            };
+            const { data: newWorkout, error: wErr } = await supabase
+                .from('workouts')
+                .insert(payload)
+                .select()
+                .single();
+            if (wErr) throw wErr;
+            const toInsert = templateExercises.map((e: UnknownRecord) => ({
+                workout_id: newWorkout.id,
+                name: e?.name || '',
+                sets: getSetsCount(e?.sets) || 4,
+                reps: e?.reps ?? '10',
+                rpe: e?.rpe ?? 8,
+                cadence: e?.cadence || '2020',
+                rest_time: e?.rest_time ?? 60,
+                method: e?.method || 'Normal',
+                video_url: e?.video_url || '',
+                notes: e?.notes || ''
+            }));
+            let newExs: UnknownRecord[] = [];
+            if (toInsert.length) {
+                const { data: exRows, error: exErr } = await supabase.from('exercises').insert(toInsert).select();
+                if (exErr) throw exErr;
+                newExs = exRows || [];
+            }
+            for (let i = 0; i < templateExercises.length; i++) {
+                const srcEx: UnknownRecord = templateExercises[i] || ({} as UnknownRecord);
+                const dstEx = newExs[i] || null;
+                const setsArr: UnknownRecord[] = Array.isArray(srcEx.sets) ? (srcEx.sets as UnknownRecord[]) : [];
+                if (dstEx && setsArr.length) {
+                    const newSets = setsArr.map((s: UnknownRecord) => ({
+                        exercise_id: (dstEx as UnknownRecord).id,
+                        weight: s?.weight ?? null,
+                        reps: s?.reps ?? null,
+                        rpe: s?.rpe ?? null,
+                        set_number: s?.set_number ?? 1,
+                        completed: s?.completed ?? false
+                    }));
+                    if (newSets.length) {
+                        const { error: setErr } = await supabase.from('sets').insert(newSets);
+                        if (setErr) throw setErr;
+                    }
+                }
+            }
+            let refreshed: UnknownRecord[] = [];
+            if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
+            const { data } = await supabase
+                .from('workouts')
+                .select('*, exercises(*, sets(*))')
+                .eq('user_id', targetUserId)
+                .eq('is_template', true)
+                .order('name');
+            refreshed = data || [];
+            refreshed = (Array.isArray(refreshed) ? refreshed : []).filter((w: UnknownRecord) => w && typeof w === 'object' && w.is_template === true);
+            const synced = (refreshed || []).filter((w: UnknownRecord) => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
+            const syncedIds = new Set((synced || []).map((w: UnknownRecord) => w?.id).filter(Boolean));
+            const others = (refreshed || []).filter((w: UnknownRecord) => !syncedIds.has(w?.id));
+            setStudentWorkouts(others || []);
+            setSyncedWorkouts(synced || []);
+            await alert('Treino enviado com sucesso!', 'Sucesso');
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+            await alert('Erro ao enviar: ' + msg);
+        }
+    }, [alert, confirm, selectedStudent, supabase, user, getSetsCount, setStudentWorkouts, setSyncedWorkouts]);
+
+    const handleEditStudent = useCallback(() => {
+        if (!selectedStudent) return;
+        setEditedStudent({ name: String(selectedStudent.name || ''), email: String(selectedStudent.email || '') });
+        setEditingStudent(true);
+    }, [selectedStudent, setEditedStudent, setEditingStudent]);
+
+    const handleSaveStudentEdit = useCallback(async () => {
+        if (!selectedStudent || !editedStudent.name || !editedStudent.email) return await alert('Preencha todos os campos.');
+        try {
+            const { error } = await supabase
+                .from('students')
+                .update({ name: editedStudent.name, email: editedStudent.email })
+                .eq('id', selectedStudent.id);
+            if (error) throw error;
+            setSelectedStudent(prev => (prev ? { ...prev, name: editedStudent.name, email: editedStudent.email } : prev));
+            setUsersList(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, name: editedStudent.name, email: editedStudent.email } : s));
+            setEditingStudent(false);
+            await alert('Dados do aluno atualizados.');
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+            await alert('Erro ao salvar: ' + msg);
+        }
+    }, [alert, selectedStudent, editedStudent, supabase, setSelectedStudent, setUsersList, setEditingStudent]);
+
+    const handleDangerAction = useCallback(async (actionName: string, actionFn: () => Promise<UnknownRecord>) => {
+        if (!(await confirm(`Tem certeza que deseja ${actionName}?`, 'ATENÇÃO - PERIGO'))) return false;
+        if (!(await confirm(`Esta ação é IRREVERSÍVEL. Todos os dados serão perdidos. Confirmar mesmo?`, 'CONFIRMAÇÃO FINAL'))) return false;
+        try {
+            const res = await actionFn();
+            if (res?.error) throw new Error(String(res.error));
+            await alert(`${actionName} realizado com sucesso.`, 'Sucesso');
+            setUsersList([]);
+            setTeachersList([]);
+            setTemplates([]);
+            return true;
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+            await alert(`Erro ao executar ${actionName}: ` + msg);
+            return false;
+        }
+    }, [alert, confirm, setUsersList, setTeachersList, setTemplates]);
+
+    const runDangerAction = useCallback(async (actionKey: string, actionName: string, actionFn: () => Promise<UnknownRecord>, resetInput: () => void) => {
+        setDangerActionLoading(actionKey);
+        try {
+            const ok = await handleDangerAction(actionName, actionFn);
+            if (ok) resetInput();
+        } finally {
+            setDangerActionLoading(null);
+        }
+    }, [handleDangerAction, setDangerActionLoading]);
+
+    // ─── useEffects moved from AdminPanelV2 ────────────────────────────────────
+
+    // testConnection
+    useEffect(() => {
+        const testConnection = async () => {
+            try {
+                if (!supabase) return;
+                const { data, error } = await supabase.from('workouts').select('*').limit(1);
+                if (error) {
+                    logError('error', "ERRO CRÍTICO SUPABASE:", error);
+                    setDebugError("Erro Supabase: " + error.message + " | Detalhes: " + JSON.stringify(error));
+                } else {
+                    void data; // connection OK
+                }
+            } catch (e: unknown) {
+                logError('error', "ERRO DE CONEXÃO/FETCH:", e);
+                const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+                setDebugError("Erro Catch: " + msg);
+            }
+        };
+        testConnection();
+    }, [supabase]);
+
+    // fetchStudents
+    useEffect(() => {
+        const fetchStudents = async () => {
+            setLoading(true);
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (!currentUser) { setLoading(false); return; }
+            try {
+                let list: UnknownRecord[] = [];
+                if (isAdmin) {
+                    await getAdminAuthHeaders();
+                    const json = await adminFetchJson(supabase, '/api/admin/students/list') as UnknownRecord;
+                    if (json?.ok) list = (json.students as UnknownRecord[]) || [];
+
+                    const legacyJson = await adminFetchJson(supabase, '/api/admin/legacy-students') as UnknownRecord;
+                    if (legacyJson?.ok && legacyJson.students) {
+                        const existingIds = new Set(list.map((s: UnknownRecord) => s.user_id || s.id));
+                        const newLegacy = ((legacyJson.students as unknown) as UnknownRecord[]).filter((s: UnknownRecord) => !existingIds.has(s.id));
+                        list = [...list, ...newLegacy];
+                        const byEmail = new Map();
+                        for (const s of (list || [])) {
+                            const key = String(s.email || '').toLowerCase();
+                            const prev = byEmail.get(key);
+                            if (!prev || (!!s.teacher_id && !prev.teacher_id)) {
+                                byEmail.set(key, s);
+                            }
+                        }
+                        list = Array.from(byEmail.values());
+                    }
+                    if (list.length === 0) {
+                        const { data: profiles } = await supabase
+                            .from('profiles')
+                            .select('id, display_name, email, role')
+                            .neq('role', 'teacher')
+                            .order('display_name');
+                        let teacherEmails = new Set<string>();
+                        try {
+                            const tJson = await adminFetchJson(supabase, '/api/admin/teachers/list') as UnknownRecord;
+                            if (tJson?.ok) teacherEmails = new Set(((tJson.teachers as UnknownRecord[]) || []).map((t: UnknownRecord) => String(t.email || '').toLowerCase()));
+                        } catch { }
+                        list = (profiles || [])
+                            .filter((p: UnknownRecord) => !p.email || !teacherEmails.has(String(p.email).toLowerCase()))
+                            .map((p: UnknownRecord) => ({ id: p.id, name: p.display_name, email: p.email, teacher_id: null as string | null, user_id: p.id }));
+                        if ((list || []).length === 0) {
+                            let query = supabase
+                                .from('students')
+                                .select('*, workouts(*)')
+                                .order('name');
+                            const uid = currentUser?.id ? String(currentUser.id) : '';
+                            if (uid) query = query.or(`teacher_id.eq.${uid},user_id.eq.${uid}`);
+                            const { data: studentsData } = await query;
+                            list = (studentsData || []).filter(s => (s.email || '').toLowerCase() !== (currentUser.email || '').toLowerCase());
+                        }
+                    }
+                    const { data: tList } = await supabase.from('teachers').select('id, name, email, user_id');
+                    const tEmails = new Set((tList || []).map((t: UnknownRecord) => String(t.email || '').toLowerCase()));
+                    const filtered = (list || []).filter((s: UnknownRecord) => {
+                        const email = String(s.email || '').toLowerCase();
+                        if (email && tEmails.has(email)) return false;
+                        return true;
+                    });
+                    try {
+                        list = (filtered || []).map((s: UnknownRecord) => {
+                            const key = 'student_teacher_' + (s.email || '');
+                            let tid = null;
+                            try { tid = localStorage.getItem(key) || null; } catch { }
+                            return tid && !s.teacher_id ? { ...s, teacher_id: tid } : s;
+                        });
+                    } catch { list = filtered; }
+                    if (teachersList.length === 0) {
+                        let jsonT = null;
+                        try {
+                            jsonT = await adminFetchJson(supabase, '/api/admin/teachers/list') as UnknownRecord;
+                        } catch { }
+                        if (jsonT?.ok) {
+                            const base = (jsonT.teachers as UnknownRecord[]) || [];
+                            try {
+                                const emails = base.map((t: UnknownRecord) => t.email).filter(Boolean);
+                                if (emails.length > 0) {
+                                    const { data: profilesMap } = await supabase
+                                        .from('profiles')
+                                        .select('id, email')
+                                        .in('email', emails);
+                                    const idByEmail = new Map((profilesMap || []).map((p: UnknownRecord) => [String(p.email || ''), p.id]));
+                                    const enriched: UnknownRecord[] = base.map((t: UnknownRecord) => ({ ...t, user_id: idByEmail.get(String(t.email || '')) || null }));
+                                    if (selectedStudent?.teacher_id && !enriched.some((t: UnknownRecord) => t.user_id === selectedStudent.teacher_id)) {
+                                        const { data: curProfile } = await supabase
+                                            .from('profiles')
+                                            .select('id, display_name, email')
+                                            .eq('id', selectedStudent.teacher_id)
+                                            .maybeSingle();
+                                        if (curProfile) enriched.unshift({ id: String(curProfile.id || ''), name: curProfile.display_name, email: curProfile.email, user_id: curProfile.id, status: 'active' } as unknown as UnknownRecord);
+                                    }
+                                    setTeachersList(enriched as unknown as AdminTeacher[]);
+                                } else {
+                                    setTeachersList(base as unknown as AdminTeacher[]);
+                                }
+                            } catch { setTeachersList(base as unknown as AdminTeacher[]); }
+                        }
+                    }
+                } else {
+                    let query = supabase
+                        .from('students')
+                        .select('*, workouts(*)')
+                        .order('name');
+                    const uid = currentUser?.id ? String(currentUser.id) : '';
+                    if (uid) query = query.or(`teacher_id.eq.${uid},user_id.eq.${uid}`);
+                    const { data: studentsData } = await query;
+                    list = (studentsData || []).filter(s => (s.email || '').toLowerCase() !== (currentUser.email || '').toLowerCase());
+                    try {
+                        list = (list || []).map(s => {
+                            const key = 'student_teacher_' + (s.email || '');
+                            let tid = null;
+                            try { tid = localStorage.getItem(key) || null; } catch { }
+                            return tid && !s.teacher_id ? { ...s, teacher_id: tid } : s;
+                        });
+                    } catch { }
+                }
+                setUsersList((list || []) as unknown as AdminUser[]);
+            } finally { setLoading(false); }
+        };
+        fetchStudents();
+    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, teachersList.length, getAdminAuthHeaders, setLoading, setUsersList, setTeachersList]);
+
+    // fetchTeachers
+    useEffect(() => {
+        if (tab === 'teachers' && isAdmin) {
+            const fetchTeachers = async () => {
+                const authHeaders = await getAdminAuthHeaders();
+                let json = null;
+                try {
+                    const res = await fetch('/api/admin/teachers/list', { headers: authHeaders });
+                    const raw = await res.text();
+                    json = raw ? parseJsonWithSchema(raw, z.record(z.unknown())) : null;
+                } catch { }
+                if (json?.ok) {
+                    const list = Array.isArray((json as Record<string, unknown>)?.teachers)
+                        ? ((json as Record<string, unknown>).teachers as Record<string, unknown>[])
+                        : [];
+                    const dedup: AdminTeacher[] = [];
+                    const seen = new Set<string>();
+                    for (const t of list) {
+                        const key = String(t?.email || '').toLowerCase();
+                        if (!seen.has(key)) { seen.add(key); dedup.push(t as AdminTeacher); }
+                    }
+                    try {
+                        const emails = dedup.map(t => t.email).filter(Boolean);
+                        if (emails.length > 0) {
+                            const { data: profilesMap } = await supabase
+                                .from('profiles')
+                                .select('id, email')
+                                .in('email', emails);
+                            const idByEmail = new Map((profilesMap || []).map(p => [p.email, p.id]));
+                            const enriched = dedup.map(t => ({ ...t, user_id: idByEmail.get(t.email) || null }));
+                            setTeachersList(enriched);
+                        } else {
+                            setTeachersList(dedup);
+                        }
+                    } catch {
+                        setTeachersList(dedup);
+                    }
+                }
+            };
+            fetchTeachers();
+        }
+    }, [tab, isAdmin, addingTeacher, editingTeacher, supabase, getAdminAuthHeaders, setTeachersList]);
+
+    // URL persistence
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const sp = new URLSearchParams(window.location.search);
+        const t = sp.get('tab');
+        if (t && ['dashboard', 'students', 'teachers', 'templates', 'videos', 'broadcast', 'system'].includes(t)) {
+            setTab(t);
+        }
+    }, [setTab]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const sp = new URLSearchParams(window.location.search);
+        if (sp.get('tab') !== tab) {
+            sp.set('tab', tab);
+            const url = `${window.location.pathname}?${sp.toString()}`;
+            window.history.replaceState(null, '', url);
+        }
+        try {
+            sessionStorage.setItem('irontracks_admin_panel_open', '1');
+            sessionStorage.setItem('irontracks_admin_panel_tab', String(tab || 'dashboard'));
+        } catch { }
+    }, [tab]);
+
+    // fetchTemplates
+    useEffect(() => {
+        if (tab !== 'templates') return;
+        const fetchTemplates = async () => {
+            try {
+                const { data: { user: currentUser } } = await supabase.auth.getUser();
+                if (!currentUser) return;
+                let list: UnknownRecord[] = [];
+                if (isAdmin || isTeacher) {
+                    try {
+                        const authHeaders = await getAdminAuthHeaders();
+                        const res = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
+                        const json = await res.json();
+                        if (json.ok) {
+                            list = (json.rows || []).filter((w: UnknownRecord) => w?.is_template === true && w?.user_id === currentUser.id);
+                        }
+                    } catch (e) { logError('error', "API fetch error", e); }
+                    if ((list || []).length === 0) {
+                        try {
+                            const { data } = await supabase
+                                .from('workouts')
+                                .select('*, exercises(*, sets(*))')
+                                .eq('is_template', true)
+                                .eq('user_id', currentUser.id)
+                                .order('name');
+                            list = (data || []).filter((w: UnknownRecord) => w?.is_template === true && w?.user_id === currentUser.id);
+                        } catch (e) { logError('error', "Supabase fetch error", e); }
+                    }
+                } else {
+                    try {
+                        const { data } = await supabase
+                            .from('workouts')
+                            .select('*, exercises(*, sets(*))')
+                            .eq('is_template', true)
+                            .eq('user_id', currentUser.id)
+                            .order('name');
+                        list = data || [];
+                    } catch (e) { logError('error', "Supabase fetch error", e); }
+                }
+                try {
+                    const resLegacy = await fetch('/api/workouts/list');
+                    const jsonLegacy = await resLegacy.json();
+                    if (jsonLegacy.ok) {
+                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as Exercise[] }));
+                        list = [...list, ...legacy];
+                    }
+                } catch { }
+                const score = (w: UnknownRecord) => {
+                    const exs = Array.isArray(w.exercises) ? w.exercises : [];
+                    return exs.length;
+                };
+                const byTitle = new Map<string, UnknownRecord>();
+                for (const w of (list || [])) {
+                    if (!w || !w.name) continue;
+                    try {
+                        const key = workoutTitleKey(w.name as string);
+                        const prev = byTitle.get(key);
+                        const curHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(w?.name as string || ''));
+                        const prevHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(prev?.name as string || ''));
+                        if (
+                            !prev
+                            || score(w) > score(prev)
+                            || (score(w) === score(prev) && curHasPrefix && !prevHasPrefix)
+                            || (score(w) === score(prev) && !!w.is_template && !prev.is_template)
+                        ) {
+                            byTitle.set(key, w);
+                        }
+                    } catch (e) { logError("Error processing workout", w, e); }
+                }
+                const deduped = Array.from(byTitle.values())
+                    .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name as string || '') }))
+                    .sort((a, b) => (a.name as string || '').localeCompare(b.name as string || ''));
+                setTemplates((deduped || []) as AdminWorkoutTemplate[]);
+            } catch (err) {
+                logError('error', "Critical error fetching templates", err);
+            }
+        };
+        fetchTemplates();
+    }, [tab, isAdmin, isTeacher, supabase, getAdminAuthHeaders, setTemplates]);
+
+    // fetchMissing + fetchVideos
+    useEffect(() => {
+        if (tab !== 'videos' || !isAdmin) return;
+        const normalizeExercise = (value: unknown): string => {
+            const s = String(value || '').trim().toLowerCase();
+            if (!s) return '';
+            return s
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, ' ')
+                .trim()
+                .replace(/\s+/g, ' ');
+        };
+        const fetchMissing = async () => {
+            setVideoMissingLoading(true);
+            try {
+                const { data: rows, error } = await supabase
+                    .from('exercises')
+                    .select('name, video_url')
+                    .or('video_url.is.null,video_url.eq.')
+                    .limit(2000);
+                if (error) throw error;
+                const normalized = new Set<string>();
+                for (const r of (rows || [])) {
+                    const name = String(r?.name || '').trim();
+                    if (!name) continue;
+                    const n = normalizeExercise(name);
+                    if (!n) continue;
+                    normalized.add(n);
+                    if (normalized.size >= 1000) break;
+                }
+                const normalizedList = Array.from(normalized);
+                if (!normalizedList.length) {
+                    setVideoMissingCount(0);
+                    return;
+                }
+                const { data: libRows } = await supabase
+                    .from('exercise_library')
+                    .select('normalized_name, video_url')
+                    .in('normalized_name', normalizedList)
+                    .limit(normalizedList.length);
+                const withVideo = new Set(
+                    (libRows || [])
+                        .filter((x) => !!String(x?.video_url || '').trim())
+                        .map((x) => String(x?.normalized_name || '').trim())
+                        .filter(Boolean)
+                );
+                let missing = 0;
+                for (const n of normalizedList) {
+                    if (!withVideo.has(n)) missing += 1;
+                }
+                setVideoMissingCount(missing);
+            } catch {
+                setVideoMissingCount(null);
+            } finally {
+                setVideoMissingLoading(false);
+            }
+        };
+        const fetchVideos = async () => {
+            setVideoLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('exercise_videos')
+                    .select('id, url, title, channel_title, created_at, exercise_library_id, exercise_library:exercise_library_id(display_name_pt)')
+                    .eq('status', 'pending')
+                    .order('created_at', { ascending: false })
+                    .limit(60);
+                if (!error) setVideoQueue(data || []);
+            } catch {
+                setVideoQueue([]);
+            } finally {
+                setVideoLoading(false);
+            }
+        };
+        fetchVideos();
+        fetchMissing();
+    }, [tab, isAdmin, supabase, setVideoLoading, setVideoMissingCount, setVideoMissingLoading, setVideoQueue]);
+
+    // fetchErrors
+    useEffect(() => {
+        if (tab !== 'errors' || !isAdmin) return;
+        let cancelled = false;
+        const fetchErrors = async () => {
+            setErrorsLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from('error_reports')
+                    .select('id, user_id, user_email, message, stack, pathname, url, user_agent, app_version, source, meta, status, created_at, updated_at, resolved_at, resolved_by')
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (cancelled) return;
+                if (error) {
+                    setErrorReports([]);
+                    return;
+                }
+                setErrorReports(Array.isArray(data) ? data : []);
+            } catch {
+                if (!cancelled) setErrorReports([]);
+            } finally {
+                if (!cancelled) setErrorsLoading(false);
+            }
+        };
+        fetchErrors();
+        return () => { cancelled = true; };
+    }, [tab, isAdmin, supabase, setErrorReports, setErrorsLoading]);
+
+    // fetchAliases
+    useEffect(() => {
+        if (tab !== 'system' || !isAdmin) return;
+        let cancelled = false;
+        const fetchAliases = async () => {
+            setExerciseAliasesLoading(true);
+            setExerciseAliasesError('');
+            try {
+                const { data, error } = await supabase
+                    .from('exercise_aliases')
+                    .select('id, user_id, canonical_id, alias, normalized_alias, confidence, source, needs_review, created_at, updated_at')
+                    .eq('needs_review', true)
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (cancelled) return;
+                if (error) {
+                    setExerciseAliasesReview([]);
+                    const msg = String(getErrorMessage(error) || '');
+                    if (msg) setExerciseAliasesError(msg);
+                    return;
+                }
+                setExerciseAliasesReview(Array.isArray(data) ? data : []);
+            } catch (e: unknown) {
+                if (!cancelled) {
+                    setExerciseAliasesReview([]);
+                    const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
+                    if (msg) setExerciseAliasesError(msg);
+                }
+            } finally {
+                if (!cancelled) setExerciseAliasesLoading(false);
+            }
+        };
+        fetchAliases();
+        return () => { cancelled = true; };
+    }, [tab, isAdmin, supabase, setExerciseAliasesError, setExerciseAliasesLoading, setExerciseAliasesReview]);
+
+    // fetchDetails
+    useEffect(() => {
+        if (!selectedStudent) return;
+        const fetchDetails = async () => {
+            setLoading(true);
+            const expectedStudentId = selectedStudent?.id || null;
+            let targetUserId = selectedStudent.user_id || '';
+            if (!targetUserId && selectedStudent.email) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .ilike('email', String(selectedStudent.email))
+                    .maybeSingle();
+                targetUserId = profile?.id || targetUserId;
+            }
+            try {
+                const key = String(selectedStudent?.id || selectedStudent?.email || targetUserId || '');
+                if (key && !loadedStudentInfo.current.has(key)) {
+                    const authHeaders = await getAdminAuthHeaders();
+                    let js = null;
+                    try {
+                        const resp = await fetch('/api/admin/students/list', { headers: authHeaders });
+                        const raw = await resp.text();
+                        js = raw ? parseJsonWithSchema(raw, z.record(z.unknown())) : null;
+                    } catch { }
+                    if (js?.ok) {
+                        const studentsList = Array.isArray((js as Record<string, unknown>)?.students)
+                            ? ((js as Record<string, unknown>).students as UnknownRecord[])
+                            : [];
+                        const row = studentsList.find((s: UnknownRecord) => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || (String(s.email || '').toLowerCase() === String(selectedStudent.email || '').toLowerCase()));
+                        if (row) {
+                            const nextTeacher = row.teacher_id ? String(row.teacher_id) : null;
+                            const nextUserId = row.user_id ? String(row.user_id) : '';
+                            const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== String(selectedStudent.user_id || ''));
+                            if (shouldUpdate) {
+                                setSelectedStudent(prev => {
+                                    if (!prev) return prev;
+                                    if (expectedStudentId && prev?.id && String(prev.id) !== String(expectedStudentId)) return prev;
+                                    return { ...prev, teacher_id: nextTeacher, user_id: nextUserId || null };
+                                });
+                            }
+                        }
+                        loadedStudentInfo.current.add(key);
+                    }
+                }
+            } catch { }
+            try {
+                if (!selectedStudent.teacher_id && selectedStudent.email) {
+                    const cached = localStorage.getItem('student_teacher_' + String(selectedStudent.email));
+                    if (cached != null && cached !== String(selectedStudent.teacher_id || '')) {
+                        setSelectedStudent(prev => (prev ? { ...prev, teacher_id: cached || null } : prev));
+                    }
+                }
+            } catch { }
+            if (targetUserId) {
+                let wData: UnknownRecord[] = [];
+                const { data } = await supabase
+                    .from('workouts')
+                    .select('*, exercises(*, sets(*))')
+                    .eq('user_id', targetUserId)
+                    .eq('is_template', true)
+                    .order('name');
+                wData = data || [];
+                wData = (Array.isArray(wData) ? wData : []).filter((w: UnknownRecord) => w && typeof w === 'object' && w.is_template === true);
+                const studentDeduped = (wData || []).sort((a: UnknownRecord, b: UnknownRecord) => String(a.name || '').localeCompare(String(b.name || '')));
+                const synced = (studentDeduped || []).filter((w: UnknownRecord) => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
+                const syncedIds = new Set((synced || []).map((w: UnknownRecord) => w?.id).filter(Boolean));
+                const others = (studentDeduped || []).filter((w: UnknownRecord) => !syncedIds.has(w?.id));
+                setStudentWorkouts(others || []);
+                setSyncedWorkouts(synced || []);
+            } else {
+                setStudentWorkouts([]);
+                setSyncedWorkouts([]);
+                setAssessments([]);
+            }
+            const { data: { user: me } } = await supabase.auth.getUser();
+            if (me) {
+                let my: UnknownRecord[] = [];
+                try {
+                    const authHeaders = await getAdminAuthHeaders();
+                    const resMine = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
+                    const jsonMine = await resMine.json();
+                    if (jsonMine.ok) my = jsonMine.rows || [];
+                    else {
+                        const { data } = await supabase
+                            .from('workouts')
+                            .select('*, exercises(*, sets(*))')
+                            .or(`created_by.eq.${me.id},user_id.eq.${me.id}`)
+                            .order('name');
+                        my = data || [];
+                    }
+                } catch {
+                    const { data } = await supabase
+                        .from('workouts')
+                        .select('*, exercises(*, sets(*))')
+                        .or(`created_by.eq.${me.id},user_id.eq.${me.id},is_template.eq.true`)
+                        .order('name');
+                    my = data || [];
+                }
+                my = (my || []).filter((w: UnknownRecord) => (w?.user_id === me.id) && (w?.is_template === true));
+                const tMap = new Map<string, UnknownRecord>();
+                for (const w of (my || [])) {
+                    const key = workoutTitleKey(w.name as string);
+                    const prev = tMap.get(key);
+                    const exs = Array.isArray(w.exercises) ? w.exercises : [];
+                    const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
+                    const score = (x: unknown) => (Array.isArray(x) ? x.length : 0);
+                    const curHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(w?.name as string || ''));
+                    const prevHasPrefix = /^[A-Z]\s-\s/.test(normalizeWorkoutTitle(prev?.name as string || ''));
+                    if (
+                        !prev
+                        || score(exs) > score(prevExs)
+                        || (score(exs) === score(prevExs) && curHasPrefix && !prevHasPrefix)
+                        || (score(exs) === score(prevExs) && !!w.is_template && !prev?.is_template)
+                    ) {
+                        tMap.set(key, w);
+                    }
+                }
+                try {
+                    const resLegacy = await fetch('/api/workouts/list');
+                    const jsonLegacy = await resLegacy.json();
+                    if (jsonLegacy.ok) {
+                        for (const r of (jsonLegacy.rows || [])) {
+                            const key = workoutTitleKey(r.name);
+                            const prev = tMap.get(key);
+                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as Exercise[] };
+                            const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
+                            if (!prev || prevExs.length < 1) tMap.set(key, candidate);
+                        }
+                    }
+                } catch { }
+                const dedupTemplates = Array.from(tMap.values())
+                    .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name as string || '') }))
+                    .sort((a, b) => (a.name as string || '').localeCompare(b.name as string || ''));
+                setTemplates((dedupTemplates || []) as AdminWorkoutTemplate[]);
+            }
+            if (targetUserId) {
+                const assessmentOrParts: unknown[] = [];
+                if (selectedStudent?.id) assessmentOrParts.push(`student_id.eq.${selectedStudent.id}`);
+                if (targetUserId) assessmentOrParts.push(`user_id.eq.${targetUserId}`);
+                if (assessmentOrParts.length > 0) {
+                    const { data: aData } = await supabase
+                        .from('assessments')
+                        .select('*')
+                        .or(assessmentOrParts.join(','))
+                        .order('date', { ascending: false });
+                    setAssessments(aData || []);
+                } else {
+                    setAssessments([]);
+                }
+            }
+            setLoading(false);
+        };
+        fetchDetails();
+    }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher, getAdminAuthHeaders, loadedStudentInfo, setAssessments, setLoading, setSelectedStudent, setStudentWorkouts, setSyncedWorkouts, setTemplates]);
+
+    // execution videos
+    useEffect(() => {
+        const raw = String(process.env.NEXT_PUBLIC_ENABLE_EXECUTION_VIDEO ?? '').trim().toLowerCase();
+        const executionVideoEnabled = raw !== 'false';
+        if (!executionVideoEnabled) return;
+        if (!selectedStudent) return;
+        if (subTab !== 'videos') return;
+        let cancelled = false;
+        const run = async () => {
+            const studentUserId = selectedStudent?.user_id ? String(selectedStudent.user_id) : '';
+            if (!studentUserId) return;
+            setExecutionVideosLoading(true);
+            setExecutionVideosError('');
+            try {
+                const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(studentUserId)}`, { cache: 'no-store', credentials: 'include' });
+                const json = await res.json().catch((): null => null);
+                if (cancelled) return;
+                if (!res.ok || !json?.ok) {
+                    setExecutionVideos([]);
+                    setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
+                    return;
+                }
+                setExecutionVideos(Array.isArray(json.items) ? json.items : []);
+            } catch (e: unknown) {
+                if (!cancelled) {
+                    setExecutionVideos([]);
+                    const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
+                    setExecutionVideosError(msg || 'Erro ao carregar');
+                }
+            } finally {
+                if (!cancelled) setExecutionVideosLoading(false);
+            }
+        };
+        run();
+        return () => { cancelled = true; };
+    }, [selectedStudent, subTab, setExecutionVideos, setExecutionVideosError, setExecutionVideosLoading]);
+
+    // checkins
+    useEffect(() => {
+        if (!selectedStudent) return;
+        if (subTab !== 'checkins') return;
+        let cancelled = false;
+        const run = async () => {
+            try {
+                setStudentCheckinsLoading(true);
+                setStudentCheckinsError('');
+                const looksLikeUuid = (v: unknown) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || '').trim());
+                const rawCandidate = selectedStudent?.user_id || selectedStudent?.id || '';
+                const studentUserId = looksLikeUuid(rawCandidate) ? String(rawCandidate) : '';
+                if (!studentUserId) {
+                    setStudentCheckinsRows([]);
+                    setStudentCheckinsError('Aluno sem user_id (não é possível buscar check-ins).');
+                    return;
+                }
+                const days = String(studentCheckinsRange || '7d') === '30d' ? 30 : 7;
+                const startIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+                let q = supabase
+                    .from('workout_checkins')
+                    .select('id, kind, created_at, energy, mood, soreness, notes, answers, workout_id, planned_workout_id')
+                    .eq('user_id', studentUserId)
+                    .gte('created_at', startIso)
+                    .order('created_at', { ascending: false })
+                    .limit(400);
+                if (studentCheckinsFilter && studentCheckinsFilter !== 'all') q = q.eq('kind', String(studentCheckinsFilter));
+                const { data, error } = await q;
+                if (error) throw error;
+                if (cancelled) return;
+                setStudentCheckinsRows(Array.isArray(data) ? data : []);
+            } catch (e: unknown) {
+                if (cancelled) return;
+                setStudentCheckinsRows([]);
+                const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
+                setStudentCheckinsError(msg || 'Falha ao carregar check-ins.');
+            } finally {
+                if (!cancelled) setStudentCheckinsLoading(false);
+            }
+        };
+        run();
+        return () => { cancelled = true; };
+    }, [selectedStudent, subTab, studentCheckinsFilter, studentCheckinsRange, supabase, setStudentCheckinsError, setStudentCheckinsLoading, setStudentCheckinsRows]);
+
+    // teachers list for student
+    useEffect(() => {
+        if (!selectedStudent || !isAdmin) return;
+        const loadTeachers = async () => {
+            try {
+                const authHeaders = await getAdminAuthHeaders();
+                const res = await fetch('/api/admin/teachers/list', { headers: authHeaders });
+                const json = await res.json();
+                if (json.ok) {
+                    const base = json.teachers || [];
+                    let enriched = base;
+                    try {
+                        const emails = base.map((t: UnknownRecord) => t.email).filter(Boolean);
+                        if (emails.length > 0) {
+                            const { data: profilesMap } = await supabase
+                                .from('profiles')
+                                .select('id, email')
+                                .in('email', emails);
+                            const idByEmail = new Map((profilesMap || []).map((p: UnknownRecord) => [String(p.email || ''), p.id]));
+                            enriched = base.map((t: UnknownRecord) => ({ ...t, user_id: idByEmail.get(String(t.email || '')) || null }));
+                        }
+                    } catch { }
+                    const currentUid = selectedStudent?.teacher_id || '';
+                    if (currentUid && !enriched.some((t: UnknownRecord) => t.user_id === currentUid)) {
+                        try {
+                            const { data: curProfile } = await supabase
+                                .from('profiles')
+                                .select('id, display_name, email')
+                                .eq('id', currentUid)
+                                .maybeSingle();
+                            if (curProfile) {
+                                enriched = [{ id: curProfile.id, name: curProfile.display_name, email: curProfile.email, user_id: curProfile.id, status: 'active' }, ...enriched];
+                            } else {
+                                enriched = [{ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' }, ...enriched];
+                            }
+                        } catch {
+                            enriched = [{ id: currentUid, name: 'Professor atribuído', email: '', user_id: currentUid, status: 'active' }, ...enriched];
+                        }
+                    }
+                    setTeachersList(enriched);
+                }
+            } catch { }
+        };
+        loadTeachers();
+    }, [selectedStudent, isAdmin, supabase, getAdminAuthHeaders, setTeachersList]);
+
+    // historyOpen + selectedTeacher side effects
+    useEffect(() => {
+        if (!selectedStudent) setHistoryOpen(false);
+    }, [selectedStudent, setHistoryOpen]);
+
+    useEffect(() => {
+        if (selectedStudent) setSelectedTeacher(null);
+    }, [selectedStudent, setSelectedTeacher]);
+
     return {
         user,
         isAdmin,
@@ -1078,6 +2108,28 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         openUserActivityUser,
 
         // Refs (if needed directly)
-        supabase
+        supabase,
+
+        // Debug
+        debugError, setDebugError,
+
+        // Utility
+        getSetsCount,
+
+        // System handlers
+        handleExportSystem,
+        handleImportSystemClick,
+        handleImportSystem,
+        handleExportPdf,
+        handleExportJson,
+        openEditWorkout,
+        openEditTemplate,
+
+        // Student handlers
+        handleAddTemplateToStudent,
+        handleEditStudent,
+        handleSaveStudentEdit,
+        handleDangerAction,
+        runDangerAction,
     };
 };
