@@ -609,6 +609,9 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
   const [mediaLoadIdRef] = useState({ current: 0 })
   const backgroundUrlRef = useRef('')
 
+  // Save-to-Photos panel (iOS fallback: long-press the image → "Adicionar à Fotos")
+  const [saveImageUrl, setSaveImageUrl] = useState<string | null>(null)
+
   // Trimming State
   const [showTrimmer, setShowTrimmer] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
@@ -1098,7 +1101,7 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       const file = new File([result.blob], result.filename, { type: result.mime })
 
       const ua = typeof navigator !== 'undefined' ? String(navigator.userAgent || '') : ''
-      const isIOS = isIOSUserAgent(ua)
+      const isIOS = isIOSUserAgent(ua) || isIosNative()
 
       let shared = false
       if (typeof navigator.share === 'function') {
@@ -1108,34 +1111,31 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           if (canShare) {
             await navigator.share(shareData)
             shared = true
-            // On iOS the share sheet opens — instruct user to save to camera roll
+            // Share sheet opened — guide iOS user to tap "Save Image"
             if (isIOS) {
-              setInfo('Toque em "Salvar Imagem" na janela de compartilhamento para salvar no rolo do iPhone.')
+              setInfo('Na janela que abriu, toque em "Salvar Imagem" para guardar no rolo do iPhone.')
             }
           }
         } catch (shareErr: unknown) {
           const name = String((shareErr as { name?: string })?.name || '').trim()
-          // If user cancelled, stop here
           if (name === 'AbortError') {
             setBusy(false)
             setBusyAction(null)
             return
           }
-          // If not allowed or other error, fall through to download
-          logWarn('warn', 'Share API failed, falling back to download:', shareErr)
+          logWarn('StoryComposer', 'Share API failed, trying save panel', shareErr)
         }
       }
 
       if (!shared) {
-        // On iOS, <a download> saves to Files app — NOT the camera roll.
-        // Trigger the download as fallback but guide the user.
-        downloadBlob(result.blob, result.filename)
         if (isIOS) {
-          setInfo('Arquivo salvo em Arquivos > Downloads. Para salvar direto no rolo: use Compartilhar e toque "Salvar Imagem".')
-        } else if (mediaKind === 'video') {
-          setInfo('Vídeo salvo em Downloads!')
+          // On iOS, <a download> goes to Files app, not camera roll.
+          // Show the image full-screen so user can long-press → "Adicionar à Fotos".
+          const objUrl = URL.createObjectURL(result.blob)
+          setSaveImageUrl(objUrl)
         } else {
-          setInfo('Imagem salva em Downloads!')
+          downloadBlob(result.blob, result.filename)
+          setInfo(mediaKind === 'video' ? 'Vídeo salvo em Downloads!' : 'Imagem salva em Downloads!')
         }
       }
     } catch (e: unknown) {
@@ -1598,6 +1598,47 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
               </div>
             </div>
           </motion.div>
+        </motion.div>
+      )}
+
+      {/* iOS Save-to-Photos panel: long-press the image → "Adicionar à Fotos" */}
+      {saveImageUrl && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[3000] bg-black flex flex-col items-center justify-between p-6 pt-safe"
+        >
+          <div className="text-center pt-8">
+            <p className="text-white font-black text-xl leading-tight">Salvar no Rolo do iPhone</p>
+            <p className="text-neutral-400 text-sm mt-2 leading-snug">
+              Toque e segure na imagem abaixo<br />e escolha <span className="text-yellow-400 font-bold">&quot;Adicionar à Fotos&quot;</span>
+            </p>
+          </div>
+
+          {/* The image — inline style overrides Capacitor's -webkit-touch-callout:none */}
+          <img
+            src={saveImageUrl}
+            alt="Story para salvar"
+            className="rounded-2xl shadow-2xl max-h-[60vh] w-auto"
+            style={{
+              WebkitTouchCallout: 'default',
+              WebkitUserSelect: 'auto',
+              userSelect: 'auto',
+              touchAction: 'auto',
+            } as React.CSSProperties}
+          />
+
+          <button
+            type="button"
+            onClick={() => {
+              try { URL.revokeObjectURL(saveImageUrl) } catch { }
+              setSaveImageUrl(null)
+            }}
+            className="w-full max-w-xs h-12 rounded-xl bg-neutral-800 border border-neutral-700 text-white font-bold text-sm hover:bg-neutral-700 active:scale-95 transition-all"
+          >
+            Fechar
+          </button>
         </motion.div>
       )}
     </AnimatePresence>

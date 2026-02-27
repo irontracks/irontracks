@@ -17,7 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "test:smoke": "tsx scripts/delete-teacher-cascade.test.ts && tsx scripts/vip-entitlement.test.ts && tsx scripts/admin-routes-smoke.test.ts && tsx scripts/auth-origin-smoke.test.ts && tsx scripts/no-duplicate-style-files.test.ts && tsx scripts/vip-endpoints-no-dup.test.ts && tsx scripts/no-direct-req-json.test.ts && tsx scripts/workouts-history-enforcement.test.ts && tsx scripts/finish-payload-smoke.test.ts && tsx scripts/critical-flow-smoke.test.ts",
     "flags:report": "NODE_NO_WARNINGS=1 tsx scripts/feature-flags-report.ts",
-    "deploy": "npm run lint --silent && git add -A && (git diff --cached --quiet && echo 'Nenhum commit necessario.' || git commit -m \"deploy: $(date +%Y-%m-%d-%H%M)\") && git push origin main",
+    "deploy": "npm run lint && npx tsc --noEmit && git add -A && (git diff-index --quiet HEAD || git commit -m \"deploy: $(date +%Y-%m-%d-%H%M)\") && git push origin main",
     "e2e:deload": "tsx scripts/e2e/deload.e2e.ts",
     "postversion": "git push && git push --tags",
     "postinstall": "node scripts/patch-ios.mjs",
