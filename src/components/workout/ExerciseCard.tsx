@@ -3,7 +3,22 @@
 import React from 'react';
 import { ArrowDown, ChevronDown, ChevronUp, Dumbbell, Loader2, Pencil, Play, Plus } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
-import { NormalSet, RestPauseSet, ClusterSet, DropSetSet } from './SetRenderers';
+import {
+  NormalSet,
+  RestPauseSet,
+  ClusterSet,
+  DropSetSet,
+  StrippingSet,
+  FST7Set,
+  HeavyDutySet,
+  PontoZeroSet,
+  ForcedRepsSet,
+  NegativeRepsSet,
+  PartialRepsSet,
+  Sistema21Set,
+  WaveSet,
+  GroupMethodSet,
+} from './SetRenderers';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
@@ -44,26 +59,80 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
     const rawCfg = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
+    const method = String(ex?.method || '').trim();
+
+    // Drop-Set: array config or saved drop stages
     const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;
     const dropStages: unknown[] = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : [];
-    const hasDropStages = dropStages.length > 0;
-    
-    if (Array.isArray(rawCfg) || hasDropStages) {
+    if (Array.isArray(rawCfg) || dropStages.length > 0) {
       return <DropSetSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
     }
-    
+
+    // Stripping: saved stripping stages OR method name
+    const stripping = isObject(log.stripping) ? (log.stripping as UnknownRecord) : null;
+    const strippingStages: unknown[] = stripping && Array.isArray(stripping.stages) ? (stripping.stages as unknown[]) : [];
+    if (method === 'Stripping' || strippingStages.length > 0) {
+      return <StrippingSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // FST-7
+    if (method === 'FST-7' || isObject(log.fst7)) {
+      return <FST7Set key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Heavy Duty
+    if (method === 'Heavy Duty' || isObject(log.heavy_duty)) {
+      return <HeavyDutySet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Ponto Zero
+    if (method === 'Ponto Zero' || isObject(log.ponto_zero)) {
+      return <PontoZeroSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Repetições Forçadas
+    if (method === 'Repetições Forçadas' || isObject(log.forced_reps)) {
+      return <ForcedRepsSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Repetições Negativas
+    if (method === 'Repetições Negativas' || isObject(log.negative_reps)) {
+      return <NegativeRepsSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Repetições Parciais
+    if (method === 'Repetições Parciais' || isObject(log.partial_reps)) {
+      return <PartialRepsSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Sistema 21
+    if (method === 'Sistema 21' || isObject(log.sistema21)) {
+      return <Sistema21Set key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Onda (Wave Loading)
+    if (method === 'Onda' || isObject(log.wave)) {
+      return <WaveSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
+    // Group methods
+    const GROUP_METHODS = ['Bi-Set', 'Super-Set', 'Tri-Set', 'Giant-Set', 'Pré-exaustão', 'Pós-exaustão'];
+    if (GROUP_METHODS.includes(method)) {
+      return <GroupMethodSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
     const cfg = getPlanConfig(ex, setIdx);
-    const method = String(ex?.method || '').trim();
     const isCluster = method === 'Cluster' || isClusterConfig(cfg);
     const isRestPause = method === 'Rest-Pause' || isRestPauseConfig(cfg);
-    
+
     if (isCluster) {
       return <ClusterSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
     }
     if (isRestPause) {
       return <RestPauseSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
     }
-    
+
+    // GVT, Pirâmide Crescente, Pirâmide Decrescente, and Normal all use NormalSet
     return <NormalSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
   };
 
