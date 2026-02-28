@@ -99,6 +99,20 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Eliminate 300ms tap delay on all interactive elements */
+button,
+a,
+[role="button"],
+[role="tab"],
+label,
+input[type="button"],
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"],
+select {
+  touch-action: manipulation;
+}
+
 /* PRINT STYLES - ROBUST PDF GENERATION */
 @media print {
   @page {

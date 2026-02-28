@@ -101,53 +101,53 @@ export async function GET(req: Request) {
       })
       .filter((s) => Boolean(s.id && s.author_id))
     const storyIds = stories.map((s) => s.id).filter(Boolean)
+    const mediaPaths = stories.map((s) => s.media_path).filter(Boolean)
+
+    const emptyResult = { data: [] as unknown[], error: null }
+    const [viewsResult, likesResult, commentsResult, profilesResult, signedUrlsResult] = await Promise.all([
+      storyIds.length ? admin.from('social_story_views').select('story_id').eq('viewer_id', userId).in('story_id', storyIds) : emptyResult,
+      storyIds.length ? admin.from('social_story_likes').select('story_id, user_id').in('story_id', storyIds) : emptyResult,
+      storyIds.length ? admin.from('social_story_comments').select('story_id').in('story_id', storyIds) : emptyResult,
+      admin.from('profiles').select('id, display_name, photo_url, role').in('id', authorIds),
+      mediaPaths.length ? admin.storage.from('social-stories').createSignedUrls(mediaPaths, signedSeconds) : Promise.resolve({ data: [] as { path: string; signedUrl: string }[] | null, error: null }),
+    ])
 
     const viewedSet = new Set<string>()
-    if (storyIds.length) {
-      const { data: viewsRaw } = await admin.from('social_story_views').select('story_id').eq('viewer_id', userId).in('story_id', storyIds)
-      for (const r of Array.isArray(viewsRaw) ? viewsRaw : []) {
-        const sid = String(asRecord(r)?.story_id || '').trim()
-        if (sid) viewedSet.add(sid)
-      }
+    for (const r of Array.isArray(viewsResult.data) ? viewsResult.data : []) {
+      const sid = String(asRecord(r)?.story_id || '').trim()
+      if (sid) viewedSet.add(sid)
     }
 
     const likeCountByStory = new Map<string, number>()
     const likedSet = new Set<string>()
-    if (storyIds.length) {
-      const { data: likesRaw } = await admin.from('social_story_likes').select('story_id, user_id').in('story_id', storyIds)
-      const likes = Array.isArray(likesRaw) ? likesRaw : []
-      for (const r of likes as unknown[]) {
-        const row = asRecord(r)
-        const sid = String(row?.story_id || '').trim()
-        const uid = String(row?.user_id || '').trim()
-        if (!sid) continue
-        likeCountByStory.set(sid, (likeCountByStory.get(sid) || 0) + 1)
-        if (uid && uid === userId) likedSet.add(sid)
-      }
+    for (const r of (Array.isArray(likesResult.data) ? likesResult.data : []) as unknown[]) {
+      const row = asRecord(r)
+      const sid = String(row?.story_id || '').trim()
+      const uid = String(row?.user_id || '').trim()
+      if (!sid) continue
+      likeCountByStory.set(sid, (likeCountByStory.get(sid) || 0) + 1)
+      if (uid && uid === userId) likedSet.add(sid)
     }
 
     const commentCountByStory = new Map<string, number>()
-    if (storyIds.length) {
-      const { data: commentsRaw } = await admin.from('social_story_comments').select('story_id').in('story_id', storyIds)
-      const comments = Array.isArray(commentsRaw) ? commentsRaw : []
-      for (const r of comments as unknown[]) {
-        const sid = String(asRecord(r)?.story_id || '').trim()
-        if (!sid) continue
-        commentCountByStory.set(sid, (commentCountByStory.get(sid) || 0) + 1)
-      }
+    for (const r of (Array.isArray(commentsResult.data) ? commentsResult.data : []) as unknown[]) {
+      const sid = String(asRecord(r)?.story_id || '').trim()
+      if (!sid) continue
+      commentCountByStory.set(sid, (commentCountByStory.get(sid) || 0) + 1)
     }
 
-    const { data: profilesRaw } = await admin
-      .from('profiles')
-      .select('id, display_name, photo_url, role')
-      .in('id', authorIds)
-    const profilesArr = Array.isArray(profilesRaw) ? profilesRaw : []
+    const profilesArr = Array.isArray(profilesResult.data) ? profilesResult.data : []
     const profileById = new Map<string, Record<string, unknown>>()
     for (const p of profilesArr as unknown[]) {
       const row = asRecord(p)
       const id = String(row?.id || '').trim()
       if (!id) continue
       profileById.set(id, row)
+    }
+
+    const signedUrlByPath = new Map<string, string>()
+    for (const item of (Array.isArray(signedUrlsResult.data) ? signedUrlsResult.data : []) as { path?: string; signedUrl?: string }[]) {
+      if (item?.path && item?.signedUrl) signedUrlByPath.set(item.path, item.signedUrl)
     }
 
     const byAuthor = new Map<string, StoryGroup>()
@@ -172,7 +172,7 @@ export async function GET(req: Request) {
         createdAt: s.created_at,
         expiresAt: s.expires_at,
         caption: s.caption ?? null,
-        mediaUrl: `/api/social/stories/media?storyId=${encodeURIComponent(String(s.id))}&signedSeconds=${encodeURIComponent(String(signedSeconds))}`,
+        mediaUrl: signedUrlByPath.get(s.media_path) ?? `/api/social/stories/media?storyId=${encodeURIComponent(String(s.id))}&signedSeconds=${encodeURIComponent(String(signedSeconds))}`,
         mediaKind: mediaKindFromPath(s.media_path),
         viewed: viewedSet.has(s.id),
         likeCount: likeCountByStory.get(s.id) || 0,
@@ -205,7 +205,7 @@ export async function GET(req: Request) {
     // Saltamos de 30s para 2 minutos de TTL. 
     // Posts de Stories não precisam ser instântaneos em tempo real a todo ms.
     await cacheSet(cacheKey, payload, 120)
-    return NextResponse.json(payload, { headers: { 'cache-control': 'public, max-age=60' } })
+    return NextResponse.json(payload, { headers: { 'cache-control': 'private, no-store' } })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }

@@ -29,11 +29,11 @@ import { createWorkout, updateWorkout, deleteWorkout, importData, setWorkoutArch
 
 import LoginScreen from '@/components/LoginScreen';
 import LoadingScreen from '@/components/LoadingScreen';
-import ActiveWorkout from '@/components/ActiveWorkout';
-import RestTimerOverlay from '@/components/workout/RestTimerOverlay';
-import IncomingInviteModal from '@/components/IncomingInviteModal';
-import InviteAcceptedModal from '@/components/InviteAcceptedModal';
-import NotificationCenter from '@/components/NotificationCenter';
+const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
+const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
+const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
+const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedModal'), { ssr: false, loading: () => null });
+const NotificationCenter = dynamic(() => import('@/components/NotificationCenter'), { ssr: false });
 import HeaderActionsMenu from '@/components/HeaderActionsMenu';
 
 // Heavy components — loaded only when needed
@@ -356,6 +356,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             clearTimeout(t);
         };
     }, [authLoading, user, router]);
+
+    // Preload common modal chunks 3s after mount so first-open feels instant
+    useEffect(() => {
+        const t = setTimeout(() => {
+            void import('@/components/SettingsModal')
+            void import('@/components/dashboard/WorkoutWizardModal')
+            void import('@/components/HistoryList')
+            void import('@/components/ActiveWorkout')
+            void import('@/components/IncomingInviteModal')
+            void import('@/components/InviteAcceptedModal')
+        }, 3000)
+        return () => clearTimeout(t)
+    }, [])
 
     // whatsNew useEffect + closeWhatsNew — handled by useWhatsNew hook above
 
@@ -1004,6 +1017,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         [activeSession?.logs, handleCloseTimer, handleUpdateSessionLog, setActiveSession]
     )
 
+    const handleOpenNotifications = useCallback(() => {
+        setShowNotifCenter(true);
+        setHasUnreadNotification(false);
+    }, []);
+
+    const handleOpenTour = useCallback(async () => {
+        try {
+            await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
+        } catch { }
+        setTourOpen(true)
+    }, [logTourEvent, TOUR_VERSION]);
+
     if (authLoading) return <LoadingScreen />;
     if (!user?.id) return <LoadingScreen />;
 
@@ -1018,6 +1043,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
+
     return (
         <>
             {/* Biometric lock — shown on top of everything when app resumes from background */}
@@ -1028,10 +1054,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 userId={user?.id || undefined}
                 settings={userSettingsApi?.settings ?? null}
                 onOpenMessages={() => setView('chat')}
-                onOpenNotifications={() => {
-                    setShowNotifCenter(true);
-                    setHasUnreadNotification(false);
-                }}
+                onOpenNotifications={handleOpenNotifications}
             >
                 <InAppNotifyBinder bind={bindInAppNotify} />
                 <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
@@ -1184,19 +1207,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         onOpenChatList={() => setView('chatList')}
                                         onOpenGlobalChat={() => setView('globalChat')}
                                         onOpenHistory={() => setView('history')}
-                                        onOpenNotifications={() => {
-                                            setShowNotifCenter(true);
-                                            setHasUnreadNotification(false);
-                                        }}
+                                        onOpenNotifications={handleOpenNotifications}
                                         onOpenSchedule={() => router.push('/dashboard/schedule')}
                                         onOpenWallet={() => openVipView()}
                                         onOpenSettings={() => setSettingsOpen(true)}
-                                        onOpenTour={async () => {
-                                            try {
-                                                await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
-                                            } catch { }
-                                            setTourOpen(true)
-                                        }}
+                                        onOpenTour={handleOpenTour}
                                         onLogout={handleLogout}
                                     />
                                 </div>
