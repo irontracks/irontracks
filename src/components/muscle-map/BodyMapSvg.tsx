@@ -163,19 +163,8 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
         </g>
       </svg>
 
-      {/* 
-        Linhas auxiliares visuais do Skeleton (caso a imagem não esteja carregada).
-        Em produção real com as fotos importadas, essas linhas base podem ser deletadas.
-      */}
-      <svg viewBox="0 0 200 450" className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
-        <ellipse cx="100" cy="26" rx="21" ry="24" fill="transparent" stroke="white" strokeWidth="1" />
-        <path d="M60,64 C46,70 36,82 34,100 L32,192 C32,210 44,222 52,226 L52,270 C52,282 56,288 64,292 L64,302 C74,306 84,308 94,308 L94,322 C92,336 88,360 86,388 L84,428 C84,434 88,438 94,438 L106,438 C112,438 116,434 116,428 L114,388 C112,360 108,336 106,322 L106,308 C116,308 126,306 136,302 L136,292 C144,288 148,282 148,270 L148,226 C156,222 168,210 168,192 L166,100 C164,82 154,70 140,64 C126,58 100,54 100,54 C100,54 74,58 60,64 Z" fill="transparent" stroke="white" strokeWidth="1" />
-        <path d="M36,100 C26,108 19,122 18,140 L17,176 C17,188 22,196 30,198 L40,198 C47,196 51,188 51,178 L51,118 C49,106 44,98 36,100 Z" fill="transparent" stroke="white" strokeWidth="1" />
-        <path d="M164,100 C174,108 181,122 182,140 L183,176 C183,188 178,196 170,198 L160,198 C153,196 149,188 149,178 L149,118 C151,106 156,98 164,100 Z" fill="transparent" stroke="white" strokeWidth="1" />
-      </svg>
       {/* Luz global e brilho suave */}
       <div className="absolute inset-0 pointer-events-none rounded-2xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]" />
     </div>
   )
 }
-
