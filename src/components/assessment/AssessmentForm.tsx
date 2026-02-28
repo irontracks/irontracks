@@ -311,9 +311,9 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   // Validação de permissão deve ser feita pelo componente pai conforme a aplicação
 
   return (
-    <div className="max-w-4xl mx-auto p-6 text-white">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 text-white">
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">
           Nova Avaliação Física
         </h1>
         <p className="text-sm text-neutral-400">
@@ -321,13 +321,14 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         </p>
       </div>
 
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
+      <div className="mb-4 sm:mb-6">
+        {/* Step circles + flex-1 connectors (never overflow) */}
+        <div className="flex items-center">
           {steps.map((step, index) => (
-            <div key={step.id} className="flex items-center">
+            <React.Fragment key={step.id}>
               <button
                 onClick={() => handleStepClick(index)}
-                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
+                className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   index <= currentStep
                     ? 'bg-yellow-500 border-yellow-500 text-black'
                     : 'bg-neutral-900 border-neutral-700 text-neutral-500 hover:border-neutral-500'
@@ -337,26 +338,17 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
                 <step.icon className="w-5 h-5" />
               </button>
               {index < steps.length - 1 && (
-                <div className={`w-24 h-1 mx-2 transition-all duration-200 ${
+                <div className={`flex-1 h-1 mx-1 sm:mx-2 transition-all duration-200 ${
                   index < currentStep ? 'bg-yellow-500' : 'bg-neutral-700'
                 }`} />
               )}
-            </div>
+            </React.Fragment>
           ))}
         </div>
-        <div className="flex justify-between mt-2">
-          {steps.map((step, index) => (
-            <div key={step.id} className="text-center flex-1">
-              <p className={`text-sm font-semibold ${
-                index <= currentStep ? 'text-yellow-500' : 'text-neutral-500'
-              }`}>
-                {step.title}
-              </p>
-              <p className="text-xs text-neutral-500 mt-1">
-                {step.description}
-              </p>
-            </div>
-          ))}
+        {/* Show only the current step label — no 5-column layout */}
+        <div className="mt-3 text-center">
+          <p className="text-sm font-semibold text-yellow-500">{currentStepData.title}</p>
+          <p className="text-xs text-neutral-500 mt-0.5">{currentStepData.description}</p>
         </div>
       </div>
 
@@ -407,17 +399,17 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
           </AnimatePresence>
         </div>
 
-        <div className="px-6 py-4 bg-neutral-950/60 border-t border-neutral-800 rounded-b-2xl flex justify-between items-center">
+        <div className="px-4 sm:px-6 py-4 bg-neutral-950/60 border-t border-neutral-800 rounded-b-2xl flex justify-between items-center gap-2">
           <button
             onClick={handlePrevious}
             disabled={currentStep === 0}
-            className="flex items-center px-4 py-2 text-sm font-medium text-neutral-200 bg-neutral-900 border border-neutral-700 rounded-lg hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 min-h-[44px] px-4 py-2 text-sm font-medium text-neutral-200 bg-neutral-900 border border-neutral-700 rounded-xl hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Anterior
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Anterior</span>
           </button>
 
-          <div className="text-sm text-neutral-500">
+          <div className="text-xs text-neutral-500 whitespace-nowrap">
             Passo {currentStep + 1} de {steps.length}
           </div>
 
@@ -425,18 +417,18 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="flex items-center px-4 py-2 text-sm font-semibold text-black bg-yellow-500 border border-yellow-500 rounded-lg hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-yellow-900/30"
+              className="flex items-center gap-2 min-h-[44px] px-4 py-2 text-sm font-semibold text-black bg-yellow-500 border border-yellow-500 rounded-xl hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-yellow-900/30"
             >
-              <Save className="w-4 h-4 mr-2" />
-              {loading ? 'Salvando...' : 'Salvar Avaliação'}
+              <Save className="w-4 h-4" />
+              <span>{loading ? 'Salvando...' : 'Salvar'}</span>
             </button>
           ) : (
             <button
               onClick={handleNext}
-              className="flex items-center px-4 py-2 text-sm font-semibold text-black bg-yellow-500 border border-yellow-500 rounded-lg hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-900/30"
+              className="flex items-center gap-2 min-h-[44px] px-4 py-2 text-sm font-semibold text-black bg-yellow-500 border border-yellow-500 rounded-xl hover:bg-yellow-400 transition-colors shadow-lg shadow-yellow-900/30"
             >
-              Próximo
-              <ArrowRight className="w-4 h-4 ml-2" />
+              <span>Próximo</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           )}
         </div>

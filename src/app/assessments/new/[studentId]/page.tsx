@@ -37,13 +37,13 @@ export default function NewAssessmentPage() {
   return (
     <DialogProvider>
       <GlobalDialog />
-      <div className="min-h-screen bg-neutral-900 text-white p-4">
+      <div className="min-h-screen bg-neutral-900 text-white px-3 sm:px-4 py-4 pt-safe pb-safe">
         <div className="max-w-5xl mx-auto bg-neutral-800 rounded-2xl border border-neutral-700">
-          <div className="p-4 border-b border-neutral-700 flex justify-between items-center">
+          <div className="px-4 py-3 border-b border-neutral-700 flex justify-between items-center">
             <h3 className="font-bold">Nova Avaliação</h3>
             <BackButton className="bg-neutral-900 border border-neutral-700 hover:bg-neutral-800" />
           </div>
-          <div className="p-4">
+          <div className="p-0">
             <AssessmentForm
               studentId={studentId}
               studentName={studentName}
