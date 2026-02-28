@@ -41,6 +41,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.87.3",
     "@tailwindcss/node": "^4.2.0",
+    "@tanstack/react-virtual": "^3.13.19",
     "buffer": "^6.0.3",
     "chart.js": "^4.5.1",
     "commander": "^12.1.0",

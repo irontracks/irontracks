@@ -201,8 +201,11 @@ export async function GET(req: Request) {
       })
 
     const payload = { ok: true, data: groups }
-    await cacheSet(cacheKey, payload, 30)
-    return NextResponse.json(payload)
+    // 🔥 UPSTASH REDIS CACHE (Stories Aggressive Cache)
+    // Saltamos de 30s para 2 minutos de TTL. 
+    // Posts de Stories não precisam ser instântaneos em tempo real a todo ms.
+    await cacheSet(cacheKey, payload, 120)
+    return NextResponse.json(payload, { headers: { 'cache-control': 'public, max-age=60' } })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
