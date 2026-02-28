@@ -242,6 +242,9 @@ type Props = {
   streakLoading?: boolean
 }
 
+const isPeriodizedWorkout = (w: DashboardWorkout) =>
+  String(w?.title || w?.name || '').trim().startsWith('VIP •')
+
 export default function StudentDashboard(props: Props) {
   const supabase = useMemo(() => createClient(), [])
   const workouts = Array.isArray(props.workouts) ? props.workouts : []
@@ -280,16 +283,21 @@ export default function StudentDashboard(props: Props) {
   const showIronRank = props.settings?.showIronRank !== false
   const showBadges = props.settings?.showBadges !== false
   const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
-  const isPeriodizedWorkout = (w: DashboardWorkout) => {
-    const title = String(w?.title || w?.name || '').trim()
-    return title.startsWith('VIP •')
-  }
-  const workoutsForTab =
-    workoutsTab === 'periodized'
-      ? (periodizedLoaded ? periodizedWorkouts : workouts.filter(isPeriodizedWorkout))
-      : workouts.filter((w) => !isPeriodizedWorkout(w))
-  const archivedCount = workoutsForTab.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0)
-  const visibleWorkouts = showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archived_at)
+  const workoutsForTab = useMemo(
+    () =>
+      workoutsTab === 'periodized'
+        ? (periodizedLoaded ? periodizedWorkouts : workouts.filter(isPeriodizedWorkout))
+        : workouts.filter((w) => !isPeriodizedWorkout(w)),
+    [workoutsTab, periodizedLoaded, periodizedWorkouts, workouts],
+  )
+  const archivedCount = useMemo(
+    () => workoutsForTab.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0),
+    [workoutsForTab],
+  )
+  const visibleWorkouts = useMemo(
+    () => (showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archived_at)),
+    [showArchived, workoutsForTab],
+  )
 
   useEffect(() => {
     isMountedRef.current = true
