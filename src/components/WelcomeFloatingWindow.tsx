@@ -71,7 +71,7 @@ export default function WelcomeFloatingWindow({ user, onClose }: WelcomeFloating
     const displayName = user?.displayName || user?.name || 'Atleta';
 
     return (
-        <div className="fixed bottom-6 right-6 z-[2000] max-w-sm w-full animate-in slide-in-from-bottom-10 fade-in duration-700">
+        <div className="fixed bottom-6 right-6 z-[2000] max-w-[calc(100vw-3rem)] w-full sm:max-w-sm animate-in slide-in-from-bottom-10 fade-in duration-700 pb-safe pr-safe">
             <div className="relative bg-neutral-900/80 backdrop-blur-xl border border-yellow-500/30 rounded-2xl shadow-2xl overflow-hidden p-6">
                 {/* Glow Effect */}
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-500/20 rounded-full blur-3xl pointer-events-none" />

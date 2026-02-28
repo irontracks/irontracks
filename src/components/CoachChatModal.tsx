@@ -175,7 +175,7 @@ export default function CoachChatModal({
     const isChatExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
 
     return (
-        <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe">
             <div className="bg-neutral-900 border border-neutral-800 w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
                 <div className="p-4 border-b border-neutral-800 flex items-center justify-between bg-neutral-950/50 rounded-t-2xl">
                     <div className="flex items-center gap-3">

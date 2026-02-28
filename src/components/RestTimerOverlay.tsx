@@ -207,7 +207,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     if (isFinished) {
         return (
             <div
-                className="fixed inset-0 z-[2200] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer"
+                className="fixed inset-0 z-[2200] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer pt-safe pb-safe"
                 onClick={() => {
                     try {
                         if (typeof onFinish === 'function') onFinish(context);

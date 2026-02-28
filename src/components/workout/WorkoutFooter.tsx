@@ -42,7 +42,7 @@ export default function WorkoutFooter() {
 
   return (
     <>
-      <div className="fixed right-3 bottom-24 sm:bottom-5 z-[60]">
+      <div className="fixed right-3 pr-safe bottom-24 sm:bottom-5 z-[60]">
         {timerMinimized ? (
           <button
             type="button"
