@@ -59,16 +59,11 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
 
       {/* 3D Realista Base - Camada Inferior (DESCOMENTAR QUANDO TIVER A IMAGEM) */}
       <img
-        src={view === 'front' ? '/body-front-placeholder.png' : '/body-back-placeholder.png'}
+        src={view === 'front' ? '/body-front.png' : '/body-back.png'}
         alt="Photorealistic Body Base"
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none opacity-50 contrast-125 saturate-50 mix-blend-luminosity"
-        style={{
-          // MOCKUP VISUAL APENAS PARA DEMOS: (substitua pelas imagens reais)
-          // Isso cria um esqueleto cinza artificial apenas para manter a tela não-vazia enquanto as imagens reais não vem.
-          background: 'radial-gradient(ellipse at center, rgba(120,120,120,0.4) 0%, rgba(30,30,30,0) 70%)'
-        }}
+        className="absolute inset-0 w-full h-[95%] top-[2.5%] object-contain pointer-events-none opacity-80 contrast-125 saturate-50 mix-blend-luminosity"
         onError={(e) => {
-          // Oculta o placeholder se a imagem real não existir
+          // Oculta o placeholder se a imagem real não existir (ex: não tem as costas ainda)
           e.currentTarget.style.display = 'none';
         }}
       />
