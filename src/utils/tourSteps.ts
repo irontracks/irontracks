@@ -1,86 +1,102 @@
 'use client'
 
-type TourAction = { name: string; args?: unknown[] }
-export type TourStep = { id: string; selector: string; title: string; body: string; action?: TourAction }
+export type TourStep = {
+  id: string
+  emoji: string
+  title: string
+  body: string
+}
 
-export function getTourSteps({ role, hasCommunity }: { role: unknown; hasCommunity: unknown }): TourStep[] {
+const BASE_STEPS: TourStep[] = [
+  {
+    id: 'welcome',
+    emoji: '🏋️',
+    title: 'Bem-vindo ao IronTracks!',
+    body: 'O app de alta performance para atletas que levam o treino a sério.\n\nEm 60 segundos vamos te mostrar tudo que você pode fazer aqui.',
+  },
+  {
+    id: 'workouts',
+    emoji: '💪',
+    title: 'Seus Treinos',
+    body: 'Crie fichas personalizadas com exercícios, séries e cargas.\n\nOrganize exatamente do jeito que seu treino precisa.',
+  },
+  {
+    id: 'start',
+    emoji: '▶️',
+    title: 'Treine em Tempo Real',
+    body: 'Toque em "Iniciar treino" para começar. Registre cada série ao vivo — o app conta o descanso automaticamente entre os exercícios.',
+  },
+  {
+    id: 'history',
+    emoji: '📈',
+    title: 'Sua Evolução',
+    body: 'Cada treino fica salvo no histórico. Veja cargas, volume total e tempo — tudo registrado para você sempre superar o que já fez.',
+  },
+  {
+    id: 'muscle-map',
+    emoji: '🦾',
+    title: 'Mapa Muscular',
+    body: 'Visualize quais grupos musculares você treinou essa semana. Identifique grupos esquecidos e equilibre seu volume de treino.',
+  },
+  {
+    id: 'stories',
+    emoji: '📸',
+    title: 'Stories de Treino',
+    body: 'Compartilhe fotos e vídeos das suas sessões. Veja o que outros atletas estão fazendo e se inspire.',
+  },
+]
+
+const COMMUNITY_STEP: TourStep = {
+  id: 'community',
+  emoji: '🤝',
+  title: 'Iron Lounge',
+  body: 'Conecte-se com outros atletas. Curta conquistas, troque experiências e faça parte de uma comunidade de alta performance.',
+}
+
+const COACH_STEPS: TourStep[] = [
+  {
+    id: 'coach-panel',
+    emoji: '🎮',
+    title: 'Painel de Coach',
+    body: 'Sua central de operações. Gerencie todos os seus alunos, crie treinos personalizados e acompanhe a evolução de cada um.',
+  },
+  {
+    id: 'coach-schedule',
+    emoji: '📅',
+    title: 'Agenda',
+    body: 'Organize seus horários e consultas com alunos. Controle sua rotina de personal trainer em um só lugar.',
+  },
+  {
+    id: 'coach-wallet',
+    emoji: '💰',
+    title: 'Carteira',
+    body: 'Recebimentos e status de assinatura dos seus alunos VIP. Visibilidade total sobre o financeiro da sua operação.',
+  },
+]
+
+const FINAL_STEP: TourStep = {
+  id: 'ready',
+  emoji: '🚀',
+  title: 'Tudo Pronto!',
+  body: 'Agora você conhece o IronTracks.\n\nUse o menu para explorar tudo — e bons treinos! 💪',
+}
+
+export function getTourSteps({
+  role,
+  hasCommunity,
+}: {
+  role?: unknown
+  hasCommunity?: unknown
+}): TourStep[] {
   const r = String(role || '').toLowerCase()
   const isCoach = r === 'teacher' || r === 'admin'
+  const withCommunity = Boolean(hasCommunity)
 
-  const base: TourStep[] = [
-    {
-      id: 'menu',
-      selector: '[data-tour="header-menu"]',
-      title: 'Menu do app',
-      body: 'Aqui você acessa histórico, configurações e atalhos.\n\nVocê também consegue reabrir este tour quando quiser.',
-    },
-    {
-      id: 'tabs',
-      selector: '[data-tour="tabs"]',
-      title: 'Abas do dashboard',
-      body: 'Use essas abas para alternar entre Treinos, Avaliações e (se liberado) Comunidade.',
-    },
-    {
-      id: 'start',
-      selector: '[data-tour="workout-start"]',
-      title: 'Começar um treino',
-      body: 'Toque em “Iniciar treino” para abrir o treino ativo e registrar suas séries.',
-    },
-    {
-      id: 'muscle-map',
-      selector: '[data-tour="muscle-map"]',
-      title: 'Mapa muscular',
-      body: 'Este painel mostra sua distribuição de volume na semana por músculo.\n\nSe algum exercício não aparecer, use “Histórico” dentro do card para reprocessar.',
-    },
-  ]
+  const middle = withCommunity
+    ? [...BASE_STEPS.slice(0, 5), COMMUNITY_STEP, BASE_STEPS[5]]
+    : BASE_STEPS
 
-  const community = Boolean(hasCommunity)
-    ? [
-        {
-          id: 'community',
-          selector: '[data-tour="tab-community"]',
-          title: 'Comunidade',
-          body: 'Aqui você acompanha a comunidade e interações sociais.',
-        },
-      ]
-    : []
-
-  const coach = isCoach
-    ? [
-        {
-          id: 'admin-open',
-          selector: '[data-tour="adminpanel.root"]',
-          title: 'Painel de controle',
-          body: 'Como professor, o Painel de Controle é o centro da operação: alunos, treinos, acompanhamentos e tarefas do dia.',
-          action: { name: 'openAdminPanel', args: ['dashboard'] },
-        },
-        {
-          id: 'admin-tabs',
-          selector: '[data-tour="adminpanel.tabs"]',
-          title: 'Abas do painel',
-          body: 'Aqui você troca entre Dashboard, Alunos, Treinos/Templates e outras áreas do painel.',
-        },
-        {
-          id: 'admin-inbox',
-          selector: '[data-tour="adminpanel.dashboard.coachInbox"]',
-          title: 'Coach Inbox',
-          body: 'Seu feed de prioridade: alunos que precisam de atenção. Clique em um aluno para abrir detalhes e agir rápido.',
-        },
-        {
-          id: 'admin-students',
-          selector: '[data-tour="adminpanel.students.search"]',
-          title: 'Buscar aluno',
-          body: 'Use a busca e filtros para encontrar alunos rapidamente.\n\nDepois, abra o aluno para ver treino, check-ins e vídeos.',
-          action: { name: 'openAdminPanel', args: ['students'] },
-        },
-        {
-          id: 'admin-student-workouts',
-          selector: '[data-tour="adminpanel.student.workouts.create"]',
-          title: 'Ação principal',
-          body: 'No aluno, você consegue criar treino e consultar histórico.\n\nEsse é o fluxo principal do professor.',
-        },
-      ]
-    : []
-
-  return [...base, ...community, ...coach] as TourStep[]
+  return isCoach
+    ? [...middle, ...COACH_STEPS, FINAL_STEP]
+    : [...middle, FINAL_STEP]
 }
