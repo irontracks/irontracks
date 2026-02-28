@@ -53,9 +53,12 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
 
       {/* 3D Realista Base - Camada Inferior */}
       {/* A imagem original tem áreas em branco/transparente grandes, então centralizamos ela. */}
+      {/* Usamos a prop 'key' com o 'view' para forçar o React a recriar a imagem ao trocar de aba, 
+          evitando que o onError antigo mantenha ela oculta (display: none). */}
       <img
+        key={view}
         src={view === 'front' ? '/body-front.png' : '/body-back.png'}
-        alt="Photorealistic Body Base"
+        alt={`Photorealistic Body Base ${view}`}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-90"
         style={{
           objectPosition: 'center top'
