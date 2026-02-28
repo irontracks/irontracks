@@ -51,7 +51,7 @@ export const Modals: React.FC = () => {
         <>
             {/* Register Student Modal */}
             {showRegisterModal && (
-                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 shadow-2xl animate-in zoom-in-95 duration-200">
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <UserPlus size={24} className="text-yellow-500" /> Novo Aluno
@@ -86,7 +86,7 @@ export const Modals: React.FC = () => {
 
             {/* Teacher Modal */}
             {showTeacherModal && (
-                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 shadow-2xl animate-in zoom-in-95 duration-200">
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <UserPlus size={24} className="text-yellow-500" /> Novo Professor
@@ -129,7 +129,7 @@ export const Modals: React.FC = () => {
 
             {/* Editing Teacher Modal */}
             {editingTeacher && (
-                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 shadow-2xl animate-in zoom-in-95 duration-200">
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <Edit3 size={24} className="text-yellow-500" /> Editar Professor

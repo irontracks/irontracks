@@ -578,7 +578,7 @@ const LoginScreen = () => {
                                     {validationErrors.fullName && <p id="error-fullName" className="mt-1 text-xs text-red-400">{validationErrors.fullName}</p>}
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="relative">
                                         <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                                         <input
@@ -910,7 +910,7 @@ const LoginScreen = () => {
 
             {/* Access Request Modal */}
             {showRequestModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pt-safe pb-safe bg-black/80 backdrop-blur-sm">
                     <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
                             <h3 className="text-lg font-black text-white italic">PEDIR ACESSO</h3>
@@ -970,7 +970,7 @@ const LoginScreen = () => {
                                         />
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-xs font-bold text-neutral-400 uppercase">Telefone</label>
                                             <input

@@ -46,7 +46,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
 
   return (
     <WorkoutProvider value={controller}>
-      <div className="fixed inset-0 z-[50] overflow-y-auto bg-neutral-900 text-white flex flex-col">
+      <div className="fixed inset-0 z-[50] overflow-y-auto bg-neutral-900 text-white flex flex-col pt-safe">
         <WorkoutHeader />
         <ExerciseList />
         <WorkoutFooter />

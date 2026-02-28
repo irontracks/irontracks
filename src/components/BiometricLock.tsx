@@ -86,7 +86,7 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
   const biometryLabel = biometryType === 'touchID' ? 'Touch ID' : 'Face ID'
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-neutral-950 gap-8 px-6">
+    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-neutral-950 gap-8 px-6 pt-safe pb-safe">
       {/* Logo / App Name */}
       <div className="flex flex-col items-center gap-3 mb-4">
         <Image

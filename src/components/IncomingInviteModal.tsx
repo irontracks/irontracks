@@ -63,7 +63,7 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
     if (!shouldShow) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 animate-fade-in">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 pt-safe pb-safe animate-fade-in">
             <div className="bg-neutral-800 p-6 rounded-3xl border border-yellow-500 shadow-2xl max-w-sm w-full text-center">
                 <div className="w-20 h-20 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
                     <Users size={32} className="text-black" />

@@ -213,7 +213,7 @@ export default function HeaderActionsMenu({
 
           {/* Dropdown panel */}
           <div
-            className="absolute right-0 mt-2 w-72 z-50 rounded-2xl overflow-hidden animate-dropdown-in"
+            className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] z-50 rounded-2xl overflow-hidden animate-dropdown-in"
             style={{
               background: 'linear-gradient(160deg, #161200 0%, #0c0c0c 25%)',
               boxShadow:
