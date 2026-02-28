@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { cacheDelete } from '@/utils/cache'
+import { logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -167,8 +169,16 @@ export async function POST(req: Request) {
               },
               { onConflict: 'provider,provider_subscription_id' },
             )
+
+          // Invalidate VIP caches so the user sees the new status immediately
+          try {
+            await Promise.all([
+              cacheDelete(`vip:access:${subRow.user_id}`),
+              cacheDelete(`dashboard:bootstrap:${subRow.user_id}`),
+            ])
+          } catch (cacheErr) { logWarn('asaas_webhook', 'Failed to invalidate VIP cache', cacheErr) }
         }
-      } catch {}
+      } catch (e) { logWarn('asaas_webhook', 'Failed to upsert user_entitlements', e) }
     }
 
     await admin.from('asaas_webhook_events').update({ processed_at: new Date().toISOString() }).eq('id', inserted.id)
@@ -185,7 +195,7 @@ export async function POST(req: Request) {
           processing_error: (e as { message?: string })?.message ?? String(e),
           processed_at: new Date().toISOString(),
         })
-    } catch {}
+    } catch (logErr) { logWarn('asaas_webhook', 'Failed to log webhook error event', logErr) }
 
     return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
   }

@@ -25,6 +25,24 @@ export async function GET(req: Request) {
     if (response) return response
     if (!q) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
 
+    // Verify the user is a member of this channel (or it's the global channel)
+    const { data: membership } = await supabase
+      .from('chat_members')
+      .select('id')
+      .eq('channel_id', q.channel_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!membership?.id) {
+      const { data: channel } = await supabase
+        .from('chat_channels')
+        .select('type')
+        .eq('id', q.channel_id)
+        .maybeSingle()
+      if (String(channel?.type || '') !== 'global') {
+        return NextResponse.json({ ok: false, error: 'not_member' }, { status: 403 })
+      }
+    }
+
     const { data: msgs, error } = await supabase
       .from('messages')
       .select('*')

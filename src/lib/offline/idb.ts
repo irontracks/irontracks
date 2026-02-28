@@ -1,5 +1,6 @@
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { nfsPutJob, nfsDeleteJob, nfsGetAllJobs } from './nativeFs'
 
 const DB_NAME = 'irontracks'
 const DB_VERSION = 1
@@ -83,6 +84,10 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
   const id = String(j?.id || '').trim()
   if (!id) return false
   const jobObj = j as Record<string, unknown>
+
+  // Write-through to native filesystem (survives iOS force-close)
+  nfsPutJob(jobObj).catch(() => { /* best effort */ })
+
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
@@ -105,6 +110,10 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
 export const queueDelete = async (id: unknown): Promise<boolean> => {
   const key = String(id || '').trim()
   if (!key) return false
+
+  // Remove from native filesystem too
+  nfsDeleteJob(key).catch(() => { /* best effort */ })
+
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
@@ -125,6 +134,11 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
 
 export const queueGetAll = async (): Promise<unknown[]> => {
   if (!hasIndexedDb()) {
+    // Try native filesystem first (iOS), fall back to localStorage
+    try {
+      const nfsJobs = await nfsGetAllJobs()
+      if (nfsJobs.length > 0) return nfsJobs
+    } catch { /* fall through */ }
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
       const list = parseJsonWithSchema(raw, z.array(z.record(z.unknown())))
@@ -142,5 +156,24 @@ export const queueGetAll = async (): Promise<unknown[]> => {
     req.onerror = () => resolve([])
   })
   await txDone(tx).catch((): null => null)
+
+  // If IDB is empty but native FS has jobs (recovery after force-close), merge them
+  if (list.length === 0) {
+    try {
+      const nfsJobs = await nfsGetAllJobs()
+      if (nfsJobs.length > 0) {
+        for (const job of nfsJobs) {
+          try {
+            const rdb = await openDb()
+            const rtx = rdb.transaction(STORE_QUEUE, 'readwrite')
+            rtx.objectStore(STORE_QUEUE).put(job)
+            await txDone(rtx).catch((): null => null)
+          } catch { /* best effort */ }
+        }
+        return nfsJobs
+      }
+    } catch { /* no native fs available */ }
+  }
+
   return list
 }

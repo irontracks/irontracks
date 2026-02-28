@@ -32,6 +32,12 @@ export default function GuidedTour({
     try { onEvent?.(name, payload) } catch { }
   }, [onEvent])
 
+  // Stable refs so keyboard handler doesn't re-register when parent re-renders callbacks
+  const onCancelRef = useRef(onCancel)
+  const onCompleteRef = useRef(onComplete)
+  useEffect(() => { onCancelRef.current = onCancel }, [onCancel])
+  useEffect(() => { onCompleteRef.current = onComplete }, [onComplete])
+
   // Mount/unmount with animation
   useEffect(() => {
     if (open) {
@@ -60,11 +66,11 @@ export default function GuidedTour({
   useEffect(() => {
     if (!open) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); onCancel?.() }
+      if (e.key === 'Escape') { e.preventDefault(); onCancelRef.current?.() }
       if (e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault()
         if (idx < safeSteps.length - 1) setIdx(i => i + 1)
-        else onComplete?.()
+        else onCompleteRef.current?.()
       }
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
@@ -73,7 +79,7 @@ export default function GuidedTour({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, idx, safeSteps.length, onCancel, onComplete])
+  }, [open, idx, safeSteps.length])
 
   const handleNext = useCallback(() => {
     if (idx < safeSteps.length - 1) {

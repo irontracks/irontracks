@@ -26,6 +26,13 @@ const trimLen = (v: unknown, max: number) => {
   return s.length > max ? s.slice(0, max) : s
 }
 
+/** Strip potential secrets from stack traces before persisting */
+const sanitizeStack = (raw: string): string => {
+  return raw
+    .replace(/(?:api[_-]?key|token|secret|password|authorization|bearer)\s*[:=]\s*\S+/gi, '[REDACTED]')
+    .replace(/(?:https?:\/\/)[^\s]*(?:key|token|secret|auth)[^\s]*/gi, '[REDACTED_URL]')
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -47,7 +54,8 @@ export async function POST(request: Request) {
     const message = trimLen(body?.message, 1200)
     if (!message) return NextResponse.json({ ok: false, error: 'missing message' }, { status: 400 })
 
-    const stack = trimLen(body?.stack, 12000) || null
+    const rawStack = trimLen(body?.stack, 12000) || null
+    const stack = rawStack ? sanitizeStack(rawStack) : null
     const pathname = trimLen(body?.pathname, 512) || null
     const url = trimLen(body?.url, 2048) || null
     const userAgent = trimLen(body?.userAgent, 1024) || null

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   flushOfflineQueue,
   getOfflineQueueSummary,
@@ -67,12 +67,18 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
     }
   }, [refreshSyncState]);
 
+  // Stable refs so listeners are registered exactly once (no churn from deps)
+  const refreshRef = useRef(refreshSyncState)
+  const flushRef = useRef(runFlushQueue)
+  useEffect(() => { refreshRef.current = refreshSyncState }, [refreshSyncState])
+  useEffect(() => { flushRef.current = runFlushQueue }, [runFlushQueue])
+
   // Listen for online/offline and queue change events
   useEffect(() => {
-    refreshSyncState();
-    const onChanged = () => refreshSyncState();
-    const onOnline = () => runFlushQueue();
-    const onOffline = () => refreshSyncState();
+    refreshRef.current();
+    const onChanged = () => refreshRef.current();
+    const onOnline = () => flushRef.current();
+    const onOffline = () => refreshRef.current();
     try {
       window.addEventListener('irontracks.offlineQueueChanged', onChanged);
       window.addEventListener('online', onOnline);
@@ -85,7 +91,7 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
         window.removeEventListener('offline', onOffline);
       } catch { /* SSR guard */ }
     };
-  }, [refreshSyncState, runFlushQueue]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-flush every 15s if there are pending items
   useEffect(() => {

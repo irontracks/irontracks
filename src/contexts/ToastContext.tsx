@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useCallback, useContext, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { ActionToast } from '@/components/ui/ActionToast'
 
 export type ToastType = 'success' | 'error' | 'info'
@@ -21,8 +21,19 @@ let idCounter = 0
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
+  // Cancel all pending timers when the provider unmounts
+  useEffect(() => {
+    return () => {
+      timers.current.forEach((t) => clearTimeout(t))
+      timers.current.clear()
+    }
+  }, [])
 
   const dismiss = useCallback((id: string) => {
+    const t = timers.current.get(id)
+    if (t !== undefined) { clearTimeout(t); timers.current.delete(id) }
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
@@ -33,7 +44,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       const trimmed = prev.length >= 3 ? prev.slice(1) : prev
       return [...trimmed, { id, message, type }]
     })
-    setTimeout(() => dismiss(id), duration)
+    const t = setTimeout(() => { dismiss(id); timers.current.delete(id) }, duration)
+    timers.current.set(id, t)
   }, [dismiss])
 
   return (

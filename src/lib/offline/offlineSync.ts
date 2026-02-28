@@ -57,13 +57,28 @@ export const getPendingCount = async () => {
   }
 };
 
+const STALE_JOB_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+
 export const getOfflineQueueSummary = async ({ userId }: { userId?: string } = {}) => {
   try {
     const all = await queueGetAll();
-    const jobs = Array.isArray(all) ? (all as OfflineJob[]) : [];
+    const rawJobs = Array.isArray(all) ? (all as OfflineJob[]) : [];
+
+    // Auto-cleanup: remove failed jobs older than 7 days
+    const now = Date.now();
+    const staleIds: string[] = []
+    const jobs = rawJobs.filter((j) => {
+      if (String(j?.status || '') === 'failed' && j?.createdAt) {
+        const age = now - new Date(j.createdAt).getTime()
+        if (age > STALE_JOB_MS) { staleIds.push(String(j.id)); return false }
+      }
+      return true
+    })
+    for (const id of staleIds) {
+      try { await queueDelete(id) } catch { /* best effort */ }
+    }
 
     // Calculate stats
-    const now = Date.now();
     const pending = jobs.filter((j) => String(j?.status || 'pending') === 'pending').length;
     const failed = jobs.filter((j) => String(j?.status || '') === 'failed').length;
     const due = jobs.filter((j) => {
@@ -185,7 +200,7 @@ export const queueFinishWorkout = async (payload: Record<string, unknown>) => {
     details: (payload.workoutTitle as string) || 'Treino Finalizado',
     status: 'pending',
     attempts: 0,
-    maxAttempts: 10,
+    maxAttempts: 5,
     nextAttemptAt: 0
   };
   await queuePut(job);

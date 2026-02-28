@@ -74,7 +74,10 @@ export const cacheGet = async <T>(key: string, parser: CacheParser<T>): Promise<
 
 export const cacheSet = async (key: string, value: unknown, ttlSeconds: number): Promise<void> => {
   const payload = JSON.stringify(value)
-  writeLocal(key, payload, ttlSeconds)
+  // Local (in-memory) cache is capped at 30s so it acts as a short-lived L1.
+  // Upstash is the authoritative store for the full TTL. This prevents the local
+  // layer from serving stale data if Upstash is invalidated externally.
+  writeLocal(key, payload, Math.min(ttlSeconds, 30))
 
   const cfg = getUpstashConfig()
   if (!cfg) return
