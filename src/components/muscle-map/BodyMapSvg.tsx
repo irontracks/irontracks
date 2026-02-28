@@ -25,8 +25,8 @@ function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: Muscl
   // Se o músculo não for treinado, ele fica transparente (não afeta a foto original).
   // Se for treinado, ele ganha a cor (ex: vermelho/laranja) e a cor se funde com os reflexos da foto.
 
-  // Como fallback, se não tiver cor (ainda não treinado), fica transparente para ver a foto limpa
-  const fillAlpha = m.color ? '0.7' : '0.0'
+  // Como fallback, se não tiver cor (ยังไม่ได้รับการฝึกฝน), fica transparente para ver a foto limpa
+  const fillAlpha = m.color ? '0.8' : '0.0'
   const fill = m.color || 'transparent'
 
   return {
@@ -34,12 +34,12 @@ function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: Muscl
     fillOpacity: fillAlpha,
     // Em uma implementação real com a foto no fundo, nós usaríamos mix-blend-mode no container pai,
     // mas aqui no SVG podemos aplicar estilos também se necessário.
-    stroke: isSelected ? '#f59e0b' : 'transparent',
-    strokeWidth: isSelected ? 1.8 : 0,
-    className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-80 hover:brightness-125',
+    stroke: 'transparent',
+    strokeWidth: 0,
+    className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-90',
     style: {
-      mixBlendMode: 'multiply' as const, // A magia negra do realismo: a cor penetra nas fibras musculares da foto
-      filter: isSelected ? 'drop-shadow(0 0 8px rgba(245,158,11,0.9))' : 'none',
+      mixBlendMode: 'color' as const, // Usa 'color' ou 'overlay' para tingir a imagem preservando brilhos e sombras
+      filter: isSelected ? 'drop-shadow(0 0 6px rgba(245,158,11,0.8)) blur(3px)' : 'blur(3px)', // Blur sutíl espalha a cor realisticamente
     }
   }
 }
@@ -49,14 +49,14 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
   const cl = (id: MuscleId) => () => onSelect?.(id)
 
   return (
-    <div className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-[#0a0a0a] border border-neutral-800 flex items-center justify-center p-4 min-h-[400px]">
+    <div className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 flex items-center justify-center p-4 min-h-[400px]">
 
       {/* 3D Realista Base - Camada Inferior */}
       {/* A imagem original tem áreas em branco/transparente grandes, então centralizamos ela. */}
       <img
         src={view === 'front' ? '/body-front.png' : '/body-back.png'}
         alt="Photorealistic Body Base"
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-90 mix-blend-luminosity"
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-90"
         style={{
           objectPosition: 'center top'
         }}
