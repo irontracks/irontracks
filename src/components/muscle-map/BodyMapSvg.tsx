@@ -17,15 +17,15 @@ type Props = {
   selected?: MuscleId | null
 }
 
-function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: MuscleId | null, showAll?: boolean) {
+function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: MuscleId | null, showAll?: boolean, intensity: number = 0.9) {
   const m = muscles?.[id] || {}
   const isSelected = selected === id
 
-  let fillAlpha = m.color ? '0.9' : '0.0'
+  let fillAlpha = m.color ? String(intensity) : '0.0'
   let fill = m.color || 'transparent'
 
   if (showAll) {
-    fillAlpha = '0.5'
+    fillAlpha = String(intensity > 0.6 ? intensity - 0.2 : intensity)
     fill = m.color || '#ef4444' // red fallback to see the shapes
   }
 
@@ -43,14 +43,14 @@ function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: Muscl
 }
 
 export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props) {
-  const [frontPos, setFrontPos] = useState({ x: 50, y: 55, s: 0.52 })
-  const [backPos, setBackPos] = useState({ x: 50, y: 55, s: 0.52 })
+  const [frontPos, setFrontPos] = useState({ x: 50, y: 55, s: 0.52, i: 0.9 })
+  const [backPos, setBackPos] = useState({ x: 50, y: 55, s: 0.52, i: 0.9 })
   const [showAll, setShowAll] = useState(true) // Força todos os músculos a aparecerem para a calibração
 
   const pos = view === 'front' ? frontPos : backPos;
   const setPos = view === 'front' ? setFrontPos : setBackPos;
 
-  const s = (id: MuscleId) => ms(id, muscles, selected, showAll)
+  const s = (id: MuscleId) => ms(id, muscles, selected, showAll, pos.i)
   const cl = (id: MuscleId) => () => onSelect?.(id)
 
   return (
@@ -158,7 +158,7 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
 
       <CalibrationOverlay
         pos={pos}
-        setPos={setPos}
+        setPos={setPos as React.Dispatch<React.SetStateAction<{ x: number, y: number, s: number, i: number }>>}
         view={view}
         showAll={showAll}
         setShowAll={setShowAll}
@@ -175,8 +175,8 @@ function CalibrationOverlay({
   showAll,
   setShowAll
 }: {
-  pos: { x: number, y: number, s: number }
-  setPos: (pos: { x: number, y: number, s: number }) => void
+  pos: { x: number, y: number, s: number, i: number }
+  setPos: (pos: { x: number, y: number, s: number, i: number }) => void
   view: string
   showAll: boolean
   setShowAll: (v: boolean) => void
@@ -225,10 +225,16 @@ function CalibrationOverlay({
         <span className="w-6 text-right ml-2 font-mono">{pos.y}</span>
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mb-2">
         <label className="w-8">Escala</label>
         <input type="range" min="0.3" max="1.5" step="0.01" value={pos.s} onChange={e => setPos({ ...pos, s: Number(e.target.value) })} className="flex-1 ml-2 accent-yellow-500" />
         <span className="w-6 text-right ml-2 font-mono">{pos.s}</span>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <label className="w-8 border-t border-white/10 pt-1 text-yellow-400">Intens</label>
+        <input type="range" min="0.1" max="1.5" step="0.05" value={pos.i} onChange={e => setPos({ ...pos, i: Number(e.target.value) })} className="flex-1 ml-2 accent-yellow-500 mt-1" />
+        <span className="w-6 text-right ml-2 font-mono border-t border-white/10 pt-1 text-yellow-400">{pos.i.toFixed(2)}</span>
       </div>
     </div>
   )
