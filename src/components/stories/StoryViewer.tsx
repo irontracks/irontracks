@@ -449,7 +449,7 @@ export default function StoryViewer({
   const viewCount = viewersStoryIdRef.current === story.id ? viewers.length : 0
 
   return (
-    <div className="fixed inset-0 z-[2000] bg-black flex items-center justify-center">
+    <div className="fixed inset-0 z-[2000] bg-black flex items-center justify-center pt-safe pb-safe">
       <div className="absolute inset-0" onClick={deleting ? undefined : onClose} />
 
       <div
