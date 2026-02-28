@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { MuscleId } from '@/utils/muscleMapConfig'
 
 type MuscleState = {
@@ -90,6 +90,34 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
   const [intensity, setIntensity] = useState(0.9)
   const [showAll, setShowAll] = useState(true)
   const [editingMuscle, setEditingMuscle] = useState<string>('global')
+
+  // NEW: Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedFront = localStorage.getItem('calibration_front');
+      const savedBack = localStorage.getItem('calibration_back');
+      const savedInt = localStorage.getItem('calibration_intensity');
+
+      setTimeout(() => {
+        if (savedFront) setFrontOffsets(JSON.parse(savedFront));
+        if (savedBack) setBackOffsets(JSON.parse(savedBack));
+        if (savedInt) setIntensity(Number(savedInt));
+      }, 0);
+    } catch (e) {
+      console.warn('Could not load calibration from local storge', e)
+    }
+  }, []);
+
+  // NEW: Save to localStorage when changed
+  useEffect(() => {
+    try {
+      localStorage.setItem('calibration_front', JSON.stringify(frontOffsets));
+      localStorage.setItem('calibration_back', JSON.stringify(backOffsets));
+      localStorage.setItem('calibration_intensity', String(intensity));
+    } catch (e) {
+      // ignore
+    }
+  }, [frontOffsets, backOffsets, intensity]);
 
   const offsets = view === 'front' ? frontOffsets : backOffsets;
   const setOffsets = view === 'front' ? setFrontOffsets : setBackOffsets;
