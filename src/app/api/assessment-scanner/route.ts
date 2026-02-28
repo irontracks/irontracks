@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processAssessmentDocument } from "@/actions/assessment-scanner-actions";
 import { requireUser } from "@/utils/auth/route";
+import { checkRateLimitAsync, getRequestIp } from "@/utils/rateLimit";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,10 @@ export async function POST(req: NextRequest) {
   try {
     const auth = await requireUser();
     if (!auth.ok) return auth.response;
+
+    const ip = getRequestIp(req);
+    const rl = await checkRateLimitAsync(`ai:assessment:${auth.user.id}:${ip}`, 5, 60_000);
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 });
 
     const contentType = req.headers.get("content-type") || "";
     const isMultipart = contentType.toLowerCase().includes("multipart/form-data");

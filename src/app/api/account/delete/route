@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +29,10 @@ export async function POST(req: Request) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`account:delete:${user.id}:${ip}`, 3, 10 * 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response

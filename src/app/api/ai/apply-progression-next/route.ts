@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 
@@ -32,6 +33,10 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`ai:progression:${auth.user.id}:${ip}`, 10, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const supabase = auth.supabase
     const parsedBody = await parseJsonBody(req, ZodBodySchema)

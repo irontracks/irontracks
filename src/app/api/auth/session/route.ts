@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 const BodySchema = z.object({
   access_token: z.string().min(1),
@@ -13,6 +14,10 @@ const BodySchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`auth:session:${ip}`, 10, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+
     const parsed = await parseJsonBody(req, BodySchema)
     if (parsed.response) return parsed.response
     const body = parsed.data!

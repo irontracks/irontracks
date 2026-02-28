@@ -6,7 +6,7 @@ export function getSupabaseCookieOptions(): CookieOptions {
 
   const forcedDomain = String(process.env.SUPABASE_COOKIE_DOMAIN || '').trim()
   const cookieDomain = forcedDomain ? forcedDomain : undefined
-  const maxAgeSeconds = isProd ? 60 * 60 * 24 * 365 : 60 * 60 * 24 * 30
+  const maxAgeSeconds = 60 * 60 * 24 * 30
   const expiresAt = new Date(Date.now() + maxAgeSeconds * 1000)
 
   return {
