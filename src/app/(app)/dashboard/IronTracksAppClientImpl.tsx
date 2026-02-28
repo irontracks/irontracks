@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, useRef, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
@@ -970,10 +970,28 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (view === 'vip') setView('dashboard');
     }, [hideVipOnIos, view]);
 
+    const [, startViewTransition] = useTransition()
+
     const openVipView = useCallback(() => {
         if (hideVipOnIos) return;
-        setView('vip');
-    }, [hideVipOnIos]);
+        startViewTransition(() => setView('vip'));
+    }, [hideVipOnIos, startViewTransition]);
+
+    const handleOpenHistory = useCallback(() => {
+        startViewTransition(() => setView('history'));
+    }, [startViewTransition]);
+
+    const handleOpenChat = useCallback(() => {
+        startViewTransition(() => setView('chat'));
+    }, [startViewTransition]);
+
+    const handleOpenChatList = useCallback(() => {
+        startViewTransition(() => setView('chatList'));
+    }, [startViewTransition]);
+
+    const handleOpenGlobalChat = useCallback(() => {
+        startViewTransition(() => setView('globalChat'));
+    }, [startViewTransition]);
 
     const handleStartFromRestTimer = useCallback(
         (ctx?: unknown) => {
@@ -1053,7 +1071,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             <InAppNotificationsProvider
                 userId={user?.id || undefined}
                 settings={userSettingsApi?.settings ?? null}
-                onOpenMessages={() => setView('chat')}
+                onOpenMessages={handleOpenChat}
                 onOpenNotifications={handleOpenNotifications}
             >
                 <InAppNotifyBinder bind={bindInAppNotify} />
@@ -1204,9 +1222,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             })();
                                             openAdminPanel(tab);
                                         }}
-                                        onOpenChatList={() => setView('chatList')}
-                                        onOpenGlobalChat={() => setView('globalChat')}
-                                        onOpenHistory={() => setView('history')}
+                                        onOpenChatList={handleOpenChatList}
+                                        onOpenGlobalChat={handleOpenGlobalChat}
+                                        onOpenHistory={handleOpenHistory}
                                         onOpenNotifications={handleOpenNotifications}
                                         onOpenSchedule={() => router.push('/dashboard/schedule')}
                                         onOpenWallet={() => openVipView()}
@@ -1261,7 +1279,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                 onOpenVipTab={() => openVipView()}
                                                 onStartSession={(w: unknown) => handleStartSession(w)}
                                                 onOpenWizard={() => setCreateWizardOpen(true)}
-                                                onOpenHistory={() => setView('history')}
+                                                onOpenHistory={handleOpenHistory}
                                                 onOpenReport={(s: unknown) => {
                                                     setReportBackView('vip');
                                                     setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]);
@@ -1276,10 +1294,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onCreateWorkout={handleCreateWorkout}
                                     onQuickView={(w) => setQuickViewWorkout(w)}
                                     onStartSession={(w) => handleStartSession(w)}
-                                    onRestoreWorkout={(w) => handleRestoreWorkout(w)}
-                                    onShareWorkout={(w) => handleShareWorkout(w)}
-                                    onEditWorkout={(w) => handleEditWorkout(w)}
-                                    onDeleteWorkout={(id, title) => {
+                                    onRestoreWorkout={(w: any) => handleRestoreWorkout(w)}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    onShareWorkout={(w: any) => handleShareWorkout(w)}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    onEditWorkout={(w: any) => handleEditWorkout(w)}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                    onDeleteWorkout={(id: any, title: any) => {
                                         if (id) handleDeleteWorkout(id, String(title || ''))
                                     }}
                                     onBulkEditWorkouts={handleBulkEditWorkouts}
@@ -1579,7 +1600,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
                                         otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
                                         otherUserPhoto={directChat.other_user_photo ?? directChat.photoUrl ?? null}
-                                        onClose={() => setView('chatList')}
+                                        onClose={handleOpenChatList}
                                     />
                                 </div>
                             )}
