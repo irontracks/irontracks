@@ -25,21 +25,19 @@ function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: Muscl
   // Se o músculo não for treinado, ele fica transparente (não afeta a foto original).
   // Se for treinado, ele ganha a cor (ex: vermelho/laranja) e a cor se funde com os reflexos da foto.
 
-  // Como fallback, se não tiver cor (ยังไม่ได้รับการฝึกฝน), fica transparente para ver a foto limpa
-  const fillAlpha = m.color ? '0.8' : '0.0'
+  // Como fallback, se não tiver cor (ainda não treinado), fica transparente para ver a foto limpa
+  const fillAlpha = m.color ? '0.9' : '0.0'
   const fill = m.color || 'transparent'
 
   return {
     fill,
     fillOpacity: fillAlpha,
-    // Em uma implementação real com a foto no fundo, nós usaríamos mix-blend-mode no container pai,
-    // mas aqui no SVG podemos aplicar estilos também se necessário.
     stroke: 'transparent',
     strokeWidth: 0,
-    className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-90',
+    className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-100',
     style: {
-      mixBlendMode: 'color' as const, // Usa 'color' ou 'overlay' para tingir a imagem preservando brilhos e sombras
-      filter: isSelected ? 'drop-shadow(0 0 6px rgba(245,158,11,0.8)) blur(3px)' : 'blur(3px)', // Blur sutíl espalha a cor realisticamente
+      mixBlendMode: 'multiply' as const, // Multiply escurece preservando as sombras reais da imagem = Cores Fortes
+      filter: isSelected ? 'drop-shadow(0 0 6px rgba(245,158,11,0.8)) blur(3.5px)' : 'blur(3.5px)', // Blur suave para borda esfumaçada
     }
   }
 }
@@ -107,13 +105,8 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
               <path d="M82,70 C82,70 100,66 100,76 L100,132 C87,140 70,132 64,118 C58,104 64,86 82,70 Z" {...s('chest')} onClick={cl('chest')} />
               <path d="M118,70 C118,70 100,66 100,76 L100,132 C113,140 130,132 136,118 C142,104 136,86 118,70 Z" {...s('chest')} onClick={cl('chest')} />
 
-              {/* ─── ABS (Gomos individuais para maior realismo) ─── */}
-              <ellipse cx="91" cy="142" rx="9.5" ry="10" {...s('abs')} onClick={cl('abs')} />
-              <ellipse cx="91" cy="161" rx="9" ry="9" {...s('abs')} onClick={cl('abs')} />
-              <ellipse cx="91" cy="178" rx="8.5" ry="8" {...s('abs')} onClick={cl('abs')} />
-              <ellipse cx="109" cy="142" rx="9.5" ry="10" {...s('abs')} onClick={cl('abs')} />
-              <ellipse cx="109" cy="161" rx="9" ry="9" {...s('abs')} onClick={cl('abs')} />
-              <ellipse cx="109" cy="178" rx="8.5" ry="8" {...s('abs')} onClick={cl('abs')} />
+              {/* ─── ABS (Bloco unificado) ─── */}
+              <path d="M82,132 C92,138 108,138 118,132 L112,188 C104,192 96,192 88,188 Z" {...s('abs')} onClick={cl('abs')} />
 
               {/* ─── BICEPS ─── */}
               <path d="M19,126 C17,138 18,154 22,164 C26,172 36,174 42,168 C48,158 48,140 44,128 C40,118 24,118 19,126 Z" {...s('biceps')} onClick={cl('biceps')} />
