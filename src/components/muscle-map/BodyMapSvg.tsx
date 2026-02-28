@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import type { MuscleId } from '@/utils/muscleMapConfig'
 
 type MuscleState = {
@@ -17,57 +17,56 @@ type Props = {
   selected?: MuscleId | null
 }
 
-function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: MuscleId | null) {
+function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: MuscleId | null, showAll?: boolean) {
   const m = muscles?.[id] || {}
   const isSelected = selected === id
 
-  // No modo realista, o SVG atua como "MÁSCARA DE LUZ" sobre a foto 3D real de fundo (blend-mode: multiply).
-  // Se o músculo não for treinado, ele fica transparente (não afeta a foto original).
-  // Se for treinado, ele ganha a cor (ex: vermelho/laranja) e a cor se funde com os reflexos da foto.
+  let fillAlpha = m.color ? '0.9' : '0.0'
+  let fill = m.color || 'transparent'
 
-  // Como fallback, se não tiver cor (ainda não treinado), fica transparente para ver a foto limpa
-  const fillAlpha = m.color ? '0.9' : '0.0'
-  const fill = m.color || 'transparent'
+  if (showAll) {
+    fillAlpha = '0.5'
+    fill = m.color || '#ef4444' // red fallback to see the shapes
+  }
 
   return {
     fill,
     fillOpacity: fillAlpha,
-    stroke: 'transparent',
-    strokeWidth: 0,
+    stroke: showAll ? 'rgba(255,255,255,0.6)' : 'transparent',
+    strokeWidth: showAll ? 1 : 0,
     className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-100',
     style: {
-      mixBlendMode: 'multiply' as const, // Multiply escurece preservando as sombras reais da imagem = Cores Fortes
-      filter: isSelected ? 'drop-shadow(0 0 6px rgba(245,158,11,0.8)) blur(3.5px)' : 'blur(3.5px)', // Blur suave para borda esfumaçada
+      mixBlendMode: (showAll ? 'normal' : 'multiply') as React.CSSProperties['mixBlendMode'],
+      filter: isSelected && !showAll ? 'drop-shadow(0 0 6px rgba(245,158,11,0.8)) blur(3.5px)' : (showAll ? 'none' : 'blur(3.5px)'),
     }
   }
 }
 
 export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props) {
-  const s = (id: MuscleId) => ms(id, muscles, selected)
+  const [frontPos, setFrontPos] = useState({ x: 50, y: 55, s: 0.52 })
+  const [backPos, setBackPos] = useState({ x: 50, y: 55, s: 0.52 })
+  const [showAll, setShowAll] = useState(true) // Força todos os músculos a aparecerem para a calibração
+
+  const pos = view === 'front' ? frontPos : backPos;
+  const setPos = view === 'front' ? setFrontPos : setBackPos;
+
+  const s = (id: MuscleId) => ms(id, muscles, selected, showAll)
   const cl = (id: MuscleId) => () => onSelect?.(id)
 
   return (
-    <div className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 flex items-center justify-center p-4 min-h-[400px]">
+    <div className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 flex items-center justify-center p-4 min-h-[460px]">
 
       {/* 3D Realista Base - Camada Inferior */}
-      {/* A imagem original tem áreas em branco/transparente grandes, então centralizamos ela. */}
-      {/* Usamos a prop 'key' com o 'view' para forçar o React a recriar a imagem ao trocar de aba, 
-          evitando que o onError antigo mantenha ela oculta (display: none). */}
       <img
         key={view}
         src={view === 'front' ? '/body-front.png' : '/body-back.png'}
         alt={`Photorealistic Body Base ${view}`}
         className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-90"
-        style={{
-          objectPosition: 'center top'
-        }}
-        onError={(e) => {
-          e.currentTarget.style.display = 'none';
-        }}
+        style={{ objectPosition: 'center top' }}
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
       />
 
       {/* SVG Máscara - Camada Superior */}
-      {/* Ajustamos o viewBox para cobrir exatamente a proporção da imagem renderizada */}
       <svg
         viewBox="0 0 200 450"
         role="img"
@@ -85,12 +84,7 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
           </filter>
         </defs>
 
-        {/* 
-          Aplicamos um transform global G para escalar e mover o molde vetorial (os paths padrão)
-          para que ele encaixe em cima do boneco específico que foi anexado.
-          Ajustes mágicos: scale(0.65) e translate(X, Y) para alinhar perfeitamente sobre a foto.
-        */}
-        <g transform="translate(26, 20) scale(0.74)">
+        <g transform={`translate(${pos.x}, ${pos.y}) scale(${pos.s})`}>
           {view === 'front' ? (
             <>
               {/* ─── FRONT DELTOIDS ─── */}
@@ -161,6 +155,38 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
 
       {/* Luz global e brilho suave */}
       <div className="absolute inset-0 pointer-events-none rounded-2xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]" />
+
+      {/* PAINEL DE CALIBRAÇÃO TEMPORÁRIO */}
+      <div className="absolute top-2 left-2 right-2 bg-black/90 p-3 rounded-xl border border-white/20 z-50 text-white text-[10px] backdrop-blur-sm">
+        <div className="flex justify-between items-center mb-2">
+          <div className="font-bold text-yellow-500 text-xs">Calibração da Foto: {view.toUpperCase()}</div>
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 active:bg-neutral-700"
+          >
+            {showAll ? 'VISUAL FINAL' : 'MOSTRAR MOLDES'}
+          </button>
+        </div>
+
+        <div className="flex justify-between items-center mb-1">
+          <label className="w-8">Eixo X</label>
+          <input type="range" min="-50" max="150" value={pos.x} onChange={e => setPos({ ...pos, x: Number(e.target.value) })} className="flex-1 ml-2" />
+          <span className="w-6 text-right ml-1">{pos.x}</span>
+        </div>
+
+        <div className="flex justify-between items-center mb-1">
+          <label className="w-8">Eixo Y</label>
+          <input type="range" min="-50" max="150" value={pos.y} onChange={e => setPos({ ...pos, y: Number(e.target.value) })} className="flex-1 ml-2" />
+          <span className="w-6 text-right ml-1">{pos.y}</span>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <label className="w-8">Escala</label>
+          <input type="range" min="0.3" max="1.5" step="0.01" value={pos.s} onChange={e => setPos({ ...pos, s: Number(e.target.value) })} className="flex-1 ml-2" />
+          <span className="w-6 text-right ml-1">{pos.s}</span>
+        </div>
+      </div>
+
     </div>
   )
 }
