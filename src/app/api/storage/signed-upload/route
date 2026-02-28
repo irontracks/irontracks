@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { canUploadToChatMediaPath, isSafeStoragePath, requireUser } from '@/utils/auth/route'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -16,6 +17,10 @@ export async function POST(request: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+
+    const ip = getRequestIp(request)
+    const rl = await checkRateLimitAsync(`storage:upload:${auth.user.id}:${ip}`, 20, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const admin = createAdminClient()
     const parsedBody = await parseJsonBody(request, BodySchema)

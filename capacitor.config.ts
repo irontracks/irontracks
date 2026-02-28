@@ -7,7 +7,6 @@ const config: CapacitorConfig = {
   server: {
     // URL de produção. Cookies de sessão Supabase ficam neste domínio.
     url: 'https://irontracks.com.br',
-    cleartext: true
   }
 };
 

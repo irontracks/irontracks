@@ -28,7 +28,20 @@ const LoginScreen = () => {
     const router = useRouter();
     useNativeAppSetup(null)
     const appVersionLabel = useMemo(() => 'v1..0', []);
-    const [isLoading, setIsLoading] = useState(false);
+    // Lazy initializer: verifica localStorage SINCRONAMENTE no primeiro render.
+    // Se houver backup de sessão (iOS cookie wipe), começa já com isLoading=true
+    // para exibir o LoadingScreen antes de qualquer frame de login — elimina o flash.
+    const [isLoading, setIsLoading] = useState(() => {
+        if (typeof window === 'undefined') return false
+        try {
+            const raw = localStorage.getItem('it.session.backup')
+            if (raw) {
+                const backup = JSON.parse(raw) as Record<string, unknown>
+                return !!(backup?.access_token && backup?.refresh_token)
+            }
+        } catch {}
+        return false
+    });
     const [errorMsg, setErrorMsg] = useState('');
     const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0);
     const [cooldownTick, setCooldownTick] = useState(0);
