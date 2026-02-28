@@ -250,6 +250,7 @@ export function useGuidedTour({
             markTourAutoOpenedThisSession(uid)
             markTourSeenEver(uid)
             await logTourEvent('tour_started', { auto: true, version: TOUR_VERSION })
+            if (cancelled) return
             setTourOpen(true)
           }
         } catch {

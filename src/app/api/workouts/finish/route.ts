@@ -10,6 +10,7 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { safeRecord } from '@/utils/guards'
 import { cacheSetNx, cacheDeletePattern } from '@/utils/cache'
 import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } from '@/utils/report/reportMetrics'
+import { logWarn } from '@/lib/logger'
 
 const parseTrainingNumberOrZero = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(String(v || '').replace(',', '.'))
@@ -242,7 +243,7 @@ export async function POST(request: Request) {
     let idempotent = false
 
     if (idempotencyKey) {
-      const isFirst = await cacheSetNx(`workouts:finish:v2:lock:${idempotencyKey}`, '1', 300)
+      const isFirst = await cacheSetNx(`workouts:finish:v2:lock:${idempotencyKey}`, '1', 30)
       if (!isFirst) {
         // Bloqueado pelo Redis. Alguém já está salvando ou salvou recentemente.
         try {
@@ -302,7 +303,7 @@ export async function POST(request: Request) {
 
     try {
       await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)
-    } catch { }
+    } catch (e) { logWarn('workouts/finish', 'Failed to delete active_workout_sessions', e) }
 
     try {
       const admin = createAdminClient()
@@ -494,7 +495,7 @@ export async function POST(request: Request) {
         cacheDeletePattern(`workouts:history:${user.id}:*`),
         cacheDeletePattern(`dashboard:bootstrap:${user.id}`),
       ])
-    } catch { }
+    } catch (e) { logWarn('workouts/finish', 'Failed to invalidate caches after workout finish', e) }
 
     try {
       const admin = createAdminClient()

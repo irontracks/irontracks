@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { cacheDelete } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,6 +102,12 @@ export async function POST() {
         })
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     }
+
+    // Invalidate VIP caches so the user sees the new status immediately
+    await Promise.all([
+      cacheDelete(`vip:access:${user.id}`).catch(() => {}),
+      cacheDelete(`dashboard:bootstrap:${user.id}`).catch(() => {}),
+    ])
 
     return NextResponse.json({ ok: true, planId: productId, expiresDate })
   } catch (e: unknown) {

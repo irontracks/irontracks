@@ -27,6 +27,25 @@ export async function POST(req: Request) {
     if (parsedBody.response) return parsedBody.response
     const { channel_id, content } = parsedBody.data!
 
+    // Verify the user is a member of this channel before allowing send
+    const { data: membership } = await supabase
+      .from('chat_members')
+      .select('id')
+      .eq('channel_id', channel_id)
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (!membership?.id) {
+      // Fallback: check if this is the global channel (no membership required)
+      const { data: channel } = await supabase
+        .from('chat_channels')
+        .select('type')
+        .eq('id', channel_id)
+        .maybeSingle()
+      if (String(channel?.type || '') !== 'global') {
+        return NextResponse.json({ ok: false, error: 'not_member' }, { status: 403 })
+      }
+    }
+
     const { data, error } = await supabase
       .from('messages')
       .insert({ channel_id, user_id: user.id, content })

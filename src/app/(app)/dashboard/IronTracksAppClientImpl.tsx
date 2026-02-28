@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense, useRef, useTransition } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
@@ -81,12 +81,12 @@ import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useNativeDeepLinks } from '@/hooks/useNativeDeepLinks'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { onNativeNotificationAction } from '@/utils/native/irontracksNative'
-import { isIosNative } from '@/utils/platform'
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
 import { useSignOut } from '@/hooks/useSignOut'
+import { useViewNavigation } from '@/hooks/useViewNavigation'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useWorkoutExport } from '@/hooks/useWorkoutExport'
 import { useWorkoutCrud } from '@/hooks/useWorkoutCrud'
@@ -105,7 +105,8 @@ import {
     PendingUpdate,
     Workout,
     Exercise,
-    UserRecord
+    UserRecord,
+    TourState
 } from '@/types/app';
 import type { AdminUser } from '@/types/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -963,35 +964,28 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
     }, [view, activeSession?.id]);
 
-    const hideVipOnIos = isIosNative();
+    const {
+        hideVipOnIos,
+        openVipView,
+        handleOpenHistory,
+        handleOpenChat,
+        handleOpenChatList,
+        handleOpenGlobalChat,
+        handleOpenNotifications,
+        handleOpenTour,
+    } = useViewNavigation({
+        setView,
+        setShowNotifCenter,
+        setHasUnreadNotification,
+        setTourOpen,
+        logTourEvent,
+        tourVersion: TOUR_VERSION,
+    })
 
     useEffect(() => {
         if (!hideVipOnIos) return;
         if (view === 'vip') setView('dashboard');
     }, [hideVipOnIos, view]);
-
-    const [, startViewTransition] = useTransition()
-
-    const openVipView = useCallback(() => {
-        if (hideVipOnIos) return;
-        startViewTransition(() => setView('vip'));
-    }, [hideVipOnIos, startViewTransition]);
-
-    const handleOpenHistory = useCallback(() => {
-        startViewTransition(() => setView('history'));
-    }, [startViewTransition]);
-
-    const handleOpenChat = useCallback(() => {
-        startViewTransition(() => setView('chat'));
-    }, [startViewTransition]);
-
-    const handleOpenChatList = useCallback(() => {
-        startViewTransition(() => setView('chatList'));
-    }, [startViewTransition]);
-
-    const handleOpenGlobalChat = useCallback(() => {
-        startViewTransition(() => setView('globalChat'));
-    }, [startViewTransition]);
 
     const handleStartFromRestTimer = useCallback(
         (ctx?: unknown) => {
@@ -1034,18 +1028,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         },
         [activeSession?.logs, handleCloseTimer, handleUpdateSessionLog, setActiveSession]
     )
-
-    const handleOpenNotifications = useCallback(() => {
-        setShowNotifCenter(true);
-        setHasUnreadNotification(false);
-    }, []);
-
-    const handleOpenTour = useCallback(async () => {
-        try {
-            await logTourEvent('tour_started', { auto: false, version: TOUR_VERSION })
-        } catch { }
-        setTourOpen(true)
-    }, [logTourEvent, TOUR_VERSION]);
 
     if (authLoading) return <LoadingScreen />;
     if (!user?.id) return <LoadingScreen />;
@@ -1098,7 +1080,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             }}
                             onComplete={async () => {
                                 setTourOpen(false)
-                                setTourBoot((prev) => ({ ...prev, completed: true, skipped: false }))
+                                setTourBoot((prev: TourState) => ({ ...prev, completed: true, skipped: false }))
                                 try { writeLocalTourDismissal(user?.id, 'completed') } catch { }
                                 const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
                                 if (!res?.ok) {
@@ -1108,7 +1090,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             }}
                             onSkip={async () => {
                                 setTourOpen(false)
-                                setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
+                                setTourBoot((prev: TourState) => ({ ...prev, completed: false, skipped: true }))
                                 try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
                                 const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
                                 if (!res?.ok) {
@@ -1118,7 +1100,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             }}
                             onCancel={async () => {
                                 setTourOpen(false)
-                                setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
+                                setTourBoot((prev: TourState) => ({ ...prev, completed: false, skipped: true }))
                                 try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
                                 const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
                                 if (!res?.ok) {

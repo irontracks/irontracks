@@ -4,6 +4,8 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logWarn } from '@/lib/logger'
+import { cacheDelete } from '@/utils/cache'
 
 const GrantSchema = z
   .object({
@@ -92,8 +94,12 @@ export async function POST(req: Request) {
               entity_id: userId,
               metadata: { plan_id: g.plan_id, days: g.days, valid_until: new Date(nextValidUntilMs).toISOString(), email: email || null, action: 'extended' },
             })
-          } catch {}
+          } catch (e) { logWarn('admin/vip/grant-trial', 'Failed to write audit_events (extended)', e) }
           updated += 1
+          await Promise.all([
+            cacheDelete(`vip:access:${userId}`).catch(() => {}),
+            cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => {}),
+          ])
           results.push({ ok: true, action: 'extended', user_id: userId, email: email || null, plan_id: g.plan_id, days: g.days, valid_until: new Date(nextValidUntilMs).toISOString() })
           continue
         }
@@ -126,8 +132,12 @@ export async function POST(req: Request) {
             entity_id: userId,
             metadata: { plan_id: g.plan_id, days: g.days, valid_until: validUntil, email: email || null, action: 'created' },
           })
-        } catch {}
+        } catch (e) { logWarn('admin/vip/grant-trial', 'Failed to write audit_events (created)', e) }
         created += 1
+        await Promise.all([
+          cacheDelete(`vip:access:${userId}`).catch(() => {}),
+          cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => {}),
+        ])
         results.push({ ok: true, action: 'created', user_id: userId, email: email || null, plan_id: g.plan_id, days: g.days, valid_until: validUntil })
       } catch (e: unknown) {
         results.push({ ok: false, error: getErrorMessage(e) || String(e), user_id: g.user_id || null, email: g.email || null, plan_id: g.plan_id, days: g.days })

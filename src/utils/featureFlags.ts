@@ -21,7 +21,19 @@ export const isKillSwitchOn = (settings: unknown): boolean => {
   return s.featuresKillSwitch === true
 }
 
-export const isFeatureEnabled = (settings: unknown, key: string): boolean => {
+/**
+ * Check if a feature is enabled. Accepts either:
+ * - user settings (legacy, per-user flags)
+ * - global flags from /api/feature-flags (DB-backed)
+ * Global flags take precedence when provided.
+ */
+export const isFeatureEnabled = (settings: unknown, key: string, globalFlags?: unknown): boolean => {
+  // Global DB flags take precedence
+  if (isObject(globalFlags) && key in globalFlags) {
+    if (globalFlags.featuresKillSwitch === true) return false
+    return globalFlags[key] === true
+  }
+  // Fallback to user settings
   if (isKillSwitchOn(settings)) return false
   const s = isObject(settings) ? settings : ({} as UnknownRecord)
   return s[key] === true

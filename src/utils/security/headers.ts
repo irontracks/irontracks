@@ -20,6 +20,7 @@ export const buildCspHeader = (nonce: string, isDev: boolean) => {
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
+    `worker-src 'self' blob:`,
   ].join('; ')
 }
 
