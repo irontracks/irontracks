@@ -40,6 +40,7 @@ type IronTracksNativePlugin = {
   getHealthSteps: () => Promise<{ steps: number }>
   // Photos
   saveImageToPhotos: (opts: { base64: string }) => Promise<{ saved: boolean; error: string }>
+  saveFileToPhotos: (opts: { path: string; isVideo: boolean }) => Promise<{ saved: boolean; error: string }>
 }
 
 export type HapticStyle =
@@ -74,6 +75,7 @@ const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
     saveWorkoutToHealth: async () => ({ saved: false, error: 'Not available on web' }),
     getHealthSteps: async () => ({ steps: 0 }),
     saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
+    saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   },
 })
 
@@ -366,5 +368,49 @@ export const saveImageToPhotos = async (base64: string) => {
     return await Native.saveImageToPhotos({ base64 })
   } catch {
     return { saved: false, error: 'Save failed' }
+  }
+}
+
+/** Write a Blob to a temp file via Capacitor Filesystem and save to camera roll.
+ *  Avoids base64 round-trip through JS — significantly faster for large files. */
+export const saveBlobToPhotos = async (blob: Blob, filename: string, isVideo: boolean): Promise<{ saved: boolean; error: string }> => {
+  try {
+    if (!isIosNative()) return { saved: false, error: 'Not iOS native' }
+
+    const { Filesystem, Directory } = await import('@capacitor/filesystem')
+
+    // Convert Blob → base64 in chunks via ArrayBuffer (faster than FileReader for the FS write)
+    const buffer = await blob.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    const chunkSize = 8192
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
+    }
+    const base64Data = btoa(binary)
+
+    // Write to Cache directory (auto-cleaned by iOS)
+    const tempPath = `irontracks_temp_${Date.now()}_${filename}`
+    const writeResult = await Filesystem.writeFile({
+      path: tempPath,
+      data: base64Data,
+      directory: Directory.Cache,
+    })
+
+    // Extract the native file path from the URI
+    let nativePath = writeResult.uri
+    if (nativePath.startsWith('file://')) {
+      nativePath = nativePath.replace('file://', '')
+    }
+
+    // Call native Swift to save from file path (no JS base64 bridge overhead)
+    const result = await Native.saveFileToPhotos({ path: nativePath, isVideo })
+
+    // Cleanup temp file (Swift also cleans up, but belt-and-suspenders)
+    try { await Filesystem.deleteFile({ path: tempPath, directory: Directory.Cache }) } catch { /* already deleted by Swift */ }
+
+    return result
+  } catch {
+    return { saved: false, error: 'Save via file failed' }
   }
 }

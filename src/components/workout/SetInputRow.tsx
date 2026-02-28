@@ -36,7 +36,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
   const done = !!log.done;
   const plannedReps = String(plannedSet?.reps ?? ex?.reps ?? '').trim();
   const plannedRpe = String(plannedSet?.rpe ?? ex?.rpe ?? '').trim();
-  
+
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
   const suggestion: DeloadEntrySuggestion | null = isObject(suggestionValue) ? (suggestionValue as DeloadEntrySuggestion) : null;
@@ -69,6 +69,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
           <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
           <button
             type="button"
+            aria-label={isNotesOpen ? 'Fechar observações' : 'Abrir observações da série'}
             onClick={() => toggleNotes(key)}
             className={
               isNotesOpen || hasNotes
@@ -83,6 +84,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-[6rem_6rem_6rem_auto] sm:items-center">
           <input
             inputMode="decimal"
+            aria-label={`Peso em kg para série ${setIdx + 1}`}
             value={weightValue}
             onChange={(e) => {
               const v = e?.target?.value ?? '';
@@ -94,6 +96,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
           <div className="relative">
             <input
               inputMode="decimal"
+              aria-label={`Repetições para série ${setIdx + 1}`}
               value={repsValue}
               onChange={(e) => {
                 const v = e?.target?.value ?? '';
@@ -111,6 +114,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
           <div className="relative">
             <input
               inputMode="decimal"
+              aria-label={`RPE percebido para série ${setIdx + 1}`}
               value={rpeValue}
               onChange={(e) => {
                 const v = e?.target?.value ?? '';

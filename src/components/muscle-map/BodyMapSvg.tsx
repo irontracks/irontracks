@@ -15,6 +15,8 @@ type Props = {
   muscles: Record<string, MuscleState>
   onSelect?: (muscleId: MuscleId) => void
   selected?: MuscleId | null
+  /** Only show the calibration overlay when this is true (admin/dev only) */
+  calibrationMode?: boolean
 }
 
 function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: MuscleId | null, showAll?: boolean, intensity: number = 0.9) {
@@ -84,7 +86,7 @@ const defaultOffsetsBack: ViewOffsets = {
   calves_rear_r: { x: 0, y: 0, s: 1, r: 0 },
 };
 
-export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props) {
+export default function BodyMapSvg({ view, muscles, onSelect, selected, calibrationMode = false }: Props) {
   const [frontOffsets, setFrontOffsets] = useState<ViewOffsets>(defaultOffsetsFront)
   const [backOffsets, setBackOffsets] = useState<ViewOffsets>(defaultOffsetsBack)
   const [intensity, setIntensity] = useState(0.9)
@@ -287,18 +289,20 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
 
       <div className="absolute inset-0 pointer-events-none rounded-2xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]" />
 
-      {/* Renders overlay outside the relative bounds for desktop layout */}
-      <CalibrationOverlay
-        offsets={offsets}
-        setOffsets={setOffsets}
-        intensity={intensity}
-        setIntensity={setIntensity}
-        view={view}
-        showAll={showAll}
-        setShowAll={setShowAll}
-        editingMuscle={editingMuscle}
-        setEditingMuscle={setEditingMuscle}
-      />
+      {/* Calibration overlay — only visible for admins/devs when calibrationMode=true */}
+      {calibrationMode && (
+        <CalibrationOverlay
+          offsets={offsets}
+          setOffsets={setOffsets}
+          intensity={intensity}
+          setIntensity={setIntensity}
+          view={view}
+          showAll={showAll}
+          setShowAll={setShowAll}
+          editingMuscle={editingMuscle}
+          setEditingMuscle={setEditingMuscle}
+        />
+      )}
     </div>
   )
 }

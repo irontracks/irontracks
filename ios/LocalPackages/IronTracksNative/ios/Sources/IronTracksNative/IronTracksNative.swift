@@ -52,6 +52,7 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getHealthSteps", returnType: CAPPluginReturnPromise),
         // Photos
         CAPPluginMethod(name: "saveImageToPhotos", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "saveFileToPhotos", returnType: CAPPluginReturnPromise),
     ]
 
     // MARK: - State
@@ -855,6 +856,50 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
                 PHPhotoLibrary.shared().performChanges({
                     PHAssetChangeRequest.creationRequestForAsset(from: image)
                 }) { success, error in
+                    if success {
+                        call.resolve(["saved": true, "error": ""])
+                    } else {
+                        call.resolve(["saved": false, "error": error?.localizedDescription ?? "Falha ao salvar"])
+                    }
+                }
+            case .denied, .restricted:
+                call.resolve(["saved": false, "error": "permissionDenied"])
+            default:
+                call.resolve(["saved": false, "error": "Permissão não concedida"])
+            }
+        }
+    }
+
+    // MARK: - Save File to Photos (file path — no base64 overhead)
+
+    @objc func saveFileToPhotos(_ call: CAPPluginCall) {
+        guard let path = call.getString("path") else {
+            call.resolve(["saved": false, "error": "Caminho do arquivo não informado"])
+            return
+        }
+        let isVideo = call.getBool("isVideo") ?? false
+        let fileURL = URL(fileURLWithPath: path)
+
+        guard FileManager.default.fileExists(atPath: path) else {
+            call.resolve(["saved": false, "error": "Arquivo não encontrado: \(path)"])
+            return
+        }
+
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            switch status {
+            case .authorized, .limited:
+                PHPhotoLibrary.shared().performChanges({
+                    if isVideo {
+                        PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
+                    } else {
+                        guard let image = UIImage(contentsOfFile: path) else {
+                            return
+                        }
+                        PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    }
+                }) { success, error in
+                    // Clean up temp file
+                    try? FileManager.default.removeItem(at: fileURL)
                     if success {
                         call.resolve(["saved": true, "error": ""])
                     } else {
