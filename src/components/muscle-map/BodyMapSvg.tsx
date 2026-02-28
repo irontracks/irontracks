@@ -268,7 +268,7 @@ function CalibrationOverlay({
 
   if (isMinimized) {
     return (
-      <div className="absolute top-2 left-2 bg-black/90 p-2 rounded-xl border border-white/20 z-50 text-white text-[10px] backdrop-blur-sm cursor-pointer" onClick={() => setIsMinimized(false)}>
+      <div className="absolute bottom-2 left-2 bg-black/90 p-2 rounded-xl border border-white/20 z-[60] text-white text-[10px] backdrop-blur-sm cursor-pointer" onClick={() => setIsMinimized(false)}>
         🔧 Expandir
       </div>
     )
@@ -288,7 +288,7 @@ function CalibrationOverlay({
   }
 
   return (
-    <div className="absolute top-2 left-2 right-2 bg-black/90 p-3 rounded-xl border border-white/20 z-50 text-white text-[10px] backdrop-blur-sm shadow-xl flex flex-col gap-2">
+    <div className="absolute bottom-2 left-2 right-2 bg-black/90 p-3 rounded-xl border border-white/20 z-[60] text-white text-[10px] backdrop-blur-sm shadow-xl flex flex-col gap-2">
       <div className="flex justify-between items-center border-b border-white/10 pb-1">
         <div className="font-bold text-yellow-500 text-xs">Calibração: {view.toUpperCase()}</div>
         <div className="flex gap-1">
