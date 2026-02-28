@@ -97,29 +97,17 @@ export async function GET() {
     // Isso corta o tempo de resposta de ~1500ms (Postgres) para ~35ms (Redis).
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (isRecord(v) ? v : null))
     if (cached) {
-      return NextResponse.json(cached, { headers: { 'cache-control': 'public, max-age=60, s-maxage=60' } })
+      return NextResponse.json(cached, { headers: { 'cache-control': 'private, no-store' } })
     }
 
     // Se nâo tiver cache, vamos para o banco pesado (Supabase)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, display_name, photo_url, role')
-      .eq('id', user.id)
-      .maybeSingle()
+    // Profile e workouts(templates) são independentes — rodam em paralelo
+    const [{ data: profile }, templateResult] = await Promise.all([
+      supabase.from('profiles').select('id, display_name, photo_url, role').eq('id', user.id).maybeSingle(),
+      (async () => { try { return await supabase.from('workouts').select('*').eq('is_template', true).eq('user_id', user.id).order('name', { ascending: true }).limit(500) } catch { return { data: null } } })(),
+    ])
 
-    let workouts: unknown[] = []
-    try {
-      const { data } = await supabase
-        .from('workouts')
-        .select('*')
-        .eq('is_template', true)
-        .eq('user_id', user.id)
-        .order('name', { ascending: true })
-        .limit(500)
-      workouts = Array.isArray(data) ? data : []
-    } catch {
-      workouts = []
-    }
+    let workouts: unknown[] = Array.isArray(templateResult.data) ? templateResult.data : []
 
     if (!workouts.length) {
       try {
@@ -167,7 +155,7 @@ export async function GET() {
     // TTL de 5 minutos. Ele é apagado ativamente quando o usuário finaliza um treino (em workouts/finish).
     await cacheSet(cacheKey, payload, 300)
 
-    return NextResponse.json(payload, { headers: { 'cache-control': 'public, max-age=60, s-maxage=60' } })
+    return NextResponse.json(payload, { headers: { 'cache-control': 'private, no-store' } })
   } catch (e: unknown) {
     return errorResponse(e)
   }
