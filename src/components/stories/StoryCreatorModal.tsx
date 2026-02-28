@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent } from 'react';
-import { X, Type, Smile, Scissors, Sparkles, Send, Loader2, Play, Pause, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Type, Smile, Scissors, Sparkles, Send, Loader2, Play, Pause, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { VideoCompositor } from '@/lib/video/VideoCompositor';
@@ -426,17 +426,23 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
             <div className="flex-1 relative flex items-center justify-center bg-neutral-900 overflow-hidden" ref={containerRef}>
                 {step === 'picker' ? (
                     <div className="text-center p-8">
-                        <div className="w-20 h-20 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                            <Sparkles className="text-yellow-500" size={40} />
+                        <div className="relative w-24 h-24 mx-auto mb-5">
+                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 rounded-full opacity-30 blur-xl animate-pulse" />
+                            <div className="relative w-24 h-24 bg-gradient-to-br from-yellow-500/20 to-amber-500/10 rounded-full flex items-center justify-center border border-yellow-500/30">
+                                <Crown className="text-yellow-500" size={40} strokeWidth={1.5} />
+                            </div>
                         </div>
-                        <h3 className="text-white font-bold text-xl mb-2">Criar Story</h3>
-                        <p className="text-neutral-400 text-sm mb-6">Compartilhe seu treino, refeição ou progresso.</p>
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="bg-yellow-500 text-black font-bold py-3 px-8 rounded-full hover:bg-yellow-400 transition-transform active:scale-95"
-                        >
-                            Escolher Mídia
-                        </button>
+                        <h3 className="font-black text-2xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500 mb-2">Criar Story</h3>
+                        <p className="text-neutral-400 text-sm mb-8">Compartilhe seu treino, refeição ou progresso.</p>
+                        <div className="relative group inline-block">
+                            <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-full opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="relative bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 hover:from-yellow-400 hover:via-amber-300 hover:to-yellow-400 text-black font-black py-3.5 px-10 rounded-full transition-all active:scale-95 uppercase tracking-wider text-sm"
+                            >
+                                Escolher Mídia
+                            </button>
+                        </div>
                         <input
                             type="file"
                             ref={fileInputRef}
@@ -717,21 +723,42 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
 
             {/* Bottom Bar */}
             {step === 'editor' && (
-                <div className="p-4 bg-black border-t border-neutral-900 flex justify-between items-center z-50">
-                    <button onClick={() => setStep('picker')} className="text-white text-sm font-medium">
-                        Cancelar
-                    </button>
+                <div className="p-4 bg-black/90 backdrop-blur-md border-t border-yellow-500/10 flex flex-col gap-3 z-50">
                     {compressionError ? (
                         <div className="text-xs text-red-400 font-semibold text-center px-3">{compressionError}</div>
                     ) : null}
-                    <button
-                        onClick={handlePost}
-                        disabled={posting || compressionRunning}
-                        className="bg-yellow-500 text-black font-bold py-3 px-6 rounded-full flex items-center gap-2 hover:bg-yellow-400 active:scale-95 disabled:opacity-50"
-                    >
-                        {posting || compressionRunning ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-                        <span>{compressionRunning ? `Comprimindo ${Math.round(compressionProgress * 100)}%` : 'Seu Story'}</span>
-                    </button>
+
+                    {/* Progress bar during compression/posting */}
+                    {(posting || compressionRunning) && (
+                        <div className="space-y-1.5" role="progressbar" aria-valuenow={Math.round(compressionProgress * 100)} aria-valuemin={0} aria-valuemax={100}>
+                            <div className="w-full bg-neutral-800/80 rounded-full h-2 overflow-hidden border border-neutral-700/50">
+                                <div
+                                    className="bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 h-2 rounded-full transition-all duration-300 ease-out"
+                                    style={{ width: `${Math.round(compressionProgress * 100)}%` }}
+                                />
+                            </div>
+                            <p className="text-[10px] text-yellow-500/70 text-center font-mono font-bold">
+                                {compressionRunning ? `Processando ${Math.round(compressionProgress * 100)}%` : 'Enviando...'}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center">
+                        <button onClick={() => setStep('picker')} className="text-neutral-400 text-sm font-bold hover:text-white transition-colors min-h-[44px] px-2">
+                            Cancelar
+                        </button>
+                        <div className="relative group">
+                            <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-full opacity-50 group-hover:opacity-100 blur-sm transition-opacity" />
+                            <button
+                                onClick={handlePost}
+                                disabled={posting || compressionRunning}
+                                className="relative bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 hover:from-yellow-400 hover:via-amber-300 hover:to-yellow-400 text-black font-black py-3 px-7 rounded-full flex items-center gap-2.5 active:scale-95 disabled:opacity-50 transition-all uppercase tracking-wider text-sm"
+                            >
+                                {posting || compressionRunning ? <Loader2 className="animate-spin" size={18} /> : <Crown size={18} strokeWidth={2.5} />}
+                                <span>{compressionRunning ? 'Processando...' : posting ? 'Enviando...' : 'Postar Story'}</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

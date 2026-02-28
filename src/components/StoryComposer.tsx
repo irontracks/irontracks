@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
-import { Share2, X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors, Loader2 } from 'lucide-react'
+import { X, Upload, Layout, Move, Info, AlertCircle, CheckCircle2, RotateCcw, Scissors, Loader2, Download, Crown } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -1309,17 +1309,17 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center sm:p-4"
+          className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center sm:p-4 pt-safe pb-safe"
         >
           {/* Mobile Header / Close */}
-          <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-transparent border-b border-neutral-800/50">
-            <div className="text-white min-w-0 flex-1 mr-4">
-              <h3 className="font-bold text-lg truncate leading-tight">{metrics.title || 'Story Composer'}</h3>
-              <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
+          <div className="flex-none px-4 pb-4 pt-14 flex justify-between items-start w-full max-w-md mx-auto sm:hidden bg-gradient-to-b from-black/60 to-transparent border-b border-yellow-500/10">
+            <div className="min-w-0 flex-1 mr-4">
+              <h3 className="font-black text-lg truncate leading-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">{metrics.title || 'Story Composer'}</h3>
+              <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">COMPARTILHE SUA CONQUISTA</p>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none"
+              className="w-8 h-8 rounded-full bg-neutral-800/80 border border-neutral-700/50 text-neutral-400 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none"
             >
               <X size={16} />
             </button>
@@ -1332,14 +1332,14 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             className="w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-5xl bg-black sm:bg-neutral-900 sm:border border-neutral-800 sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Desktop Header */}
-            <div className="hidden sm:flex px-6 py-5 border-b border-neutral-800 items-center justify-between flex-none bg-neutral-900">
+            <div className="hidden sm:flex px-6 py-5 border-b border-yellow-500/10 items-center justify-between flex-none bg-gradient-to-r from-neutral-900 via-neutral-900 to-neutral-900">
               <div>
-                <h2 className="font-bold text-white text-xl">{metrics.title || 'Story Composer'}</h2>
-                <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mt-1">COMPARTILHE SUA CONQUISTA</p>
+                <h2 className="font-black text-xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">{metrics.title || 'Story Composer'}</h2>
+                <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">COMPARTILHE SUA CONQUISTA</p>
               </div>
               <button
                 onClick={onClose}
-                className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"
               >
                 <X size={18} />
               </button>
@@ -1586,47 +1586,62 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
                   {/* Actions */}
                   <div className="space-y-3 pt-2">
-                    <button
-                      onClick={postToIronTracks}
-                      disabled={busy}
-                      aria-label="Postar story no IronTracks"
-                      aria-busy={busyAction === 'post'}
-                      className="h-14 w-full rounded-xl bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-yellow-500/10 transition-all active:scale-[0.98]"
-                    >
-                      {busyAction === 'post' ? (
-                        <>
-                          <Loader2 className="animate-spin" size={18} />
-                          {busySubAction === 'processing' ? 'A PROCESSAR VÍDEO...' : 'A ENVIAR...'}
-                        </>
-                      ) : 'POSTAR NO IRONTRACKS'}
-                    </button>
+                    {/* Primary: Post */}
+                    <div className="relative group">
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-600 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-opacity" />
+                      <button
+                        onClick={postToIronTracks}
+                        disabled={busy}
+                        aria-label="Postar story no IronTracks"
+                        aria-busy={busyAction === 'post'}
+                        className="relative h-14 w-full rounded-2xl bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 hover:from-yellow-400 hover:via-amber-300 hover:to-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed text-black font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 transition-all active:scale-[0.97]"
+                      >
+                        {busyAction === 'post' ? (
+                          <>
+                            <Loader2 className="animate-spin" size={18} />
+                            <span>{busySubAction === 'processing' ? 'PROCESSANDO...' : 'ENVIANDO...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Crown size={18} strokeWidth={2.5} />
+                            <span>POSTAR NO IRONTRACKS</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
+                    {/* Upload progress bar */}
                     {busyAction === 'post' && busySubAction === 'uploading' && (
-                      <div className="space-y-1" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do upload">
-                        <div className="w-full bg-neutral-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="space-y-1.5" role="progressbar" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100} aria-label="Progresso do upload">
+                        <div className="w-full bg-neutral-800/80 rounded-full h-2 overflow-hidden border border-neutral-700/50">
                           <div
-                            className="bg-yellow-500 h-1.5 rounded-full transition-all duration-300 ease-out"
+                            className="bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 h-2 rounded-full transition-all duration-300 ease-out"
                             style={{ width: `${uploadProgress}%` }}
                           />
                         </div>
-                        <p className="text-[10px] text-neutral-500 text-right font-mono">{uploadProgress}%</p>
+                        <p className="text-[10px] text-yellow-500/70 text-right font-mono font-bold">{uploadProgress}%</p>
                       </div>
                     )}
 
+                    {/* Secondary: Download / Share */}
                     <button
                       onClick={shareImage}
                       disabled={busy}
-                      className="h-12 w-full rounded-xl bg-transparent hover:bg-neutral-900 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-400 font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 border border-transparent hover:border-neutral-800 transition-all active:scale-[0.98]"
+                      className="relative h-12 w-full rounded-xl bg-neutral-900/80 hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed text-neutral-300 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border border-neutral-700/50 hover:border-yellow-500/30 transition-all active:scale-[0.97] overflow-hidden"
                     >
                       {busyAction === 'share' ? (
                         <>
-                          <Loader2 className="animate-spin" size={14} />
-                          {busySubAction === 'processing' ? 'A PROCESSAR...' : 'A GUARDAR...'}
+                          {/* Progress bar background inside button */}
+                          <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/10 via-amber-500/15 to-yellow-500/10 transition-all duration-300" />
+                          <div className="relative flex items-center gap-2">
+                            <Loader2 className="animate-spin text-yellow-500" size={16} />
+                            <span className="text-yellow-500">{busySubAction === 'processing' ? 'PROCESSANDO...' : 'SALVANDO...'}</span>
+                          </div>
                         </>
                       ) : (
                         <>
-                          <Share2 size={14} />
-                          BAIXAR / COMPARTILHAR
+                          <Download size={15} className="text-yellow-500/70" />
+                          <span>BAIXAR / COMPARTILHAR</span>
                         </>
                       )}
                     </button>
