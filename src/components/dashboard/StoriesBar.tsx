@@ -92,14 +92,14 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       const createResp = await fetch(createUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ 
-          mediaPath: path, 
+        body: JSON.stringify({
+          mediaPath: path,
           media_path: path,
-          caption: null, 
-          meta: { 
+          caption: null,
+          meta: {
             source: 'upload',
             ...metadata // Pass filters/trim info to DB
-          } 
+          }
         }),
       })
       const createJson = await createResp.json().catch((): null => null)
@@ -121,17 +121,22 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
   }
 
   useEffect(() => {
-    reload()
+    // 🔥 FRONTEND CACHE AVOIDANCE
+    // Impede o stories de recarregar toda vez que o usuário navega entre tabs (que é comum no app em react).
+    // Só faz fetch inicial se Groups estiver vazio, senão espera pelo pull-to-refresh / atualizar
+    if (groups.length === 0) {
+      reload()
+    }
     const onRefresh = () => reload()
     try {
       window.addEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
-    } catch {}
+    } catch { }
     return () => {
       try {
         window.removeEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
-      } catch {}
+      } catch { }
     }
-  }, [reload])
+  }, [reload, groups.length])
 
   const ordered = useMemo(() => {
     const arr = Array.isArray(groups) ? groups : []
