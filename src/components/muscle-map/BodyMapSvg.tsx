@@ -156,37 +156,80 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected }: Props)
       {/* Luz global e brilho suave */}
       <div className="absolute inset-0 pointer-events-none rounded-2xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]" />
 
-      {/* PAINEL DE CALIBRAÇÃO TEMPORÁRIO */}
-      <div className="absolute top-2 left-2 right-2 bg-black/90 p-3 rounded-xl border border-white/20 z-50 text-white text-[10px] backdrop-blur-sm">
-        <div className="flex justify-between items-center mb-2">
-          <div className="font-bold text-yellow-500 text-xs">Calibração da Foto: {view.toUpperCase()}</div>
+      <CalibrationOverlay
+        pos={pos}
+        setPos={setPos}
+        view={view}
+        showAll={showAll}
+        setShowAll={setShowAll}
+      />
+
+    </div>
+  )
+}
+
+function CalibrationOverlay({
+  pos,
+  setPos,
+  view,
+  showAll,
+  setShowAll
+}: {
+  pos: { x: number, y: number, s: number }
+  setPos: (pos: { x: number, y: number, s: number }) => void
+  view: string
+  showAll: boolean
+  setShowAll: (v: boolean) => void
+}) {
+  const [isMinimized, setIsMinimized] = useState(false)
+
+  if (isMinimized) {
+    return (
+      <div className="absolute top-2 left-2 bg-black/90 p-2 rounded-xl border border-white/20 z-50 text-white text-[10px] backdrop-blur-sm cursor-pointer" onClick={() => setIsMinimized(false)}>
+        🔧 Expandir Controles
+      </div>
+    )
+  }
+
+  return (
+    <div className="absolute top-2 left-2 right-2 bg-black/90 p-3 rounded-xl border border-white/20 z-50 text-white text-[10px] backdrop-blur-sm shadow-xl">
+      <div className="flex justify-between items-center mb-3 border-b border-white/10 pb-2">
+        <div className="font-bold text-yellow-500 text-xs flex items-center gap-2">
+          Calibração: {view.toUpperCase()}
+        </div>
+        <div className="flex gap-2">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 active:bg-neutral-700"
+            className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 active:bg-neutral-700 font-medium"
           >
             {showAll ? 'VISUAL FINAL' : 'MOSTRAR MOLDES'}
           </button>
-        </div>
-
-        <div className="flex justify-between items-center mb-1">
-          <label className="w-8">Eixo X</label>
-          <input type="range" min="-50" max="150" value={pos.x} onChange={e => setPos({ ...pos, x: Number(e.target.value) })} className="flex-1 ml-2" />
-          <span className="w-6 text-right ml-1">{pos.x}</span>
-        </div>
-
-        <div className="flex justify-between items-center mb-1">
-          <label className="w-8">Eixo Y</label>
-          <input type="range" min="-50" max="150" value={pos.y} onChange={e => setPos({ ...pos, y: Number(e.target.value) })} className="flex-1 ml-2" />
-          <span className="w-6 text-right ml-1">{pos.y}</span>
-        </div>
-
-        <div className="flex justify-between items-center">
-          <label className="w-8">Escala</label>
-          <input type="range" min="0.3" max="1.5" step="0.01" value={pos.s} onChange={e => setPos({ ...pos, s: Number(e.target.value) })} className="flex-1 ml-2" />
-          <span className="w-6 text-right ml-1">{pos.s}</span>
+          <button
+            onClick={() => setIsMinimized(true)}
+            className="px-2 py-1 bg-neutral-800 rounded border border-neutral-700 active:bg-neutral-700"
+          >
+            ➖
+          </button>
         </div>
       </div>
 
+      <div className="flex justify-between items-center mb-2">
+        <label className="w-8">Eixo X</label>
+        <input type="range" min="-50" max="150" value={pos.x} onChange={e => setPos({ ...pos, x: Number(e.target.value) })} className="flex-1 ml-2 accent-yellow-500" />
+        <span className="w-6 text-right ml-2 font-mono">{pos.x}</span>
+      </div>
+
+      <div className="flex justify-between items-center mb-2">
+        <label className="w-8">Eixo Y</label>
+        <input type="range" min="-50" max="150" value={pos.y} onChange={e => setPos({ ...pos, y: Number(e.target.value) })} className="flex-1 ml-2 accent-yellow-500" />
+        <span className="w-6 text-right ml-2 font-mono">{pos.y}</span>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <label className="w-8">Escala</label>
+        <input type="range" min="0.3" max="1.5" step="0.01" value={pos.s} onChange={e => setPos({ ...pos, s: Number(e.target.value) })} className="flex-1 ml-2 accent-yellow-500" />
+        <span className="w-6 text-right ml-2 font-mono">{pos.s}</span>
+      </div>
     </div>
   )
 }
