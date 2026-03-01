@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
-import { checkRateLimit, getRequestIp } from '@/utils/rateLimit'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
@@ -78,9 +78,9 @@ const normalizeResult = (obj: unknown): { items: Array<Record<string, unknown>> 
       const normalizedContrib =
         weightSum > 0
           ? contributions.map((c: unknown) => {
-              const cc = c as Record<string, unknown>
-              return { ...cc, weight: (Number(cc.weight) || 0) / weightSum }
-            })
+            const cc = c as Record<string, unknown>
+            return { ...cc, weight: (Number(cc.weight) || 0) / weightSum }
+          })
           : []
 
       const confidenceRaw = Number(item?.confidence)
@@ -113,6 +113,10 @@ export async function POST(req: Request) {
     if (!access.allowed) {
       return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
     }
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`ai:exercise-muscle-map:${userId}:${ip}`, 30, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
@@ -206,12 +210,12 @@ export async function POST(req: Request) {
     const upsertRows = normalized.items.map((it: unknown) => {
       const row = it && typeof it === 'object' ? (it as Record<string, unknown>) : {}
       return ({
-      user_id: userId,
-      exercise_key: row.exercise_key,
-      canonical_name: row.canonical_name,
-      mapping: row.mapping,
-      confidence: row.confidence,
-      source: 'ai',
+        user_id: userId,
+        exercise_key: row.exercise_key,
+        canonical_name: row.canonical_name,
+        mapping: row.mapping,
+        confidence: row.confidence,
+        source: 'ai',
       })
     })
 

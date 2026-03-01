@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
@@ -75,9 +76,9 @@ const normalizeAiItems = (obj: unknown): Array<Record<string, unknown>> => {
       const normalizedContrib =
         weightSum > 0
           ? contributions.map((c: unknown) => {
-              const cc = c as Record<string, unknown>
-              return { ...cc, weight: (Number(cc.weight) || 0) / weightSum }
-            })
+            const cc = c as Record<string, unknown>
+            return { ...cc, weight: (Number(cc.weight) || 0) / weightSum }
+          })
           : []
 
       const confidenceRaw = Number(item?.confidence)
@@ -159,6 +160,11 @@ export async function POST(req: Request) {
     if (!access.allowed) {
       return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
     }
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`ai:muscle-map-backfill:${userId}:${ip}`, 2, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+
     const admin = createAdminClient()
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)

@@ -1100,26 +1100,29 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
         )
       ])
 
-      // ── iOS native (Capacitor): save via temp file (fast) with base64 fallback ──
+      // ── iOS native (Capacitor): save directly to camera roll ──
       if (isIosNative()) {
         setBusySubAction('uploading')
         const isVideo = mediaKind === 'video'
 
-        // Try file-path method first (avoids base64 JS overhead)
-        const fileSave = await saveBlobToPhotos(result.blob, result.filename, isVideo)
-        if (fileSave.saved) {
-          setInfo(isVideo ? 'Vídeo salvo no rolo!' : 'Imagem salva no rolo!')
-          return
-        }
-        if (fileSave.error === 'permissionDenied') {
-          setError('Permissão de Fotos negada. Vá em Ajustes > IronTracks > Fotos.')
-          await openAppSettings()
-          return
+        // Try file-path method first (faster — no base64 overhead)
+        // This requires the native build with saveFileToPhotos support
+        let saved = false
+        try {
+          const fileSave = await saveBlobToPhotos(result.blob, result.filename, isVideo)
+          if (fileSave.saved) {
+            saved = true
+          } else if (fileSave.error === 'permissionDenied') {
+            setError('Permissão de Fotos negada. Vá em Ajustes > IronTracks > Fotos.')
+            await openAppSettings()
+            return
+          }
+        } catch {
+          // saveFileToPhotos not available in this native build — continue to base64 fallback
         }
 
-        // Fallback: legacy base64 method (images only — videos too large for base64)
-        if (!isVideo) {
-          logWarn('StoryComposer', 'File save failed, falling back to base64', fileSave.error)
+        // Fallback: base64 method (always works on any native build)
+        if (!saved) {
           const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
             reader.onloadend = () => {
@@ -1131,20 +1134,23 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
             reader.onerror = () => reject(new Error('reader_error'))
             reader.readAsDataURL(result.blob)
           })
-          const legacySave = await saveImageToPhotos(base64)
-          if (legacySave.saved) {
-            setInfo('Imagem salva no rolo!')
-            return
-          }
-          if (legacySave.error === 'permissionDenied') {
+
+          const saveResult = await saveImageToPhotos(base64)
+          if (saveResult.saved) {
+            saved = true
+          } else if (saveResult.error === 'permissionDenied') {
             setError('Permissão de Fotos negada. Vá em Ajustes > IronTracks > Fotos.')
             await openAppSettings()
             return
+          } else {
+            logWarn('StoryComposer', 'Native save failed, trying share API', saveResult.error)
           }
         }
 
-        // Both methods failed → fall through to Web Share API
-        logWarn('StoryComposer', 'All native save methods failed, trying share API', fileSave.error)
+        if (saved) {
+          setInfo(isVideo ? 'Vídeo salvo no rolo!' : 'Imagem salva no rolo!')
+          return
+        }
       }
 
       // ── Web Share API (iOS PWA / non-native / fallback) ──────────────────────

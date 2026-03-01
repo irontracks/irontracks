@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Plus, ArrowLeft, Save, Upload, Link2, Play, X, Image as ImageIcon } from 'lucide-react';
+import { Trash2, Plus, ArrowLeft, Link2, Play } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
@@ -10,77 +10,15 @@ import { HELP_TERMS } from '@/utils/help/terms';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { WorkoutHeader } from './ExerciseEditor/WorkoutHeader'
+import { CardioFields, CARDIO_OPTIONS } from './ExerciseEditor/CardioFields'
+import { SetDetailsSection } from './ExerciseEditor/SetDetailsSection'
+import type { AdvancedConfig, SetDetail, Exercise, Workout } from './ExerciseEditor/types'
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 const DEFAULT_CARDIO_OPTION = 'Esteira';
 
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-
-interface AdvancedConfig {
-    initial_reps?: number | null;
-    mini_sets?: number | null;
-    rest_time_sec?: number | null;
-    weight?: number | null;
-    reps?: string | number | null;
-    type?: string;
-    workSec?: number;
-    restSec?: number;
-    rounds?: number;
-    hitIntensity?: string;
-    incline?: string | number;
-    speed?: string | number;
-    resistance?: string | number;
-    heart_rate?: string | number;
-    cluster_size?: number | null;
-    intra_rest_sec?: number | null;
-    total_reps?: number | null;
-    isHIT?: boolean;
-    [key: string]: unknown;
-}
-
-interface SetDetail {
-    set_number: number;
-    reps: string | number | null;
-    rpe: number | null;
-    weight: number | null;
-    is_warmup?: boolean;
-    isWarmup?: boolean;
-    advanced_config?: AdvancedConfig | AdvancedConfig[] | null;
-    advancedConfig?: AdvancedConfig | AdvancedConfig[] | null;
-    it_auto?: {
-        source: string;
-        kind: string;
-        label: string;
-        hash: string;
-    } | null;
-}
-
-interface Exercise {
-    name: string;
-    sets: number | string;
-    reps: string | number | null;
-    rpe: number | string | null;
-    method?: string | null;
-    restTime?: number | string | null;
-    rest_time?: number | string | null;
-    videoUrl?: string | null;
-    video_url?: string | null;
-    notes?: string | null;
-    cadence?: string | null;
-    type?: string;
-    setDetails?: SetDetail[];
-    set_details?: SetDetail[];
-    order?: number;
-}
-
-interface Workout {
-    id?: string;
-    title?: string;
-    notes?: string;
-    exercises?: Exercise[];
-    created_by?: string;
-    user_id?: string;
-}
 
 interface ExerciseEditorProps {
     workout: Workout;
@@ -973,64 +911,18 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
     return (
         <div className="h-full flex flex-col bg-neutral-900">
-            <div className="px-4 py-2 border-b border-neutral-800 flex items-center justify-between bg-neutral-950 sticky top-0 z-30 pt-safe">
-                <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-h-[48px]">
-                    <div className="flex items-center justify-between gap-3 min-w-0">
-                        <h2 className="text-base md:text-lg font-bold text-white whitespace-nowrap truncate min-w-0">
-                            Editar Treino
-                        </h2>
-                        <div className="shrink-0 flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold rounded-full transition-colors text-sm disabled:opacity-70 disabled:cursor-not-allowed min-h-[44px]"
-                            >
-                                <Save size={18} />
-                                <span className="hidden sm:inline">{saving ? 'SALVANDO...' : 'SALVAR'}</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => onCancel?.()}
-                                className="h-10 w-10 inline-flex items-center justify-center rounded-full bg-neutral-900 border border-neutral-800 text-neutral-200 hover:bg-neutral-800 transition-colors"
-                                title="Fechar"
-                            >
-                                <X size={16} />
-                            </button>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        <button
-                            onClick={handleScannerFileClick}
-                            disabled={scannerLoading}
-                            className="shrink-0 flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
-                            title="Importar treino via IA (foto/PDF)"
-                        >
-                            <ImageIcon size={18} />
-                            <span className="text-sm font-bold hidden sm:inline">Importar Treino (Foto/PDF)</span>
-                            <span className="text-sm font-bold sm:hidden">Importar</span>
-                        </button>
-                        <input
-                            ref={scannerFileInputRef}
-                            type="file"
-                            accept="image/*,application/pdf"
-                            multiple
-                            className="hidden"
-                            onChange={handleScannerFileChange}
-                        />
-                        <button
-                            onClick={handleImportJsonClick}
-                            className="shrink-0 flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full hover:bg-neutral-800 transition-colors min-h-[44px]"
-                            title="Carregar JSON"
-                        >
-                            <Upload size={18} />
-                            <span className="text-sm font-bold hidden sm:inline">Carregar JSON</span>
-                            <span className="text-sm font-bold sm:hidden">JSON</span>
-                        </button>
-                        <input ref={fileInputRef} type="file" accept=".json,application/json" className="hidden" onChange={handleImportJson} />
-                    </div>
-                </div>
-            </div>
+            <WorkoutHeader
+                saving={saving}
+                scannerLoading={scannerLoading}
+                scannerFileInputRef={scannerFileInputRef}
+                fileInputRef={fileInputRef}
+                onSave={handleSave}
+                onCancel={() => onCancel?.()}
+                onScannerFileClick={handleScannerFileClick}
+                onScannerFileChange={handleScannerFileChange}
+                onImportJsonClick={handleImportJsonClick}
+                onImportJson={handleImportJson}
+            />
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {scannerLoading && (
@@ -1160,586 +1052,159 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                             </div>
                                         )}
 
-                                        {exerciseType === 'cardio' ? (
-                                            <>
-                                                <div className="grid grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                                                     <div>
-                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
-                                                            {String(exercise?.name || '').toLowerCase() === 'bike outdoor'
-                                                                ? 'Tempo (minutos) (opcional)'
-                                                                : 'Tempo (minutos)'}
+                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</label>
+                                                        <div className="flex items-center gap-1">
+                                                            <input
+                                                                type="number"
+                                                                value={setsCount || ''}
+                                                                onChange={e => updateExercise(index, 'sets', e.target.value)}
+                                                                className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                            />
+                                                            <button
+                                                                onClick={() => updateExercise(index, 'duplicate', true)}
+                                                                className="h-8 w-8 bg-neutral-700 hover:bg-white hover:text-black text-neutral-400 rounded-lg flex items-center justify-center transition-colors"
+                                                                title="Duplicar Série"
+                                                            >
+                                                                <Plus size={14} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</label>
+                                                        <input
+                                                            type="text"
+                                                            value={exercise.reps ? String(exercise.reps) : ''}
+                                                            onChange={e => updateExercise(index, 'reps', e.target.value)}
+                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                            RPE
+                                                            <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
                                                         </label>
                                                         <input
                                                             type="number"
-                                                            min={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? undefined : 1}
-                                                            value={exercise.reps ? String(exercise.reps) : ''}
-                                                            onChange={e => updateExercise(index, 'reps', e.target.value)}
-                                                            className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-blue-500 border border-neutral-700"
-                                                            placeholder={String(exercise?.name || '').toLowerCase() === 'bike outdoor' ? 'Livre' : '30'}
+                                                            value={exercise.rpe ? String(exercise.rpe) : ''}
+                                                            onChange={e => updateExercise(index, 'rpe', e.target.value)}
+                                                            className="w-full bg-neutral-900 border border-yellow-500/20 rounded-lg p-2 text-center text-sm font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
+                                                            placeholder="8"
                                                         />
                                                     </div>
                                                     <div>
-                                                        <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</label>
+                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</label>
                                                         <input
                                                             type="number"
-                                                            min="1"
-                                                            value={exercise.rpe ? String(exercise.rpe) : ''}
-                                                            onChange={e => updateExercise(index, 'rpe', e.target.value)}
-                                                            className="w-full bg-neutral-900 border border-yellow-500/20 rounded-xl p-4 text-center text-xl font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
-                                                            placeholder="5"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                {/* Cardio Advanced Config (HIT / Incline / Speed) */}
-                                                {(() => {
-                                                    const cardioSet = setDetails[0];
-                                                    const config: AdvancedConfig = (cardioSet?.advanced_config as AdvancedConfig) || {};
-                                                    const isHIT = !!config?.isHIT;
-
-                                                    const updateCardioConfig = (field: string, val: string | number | boolean | null | undefined) => {
-                                                        const newConfig = { ...config, [field]: val };
-                                                        if (val === '' || val === null || val === undefined) delete newConfig[field];
-
-                                                        // If turning off HIT, clean up HIT fields
-                                                        if (field === 'isHIT' && !val) {
-                                                            delete newConfig.workSec;
-                                                            delete newConfig.restSec;
-                                                            delete newConfig.rounds;
-                                                            delete newConfig.hitIntensity;
-                                                        }
-
-                                                        updateSetDetail(index, 0, {
-                                                            advanced_config: Object.keys(newConfig).length > 0 ? newConfig : null
-                                                        });
-                                                    };
-
-                                                    const workSec = Number(config?.workSec) || 0;
-                                                    const restSec = Number(config?.restSec) || 0;
-                                                    const hitInvalid = isHIT && (workSec <= 0 || restSec >= workSec);
-
-                                                    return (
-                                                        <div className="mt-4 pt-4 border-t border-neutral-800">
-                                                            <div className="flex items-center justify-between mb-3">
-                                                                <label className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</label>
-                                                                <div className="flex items-center gap-2">
-                                                                    <label className="text-[10px] font-bold text-white uppercase cursor-pointer select-none flex items-center gap-2">
-                                                                        Modo HIT
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={isHIT}
-                                                                            onChange={(e) => updateCardioConfig('isHIT', e.target.checked)}
-                                                                            className="accent-yellow-500 w-4 h-4"
-                                                                        />
-                                                                    </label>
-                                                                </div>
-                                                            </div>
-
-                                                            {isHIT && (
-                                                                <div className="bg-neutral-900/50 p-3 rounded-xl border border-neutral-800 mb-3 animate-in slide-in-from-top-2">
-                                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                                        <div>
-                                                                            <label className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</label>
-                                                                            <input
-                                                                                type="number"
-                                                                                value={config.workSec ?? ''}
-                                                                                onChange={e => updateCardioConfig('workSec', Number(e.target.value))}
-                                                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700"
-                                                                                placeholder="30"
-                                                                            />
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</label>
-                                                                            <input
-                                                                                type="number"
-                                                                                value={config.restSec ?? ''}
-                                                                                onChange={e => updateCardioConfig('restSec', Number(e.target.value))}
-                                                                                className={`w-full bg-neutral-900 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 ${hitInvalid ? 'border-red-500/50' : 'border-neutral-700'}`}
-                                                                                placeholder="10"
-                                                                            />
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</label>
-                                                                            <input
-                                                                                type="number"
-                                                                                value={config.rounds ?? ''}
-                                                                                onChange={e => updateCardioConfig('rounds', Number(e.target.value))}
-                                                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                                placeholder="10"
-                                                                            />
-                                                                        </div>
-                                                                        <div>
-                                                                            <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</label>
-                                                                            <select
-                                                                                value={config.hitIntensity ?? 'high'}
-                                                                                onChange={e => updateCardioConfig('hitIntensity', e.target.value)}
-                                                                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 h-[38px]"
-                                                                            >
-                                                                                <option value="low">Baixa</option>
-                                                                                <option value="medium">Média</option>
-                                                                                <option value="high">Alta</option>
-                                                                            </select>
-                                                                        </div>
-                                                                    </div>
-                                                                    {hitInvalid && (
-                                                                        <div className="mt-2 text-[10px] text-red-400 font-bold">
-                                                                            ⚠️ O tempo de descanso deve ser menor que o tempo de trabalho.
-                                                                        </div>
-                                                                    )}
-                                                                    {!hitInvalid && workSec > 0 && (
-                                                                        <div className="mt-2 text-[10px] text-neutral-500 font-mono text-center">
-                                                                            Resumo: {config.rounds || '?'} rounds de {workSec}s ativo / {restSec}s descanso
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-
-                                                            <details className="group">
-                                                                <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
-                                                                    <span>Parâmetros de Equipamento</span>
-                                                                    <span className="group-open:rotate-180 transition-transform">▼</span>
-                                                                </summary>
-
-                                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
-                                                                    {/* Inclinação */}
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={config.incline ?? ''}
-                                                                            onChange={e => updateCardioConfig('incline', e.target.value)}
-                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                            placeholder="0"
-                                                                        />
-                                                                    </div>
-
-                                                                    {/* Velocidade */}
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            step="0.1"
-                                                                            value={config.speed ?? ''}
-                                                                            onChange={e => updateCardioConfig('speed', e.target.value)}
-                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                            placeholder="km/h"
-                                                                        />
-                                                                    </div>
-
-                                                                    {/* Resistência / Carga */}
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={config.resistance ?? ''}
-                                                                            onChange={e => updateCardioConfig('resistance', e.target.value)}
-                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
-                                                                            placeholder="Nível"
-                                                                        />
-                                                                    </div>
-
-                                                                    {/* Frequência Cardíaca Alvo */}
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={config.heart_rate ?? ''}
-                                                                            onChange={e => updateCardioConfig('heart_rate', e.target.value)}
-                                                                            className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-red-400 font-bold outline-none focus:border-red-500 placeholder-neutral-700"
-                                                                            placeholder="♥"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            </details>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </>
-                                        ) : (
-                                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                                                <div>
-                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</label>
-                                                    <div className="flex items-center gap-1">
-                                                        <input
-                                                            type="number"
-                                                            value={setsCount || ''}
-                                                            onChange={e => updateExercise(index, 'sets', e.target.value)}
+                                                            value={(exercise.restTime ?? '')}
+                                                            onChange={e => updateExercise(index, 'restTime', e.target.value)}
                                                             className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
                                                         />
-                                                        <button
-                                                            onClick={() => updateExercise(index, 'duplicate', true)}
-                                                            className="h-8 w-8 bg-neutral-700 hover:bg-white hover:text-black text-neutral-400 rounded-lg flex items-center justify-center transition-colors"
-                                                            title="Duplicar Série"
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                            Cad
+                                                            <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={exercise.cadence || ''}
+                                                            onChange={e => updateExercise(index, 'cadence', e.target.value)}
+                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                            Método
+                                                            {(() => {
+                                                                const m = String(safeMethod || 'Normal');
+                                                                const term =
+                                                                    m === 'Drop-set'
+                                                                        ? HELP_TERMS.dropSet
+                                                                        : m === 'Rest-Pause'
+                                                                            ? HELP_TERMS.restPause
+                                                                            : m === 'Cluster'
+                                                                                ? HELP_TERMS.cluster
+                                                                                : m === 'Bi-Set'
+                                                                                    ? HELP_TERMS.biSet
+                                                                                    : null;
+                                                                return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
+                                                            })()}
+                                                        </label>
+                                                        <select
+                                                            value={safeMethod || 'Normal'}
+                                                            onChange={e => updateExercise(index, 'method', e.target.value)}
+                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
                                                         >
-                                                            <Plus size={14} />
-                                                        </button>
+                                                            <option value="Normal">Normal</option>
+                                                            <option value="Drop-set">Drop</option>
+                                                            <option value="Rest-Pause">Rest-P</option>
+                                                            <option value="Bi-Set">Bi-Set</option>
+                                                            <option value="Cluster">Cluster</option>
+                                                        </select>
                                                     </div>
                                                 </div>
-                                                <div>
-                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</label>
-                                                    <input
-                                                        type="text"
-                                                        value={exercise.reps ? String(exercise.reps) : ''}
-                                                        onChange={e => updateExercise(index, 'reps', e.target.value)}
-                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                {exerciseType === 'cardio' ? (
+                                                    <CardioFields
+                                                        exercise={exercise}
+                                                        setDetails={setDetails}
+                                                        onUpdateExercise={(field, value) => updateExercise(index, field, value)}
+                                                        onUpdateSetDetail={(setIdx, patch) => updateSetDetail(index, setIdx, patch)}
                                                     />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                        RPE
-                                                        <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        value={exercise.rpe ? String(exercise.rpe) : ''}
-                                                        onChange={e => updateExercise(index, 'rpe', e.target.value)}
-                                                        className="w-full bg-neutral-900 border border-yellow-500/20 rounded-lg p-2 text-center text-sm font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
-                                                        placeholder="8"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</label>
-                                                    <input
-                                                        type="number"
-                                                        value={(exercise.restTime ?? '')}
-                                                        onChange={e => updateExercise(index, 'restTime', e.target.value)}
-                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                        Cad
-                                                        <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={exercise.cadence || ''}
-                                                        onChange={e => updateExercise(index, 'cadence', e.target.value)}
-                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                        Método
-                                                        {(() => {
-                                                            const m = String(safeMethod || 'Normal');
-                                                            const term =
-                                                                m === 'Drop-set'
-                                                                    ? HELP_TERMS.dropSet
-                                                                    : m === 'Rest-Pause'
-                                                                        ? HELP_TERMS.restPause
-                                                                        : m === 'Cluster'
-                                                                            ? HELP_TERMS.cluster
-                                                                            : m === 'Bi-Set'
-                                                                                ? HELP_TERMS.biSet
-                                                                                : null;
-                                                            return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
-                                                        })()}
-                                                    </label>
-                                                    <select
-                                                        value={safeMethod || 'Normal'}
-                                                        onChange={e => updateExercise(index, 'method', e.target.value)}
-                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
-                                                    >
-                                                        <option value="Normal">Normal</option>
-                                                        <option value="Drop-set">Drop</option>
-                                                        <option value="Rest-Pause">Rest-P</option>
-                                                        <option value="Bi-Set">Bi-Set</option>
-                                                        <option value="Cluster">Cluster</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        )}
+                                                ) : (
+                                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
 
-                                        <div className="space-y-3 pt-2">
-                                            <div>
-                                                <div className="flex items-center justify-between gap-3 mb-1">
-                                                    <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
-                                                    {String(exercise.videoUrl || '').trim() ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                try {
-                                                                    e.preventDefault();
-                                                                    e.stopPropagation();
-                                                                } catch { }
-                                                                try {
-                                                                    window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
-                                                                } catch { }
-                                                            }}
-                                                            className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
-                                                            title="Ver vídeo"
-                                                        >
-                                                            <Play size={14} />
-                                                            Ver vídeo
-                                                        </button>
-                                                    ) : null}
-                                                </div>
-                                                <input
-                                                    value={exercise.videoUrl || ''}
-                                                    onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
-                                                    className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
-                                                    placeholder="https://youtube.com/..."
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
-                                                <textarea
-                                                    value={exercise.notes || ''}
-                                                    onChange={e => updateExercise(index, 'notes', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"
-                                                    placeholder="Dicas de execução..."
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {exerciseType !== 'cardio' && setsCount > 0 && (
-                                            <div className="pt-4 space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Séries</div>
-                                                    <div className="text-[10px] text-neutral-600">{setsCount}</div>
-                                                </div>
-
-                                                {setDetails.map((s, setIdx) => {
-                                                    const isWarmup = !!(s?.is_warmup ?? s?.isWarmup)
-                                                    const borderClass = isWarmup ? 'border-yellow-500/60' : 'border-neutral-700'
-                                                    const config: AdvancedConfig = (s?.advanced_config as AdvancedConfig) ?? (s?.advancedConfig as AdvancedConfig) ?? null
-                                                    const isObj = config && typeof config === 'object' && !Array.isArray(config)
-                                                    const isDropCfg = Array.isArray(config)
-                                                    const isClusterCfg = isObj && (config?.cluster_size != null || config?.intra_rest_sec != null || config?.total_reps != null)
-                                                    const isRestPauseCfg = isObj && (config?.mini_sets != null || config?.rest_time_sec != null || config?.initial_reps != null)
-
-                                                    const updateConfig = (nextConfig: AdvancedConfig | AdvancedConfig[] | null) => {
-                                                        updateSetDetail(index, setIdx, { advanced_config: nextConfig })
-                                                    }
-
-                                                    return (
-                                                        <div key={setIdx} className={`bg-neutral-900 border ${borderClass} rounded-xl p-3`}>
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="text-xs font-bold text-white">Série {s?.set_number ?? (setIdx + 1)}</div>
-                                                                    <label className="flex items-center gap-2 text-[10px] text-neutral-300 font-bold">
-                                                                        {setIdx === 0 && (
-                                                                            <input
-                                                                                type="checkbox"
-                                                                                checked={isWarmup}
-                                                                                onChange={(e) => updateSetDetail(index, setIdx, { is_warmup: !!e.target.checked })}
-                                                                                className="accent-yellow-500"
-                                                                            />
-                                                                        )}
-                                                                        {setIdx === 0 && 'Série de Aquecimento'}
-                                                                    </label>
-                                                                </div>
-                                                                <select
-                                                                    value={isDropCfg ? 'Drop-set' : (config?.type === 'sst' ? 'SST' : (isRestPauseCfg ? 'Rest-Pause' : 'Normal'))}
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value;
-                                                                        if (val === 'Normal') {
-                                                                            updateConfig(null);
-                                                                        } else if (val === 'Drop-set') {
-                                                                            updateConfig([{ weight: null, reps: '' }]);
-                                                                        } else if (val === 'SST') {
-                                                                            updateConfig({ type: 'sst', initial_reps: 10, mini_sets: 2, rest_time_sec: 10 });
-                                                                        } else if (val === 'Rest-Pause') {
-                                                                            updateConfig({ initial_reps: 10, mini_sets: 2, rest_time_sec: 20 });
-                                                                        }
-                                                                    }}
-                                                                    className="bg-neutral-800 text-[10px] font-bold text-neutral-300 border border-neutral-700 rounded-md px-2 py-1 outline-none focus:border-yellow-500"
-                                                                >
-                                                                    <option value="Normal">Normal</option>
-                                                                    <option value="Drop-set">Drop Set</option>
-                                                                    <option value="SST">SST</option>
-                                                                    <option value="Rest-Pause">Rest-Pause</option>
-                                                                </select>
+                                                        <div>
+                                                            <div className="flex items-center justify-between gap-3 mb-1">
+                                                                <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
+                                                                {String(exercise.videoUrl || '').trim() ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            try {
+                                                                                e.preventDefault();
+                                                                                e.stopPropagation();
+                                                                            } catch { }
+                                                                            try {
+                                                                                window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
+                                                                            } catch { }
+                                                                        }}
+                                                                        className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
+                                                                        title="Ver vídeo"
+                                                                    >
+                                                                        <Play size={14} />
+                                                                        Ver vídeo
+                                                                    </button>
+                                                                ) : null}
                                                             </div>
-
-                                                            {(!isDropCfg && !isClusterCfg && !isRestPauseCfg && (safeMethod === 'Normal' || safeMethod === 'Bi-Set' || safeMethod === 'Rest-Pause' || safeMethod === 'Drop-set' || safeMethod === 'Cluster')) && (
-                                                                <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(s?.weight ?? '')}
-                                                                            onChange={(e) => updateSetDetail(index, setIdx, { weight: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={(s?.reps ?? '')}
-                                                                            onChange={(e) => updateSetDetail(index, setIdx, { reps: e.target.value })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-yellow-500 uppercase font-bold">RPE</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(s?.rpe ?? '')}
-                                                                            onChange={(e) => updateSetDetail(index, setIdx, { rpe: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-yellow-500/20 rounded-lg p-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {(isDropCfg || safeMethod === 'Drop-set') && (
-                                                                <div className="mt-3 space-y-2">
-                                                                    <div className="flex items-center justify-between">
-                                                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">Drop Set</div>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={() => {
-                                                                                const list: AdvancedConfig[] = Array.isArray(config) ? config : []
-                                                                                updateConfig([...(list || []), { weight: null, reps: '' }])
-                                                                            }}
-                                                                            className="text-[10px] font-bold text-yellow-500 hover:text-yellow-400"
-                                                                        >
-                                                                            (+) Add Drop
-                                                                        </button>
-                                                                    </div>
-
-                                                                    {(Array.isArray(config) ? config : []).map((d: AdvancedConfig, dIdx: number) => (
-                                                                        <div key={dIdx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
-                                                                            <div>
-                                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Peso (kg)</label>
-                                                                                <input
-                                                                                    type="number"
-                                                                                    value={(d?.weight ?? '')}
-                                                                                    onChange={(e) => {
-                                                                                        const list = Array.isArray(config) ? [...config] : []
-                                                                                        const next = { ...(list[dIdx] || {}), weight: e.target.value === '' ? null : Number(e.target.value) }
-                                                                                        list[dIdx] = next
-                                                                                        updateConfig(list)
-                                                                                    }}
-                                                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                                />
-                                                                            </div>
-                                                                            <div>
-                                                                                <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps</label>
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={(d?.reps ? String(d.reps) : '')}
-                                                                                    onChange={(e) => {
-                                                                                        const list = Array.isArray(config) ? [...config] : []
-                                                                                        const next = { ...(list[dIdx] || {}), reps: e.target.value }
-                                                                                        list[dIdx] = next
-                                                                                        updateConfig(list)
-                                                                                    }}
-                                                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                                />
-                                                                            </div>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    const list = Array.isArray(config) ? [...config] : []
-                                                                                    list.splice(dIdx, 1)
-                                                                                    updateConfig(list)
-                                                                                }}
-                                                                                className="h-9 w-9 bg-neutral-800 border border-neutral-700 rounded-lg text-neutral-300 hover:text-red-400"
-                                                                                title="Remover drop"
-                                                                            >
-                                                                                <Trash2 size={14} className="mx-auto" />
-                                                                            </button>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {(isRestPauseCfg || safeMethod === 'Rest-Pause' || config?.type === 'sst') && !isDropCfg && config && typeof config === 'object' && (
-                                                                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                                                    <div className="col-span-full mb-1">
-                                                                        <span className="text-[10px] uppercase font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded">
-                                                                            Configuração {config?.type === 'sst' ? 'SST' : 'Rest-Pause'}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.weight ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Reps Iniciais</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.initial_reps ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), initial_reps: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Pausa (s)</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.rest_time_sec ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), rest_time_sec: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Mini-sets</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.mini_sets ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), mini_sets: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {(isClusterCfg || safeMethod === 'Cluster') && !isDropCfg && (
-                                                                <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Carga</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.weight ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Total Reps</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.total_reps ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), total_reps: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Cluster</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.cluster_size ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), cluster_size: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold">Intra (s)</label>
-                                                                        <input
-                                                                            type="number"
-                                                                            value={(config?.intra_rest_sec ?? '')}
-                                                                            onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), intra_rest_sec: e.target.value === '' ? null : Number(e.target.value) })}
-                                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                                                                        />
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
+                                                            <input
+                                                                value={exercise.videoUrl || ''}
+                                                                onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
+                                                                className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
+                                                                placeholder="https://youtube.com/..."
+                                                            />
                                                         </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        )}
+                                                        <div>
+                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
+                                                            <textarea
+                                                                value={exercise.notes || ''}
+                                                                onChange={e => updateExercise(index, 'notes', e.target.value)}
+                                                                className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"
+                                                                placeholder="Dicas de execução..."
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {setsCount > 0 && exerciseType !== 'cardio' && (
+                                                    <SetDetailsSection
+                                                        setDetails={setDetails}
+                                                        safeMethod={safeMethod}
+                                                        exerciseIndex={index}
+                                                        onUpdateSetDetail={updateSetDetail}
+                                                    />
+                                                )}
                                     </div>
 
                                     {isBiSet && hasNext && (

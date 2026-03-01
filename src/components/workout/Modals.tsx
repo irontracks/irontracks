@@ -201,8 +201,9 @@ export default function Modals() {
             </div>
             <div className="p-4 space-y-4">
               <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Esforço (RPE 1–10)</div>
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400" id="checkin-rpe-label">Esforço (RPE 1–10)</div>
                 <select
+                  aria-labelledby="checkin-rpe-label"
                   value={String(postCheckinDraft?.rpe ?? '')}
                   onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, rpe: String(e.target.value || '') }))}
                   className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
@@ -237,8 +238,9 @@ export default function Modals() {
               </div>
 
               <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
+                <div className="text-xs font-black uppercase tracking-widest text-neutral-400" id="checkin-soreness-label">Dor / Soreness (0–10)</div>
                 <select
+                  aria-labelledby="checkin-soreness-label"
                   value={String(postCheckinDraft?.soreness ?? '')}
                   onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
                   className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
@@ -255,6 +257,7 @@ export default function Modals() {
               <div className="space-y-2">
                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
                 <textarea
+                  aria-label="Observações do treino"
                   value={String(postCheckinDraft?.notes || '')}
                   onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
                   className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
@@ -357,8 +360,9 @@ export default function Modals() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Redução (%)</label>
+                      <label htmlFor="deload-reduction" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Redução (%)</label>
                       <input
+                        id="deload-reduction"
                         inputMode="decimal"
                         value={Number.isFinite(reductionPct) ? String(reductionPct) : ''}
                         onChange={(e) => updateDeloadModalFromPercent(e?.target?.value ?? '')}
@@ -367,8 +371,9 @@ export default function Modals() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Peso sugerido (kg)</label>
+                      <label htmlFor="deload-weight" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Peso sugerido (kg)</label>
                       <input
+                        id="deload-weight"
                         inputMode="decimal"
                         value={Number.isFinite(suggestedWeight) ? String(suggestedWeight) : ''}
                         onChange={(e) => updateDeloadModalFromWeight(e?.target?.value ?? '')}
@@ -434,8 +439,9 @@ export default function Modals() {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <label htmlFor="add-exercise-name" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
                 <input
+                  id="add-exercise-name"
                   value={String(addExerciseDraft?.name ?? '')}
                   onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
                   className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
@@ -444,8 +450,9 @@ export default function Modals() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <label htmlFor="add-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
                   <input
+                    id="add-exercise-sets"
                     inputMode="decimal"
                     value={String(addExerciseDraft?.sets ?? '')}
                     onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
@@ -454,8 +461,9 @@ export default function Modals() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <label htmlFor="add-exercise-rest" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
                   <input
+                    id="add-exercise-rest"
                     inputMode="decimal"
                     value={String(addExerciseDraft?.restTime ?? '')}
                     onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
@@ -496,6 +504,7 @@ export default function Modals() {
               <button
                 type="button"
                 onClick={() => { setEditExerciseOpen(false); setEditExerciseIdx(null); }}
+                aria-label="Fechar editor de exercício"
                 className="h-10 w-10 inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700"
               >
                 <X size={16} />
@@ -503,8 +512,9 @@ export default function Modals() {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <label htmlFor="edit-exercise-name" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
                 <input
+                  id="edit-exercise-name"
                   value={String(editExerciseDraft?.name ?? '')}
                   onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
                   className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
@@ -513,8 +523,9 @@ export default function Modals() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <label htmlFor="edit-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
                   <input
+                    id="edit-exercise-sets"
                     inputMode="decimal"
                     value={String(editExerciseDraft?.sets ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
@@ -523,8 +534,9 @@ export default function Modals() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <label htmlFor="edit-exercise-rest" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
                   <input
+                    id="edit-exercise-rest"
                     inputMode="decimal"
                     value={String(editExerciseDraft?.restTime ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
@@ -534,8 +546,9 @@ export default function Modals() {
                 </div>
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Método</label>
+                <label htmlFor="edit-exercise-method" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Método</label>
                 <select
+                  id="edit-exercise-method"
                   value={String(editExerciseDraft?.method ?? 'Normal')}
                   onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, method: String(e.target.value || 'Normal') }))}
                   className="mt-2 w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
@@ -1145,7 +1158,7 @@ export default function Modals() {
                           if (!w) {
                             try {
                               window.alert('Preencha pelo menos 1 etapa com peso antes de linkar.');
-                            } catch {}
+                            } catch { }
                             return;
                           }
                           setDropSetModal((prev) => {

@@ -27,6 +27,10 @@ const eslintConfig = defineConfig([
       ...Object.fromEntries(
         Object.entries(jsxA11y.configs.recommended.rules).map(([key]) => [key, "warn"])
       ),
+      // Accept htmlFor alone (without nesting) as valid label association
+      "jsx-a11y/label-has-associated-control": ["warn", { assert: "either" }],
+      // label-has-for is deprecated; disable it in favour of label-has-associated-control
+      "jsx-a11y/label-has-for": "off",
     },
   },
   // Override default ignores of eslint-config-next.
