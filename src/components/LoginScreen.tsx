@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar } from 'lucide-react';
+import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert } from 'lucide-react';
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -51,6 +51,7 @@ const LoginScreen = () => {
     // Auth Mode: 'login', 'signup', 'recover', 'recover_code'
     // Default to 'login' to skip menu if Google is removed
     const [authMode, setAuthMode] = useState('login');
+    const [showNoAccountModal, setShowNoAccountModal] = useState(false);
 
     // Email Auth State
     const [emailData, setEmailData] = useState({
@@ -262,6 +263,30 @@ const LoginScreen = () => {
                 const supabase = createClient();
                 const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token, nonce });
                 if (error) throw error;
+
+                // Verificar se o usuário tem cadastro (profile ou student/teacher)
+                const userId = data?.user?.id;
+                const userEmail = data?.user?.email?.trim().toLowerCase() || '';
+                if (userId) {
+                    const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle();
+                    if (!profile?.id) {
+                        // Sem perfil — checar se existe student/teacher por email
+                        const checkRes = await fetch('/api/auth/apple/preflight', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: userEmail, full_name: '', check_only: true })
+                        }).then(r => r.json()).catch(() => ({ ok: false }));
+
+                        if (!checkRes?.existed) {
+                            // Nenhum cadastro encontrado — sign out e mostrar aviso
+                            await supabase.auth.signOut();
+                            setShowNoAccountModal(true);
+                            setIsLoading(false);
+                            return;
+                        }
+                    }
+                }
+
                 const session = data?.session;
                 if (session?.access_token && session?.refresh_token) {
                     await fetch('/api/auth/session', {
@@ -1036,6 +1061,51 @@ const LoginScreen = () => {
                                 </form>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal: Sem Cadastro (Apple Sign-In sem conta) */}
+            {showNoAccountModal && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 pt-safe pb-safe">
+                    <div className="w-full max-w-sm bg-neutral-900 border border-neutral-700/50 rounded-3xl p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+                        {/* Icon */}
+                        <div className="flex justify-center mb-5">
+                            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500/20 to-orange-500/10 border border-red-500/30 flex items-center justify-center">
+                                <ShieldAlert size={32} className="text-red-400" />
+                            </div>
+                        </div>
+
+                        {/* Title */}
+                        <h3 className="text-white font-black text-lg text-center mb-2">
+                            Conta não encontrada
+                        </h3>
+
+                        {/* Description */}
+                        <p className="text-neutral-400 text-sm text-center leading-relaxed mb-6">
+                            Não encontramos um cadastro vinculado a esta conta Apple.
+                            Para acessar o IronTracks, é necessário que seu <span className="text-white font-semibold">professor/personal</span> cadastre você no sistema primeiro.
+                        </p>
+
+                        {/* Steps */}
+                        <div className="bg-neutral-800/50 rounded-2xl p-4 mb-6 space-y-3">
+                            <div className="flex items-start gap-3">
+                                <div className="flex-none w-6 h-6 rounded-full bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center text-yellow-500 text-xs font-black">1</div>
+                                <p className="text-sm text-neutral-300">Peça ao seu professor para cadastrar você no app</p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                                <div className="flex-none w-6 h-6 rounded-full bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center text-yellow-500 text-xs font-black">2</div>
+                                <p className="text-sm text-neutral-300">Após o cadastro, volte e entre com a mesma conta Apple</p>
+                            </div>
+                        </div>
+
+                        {/* Button */}
+                        <button
+                            onClick={() => setShowNoAccountModal(false)}
+                            className="w-full min-h-[48px] bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 hover:from-yellow-400 hover:via-amber-300 hover:to-yellow-400 text-black font-black text-sm uppercase tracking-wider rounded-xl transition-all active:scale-[0.97]"
+                        >
+                            ENTENDI
+                        </button>
                     </div>
                 </div>
             )}
