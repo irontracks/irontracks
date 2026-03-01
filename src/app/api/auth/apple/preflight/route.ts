@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 const BodySchema = z.object({
   email: z.string().email(),
   full_name: z.string().optional(),
+  check_only: z.boolean().optional(),
 })
 
 export async function POST(req: Request) {
@@ -34,6 +35,11 @@ export async function POST(req: Request) {
 
     if (existingStudent?.id || existingTeacher?.id) {
       return NextResponse.json({ ok: true, existed: true })
+    }
+
+    // check_only mode: only verify existence, don't create
+    if (body.check_only) {
+      return NextResponse.json({ ok: true, existed: false })
     }
 
     const safeName =
