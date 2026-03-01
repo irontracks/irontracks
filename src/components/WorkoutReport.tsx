@@ -15,6 +15,13 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { escapeHtml } from '@/utils/escapeHtml'
+import {
+    formatDate as sharedFormatDate,
+    formatDuration as sharedFormatDuration,
+    formatKm as sharedFormatKm,
+    formatKmh as sharedFormatKmh,
+    calculateTotalVolume,
+} from '@/utils/report/formatters'
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
 import { ReportMetricsPanel } from '@/components/workout-report/ReportMetricsPanel'
 import { MuscleTrendPanel } from '@/components/workout-report/MuscleTrendPanel'
@@ -54,13 +61,8 @@ const parseSessionNotes = (notes: unknown): AnyObj | null => {
     }
 };
 
-const normalizeExerciseKey = (v: unknown): string => {
-    try {
-        return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
-    } catch {
-        return '';
-    }
-};
+// normalizeExerciseKey is now in @/utils/report/formatters
+import { normalizeExerciseKey } from '@/utils/report/formatters'
 
 
 const remapPrevLogsByCanonical = (prevLogsByExercise: unknown, canonicalMap: unknown): Record<string, unknown> => {
@@ -744,41 +746,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     if (!session) return null;
 
-    const formatDate = (ts: unknown): string => {
-        if (!ts) return '';
-        const tsObj = ts && typeof ts === 'object' ? (ts as AnyObj) : null
-        const raw = tsObj?.toDate && typeof tsObj.toDate === 'function' ? (tsObj.toDate as () => unknown)() : ts
-        const d = raw instanceof Date ? raw : new Date(raw as unknown as string | number | Date)
-        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
-    };
-
-    const formatDuration = (s: unknown): string => {
-        const v = Number(s) || 0
-        const mins = Math.floor(v / 60);
-        const secs = Math.floor(v % 60);
-        return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    };
-
+    // Use shared formatters from @/utils/report/formatters
+    const formatDate = sharedFormatDate;
+    const formatDuration = sharedFormatDuration;
+    const formatKm = sharedFormatKm;
+    const formatKmh = sharedFormatKmh;
     const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const calculateTotalVolume = (logs: unknown): number => {
-        try {
-            const safeLogs = logs && typeof logs === 'object' ? (logs as Record<string, unknown>) : {};
-            let volume = 0;
-            Object.values(safeLogs).forEach((log) => {
-                if (!log || typeof log !== 'object') return;
-                const row = log as Record<string, unknown>;
-                const w = Number(String(row.weight ?? '').replace(',', '.'));
-                const r = Number(String(row.reps ?? '').replace(',', '.'));
-                if (!Number.isFinite(w) || !Number.isFinite(r)) return;
-                if (w <= 0 || r <= 0) return;
-                volume += w * r;
-            });
-            return volume;
-        } catch {
-            return 0;
-        }
-    };
 
     const effectivePreviousSession = (() => {
         if (!previousSession) return resolvedPreviousSession;
@@ -806,18 +779,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const reportRest = reportMeta?.rest && typeof reportMeta.rest === 'object' ? (reportMeta.rest as AnyObj) : null
     const reportWeekly = reportMeta?.weekly && typeof reportMeta.weekly === 'object' ? (reportMeta.weekly as AnyObj) : null
     const reportLoadFlags = reportMeta?.loadFlags && typeof reportMeta.loadFlags === 'object' ? (reportMeta.loadFlags as AnyObj) : null
-
-    const formatKm = (meters: unknown): string => {
-        const m = Number(meters);
-        if (!Number.isFinite(m) || m <= 0) return '-';
-        return `${(m / 1000).toFixed(2)} km`;
-    };
-
-    const formatKmh = (kmh: unknown): string => {
-        const v = Number(kmh);
-        if (!Number.isFinite(v) || v <= 0) return '-';
-        return `${v.toFixed(1)} km/h`;
-    };
 
     const prevLogsMap = (() => {
         try {
@@ -1798,8 +1759,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                 {effectivePreviousSession && Number.isFinite(volumeDelta) && (
                                     <span
                                         className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold w-fit ${volumeDelta >= 0
-                                                ? 'bg-green-500/15 text-green-200 border border-green-500/30'
-                                                : 'bg-red-500/15 text-red-200 border border-red-500/30'
+                                            ? 'bg-green-500/15 text-green-200 border border-green-500/30'
+                                            : 'bg-red-500/15 text-red-200 border border-red-500/30'
                                             }`}
                                     >
                                         {volumeDelta >= 0 ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
