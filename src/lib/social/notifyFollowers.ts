@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { sendPushToUsers } from '@/lib/push/apns'
 
 const chunk = (arr: unknown, size: unknown): unknown[][] => {
   const out: unknown[][] = []
@@ -94,5 +95,20 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
     }
     inserted += (part as unknown[]).length
   }
+  // Fire-and-forget: send APNs remote push to all recipient devices
+  try {
+    const recipientIds = [...new Set(
+      safeRows
+        .map((r) => String(r.user_id || r.recipient_id || '').trim())
+        .filter(Boolean)
+    )]
+    const firstRow = safeRows[0] || {}
+    const title = String(firstRow.title || '').trim()
+    const message = String(firstRow.message || '').trim()
+    if (recipientIds.length && title && message) {
+      void sendPushToUsers(recipientIds, title, message).catch(() => { })
+    }
+  } catch { }
+
   return { ok: true, inserted }
 }
