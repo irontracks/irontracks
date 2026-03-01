@@ -81,17 +81,25 @@ export async function GET(req: Request) {
       if (fErr || !follow) return new Response('forbidden', { status: 403 })
     }
 
-    const bucket = 'social-stories'
-    const { data: signed, error: sErr } = await admin.storage.from(bucket).createSignedUrl(String(story.media_path), signedSeconds)
-    if (sErr || !signed?.signedUrl) return new Response(sErr?.message || 'failed_to_sign', { status: 400 })
+    const mediaPath = String(story.media_path)
+    let redirectUrl: string
+
+    // Cloudinary URLs are stored as full https:// — no signing needed, CDN serves them directly
+    if (mediaPath.startsWith('https://')) {
+      redirectUrl = mediaPath
+    } else {
+      // Supabase Storage path — generate a short-lived signed URL
+      const bucket = 'social-stories'
+      const { data: signed, error: sErr } = await admin.storage.from(bucket).createSignedUrl(mediaPath, signedSeconds)
+      if (sErr || !signed?.signedUrl) return new Response(sErr?.message || 'failed_to_sign', { status: 400 })
+      redirectUrl = String(signed.signedUrl)
+    }
 
     const headers = new Headers()
-    headers.set('Location', String(signed.signedUrl))
-    // 5-minute edge cache so Vercel CDN can serve repeated views without hitting origin
+    headers.set('Location', redirectUrl)
     headers.set('Cache-Control', 'private, s-maxage=300, stale-while-revalidate=60')
-    headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
-    // Cache for 5 minutes (300s) instead of 30s — signed URL is valid for signedSeconds anyway
-    await cacheSet(cacheKey, { redirectUrl: String(signed.signedUrl), contentType: headers.get('Content-Type') }, 300)
+    headers.set('Content-Type', guessContentTypeFromPath(mediaPath) || 'application/octet-stream')
+    await cacheSet(cacheKey, { redirectUrl, contentType: headers.get('Content-Type') }, 300)
     return new Response(null, { status: 307, headers })
   } catch (e: unknown) {
     return new Response(getErrorMessage(e) ?? 'internal_error', { status: 500 })
@@ -122,9 +130,16 @@ export async function POST(req: Request) {
 
     if (error || !story?.media_path) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'not_found' }, { status: 404 })
 
+    const mediaPath = String(story.media_path)
+
+    // Cloudinary URLs are stored as full https:// — return directly
+    if (mediaPath.startsWith('https://')) {
+      return NextResponse.json({ ok: true, url: mediaPath })
+    }
+
     const admin = createAdminClient()
     const bucket = 'social-stories'
-    const { data, error: sErr } = await admin.storage.from(bucket).createSignedUrl(String(story.media_path), signedSeconds)
+    const { data, error: sErr } = await admin.storage.from(bucket).createSignedUrl(mediaPath, signedSeconds)
     if (sErr || !data?.signedUrl) return NextResponse.json({ ok: false, error: sErr?.message || 'failed' }, { status: 400 })
 
     return NextResponse.json({ ok: true, url: data.signedUrl })
