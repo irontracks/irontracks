@@ -50,7 +50,8 @@ export async function GET(req: Request) {
     if (cached?.redirectUrl) {
       const headers = new Headers()
       headers.set('Location', String(cached.redirectUrl))
-      headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
+      // s-maxage lets the Vercel Edge Cache serve this without hitting origin on repeated views
+      headers.set('Cache-Control', 'private, s-maxage=300, stale-while-revalidate=60')
       headers.set('Content-Type', String(cached.contentType || 'application/octet-stream'))
       return new Response(null, { status: 307, headers })
     }
@@ -86,9 +87,11 @@ export async function GET(req: Request) {
 
     const headers = new Headers()
     headers.set('Location', String(signed.signedUrl))
-    headers.set('Cache-Control', 'private, max-age=600, stale-while-revalidate=600')
+    // 5-minute edge cache so Vercel CDN can serve repeated views without hitting origin
+    headers.set('Cache-Control', 'private, s-maxage=300, stale-while-revalidate=60')
     headers.set('Content-Type', guessContentTypeFromPath(String(story.media_path)) || 'application/octet-stream')
-    await cacheSet(cacheKey, { redirectUrl: String(signed.signedUrl), contentType: headers.get('Content-Type') }, 30)
+    // Cache for 5 minutes (300s) instead of 30s — signed URL is valid for signedSeconds anyway
+    await cacheSet(cacheKey, { redirectUrl: String(signed.signedUrl), contentType: headers.get('Content-Type') }, 300)
     return new Response(null, { status: 307, headers })
   } catch (e: unknown) {
     return new Response(getErrorMessage(e) ?? 'internal_error', { status: 500 })
