@@ -10,7 +10,7 @@ import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { saveImageToPhotos, saveBlobToPhotos, openAppSettings } from '@/utils/native/irontracksNative'
-import { uploadWithTus } from '@/utils/storage/tusUpload'
+import { uploadStoryMedia } from '@/utils/storage/mediaUpload'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
 // --- Types ---
@@ -1236,15 +1236,10 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
           if (isIOSUserAgent(ua)) throw new Error('No iPhone, o vídeo com layout precisa ser MP4. Atualize o iOS/Safari ou poste via desktop.')
         }
 
-        const ext = mime.includes('mp4') ? '.mp4' : '.webm'
-        const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
-        path = `${uid}/stories/${storyId}${ext}`
-
         setBusySubAction('uploading')
         setUploadProgress(0)
 
-        // Upload via TUS
-        await uploadWithTus(blob, 'social-stories', path, mime, (uploaded, total) => {
+        path = await uploadStoryMedia(blob, uid, mime, (uploaded: number, total: number) => {
           if (total > 0) setUploadProgress(Math.round((uploaded / total) * 100))
         })
         setUploadProgress(100)
@@ -1261,14 +1256,11 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
       } else {
         // Image
         const result = await createImageBlob({ type: 'jpg', quality: 0.92 })
-        const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
-        path = `${uid}/stories/${storyId}.jpg`
 
         setBusySubAction('uploading')
         setUploadProgress(0)
 
-        // Upload via TUS
-        await uploadWithTus(result.blob, 'social-stories', path, result.mime, (uploaded, total) => {
+        path = await uploadStoryMedia(result.blob, uid, result.mime, (uploaded: number, total: number) => {
           if (total > 0) setUploadProgress(Math.round((uploaded / total) * 100))
         })
         setUploadProgress(100)

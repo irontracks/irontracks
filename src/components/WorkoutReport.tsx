@@ -27,6 +27,10 @@ import { ReportMetricsPanel } from '@/components/workout-report/ReportMetricsPan
 import { MuscleTrendPanel } from '@/components/workout-report/MuscleTrendPanel'
 import { MuscleTrend4wPanel } from '@/components/workout-report/MuscleTrend4wPanel'
 import { ExerciseTrendPanel } from '@/components/workout-report/ExerciseTrendPanel'
+import { ReportCheckinPanel } from '@/components/workout-report/ReportCheckinPanel'
+import { ReportAiSection } from '@/components/workout-report/ReportAiSection'
+import { ReportSummaryCards } from '@/components/workout-report/ReportSummaryCards'
+import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCard'
 
 type AnyObj = Record<string, unknown>
 
@@ -328,7 +332,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         });
     }, [session]);
 
-    const [applyState, setApplyState] = useState<{ status: string; error: string; templateId: string | null }>({ status: 'idle', error: '', templateId: null });
+    const [applyState, setApplyState] = useState<{ status: 'idle' | 'loading' | 'success' | 'error'; error: string; templateId: string | null }>({ status: 'idle', error: '', templateId: null });
 
     const targetUserId = useMemo(() => {
         const candidates = [
@@ -1424,293 +1428,22 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         </div>
                     )}
 
-                    {(preCheckin || postCheckin) && (
-                        <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Check-in</div>
-                                    <div className="text-lg font-black text-white">Pré e Pós-treino</div>
-                                    <div className="text-xs text-neutral-300">Contexto rápido para evolução e ajustes.</div>
-                                </div>
-                            </div>
-                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pré</div>
-                                    <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                                        <div>
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Energia</div>
-                                            <div className="font-black text-white">{preCheckin?.energy != null && String(preCheckin.energy) !== '' ? String(preCheckin.energy) : '—'}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
-                                            <div className="font-black text-white">
-                                                {preCheckin?.soreness != null && String(preCheckin.soreness) !== '' ? String(preCheckin.soreness) : '—'}
-                                            </div>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo disponível</div>
-                                            <div className="font-black text-white">
-                                                {preCheckin?.timeMinutes != null && String(preCheckin.timeMinutes) !== '' ? `${String(preCheckin.timeMinutes)} min` : '—'}
-                                            </div>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Observações</div>
-                                            <div className="text-neutral-200">{preCheckin?.notes ? String(preCheckin.notes) : '—'}</div>
-                                        </div>
-                                    </div>
-                                </div>
+                    <ReportCheckinPanel
+                        preCheckin={preCheckin}
+                        postCheckin={postCheckin}
+                        recommendations={checkinRecommendations}
+                    />
 
-                                <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pós</div>
-                                    <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                                        <div>
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">RPE</div>
-                                            <div className="font-black text-white">{postCheckin?.rpe != null && String(postCheckin.rpe) !== '' ? String(postCheckin.rpe) : '—'}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Satisfação</div>
-                                            <div className="font-black text-white">
-                                                {postCheckin?.satisfaction != null && String(postCheckin.satisfaction) !== '' ? String(postCheckin.satisfaction) : '—'}
-                                            </div>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
-                                            <div className="font-black text-white">
-                                                {postCheckin?.soreness != null && String(postCheckin.soreness) !== '' ? String(postCheckin.soreness) : '—'}
-                                            </div>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Observações</div>
-                                            <div className="text-neutral-200">{postCheckin?.notes ? String(postCheckin.notes) : '—'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            {checkinRecommendations.length ? (
-                                <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950/40 p-4">
-                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-300">Recomendações</div>
-                                    <div className="mt-2 space-y-1 text-sm text-neutral-200">
-                                        {checkinRecommendations.map((r) => (
-                                            <div key={r}>{r}</div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : null}
-                        </div>
-                    )}
-
-                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
-                        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                            <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">IA</div>
-                                <div className="flex items-center gap-2">
-                                    <div className="text-lg font-black text-white">Insights pós-treino</div>
-                                    {credits?.insights && (
-                                        <div className={`text-xs px-2 py-0.5 rounded font-mono font-bold ${isInsightsExhausted(credits.insights) ? 'bg-red-500/20 text-red-400' : 'bg-neutral-800 text-neutral-400'}`}>
-                                            {credits.insights.used}/{formatLimit(credits.insights.limit)}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="text-xs text-neutral-300">Resumo + progressão + motivação com IA IronTracks</div>
-                            </div>
-                            <div className="flex items-center gap-2 w-full md:w-auto">
-                                <button
-                                    type="button"
-                                    onClick={handleGenerateAi}
-                                    disabled={aiState?.loading}
-                                    className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-black flex items-center justify-center gap-2 disabled:opacity-60 flex-col leading-none"
-                                >
-                                    <div className="flex items-center gap-2">
-                                        {aiState?.loading ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                                        {ai ? 'Regerar' : 'Gerar'}
-                                    </div>
-                                    {credits?.insights && (
-                                        <span className="text-[9px] font-mono opacity-80">
-                                            ({credits.insights.used}/{formatLimit(credits.insights.limit)})
-                                        </span>
-                                    )}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCoachChat(true)}
-                                    className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-black flex items-center justify-center gap-2 border border-neutral-700"
-                                >
-                                    <MessageSquare size={18} />
-                                    Conversar
-                                </button>
-                            </div>
-                        </div>
-
-                        {aiState?.error && (
-                            <div className="mt-3 text-sm font-semibold text-red-300">{aiState?.error || 'Falha ao gerar insights.'}</div>
-                        )}
-
-                        {ai && (
-                            <div className="mt-4 space-y-3">
-                                {renderAiRating()}
-                                {!!(ai.metrics && typeof ai.metrics === 'object') && (
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                        <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Volume total</div>
-                                            <div className="text-lg font-mono font-bold text-white">
-                                                {(() => {
-                                                    const v = Number((ai.metrics as AnyObj)?.totalVolumeKg || 0);
-                                                    if (!Number.isFinite(v) || v <= 0) return '—';
-                                                    return `${v.toLocaleString('pt-BR')}kg`;
-                                                })()}
-                                            </div>
-                                        </div>
-                                        <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Séries concluídas</div>
-                                            <div className="text-lg font-mono font-bold text-white">
-                                                {(() => {
-                                                    const v = Number((ai.metrics as AnyObj)?.totalSetsDone || 0);
-                                                    if (!Number.isFinite(v) || v <= 0) return '—';
-                                                    return v.toString();
-                                                })()}
-                                            </div>
-                                        </div>
-                                        <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Exercícios</div>
-                                            <div className="text-lg font-mono font-bold text-white">
-                                                {(() => {
-                                                    const v = Number((ai.metrics as AnyObj)?.totalExercises || 0);
-                                                    if (!Number.isFinite(v) || v <= 0) return '—';
-                                                    return v.toString();
-                                                })()}
-                                            </div>
-                                        </div>
-                                        <div className="bg-neutral-950 rounded-xl border border-neutral-800 p-3">
-                                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Top exercício</div>
-                                            <div className="text-xs font-semibold text-neutral-100">
-                                                {(() => {
-                                                    const list = Array.isArray((ai.metrics as AnyObj)?.topExercises) ? ((ai.metrics as AnyObj).topExercises as unknown[]) : [];
-                                                    if (!list.length) return '—';
-                                                    const first = list[0] && typeof list[0] === 'object' ? list[0] : null;
-                                                    if (!first) return '—';
-                                                    const f = first as AnyObj
-                                                    const name = String(f.name || '').trim() || '—';
-                                                    const v = Number(f.volumeKg || 0);
-                                                    const volumeLabel = Number.isFinite(v) && v > 0 ? `${v.toLocaleString('pt-BR')}kg` : '';
-                                                    return volumeLabel ? `${name} • ${volumeLabel}` : name;
-                                                })()}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div className="md:col-span-2 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Resumo</div>
-                                        <ul className="space-y-2">
-                                            {(Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []).map((item: unknown, idx: number) => (
-                                                <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
-                                            ))}
-                                        </ul>
-
-                                        {Array.isArray(ai.highlights) && (ai.highlights as unknown[]).length > 0 && (
-                                            <div className="mt-4">
-                                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Destaques</div>
-                                                <ul className="space-y-2">
-                                                    {(ai.highlights as unknown[]).map((item: unknown, idx: number) => (
-                                                        <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {Array.isArray(ai.warnings) && (ai.warnings as unknown[]).length > 0 && (
-                                            <div className="mt-4">
-                                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Atenção</div>
-                                                <ul className="space-y-2">
-                                                    {(ai.warnings as unknown[]).map((item: unknown, idx: number) => (
-                                                        <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="bg-black rounded-xl p-4 text-white">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Motivação</div>
-                                        <div className="text-sm font-semibold">{String(ai.motivation || '').trim() || '—'}</div>
-
-                                        {Array.isArray(ai.prs) && (ai.prs as unknown[]).length > 0 && (
-                                            <div className="mt-4">
-                                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">PRs</div>
-                                                <div className="space-y-2">
-                                                    {(ai.prs as unknown[]).map((p: unknown, idx: number) => {
-                                                        const pr = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
-                                                        return (
-                                                            <div key={idx} className="text-xs text-neutral-200">
-                                                                <span className="font-black">{String(pr.exercise || '').trim() || '—'}</span>{' '}
-                                                                <span className="text-neutral-400">{String(pr.label || '').trim() ? `(${String(pr.label).trim()})` : ''}</span>{' '}
-                                                                <span className="font-semibold">{String(pr.value || '').trim()}</span>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="mt-4">
-                                            {aiState?.cached ? (
-                                                <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-yellow-400">
-                                                    <Check size={14} /> Salvo no histórico
-                                                </div>
-                                            ) : (
-                                                <div className="text-[11px] font-semibold text-neutral-400">Ao gerar, salva no histórico automaticamente.</div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {Array.isArray(ai.progression) && (ai.progression as unknown[]).length > 0 && (
-                                        <div className="md:col-span-3 bg-neutral-950 rounded-xl border border-neutral-800 p-4">
-                                            <div className="flex items-center justify-between gap-3 mb-3">
-                                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Progressão sugerida (próximo treino)</div>
-                                                <button
-                                                    type="button"
-                                                    onClick={handleApplyProgression}
-                                                    disabled={applyState.status === 'loading'}
-                                                    className="min-h-[36px] px-3 py-1.5 rounded-full bg-black text-white text-[11px] font-bold uppercase tracking-wide flex items-center gap-2 disabled:opacity-60"
-                                                >
-                                                    {applyState.status === 'loading' ? (
-                                                        <Loader2 size={14} className="animate-spin" />
-                                                    ) : (
-                                                        <Sparkles size={14} />
-                                                    )}
-                                                    <span>{applyState.status === 'success' ? 'Aplicado' : 'Aplicar no próximo treino'}</span>
-                                                </button>
-                                            </div>
-                                            {applyState.status === 'error' && (
-                                                <div className="mb-2 text-[11px] font-semibold text-red-300">{applyState.error}</div>
-                                            )}
-                                            {applyState.status === 'success' && (
-                                                <div className="mb-2 text-[11px] font-semibold text-green-300 flex items-center gap-1">
-                                                    <Check size={12} />
-                                                    <span>Sugestões aplicadas no próximo treino.</span>
-                                                </div>
-                                            )}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {(ai.progression as unknown[]).map((rec: unknown, idx: number) => {
-                                                    const r = rec && typeof rec === 'object' ? (rec as AnyObj) : ({} as AnyObj)
-                                                    return (
-                                                        <div key={idx} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
-                                                            <div className="text-sm font-black text-neutral-100">{String(r.exercise || '').trim() || '—'}</div>
-                                                            <div className="text-sm text-neutral-100 mt-1">{String(r.recommendation || '').trim()}</div>
-                                                            {String(r.reason || '').trim() && (
-                                                                <div className="text-xs text-neutral-400 mt-2">{String(r.reason || '').trim()}</div>
-                                                            )}
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <ReportAiSection
+                        ai={ai}
+                        aiState={{ loading: aiState.loading, error: aiState.error, cached: aiState.cached }}
+                        credits={credits}
+                        applyState={applyState}
+                        onGenerateAi={handleGenerateAi}
+                        onApplyProgression={handleApplyProgression}
+                        onOpenChat={() => setShowCoachChat(true)}
+                        renderAiRating={renderAiRating}
+                    />
 
                     {isTeamSession && (
                         <div className="mb-8 p-4 rounded-lg border border-neutral-800 bg-neutral-900/60 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -1742,68 +1475,14 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         </div>
                     )}
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                        <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800 flex flex-col justify-between">
-                            <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Tempo Total</p>
-                            <p className="text-3xl font-mono font-bold">{formatDuration(safeSession?.totalTime)}</p>
-                        </div>
-                        <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800 flex flex-col justify-between">
-                            <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Volume (Kg)</p>
-                            <div className="flex flex-col gap-1">
-                                <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1 min-w-0">
-                                    <span className="text-2xl sm:text-3xl font-mono font-bold leading-none min-w-0">
-                                        {currentVolume.toLocaleString('pt-BR')}
-                                    </span>
-                                    <span className="text-sm font-black text-neutral-400">kg</span>
-                                </div>
-                                {effectivePreviousSession && Number.isFinite(volumeDelta) && (
-                                    <span
-                                        className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-semibold w-fit ${volumeDelta >= 0
-                                            ? 'bg-green-500/15 text-green-200 border border-green-500/30'
-                                            : 'bg-red-500/15 text-red-200 border border-red-500/30'
-                                            }`}
-                                    >
-                                        {volumeDelta >= 0 ? <TrendingUp size={12} className="mr-1" /> : <TrendingDown size={12} className="mr-1" />}
-                                        {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                        <div className="bg-orange-500/10 p-4 rounded-lg border border-orange-500/30 flex flex-col justify-between">
-                            <p className="text-xs font-bold uppercase text-orange-300 mb-1 flex items-center gap-1">
-                                <Flame size={12} /> Calorias
-                            </p>
-                            <p className="text-3xl font-mono font-bold text-orange-200">~{calories}</p>
-                        </div>
-                        <div className="bg-black text-white p-4 rounded-lg flex flex-col justify-between">
-                            <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Status</p>
-                            <p className="text-xl font-bold uppercase italic">CONCLUÍDO</p>
-                        </div>
-                    </div>
-
-                    {outdoorBike && (Number(outdoorBike?.distanceMeters) > 0 || Number(outdoorBike?.durationSeconds) > 0) && (
-                        <div className="mb-8">
-                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Bike Outdoor</div>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
-                                    <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Distância</p>
-                                    <p className="text-2xl font-mono font-bold">{formatKm(outdoorBike.distanceMeters)}</p>
-                                </div>
-                                <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
-                                    <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Vel. Média</p>
-                                    <p className="text-2xl font-mono font-bold">{formatKmh(outdoorBike.avgSpeedKmh)}</p>
-                                </div>
-                                <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
-                                    <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Vel. Máx</p>
-                                    <p className="text-2xl font-mono font-bold">{formatKmh(outdoorBike.maxSpeedKmh)}</p>
-                                </div>
-                                <div className="bg-neutral-900/60 p-4 rounded-lg border border-neutral-800">
-                                    <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Tempo Bike</p>
-                                    <p className="text-2xl font-mono font-bold">{formatDuration(Number(outdoorBike.durationSeconds) || 0)}</p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <ReportSummaryCards
+                        session={safeSession}
+                        currentVolume={currentVolume}
+                        volumeDelta={volumeDelta}
+                        calories={calories}
+                        outdoorBike={outdoorBike}
+                        hasPreviousSession={!!effectivePreviousSession}
+                    />
 
                     <div className="space-y-8">
                         {exercisesList.length === 0 && (
@@ -1813,122 +1492,16 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         )}
                         {exercisesList.map((ex, exIdx) => {
                             const obj = (ex && typeof ex === 'object' ? ex as Record<string, unknown> : {}) as Record<string, unknown>;
-                            const exName = String(obj?.name || '').trim();
-                            const exKey = normalizeExerciseKey(exName);
-                            const prevLogs = prevLogsMap[exKey] || [];
-                            const baseMs = prevBaseMsMap[exKey] ?? null;
-                            const baseText = (() => {
-                                try {
-                                    if (!Number.isFinite(Number(baseMs))) return '';
-                                    const d = new Date(Number(baseMs));
-                                    if (Number.isNaN(d.getTime())) return '';
-                                    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-                                } catch {
-                                    return '';
-                                }
-                            })();
+                            const exKey = normalizeExerciseKey(obj?.name);
                             return (
-                                <div key={exIdx} className="break-inside-avoid">
-                                    <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-800 pb-2">
-                                        <h3 className="text-xl font-bold uppercase flex items-center gap-2">
-                                            <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>
-                                            {exName || '—'}
-                                        </h3>
-                                        <div className="flex gap-3 text-xs font-mono text-neutral-400">
-                                            {baseText && <span>Base: <span className="font-bold text-neutral-100">{baseText}</span></span>}
-                                            {(() => {
-                                                const m = String((obj?.method ?? '') as string).trim();
-                                                return m && m !== 'Normal' ? <span className="text-red-300 font-bold uppercase">{m}</span> : null;
-                                            })()}
-                                            {(() => {
-                                                const r = obj?.rpe as unknown;
-                                                return r != null && String(r).trim() ? <span>RPE: <span className="font-bold text-neutral-100">{String(r)}</span></span> : null;
-                                            })()}
-                                            <span>Cad: <span className="font-bold text-neutral-100">{String((obj?.cadence ?? '-') as string)}</span></span>
-                                        </div>
-                                    </div>
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="text-[10px] uppercase tracking-widest text-neutral-400 border-b border-neutral-800">
-                                                <th className="py-2 text-left w-16 font-black">Série</th>
-                                                <th className="py-2 text-center w-24 font-black">Carga</th>
-                                                <th className="py-2 text-center w-24 font-black">Reps</th>
-                                                <th className="py-2 text-center w-32 font-black">Evolução</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {Array.from({ length: Number((obj?.sets as unknown) ?? 0) || 0 }).map((_, sIdx) => {
-                                                const key = `${exIdx}-${sIdx}`;
-                                                const log = sessionLogs[key];
-                                                const prevLog = Array.isArray(prevLogs) && prevLogs[sIdx] ? prevLogs[sIdx] : null;
-
-                                                if (!log || typeof log !== 'object') return null;
-                                                const logObj = log as AnyObj;
-                                                if (!logObj.weight && !logObj.reps) return null;
-
-                                                let progressionText = "-";
-                                                let rowClass = "";
-
-                                                if (prevLog && typeof prevLog === 'object') {
-                                                    const prevObj = prevLog as AnyObj;
-                                                    const cw = Number(String(logObj?.weight ?? '').replace(',', '.'));
-                                                    const pw = Number(String(prevObj?.weight ?? '').replace(',', '.'));
-                                                    const cr = Number(String(logObj?.reps ?? '').replace(',', '.'));
-                                                    const pr = Number(String(prevObj?.reps ?? '').replace(',', '.'));
-                                                    const canWeight = Number.isFinite(cw) && cw > 0 && Number.isFinite(pw) && pw > 0;
-                                                    const canReps = Number.isFinite(cr) && cr > 0 && Number.isFinite(pr) && pr > 0;
-                                                    if (canWeight) {
-                                                        const delta = cw - pw;
-                                                        if (delta > 0) {
-                                                            progressionText = `+${String(delta).replace(/\\.0+$/, '')}kg`;
-                                                            rowClass = "bg-green-500/15 text-green-200 font-bold";
-                                                        } else if (delta < 0) {
-                                                            progressionText = `${String(delta).replace(/\\.0+$/, '')}kg`;
-                                                            rowClass = "text-red-300 font-bold";
-                                                        } else {
-                                                            progressionText = "=";
-                                                        }
-                                                    } else if (canReps) {
-                                                        const delta = cr - pr;
-                                                        if (delta > 0) {
-                                                            progressionText = `+${delta} reps`;
-                                                            rowClass = "bg-green-500/15 text-green-200 font-bold";
-                                                        } else if (delta < 0) {
-                                                            progressionText = `${delta} reps`;
-                                                            rowClass = "text-red-300 font-bold";
-                                                        } else {
-                                                            progressionText = "=";
-                                                        }
-                                                    }
-                                                }
-
-                                                return (
-                                                    <React.Fragment key={`${exIdx}-${sIdx}`}>
-                                                        <tr className="border-b border-neutral-800">
-                                                            <td className="py-2 font-mono text-neutral-400 text-xs">#{sIdx + 1}</td>
-                                                            <td className="py-2 text-center font-semibold text-sm">{logObj.weight != null && String(logObj.weight) !== '' ? String(logObj.weight) : '-'}</td>
-                                                            <td className="py-2 text-center font-mono text-sm">{logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '-'}</td>
-                                                            <td className={`py-2 text-center text-[11px] uppercase ${rowClass}`}>{progressionText}</td>
-                                                        </tr>
-                                                        {(() => {
-                                                            const noteRaw = logObj?.notes ?? logObj?.note ?? logObj?.observation ?? null;
-                                                            const note = noteRaw != null ? String(noteRaw).trim() : '';
-                                                            if (!note) return null;
-                                                            return (
-                                                                <tr key={`${sIdx}-note`} className="border-b border-neutral-800">
-                                                                    <td className="pb-3 pt-1 text-[10px] uppercase tracking-widest text-neutral-500 font-black">Obs</td>
-                                                                    <td className="pb-3 pt-1 text-xs text-neutral-200" colSpan={3}>
-                                                                        {note}
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })()}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <ReportExerciseCard
+                                    key={exIdx}
+                                    exercise={obj}
+                                    exIdx={exIdx}
+                                    sessionLogs={sessionLogs}
+                                    prevLogs={(Array.isArray(prevLogsMap[exKey]) ? prevLogsMap[exKey] : []) as unknown[]}
+                                    baseMs={prevBaseMsMap[exKey] ?? null}
+                                />
                             );
                         })}
                     </div>

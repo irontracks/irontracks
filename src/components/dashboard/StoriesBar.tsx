@@ -7,10 +7,10 @@ import { createClient } from '@/utils/supabase/client'
 import StoryViewer from '@/components/stories/StoryViewer'
 import StoryCreatorModal from '@/components/stories/StoryCreatorModal'
 import { Story, StoryGroup } from '@/types/social'
-import { parseExt, guessMediaKind, extFromMime } from '@/utils/mediaUtils'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
+import { uploadStoryFile } from '@/utils/storage/mediaUpload'
 
 const initials = (name: string) => {
   const n = String(name || '').trim()
@@ -59,47 +59,21 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
         throw new Error(`Vídeo muito grande (máx 200MB). Atual: ${(file.size / (1024 * 1024)).toFixed(1)}MB`)
       }
 
-      const rawName = String(file?.name || '').trim().toLowerCase()
-      const ext0 = parseExt(rawName) || extFromMime(file.type)
-      const kind = guessMediaKind(file.type, ext0)
-      const ext = ext0 || (kind === 'video' ? '.mp4' : '.jpg')
-      const storyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
-      const path = `${uid}/stories/${storyId}${ext}`
+      // uploadStoryFile handles provider selection (Cloudinary or Supabase signed URL)
+      // and returns either a full Cloudinary URL or a Supabase relative path
+      const mediaPath = await uploadStoryFile(file, uid)
 
-      const signResp = await fetch('/api/storage/social-stories/signed-upload', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          path,
-          contentType: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg'),
-        }),
-      })
-      const signJson = await signResp.json().catch((): null => null)
-      if (!signResp.ok || !signJson?.ok || !signJson?.token) throw new Error(String(signJson?.error || 'Falha ao preparar upload'))
-
-      if (typeof signJson?.bucketLimitBytes === 'number' && Number.isFinite(signJson.bucketLimitBytes) && file.size > signJson.bucketLimitBytes) {
-        throw new Error(
-          `Arquivo maior que o limite do bucket (${(signJson.bucketLimitBytes / (1024 * 1024)).toFixed(0)}MB). Atual: ${(file.size / (1024 * 1024)).toFixed(1)}MB`
-        )
-      }
-
-      const { error: upErr } = await supabase.storage
-        .from('social-stories')
-        .uploadToSignedUrl(path, String(signJson.token), file, { contentType: file.type || (kind === 'video' ? 'video/mp4' : 'image/jpeg') })
-      if (upErr) throw upErr
-
-      const createUrl = isIosNative() ? `/api/social/stories/create?media_path=${encodeURIComponent(path)}` : '/api/social/stories/create'
+      const createUrl = isIosNative()
+        ? `/api/social/stories/create?media_path=${encodeURIComponent(mediaPath)}`
+        : '/api/social/stories/create'
       const createResp = await fetch(createUrl, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          mediaPath: path,
-          media_path: path,
+          mediaPath,
+          media_path: mediaPath,
           caption: null,
-          meta: {
-            source: 'upload',
-            ...metadata // Pass filters/trim info to DB
-          }
+          meta: { source: 'upload', ...metadata },
         }),
       })
       const createJson = await createResp.json().catch((): null => null)
