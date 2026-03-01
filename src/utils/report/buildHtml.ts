@@ -1,65 +1,13 @@
 import { escapeHtml } from '@/utils/escapeHtml'
+import {
+  isRecord,
+  formatDate,
+  formatShortDate,
+  formatDuration,
+  normalizeExerciseKey,
+  calculateTotalVolume,
+} from '@/utils/report/formatters'
 
-const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
-
-const formatDate = (ts: unknown): string => {
-  if (!ts) return ''
-  const obj = isRecord(ts) ? ts : null
-  const toDate = obj && typeof obj.toDate === 'function' ? (obj.toDate as () => unknown) : null
-  const d = toDate
-    ? toDate()
-    : new Date(typeof ts === 'number' || typeof ts === 'string' || ts instanceof Date ? ts : String(ts))
-  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
-
-const formatShortDate = (ts: unknown): string => {
-  try {
-    if (!ts) return ''
-    const obj = isRecord(ts) ? ts : null
-    const toDate = obj && typeof obj.toDate === 'function' ? (obj.toDate as () => unknown) : null
-    const d = toDate
-      ? toDate()
-      : new Date(typeof ts === 'number' || typeof ts === 'string' || ts instanceof Date ? ts : String(ts))
-    if (!(d instanceof Date) || Number.isNaN(d.getTime())) return ''
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-  } catch {
-    return ''
-  }
-}
-
-const formatDuration = (s: unknown): string => {
-  const safe = Number(s) || 0
-  const mins = Math.floor(safe / 60)
-  const secs = Math.floor(safe % 60)
-  return `${mins}:${secs < 10 ? '0' : ''}${secs}`
-}
-
-const normalizeExerciseKey = (v: unknown): string => {
-  try {
-    return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ')
-  } catch {
-    return ''
-  }
-}
-
-const calculateTotalVolume = (logs: unknown): number => {
-  try {
-    let volume = 0
-    const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {}
-    Object.values(safeLogs).forEach((log: unknown) => {
-      if (!isRecord(log)) return
-      const w = Number(String(log.weight ?? '').replace(',', '.'))
-      const r = Number(String(log.reps ?? '').replace(',', '.'))
-      if (!Number.isFinite(w) || !Number.isFinite(r)) return
-      if (w <= 0 || r <= 0) return
-      volume += w * r
-    })
-    return volume
-  } catch {
-    return 0
-  }
-}
 
 const getSetTag = (log: unknown): string | null => {
   if (!isRecord(log)) return null
@@ -744,17 +692,17 @@ export function buildReportHTML(
             <div class="value">${formatDuration(reportData?.session?.realTimeSeconds || 0)}</div>
           </div>
           ${Number(reportData?.session?.executionTotalSeconds || 0) > 0
-            ? `<div class="card">
+      ? `<div class="card">
             <div class="muted" style="margin-bottom:4px">Execução</div>
             <div class="value">${formatDuration(Number(reportData?.session?.executionTotalSeconds || 0))}</div>
           </div>`
-            : ''}
+      : ''}
           ${Number(reportData?.session?.restTotalSeconds || 0) > 0
-            ? `<div class="card">
+      ? `<div class="card">
             <div class="muted" style="margin-bottom:4px">Descanso</div>
             <div class="value">${formatDuration(Number(reportData?.session?.restTotalSeconds || 0))}</div>
           </div>`
-            : ''}
+      : ''}
           <div class="card">
             <div class="muted" style="margin-bottom:4px">Séries</div>
             <div class="value-row">

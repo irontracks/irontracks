@@ -1010,27 +1010,35 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             const dateLabel = new Date().toISOString().slice(0, 10);
             const kind = current.type === 'week' ? 'Semanal' : current.type === 'month' ? 'Mensal' : 'Periodo';
             const fileName = `Relatorio_${kind}_${dateLabel}`;
-            const res = await fetch('/api/report', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ html, fileName })
-            });
-            if (!res.ok) {
-                const txt = await res.text().catch(() => '');
-                throw new Error(txt || `Falha ao gerar PDF (${res.status})`);
-            }
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
+            // Client-side PDF: open HTML in new window and trigger print dialog
             try {
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${fileName}.pdf`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-            } catch { }
-            setPeriodPdf({ status: 'ready', url, blob, error: '' });
+                const printWindow = window.open('', '_blank');
+                if (printWindow) {
+                    printWindow.document.open();
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                    setTimeout(() => {
+                        try {
+                            printWindow.focus();
+                            printWindow.print();
+                        } catch { }
+                    }, 500);
+                } else {
+                    // Fallback: download as HTML
+                    const blob = new Blob([html], { type: 'text/html' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${fileName}.html`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                }
+                setPeriodPdf({ status: 'ready', url: null, blob: null, error: '' });
+            } catch {
+                // Print approach failed silently
+            }
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
             setPeriodPdf((prev) => ({ ...prev, status: 'error', error: msg || 'Falha ao gerar PDF' }));
