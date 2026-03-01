@@ -479,10 +479,9 @@ export default function StoryViewer({
               <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
                 <div
                   ref={(el) => { barRefsRef.current[i] = el }}
-                  className="h-full rounded-full bg-white/90 origin-left"
+                  className="h-full rounded-full bg-white/90 origin-left transition-transform duration-[50ms] ease-linear"
                   style={{
                     transform: `scaleX(${i < idx ? 1 : 0})`,
-                    transition: 'none',
                   }}
                 />
               </div>
