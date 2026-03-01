@@ -85,6 +85,10 @@ export default function StoryViewer({
   const [muted, setMuted] = useState(true)
   const [videoError, setVideoError] = useState('')
 
+  // Use a single "paused" state that controls CSS animation-play-state
+  // This avoids tearing down useEffect loops on every touch
+  const isPaused = holding || commentsOpen || viewersOpen || hidden || deleting
+
   const rafRef = useRef<number | null>(null)
   const lastTsRef = useRef<number>(0)
   const elapsedRef = useRef<number>(0)
@@ -93,8 +97,10 @@ export default function StoryViewer({
   const preloadRef = useRef<{ aborts: AbortController[] }>({ aborts: [] })
   const stallRef = useRef<{ lastTime: number; lastTs: number; attempts: number }>({ lastTime: 0, lastTs: 0, attempts: 0 })
   const advanceLockRef = useRef<string>('')
-  // Refs for imperatively updating the progress bar — avoids React re-renders on every RAF tick
   const barRefsRef = useRef<(HTMLDivElement | null)[]>([])
+  // Ref mirrors for paused state so video RAF loop doesn't need state deps
+  const pausedRef = useRef(false)
+  pausedRef.current = isPaused
 
   const name = String(group.displayName || '').trim() || (group.authorId === myId ? 'Você' : 'Amigo')
   const isMine = String(group.authorId || '').trim() === String(myId || '').trim()
@@ -231,40 +237,24 @@ export default function StoryViewer({
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
-  // RAF loop for photos and video-fallback: imperatively update bar via DOM ref (no setState)
+  // ===== PHOTO PROGRESS: pure CSS animation (no JS at all) =====
+  // For photos, we use a CSS @keyframes animation on the bar div.
+  // The animation is started when a photo story is shown, and paused/resumed via animation-play-state.
+  // Duration changes trigger a re-mount via key change.
+  // Auto advance when the CSS animation ends:
   useEffect(() => {
-    if (!storyId) return
-    if (isVideo && !needsVideoFallback) return
-
-    const applyProgress = (p: number) => {
-      const el = barRefsRef.current[idx]
-      if (el) el.style.transform = `scaleX(${p})`
+    if (!storyId || (isVideo && !needsVideoFallback)) return
+    const el = barRefsRef.current[idx]
+    if (!el) return
+    const onEnd = () => {
+      elapsedRef.current = 0
+      goNext()
     }
+    el.addEventListener('animationend', onEnd)
+    return () => el.removeEventListener('animationend', onEnd)
+  }, [storyId, idx, isVideo, needsVideoFallback, goNext])
 
-    const tick = (ts: number) => {
-      rafRef.current = requestAnimationFrame(tick)
-      const paused = holding || commentsOpen || viewersOpen || hidden || deleting
-
-      if (!lastTsRef.current) { lastTsRef.current = ts; return }
-      const delta = ts - lastTsRef.current
-      lastTsRef.current = ts
-      if (paused) return
-
-      elapsedRef.current += delta
-      const next = Math.max(0, Math.min(1, elapsedRef.current / durationMs))
-      if (next >= 1) {
-        elapsedRef.current = 0
-        applyProgress(0)
-        goNext()
-        return
-      }
-      applyProgress(next)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, idx, storyId, viewersOpen, needsVideoFallback])
-
-  // Video timeupdate: imperatively update bar via DOM ref (no setState)
+  // ===== VIDEO PROGRESS: RAF loop reads paused from ref (no state deps = never restarts) =====
   useEffect(() => {
     if (!storyId || !isVideo) return
     const v = videoRef.current
@@ -276,6 +266,7 @@ export default function StoryViewer({
     }
 
     const update = () => {
+      if (pausedRef.current) return
       const d = Number(v.duration || 0)
       if (!Number.isFinite(d) || d <= 0) return
       const start = Math.max(0, Number(trimRange?.start ?? 0))
@@ -473,19 +464,42 @@ export default function StoryViewer({
       >
         {/* Header / Barra de Progresso */}
         <div className="absolute top-0 left-0 right-0 p-3 z-20 bg-gradient-to-b from-black/80 to-transparent">
-          {/* Barras de progresso — animadas via DOM ref para evitar React re-renders */}
+          {/* Barras de progresso */}
           <div className="flex gap-1 mb-2">
-            {stories.map((s, i) => (
-              <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
-                <div
-                  ref={(el) => { barRefsRef.current[i] = el }}
-                  className="h-full rounded-full bg-white/90 origin-left transition-transform duration-[50ms] ease-linear"
-                  style={{
-                    transform: `scaleX(${i < idx ? 1 : 0})`,
-                  }}
-                />
-              </div>
-            ))}
+            {stories.map((s, i) => {
+              const isPhotoBar = !(isVideo && !needsVideoFallback)
+              const isCurrent = i === idx
+              const isDone = i < idx
+
+              // For the current photo bar: use CSS animation
+              // For completed bars: scaleX(1)
+              // For future bars: scaleX(0)
+              // For video bars: driven by ref in the timeupdate handler
+              if (isPhotoBar && isCurrent) {
+                return (
+                  <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+                    <div
+                      ref={(el) => { barRefsRef.current[i] = el }}
+                      className="h-full rounded-full bg-white/90 origin-left"
+                      style={{
+                        animation: `story-bar-fill ${durationMs}ms linear forwards`,
+                        animationPlayState: isPaused ? 'paused' : 'running',
+                      }}
+                    />
+                  </div>
+                )
+              }
+
+              return (
+                <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
+                  <div
+                    ref={(el) => { barRefsRef.current[i] = el }}
+                    className="h-full rounded-full bg-white/90 origin-left"
+                    style={{ transform: `scaleX(${isDone ? 1 : 0})` }}
+                  />
+                </div>
+              )
+            })}
           </div>
 
           <div className="flex items-center gap-3">

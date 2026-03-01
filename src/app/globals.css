@@ -52,6 +52,17 @@
   }
 }
 
+/* Story progress bar animation — pure CSS, no JS jank */
+@keyframes story-bar-fill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
 .pb-safe-extra {
   padding-bottom: calc(env(safe-area-inset-bottom) + 80px);
 }
@@ -163,9 +174,17 @@ select {
   .no-print {
     display: none !important;
   }
-  
+
   /* Ensure text is black */
-  p, h1, h2, h3, h4, span, div, td, th {
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  span,
+  div,
+  td,
+  th {
     color: black !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
