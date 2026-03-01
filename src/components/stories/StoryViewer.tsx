@@ -237,22 +237,35 @@ export default function StoryViewer({
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
-  // ===== PHOTO PROGRESS: pure CSS animation (no JS at all) =====
-  // For photos, we use a CSS @keyframes animation on the bar div.
-  // The animation is started when a photo story is shown, and paused/resumed via animation-play-state.
-  // Duration changes trigger a re-mount via key change.
-  // Auto advance when the CSS animation ends:
+  // ===== PHOTO PROGRESS: pure CSS animation, pause/resume via ref =====
+  // Control animationPlayState imperatively so React re-renders never restart the animation
+  useEffect(() => {
+    if (isVideo && !needsVideoFallback) return
+    const el = barRefsRef.current[idx]
+    if (!el) return
+    el.style.animationPlayState = isPaused ? 'paused' : 'running'
+  }, [isPaused, idx, isVideo, needsVideoFallback])
+
+  // Set animation on mount for the current photo bar — only restarts on story change
   useEffect(() => {
     if (!storyId || (isVideo && !needsVideoFallback)) return
     const el = barRefsRef.current[idx]
     if (!el) return
+    // Reset and apply animation imperatively (never via React inline style)
+    el.style.animation = 'none'
+    // Force reflow to restart animation cleanly
+    void el.offsetWidth
+    el.style.animation = `story-bar-fill ${durationMs}ms linear forwards`
+    el.style.animationPlayState = pausedRef.current ? 'paused' : 'running'
+
     const onEnd = () => {
       elapsedRef.current = 0
       goNext()
     }
     el.addEventListener('animationend', onEnd)
     return () => el.removeEventListener('animationend', onEnd)
-  }, [storyId, idx, isVideo, needsVideoFallback, goNext])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyId, idx, durationMs, isVideo, needsVideoFallback, goNext])
 
   // ===== VIDEO PROGRESS: RAF loop reads paused from ref (no state deps = never restarts) =====
   useEffect(() => {
@@ -467,34 +480,13 @@ export default function StoryViewer({
           {/* Barras de progresso */}
           <div className="flex gap-1 mb-2">
             {stories.map((s, i) => {
-              const isPhotoBar = !(isVideo && !needsVideoFallback)
-              const isCurrent = i === idx
               const isDone = i < idx
-
-              // For the current photo bar: use CSS animation
-              // For completed bars: scaleX(1)
-              // For future bars: scaleX(0)
-              // For video bars: driven by ref in the timeupdate handler
-              if (isPhotoBar && isCurrent) {
-                return (
-                  <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
-                    <div
-                      ref={(el) => { barRefsRef.current[i] = el }}
-                      className="h-full rounded-full bg-white/90 origin-left"
-                      style={{
-                        animation: `story-bar-fill ${durationMs}ms linear forwards`,
-                        animationPlayState: isPaused ? 'paused' : 'running',
-                      }}
-                    />
-                  </div>
-                )
-              }
-
+              // All bars render the same — the animation is set imperatively via ref
               return (
                 <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
                   <div
                     ref={(el) => { barRefsRef.current[i] = el }}
-                    className="h-full rounded-full bg-white/90 origin-left"
+                    className="h-full rounded-full bg-white/90 origin-left will-change-transform"
                     style={{ transform: `scaleX(${isDone ? 1 : 0})` }}
                   />
                 </div>
