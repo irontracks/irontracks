@@ -79,7 +79,6 @@ export default function StoryViewer({
   const viewersStoryIdRef = useRef<string>('')
 
   const [deleting, setDeleting] = useState(false)
-  const [progress, setProgress] = useState(0)
   const [holding, setHolding] = useState(false)
   const [hidden, setHidden] = useState(false)
   const [durationMs, setDurationMs] = useState(5000)
@@ -89,12 +88,13 @@ export default function StoryViewer({
   const rafRef = useRef<number | null>(null)
   const lastTsRef = useRef<number>(0)
   const elapsedRef = useRef<number>(0)
-  const lastProgressUpdateRef = useRef<number>(0)
   const closeRequestedRef = useRef(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const preloadRef = useRef<{ aborts: AbortController[] }>({ aborts: [] })
   const stallRef = useRef<{ lastTime: number; lastTs: number; attempts: number }>({ lastTime: 0, lastTs: 0, attempts: 0 })
   const advanceLockRef = useRef<string>('')
+  // Refs for imperatively updating the progress bar — avoids React re-renders on every RAF tick
+  const barRefsRef = useRef<(HTMLDivElement | null)[]>([])
 
   const name = String(group.displayName || '').trim() || (group.authorId === myId ? 'Você' : 'Amigo')
   const isMine = String(group.authorId || '').trim() === String(myId || '').trim()
@@ -171,7 +171,6 @@ export default function StoryViewer({
   useEffect(() => {
     elapsedRef.current = 0
     lastTsRef.current = 0
-    setProgress(0)
     setCommentsOpen(false)
     setViewersOpen(false)
     setMuted(true)
@@ -181,6 +180,10 @@ export default function StoryViewer({
     viewersStoryIdRef.current = ''
     stallRef.current = { lastTime: 0, lastTs: 0, attempts: 0 }
     advanceLockRef.current = ''
+    // Reset all bars immediately when story changes
+    barRefsRef.current.forEach((el, i) => {
+      if (el) el.style.transform = 'scaleX(0)'
+    })
   }, [storyId])
 
   const toggleMuted = useCallback(() => {
@@ -228,10 +231,16 @@ export default function StoryViewer({
     return () => document.removeEventListener('visibilitychange', onVis)
   }, [])
 
-  // Loop de Animação
+  // RAF loop for photos and video-fallback: imperatively update bar via DOM ref (no setState)
   useEffect(() => {
     if (!storyId) return
     if (isVideo && !needsVideoFallback) return
+
+    const applyProgress = (p: number) => {
+      const el = barRefsRef.current[idx]
+      if (el) el.style.transform = `scaleX(${p})`
+    }
+
     const tick = (ts: number) => {
       rafRef.current = requestAnimationFrame(tick)
       const paused = holding || commentsOpen || viewersOpen || hidden || deleting
@@ -245,23 +254,27 @@ export default function StoryViewer({
       const next = Math.max(0, Math.min(1, elapsedRef.current / durationMs))
       if (next >= 1) {
         elapsedRef.current = 0
-        lastProgressUpdateRef.current = ts
-        setProgress(0)
+        applyProgress(0)
         goNext()
         return
       }
-      if (ts - lastProgressUpdateRef.current < 50) return
-      lastProgressUpdateRef.current = ts
-      setProgress((prev) => (Math.abs(prev - next) < 0.005 ? prev : next))
+      applyProgress(next)
     }
     rafRef.current = requestAnimationFrame(tick)
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, storyId, viewersOpen, needsVideoFallback])
+  }, [commentsOpen, deleting, durationMs, goNext, hidden, holding, isVideo, idx, storyId, viewersOpen, needsVideoFallback])
 
+  // Video timeupdate: imperatively update bar via DOM ref (no setState)
   useEffect(() => {
     if (!storyId || !isVideo) return
     const v = videoRef.current
     if (!v) return
+
+    const applyProgress = (p: number) => {
+      const el = barRefsRef.current[idx]
+      if (el) el.style.transform = `scaleX(${Math.max(0, Math.min(1, p))})`
+    }
+
     const update = () => {
       const d = Number(v.duration || 0)
       if (!Number.isFinite(d) || d <= 0) return
@@ -276,11 +289,11 @@ export default function StoryViewer({
       const effective = Math.max(0.1, end - start)
       const clamped = Math.min(end, Math.max(start, ct))
       const next = Math.max(0, Math.min(1, (clamped - start) / effective))
-      setProgress((prev) => (Math.abs(prev - next) < 0.01 ? prev : next))
+      applyProgress(next)
       if (clamped >= end - 0.05) {
         if (advanceLockRef.current !== String(storyId || '')) {
           advanceLockRef.current = String(storyId || '')
-          setProgress(0)
+          applyProgress(0)
           goNext()
         }
       }
@@ -292,7 +305,7 @@ export default function StoryViewer({
       v.removeEventListener('timeupdate', update)
       v.removeEventListener('durationchange', update)
     }
-  }, [isVideo, storyId, goNext, trimRange?.start, trimRange?.end])
+  }, [isVideo, storyId, idx, goNext, trimRange?.start, trimRange?.end])
 
   // Controle de Video Play/Pause
   useEffect(() => {
@@ -460,19 +473,18 @@ export default function StoryViewer({
       >
         {/* Header / Barra de Progresso */}
         <div className="absolute top-0 left-0 right-0 p-3 z-20 bg-gradient-to-b from-black/80 to-transparent">
+          {/* Barras de progresso — animadas via DOM ref para evitar React re-renders */}
           <div className="flex gap-1 mb-2">
             {stories.map((s, i) => (
               <div key={s.id} className="flex-1 h-1 rounded-full bg-white/20 overflow-hidden">
-                <svg className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
-                  <rect
-                    x="0"
-                    y="0"
-                    width={Math.round((i < idx ? 1 : i === idx ? progress : 0) * 100)}
-                    height="4"
-                    rx="2"
-                    fill="rgba(255,255,255,0.9)"
-                  />
-                </svg>
+                <div
+                  ref={(el) => { barRefsRef.current[i] = el }}
+                  className="h-full rounded-full bg-white/90 origin-left"
+                  style={{
+                    transform: `scaleX(${i < idx ? 1 : 0})`,
+                    transition: 'none',
+                  }}
+                />
               </div>
             ))}
           </div>
@@ -543,7 +555,8 @@ export default function StoryViewer({
                         onEnded={() => {
                           if (advanceLockRef.current !== String(story?.id || '')) {
                             advanceLockRef.current = String(story?.id || '')
-                            setProgress(0)
+                            const el = barRefsRef.current[idx]
+                            if (el) el.style.transform = 'scaleX(0)'
                             goNext()
                           }
                         }}
@@ -557,7 +570,11 @@ export default function StoryViewer({
                         </div>
                         <button
                           type="button"
-                          onClick={() => { setProgress(0); goNext(); }}
+                          onClick={() => {
+                            const el = barRefsRef.current[idx]
+                            if (el) el.style.transform = 'scaleX(0)'
+                            goNext()
+                          }}
                           className="mt-4 min-h-[44px] px-5 rounded-2xl bg-yellow-500 text-black font-black uppercase tracking-widest"
                         >
                           Próximo
