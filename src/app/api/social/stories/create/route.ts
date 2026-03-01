@@ -7,6 +7,7 @@ import { isAllowedStoryPath, validateStoryPayload } from '@/lib/social/storyVali
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { enqueueStoryJob, guessMediaType } from '@/lib/queue/storyQueue'
 
 export const dynamic = 'force-dynamic'
 const BodySchema = z.unknown()
@@ -83,6 +84,15 @@ export async function POST(req: Request) {
     // Fire-and-forget notifications — must not block the response
     const storyId = data.id
     const authorId = auth.user.id
+
+    // Enqueue async video/image processing job (fire-and-forget)
+    void enqueueStoryJob({
+      storyId,
+      mediaPath,
+      userId: authorId,
+      mediaType: guessMediaType(mediaPath),
+      enqueuedAt: Date.now(),
+    }).catch(() => { })
     void Promise.race([
       (async () => {
         const throttled = await shouldThrottleBySenderType(authorId, 'story_posted', 5)
@@ -111,7 +121,7 @@ export async function POST(req: Request) {
       })(),
       // Hard cap: notifications must finish in 5s or be abandoned
       new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-    ]).catch(() => {})
+    ]).catch(() => { })
 
     return NextResponse.json({ ok: true, data })
   } catch (e: unknown) {
