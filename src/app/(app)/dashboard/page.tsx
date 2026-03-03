@@ -14,7 +14,7 @@ const hydrateWorkouts = async (supabase: Awaited<ReturnType<typeof import('@/uti
   try {
     const { data } = await supabase
       .from('exercises')
-      .select('*')
+      .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order"')
       .in('workout_id', workoutIds)
       .order('order', { ascending: true })
       .limit(5000)
@@ -29,7 +29,7 @@ const hydrateWorkouts = async (supabase: Awaited<ReturnType<typeof import('@/uti
     try {
       const { data } = await supabase
         .from('sets')
-        .select('*')
+        .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config')
         .in('exercise_id', exerciseIds)
         .order('set_number', { ascending: true })
         .limit(20000)
@@ -101,7 +101,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   try {
     const { data } = await supabase
       .from('workouts')
-      .select('*')
+      .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
       .eq('is_template', true)
       .eq('user_id', user.id)
       .order('name', { ascending: true })
@@ -113,7 +113,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
   if (!baseWorkouts.length) {
     try {
-      const { data } = await supabase.from('workouts').select('*').eq('user_id', user.id).order('name', { ascending: true }).limit(500)
+      const { data } = await supabase.from('workouts').select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id').eq('user_id', user.id).order('name', { ascending: true }).limit(500)
       baseWorkouts = Array.isArray(data) ? data : []
     } catch {
       baseWorkouts = []
@@ -127,7 +127,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       if (studentId) {
         const { data } = await supabase
           .from('workouts')
-          .select('*')
+          .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
           .eq('is_template', true)
           .or(`user_id.eq.${studentId},student_id.eq.${studentId}`)
           .order('name', { ascending: true })
