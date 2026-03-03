@@ -1029,8 +1029,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         [activeSession?.logs, handleCloseTimer, handleUpdateSessionLog, setActiveSession]
     )
 
-    if (authLoading) return <LoadingScreen />;
-    if (!user?.id) return <LoadingScreen />;
+    // Show loading screen while auth resolves — UNLESS we already have cached workouts
+    // to show. In that case, render the dashboard immediately (workouts will be
+    // refreshed silently in the background once auth completes).
+    const hasCachedWorkouts = Array.isArray(workouts) && workouts.length > 0
+    if (authLoading && !hasCachedWorkouts) return <LoadingScreen />;
+    if (!user?.id && !hasCachedWorkouts) return <LoadingScreen />;
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;

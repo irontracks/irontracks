@@ -48,9 +48,23 @@ export function useWorkoutFetch({
     initialWorkouts,
 }: UseWorkoutFetchOptions): UseWorkoutFetchReturn {
     const [workouts, setWorkouts] = useState<Array<Record<string, unknown>>>(() => {
+        // 1. Prefer SSR-provided initial workouts
         if (Array.isArray(initialWorkouts) && initialWorkouts.length > 0) {
             return initialWorkouts.map((w) => mapWorkoutRow(w))
         }
+        // 2. Synchronously read from localStorage so workouts are visible on first render,
+        //    before auth and network requests complete (zero-latency perceived startup).
+        try {
+            if (typeof window !== 'undefined') {
+                const raw = localStorage.getItem('it_workouts_cache_v1')
+                if (raw) {
+                    const parsed: unknown = JSON.parse(raw)
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed as Array<Record<string, unknown>>
+                    }
+                }
+            }
+        } catch { }
         return []
     })
     const [stats, setStats] = useState<WorkoutStats>({ workouts: 0, exercises: 0, activeStreak: 0 })
@@ -335,6 +349,10 @@ export function useWorkoutFetch({
 
                 try {
                     await cacheSetWorkouts({ userId: currentUser?.id, workouts: mapped })
+                } catch { }
+                // Persist to localStorage for synchronous startup hydration on next open
+                try {
+                    localStorage.setItem('it_workouts_cache_v1', JSON.stringify(mapped))
                 } catch { }
 
                 if (role === 'admin' || role === 'teacher') {
