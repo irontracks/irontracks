@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
-import { Check, X, Loader2, Calendar, Mail, Phone, User, Clock, GraduationCap } from 'lucide-react'
+import React, { useEffect, useState, useCallback } from 'react'
+import { Check, X, Loader2, Calendar, Mail, Phone, Clock, GraduationCap } from 'lucide-react'
 import { useDialog } from '@/contexts/DialogContext'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
+import { createClient } from '@/utils/supabase/client'
 
 interface AccessRequest {
     id: string
@@ -19,16 +20,32 @@ interface AccessRequest {
     [key: string]: unknown
 }
 
+/**
+ * Bug #6 fix: get the Supabase session token so the API route
+ * can authenticate via requireRoleWithBearer — without it the
+ * endpoint may return 401 silently and the list appears empty.
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+    try {
+        const supabase = createClient()
+        const { data } = await supabase.auth.getSession()
+        const token = data?.session?.access_token
+        if (token) return { Authorization: `Bearer ${token}` }
+    } catch { /* fallback: cookie-based auth */ }
+    return {}
+}
+
 export default function RequestsTab() {
     const { confirm, alert } = useDialog()
     const [requests, setRequests] = useState<AccessRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [processing, setProcessing] = useState<string | null>(null) // id being processed
 
-    const fetchRequests = async () => {
+    const fetchRequests = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('/api/admin/access-requests/list?status=pending')
+            const headers = await getAuthHeaders()
+            const res = await fetch('/api/admin/access-requests/list?status=pending', { headers })
             const json = await res.json()
             if (json.ok) {
                 setRequests((json.data || []) as AccessRequest[])
@@ -40,11 +57,11 @@ export default function RequestsTab() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
 
     useEffect(() => {
         fetchRequests()
-    }, [])
+    }, [fetchRequests])
 
     const handleAction = async (req: AccessRequest, action: string) => {
         if (action === 'reject') {
@@ -65,9 +82,10 @@ export default function RequestsTab() {
 
         setProcessing(req.id)
         try {
+            const headers = await getAuthHeaders()
             const res = await fetch('/api/admin/access-requests/action', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...headers },
                 body: JSON.stringify({ requestId: req.id, action })
             })
             const json = await res.json()
@@ -78,7 +96,7 @@ export default function RequestsTab() {
             } else {
                 await alert(json.error || 'Erro ao processar.')
             }
-        } catch (e) {
+        } catch {
             await alert('Erro de conexão.')
         } finally {
             setProcessing(null)
@@ -139,7 +157,7 @@ export default function RequestsTab() {
                                     </h4>
                                     <div className="flex items-center gap-1 text-[10px] text-neutral-500">
                                         <Clock size={10} />
-                                        <span>{new Date(req.created_at).toLocaleDateString()} às {new Date(req.created_at).toLocaleTimeString().slice(0,5)}</span>
+                                        <span>{new Date(req.created_at).toLocaleDateString()} às {new Date(req.created_at).toLocaleTimeString().slice(0, 5)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -169,7 +187,7 @@ export default function RequestsTab() {
                         <div className="grid grid-cols-2 gap-2 mt-auto pt-2">
                             <button
                                 onClick={() => handleAction(req, 'reject')}
-                                disabled={processing === req.id}
+                                disabled={!!processing}
                                 className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 text-xs font-black uppercase transition-colors disabled:opacity-50"
                             >
                                 {processing === req.id ? <Loader2 className="animate-spin" size={14} /> : <X size={14} />}
@@ -177,7 +195,7 @@ export default function RequestsTab() {
                             </button>
                             <button
                                 onClick={() => handleAction(req, 'accept')}
-                                disabled={processing === req.id}
+                                disabled={!!processing}
                                 className="flex items-center justify-center gap-2 py-3 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 font-black text-xs uppercase transition-colors disabled:opacity-50"
                             >
                                 {processing === req.id ? <Loader2 className="animate-spin" size={14} /> : <Check size={14} />}

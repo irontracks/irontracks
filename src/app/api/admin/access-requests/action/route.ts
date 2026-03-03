@@ -149,37 +149,63 @@ export async function POST(req: Request) {
         // 1. Create Teacher record if not exists
         const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', email).maybeSingle()
         if (!existingTeacher) {
-            await admin.from('teachers').insert({
-                email,
-                name: fullName || email.split('@')[0],
-                phone: request.phone || null,
-                user_id: userId || null,
-                status: 'active'
-            })
+          await admin.from('teachers').insert({
+            email,
+            name: fullName || email.split('@')[0],
+            phone: request.phone || null,
+            user_id: userId || null,
+            status: 'active',
+            is_approved: true,          // Bug #8 fix: mark approval upfront
+            approved_at: new Date().toISOString(),
+            approved_by: auth.user.id,
+          })
+        } else {
+          // Update existing teacher record with approval info
+          await admin.from('teachers').update({
+            user_id: userId || null,
+            is_approved: true,
+            approved_at: new Date().toISOString(),
+            approved_by: auth.user.id,
+          }).eq('id', existingTeacher.id)
         }
-        
+
         // 2. Update Profile role if exists
         if (userId) {
-            await admin.from('profiles').update({
-              role: 'teacher',
-              is_approved: true,
-              approval_status: 'approved',
-              approved_at: new Date().toISOString(),
-              approved_by: auth.user.id,
-            }).eq('id', userId)
+          await admin.from('profiles').update({
+            role: 'teacher',
+            is_approved: true,
+            approval_status: 'approved',
+            approved_at: new Date().toISOString(),
+            approved_by: auth.user.id,
+          }).eq('id', userId)
+        }
+        // Bug #8 fix: if user has no account yet, store pre-approval in access_requests
+        // so that when they sign up, the onboarding flow can pick up their approved status
+        if (!userId) {
+          try {
+            await admin.from('access_requests').update({
+              status: 'accepted',
+              metadata: {
+                pre_approved: true,
+                role: 'teacher',
+                approved_at: new Date().toISOString(),
+                approved_by: auth.user.id,
+              }
+            }).eq('id', requestId)
+          } catch { /* non-fatal — pre-approval stored in teachers table */ }
         }
       }
 
       if (userId) {
         // If not teacher (or fallback), ensure approved
         if (roleRequested !== 'teacher') {
-            const { error: approveError } = await admin.from('profiles').update({
-              is_approved: true,
-              approval_status: 'approved',
-              approved_at: new Date().toISOString(),
-              approved_by: auth.user.id,
-            }).eq('id', userId)
-            if (approveError) throw approveError
+          const { error: approveError } = await admin.from('profiles').update({
+            is_approved: true,
+            approval_status: 'approved',
+            approved_at: new Date().toISOString(),
+            approved_by: auth.user.id,
+          }).eq('id', userId)
+          if (approveError) throw approveError
         }
 
         const { data: existingStudent } = await admin.from('students').select('id').ilike('email', email).maybeSingle()
@@ -195,7 +221,7 @@ export async function POST(req: Request) {
 
       try {
         await sendApprovalEmail(email, fullName, !!userId)
-      } catch {}
+      } catch { }
 
       return NextResponse.json({
         ok: true,
