@@ -8,6 +8,7 @@
  * Tokens are read from the `device_push_tokens` table (already populated by usePushNotifications.ts).
  */
 import * as crypto from 'crypto'
+import * as http2 from 'http2'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logInfo, logError, logWarn } from '@/lib/logger'
 
@@ -55,54 +56,78 @@ async function sendOneApnsPush(
     cfg: { keyId: string; teamId: string; keyP8: string; bundleId: string },
     extra?: Record<string, unknown>
 ): Promise<{ ok: boolean; error?: string }> {
-    const jwt = getJwt(cfg)
-    const apnsPayload = JSON.stringify({
-        aps: {
-            alert: { title, body },
-            sound: 'default',
-            badge: 1,
-        },
-        ...extra,
-    })
+    return new Promise((resolve) => {
+        try {
+            const jwt = getJwt(cfg)
+            const apnsPayload = JSON.stringify({
+                aps: {
+                    alert: { title, body },
+                    sound: 'default',
+                    badge: 1,
+                },
+                ...extra,
+            })
 
-    const isProduction = true
-    const host = isProduction
-        ? 'https://api.push.apple.com'
-        : 'https://api.sandbox.push.apple.com'
+            const isProduction = true
+            const host = isProduction
+                ? 'https://api.push.apple.com'
+                : 'https://api.sandbox.push.apple.com'
 
-    try {
-        const res = await fetch(`${host}/3/device/${token}`, {
-            method: 'POST',
-            headers: {
+            const client = http2.connect(host)
+
+            client.on('error', (err) => {
+                logError('apns', '[APNs] HTTP/2 client error', err)
+                resolve({ ok: false, error: err.message })
+            })
+
+            const req = client.request({
+                ':method': 'POST',
+                ':path': `/3/device/${token}`,
                 'authorization': `bearer ${jwt}`,
                 'apns-topic': cfg.bundleId,
                 'apns-push-type': 'alert',
                 'apns-priority': '10',
                 'apns-expiration': '0',
                 'content-type': 'application/json',
-            },
-            body: apnsPayload,
-        })
-        if (!res.ok) {
-            const errBody = await res.text().catch(() => '')
-            let reason = ''
-            try {
-                const json = JSON.parse(errBody)
-                reason = json.reason || errBody
-            } catch {
-                reason = errBody || `HTTP ${res.status}`
-            }
-            logWarn('apns', `[APNs] Push failed: ${reason} — token=${token.slice(0, 8)}...`)
-            return { ok: false, error: reason }
-        } else {
-            logInfo('apns', `[APNs] Push sent OK — token=${token.slice(0, 8)}...`)
-            return { ok: true }
+            })
+
+            req.on('response', (headers) => {
+                const status = headers[':status']
+                let data = ''
+                req.on('data', (chunk) => { data += chunk })
+                req.on('end', () => {
+                    client.close()
+                    if (status === 200) {
+                        logInfo('apns', `[APNs] Push sent OK — token=${token.slice(0, 8)}...`)
+                        resolve({ ok: true })
+                    } else {
+                        let reason = data
+                        try {
+                            const json = JSON.parse(data)
+                            reason = json.reason || data
+                        } catch {
+                            reason = data || `HTTP ${status}`
+                        }
+                        logWarn('apns', `[APNs] Push failed: ${reason} — token=${token.slice(0, 8)}...`)
+                        resolve({ ok: false, error: reason })
+                    }
+                })
+            })
+
+            req.on('error', (err) => {
+                client.close()
+                logError('apns', '[APNs] Request error', err)
+                resolve({ ok: false, error: err.message })
+            })
+
+            req.write(apnsPayload)
+            req.end()
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : String(e)
+            logError('apns', '[APNs] Unexpected error in sendOneApnsPush', msg)
+            resolve({ ok: false, error: msg })
         }
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        logError('apns', '[APNs] Network error sending push', { token: token.slice(0, 8), err: msg })
-        return { ok: false, error: msg }
-    }
+    })
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
