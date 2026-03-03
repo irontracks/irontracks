@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
@@ -6,6 +7,15 @@ import { cacheDelete } from '@/utils/cache'
 import { logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
+
+const safeEqual = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b))
+  } catch {
+    return false
+  }
+}
 
 const mapSubscriptionStatusFromPayment = (status: string) => {
   const s = (status || '').toUpperCase()
@@ -37,7 +47,7 @@ export async function POST(req: Request) {
   if (!secret) {
     return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 500 })
   }
-  if (provided !== secret) {
+  if (!provided || !safeEqual(provided, secret)) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 
@@ -101,11 +111,11 @@ export async function POST(req: Request) {
     const { data: appPayRow } = payRow
       ? { data: null as Record<string, unknown> | null }
       : await admin
-          .from('app_payments')
-          .update(updates)
-          .eq('asaas_payment_id', paymentId)
-          .select('id, subscription_id')
-          .maybeSingle()
+        .from('app_payments')
+        .update(updates)
+        .eq('asaas_payment_id', paymentId)
+        .select('id, subscription_id')
+        .maybeSingle()
     if (!payRow?.id && !appPayRow?.id) {
       await admin.from('app_payments').update(updates).eq('provider', 'asaas').eq('provider_payment_id', paymentId)
     }
