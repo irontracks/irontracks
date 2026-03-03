@@ -1400,27 +1400,29 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             )}
 
                             {view === 'active' && activeSession && (
-                                <ActiveWorkout
-                                    session={activeSession as Record<string, unknown>}
-                                    user={user as unknown as AdminUser}
-                                    settings={userSettingsApi?.settings ?? null}
-                                    onUpdateLog={handleUpdateSessionLog}
-                                    onFinish={handleFinishSession}
-                                    onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
-                                    onBack={() => setView('dashboard')}
-                                    onStartTimer={handleStartTimer}
-                                    isCoach={isCoach}
-                                    onUpdateSession={(updates: unknown) =>
-                                        setActiveSession((prev) => {
-                                            if (!prev) return prev
-                                            const u = updates && typeof updates === 'object' ? (updates as Record<string, unknown>) : {}
-                                            return { ...prev, ...(u as Partial<ActiveWorkoutSession>) }
-                                        })
-                                    }
-                                    nextWorkout={nextWorkout}
-                                    onEditWorkout={() => handleOpenActiveWorkoutEditor()}
-                                    onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
-                                />
+                                <SectionErrorBoundary section="Treino Ativo" fullScreen onReset={() => setView('dashboard')}>
+                                    <ActiveWorkout
+                                        session={activeSession as Record<string, unknown>}
+                                        user={user as unknown as AdminUser}
+                                        settings={userSettingsApi?.settings ?? null}
+                                        onUpdateLog={handleUpdateSessionLog}
+                                        onFinish={handleFinishSession}
+                                        onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
+                                        onBack={() => setView('dashboard')}
+                                        onStartTimer={handleStartTimer}
+                                        isCoach={isCoach}
+                                        onUpdateSession={(updates: unknown) =>
+                                            setActiveSession((prev) => {
+                                                if (!prev) return prev
+                                                const u = updates && typeof updates === 'object' ? (updates as Record<string, unknown>) : {}
+                                                return { ...prev, ...(u as Partial<ActiveWorkoutSession>) }
+                                            })
+                                        }
+                                        nextWorkout={nextWorkout}
+                                        onEditWorkout={() => handleOpenActiveWorkoutEditor()}
+                                        onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
+                                    />
+                                </SectionErrorBoundary>
                             )}
 
                             {editActiveOpen && view === 'active' && editActiveDraft && (
@@ -1580,14 +1582,16 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                             {view === 'directChat' && directChat && (
                                 <div className="absolute inset-0 z-50 bg-neutral-900">
-                                    <ChatDirectScreen
-                                        user={user as unknown as AdminUser}
-                                        targetUser={directChat}
-                                        otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
-                                        otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
-                                        otherUserPhoto={directChat.other_user_photo ?? directChat.photoUrl ?? null}
-                                        onClose={handleOpenChatList}
-                                    />
+                                    <SectionErrorBoundary section="Chat Direto" fullScreen onReset={() => setView('chatList')}>
+                                        <ChatDirectScreen
+                                            user={user as unknown as AdminUser}
+                                            targetUser={directChat}
+                                            otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
+                                            otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
+                                            otherUserPhoto={directChat.other_user_photo ?? directChat.photoUrl ?? null}
+                                            onClose={handleOpenChatList}
+                                        />
+                                    </SectionErrorBoundary>
                                 </div>
                             )}
 
@@ -1754,7 +1758,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         </button>
                                     </div>
                                     <div className="p-4 relative">
-                                        <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen />
+                                        <SectionErrorBoundary section="Notificações" onReset={() => setShowNotifCenter(false)}>
+                                            <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen />
+                                        </SectionErrorBoundary>
                                     </div>
                                 </div>
                             </div>
