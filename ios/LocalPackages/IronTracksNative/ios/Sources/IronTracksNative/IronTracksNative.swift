@@ -253,6 +253,16 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Live Activities
 
     @objc func startRestLiveActivity(_ call: CAPPluginCall) {
+        let id = String(call.getString("id") ?? "rest_timer")
+        let seconds = Double(call.getInt("seconds") ?? 0)
+        
+        if seconds > 0 {
+            // Always start background alarm regardless of Live Activity support or success
+            DispatchQueue.main.async { [weak self] in
+                self?.startBackgroundAlarmScheduler(restId: id, seconds: seconds)
+            }
+        }
+
         if #available(iOS 16.2, *) {
             startRestLiveActivityAvailable(call)
             return
@@ -304,12 +314,6 @@ public class IronTracksNative: CAPPlugin, CAPBridgedPlugin {
                     pushType: nil
                 )
                 Self.restActivities[id] = activity
-
-                // Start background alarm scheduler
-                await MainActor.run {
-                    self.startBackgroundAlarmScheduler(restId: id, seconds: seconds)
-                }
-
                 call.resolve()
             } catch {
                 call.reject("live_activity_error", error.localizedDescription)

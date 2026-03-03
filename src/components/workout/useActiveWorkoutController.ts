@@ -8,14 +8,14 @@ import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { 
-  ActiveWorkoutProps, 
-  UnknownRecord, 
-  WorkoutExercise, 
-  WorkoutSession, 
-  WorkoutDraft, 
+import {
+  ActiveWorkoutProps,
+  UnknownRecord,
+  WorkoutExercise,
+  WorkoutSession,
+  WorkoutDraft,
   WorkoutSetDetail,
-  ReportHistory, 
+  ReportHistory,
   ReportHistoryItem,
   AiRecommendation,
   DeloadSetEntries,
@@ -23,24 +23,24 @@ import {
   DeloadAnalysis,
   DeloadSuggestion
 } from './types';
-import { 
-  isObject, 
-  isClusterConfig, 
-  isRestPauseConfig, 
-  buildPlannedBlocks, 
-  buildBlocksByCount, 
-  toNumber, 
-  safeJsonParse, 
-  toDateMs, 
-  averageNumbers, 
-  extractLogWeight, 
-  withTimeout, 
-  normalizeReportHistory, 
-  readReportCache, 
-  writeReportCache, 
-  clampNumber, 
-  roundToStep, 
-  normalizeExerciseKey, 
+import {
+  isObject,
+  isClusterConfig,
+  isRestPauseConfig,
+  buildPlannedBlocks,
+  buildBlocksByCount,
+  toNumber,
+  safeJsonParse,
+  toDateMs,
+  averageNumbers,
+  extractLogWeight,
+  withTimeout,
+  normalizeReportHistory,
+  readReportCache,
+  writeReportCache,
+  clampNumber,
+  roundToStep,
+  normalizeExerciseKey,
   estimate1Rm,
   DELOAD_HISTORY_KEY,
   DELOAD_AUDIT_KEY,
@@ -159,6 +159,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     restTime: '60',
     method: 'Normal',
   }));
+  const [linkedWeightExercises, setLinkedWeightExercises] = useState<Set<number>>(new Set());
 
   const restPauseRefs = useRef<InputRefMap>({});
   const clusterRefs = useRef<InputRefMap>({});
@@ -187,7 +188,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     const id = setInterval(() => {
       try {
         if (typeof document !== 'undefined' && document.hidden) return;
-      } catch {}
+      } catch { }
       setTicker(Date.now());
     }, 1000);
     return () => clearInterval(id);
@@ -219,10 +220,31 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const updateLog = (key: string, patch: unknown) => {
     try {
       if (typeof props?.onUpdateLog !== 'function') return;
-      const prev = getLog(key);
+
       const patchObj: UnknownRecord = isObject(patch) ? patch : {};
+      const [exIdxStr] = key.split('-');
+      const exIdx = parseInt(exIdxStr, 10);
+
+      // If weight changes and this exercise has linked weights enable, update all sets
+      if (linkedWeightExercises.has(exIdx) && 'weight' in patchObj) {
+        const ex = exercises[exIdx];
+        if (ex) {
+          const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
+          const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
+          const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+
+          for (let setIdx = 0; setIdx < setsCount; setIdx++) {
+            const linkedKey = `${exIdx}-${setIdx}`;
+            const prev = getLog(linkedKey);
+            props.onUpdateLog(linkedKey, { ...prev, ...patchObj });
+          }
+          return;
+        }
+      }
+
+      const prev = getLog(key);
       props.onUpdateLog(key, { ...prev, ...patchObj });
-    } catch {}
+    } catch { }
   };
 
   const getPlanConfig = (ex: WorkoutExercise, setIdx: number): UnknownRecord | null => {
@@ -352,7 +374,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
             if (hasValues) {
               sets.push({ weight, reps });
             }
-          } catch {}
+          } catch { }
         });
         if (!sets.length) return null;
         const weightList = sets
@@ -531,7 +553,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           : prev,
       );
       setReportHistoryUpdatedAt((prev) => (prev ? prev : Date.now()));
-    } catch {}
+    } catch { }
   }, [ticker]);
 
   const loadDeloadHistory = (): ReportHistory => {
@@ -550,7 +572,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     try {
       if (typeof window === 'undefined') return;
       window.localStorage.setItem(DELOAD_HISTORY_KEY, JSON.stringify(next));
-    } catch {}
+    } catch { }
   };
 
   const appendDeloadAudit = (entry: unknown) => {
@@ -561,7 +583,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const list: unknown[] = Array.isArray(parsed) ? parsed : [];
       const next = [entry, ...list].slice(0, 100);
       window.localStorage.setItem(DELOAD_AUDIT_KEY, JSON.stringify(next));
-    } catch {}
+    } catch { }
   };
 
   const buildExerciseHistoryEntry = (ex: WorkoutExercise, exIdx: number): ReportHistoryItem | null => {
@@ -607,7 +629,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         next.exercises[key] = { name, items: updated };
       });
       saveDeloadHistory(next);
-    } catch {}
+    } catch { }
   };
 
   const analyzeDeloadHistory = (items: ReportHistoryItem[]): DeloadAnalysis => {
@@ -839,7 +861,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           if (!safeEx || !Number.isFinite(safeIdx) || safeIdx < 0) {
             try {
               await alert('Deload indisponível: exercício inválido.');
-            } catch {}
+            } catch { }
             return;
           }
           const name = String(safeEx?.name || '').trim() || `Exercício ${safeIdx + 1}`;
@@ -847,10 +869,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           if (!setsCount || setsCount <= 0) {
             try {
               await alert('Deload indisponível: exercício sem séries configuradas.');
-            } catch {}
+            } catch { }
             return;
           }
-          
+
           const statusSnap = reportHistoryStatusRef.current && typeof reportHistoryStatusRef.current === 'object' ? reportHistoryStatusRef.current : { status: 'idle' };
           const isStillLoading = String(statusSnap?.status || 'idle') === 'loading' && !Number(reportHistoryUpdatedAtRef.current || 0);
           if (reportHistoryLoadingRef.current || isStillLoading) {
@@ -937,7 +959,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
               : '';
             try {
               await alert(`${watermarkMsg}Deload completo indisponível: ${baseErrorClean}${reportMsg ? ` ${reportMsg}` : ''}`);
-            } catch {}
+            } catch { }
             return;
           }
           const reason = getDeloadReason(suggestion.analysis, suggestion.appliedReduction, suggestion.historyCount);
@@ -952,7 +974,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     } catch (e: unknown) {
       try {
         await alert('Tempo limite ao processar o Deload. Tente novamente em instantes.');
-      } catch {}
+      } catch { }
     }
   };
 
@@ -1056,7 +1078,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     } catch (e: unknown) {
       try {
         await alert('Não foi possível aplicar o deload agora.');
-      } catch {}
+      } catch { }
     }
   };
 
@@ -1066,11 +1088,20 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const s = Number(seconds);
       if (!Number.isFinite(s) || s <= 0) return;
       props.onStartTimer(s, context);
-    } catch {}
+    } catch { }
   };
 
   const toggleCollapse = (exIdx: number) => {
     setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(exIdx)) next.delete(exIdx);
+      else next.add(exIdx);
+      return next;
+    });
+  };
+
+  const toggleLinkWeights = (exIdx: number) => {
+    setLinkedWeightExercises((prev) => {
       const next = new Set(prev);
       if (next.has(exIdx)) next.delete(exIdx);
       else next.add(exIdx);
@@ -1120,7 +1151,45 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
         await alert('Não foi possível adicionar série extra: ' + msg);
-      } catch {}
+      } catch { }
+    }
+  };
+
+  const removeExtraSetFromExercise = async (exIdx: unknown) => {
+    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    const idx = Number(exIdx);
+    if (!Number.isFinite(idx) || idx < 0) return;
+    if (idx >= exercises.length) return;
+    try {
+      const nextExercises = [...exercises];
+      const exRaw = nextExercises[idx] && typeof nextExercises[idx] === 'object' ? nextExercises[idx] : {};
+      const setsHeader = Math.max(0, Number.parseInt(String(exRaw?.sets ?? '0'), 10) || 0);
+      const sdArrRaw = Array.isArray(exRaw?.setDetails) ? exRaw.setDetails : Array.isArray(exRaw?.set_details) ? exRaw.set_details : [];
+      const sdArr = Array.isArray(sdArrRaw) ? [...sdArrRaw] : [];
+      const setsCount = Math.max(setsHeader, sdArr.length);
+
+      // Prevent deleting if there are only 0 or 1 sets left
+      if (setsCount <= 1) return;
+
+      sdArr.pop();
+      nextExercises[idx] = {
+        ...exRaw,
+        sets: setsCount - 1,
+        setDetails: sdArr,
+      };
+
+      const nextLogs: Record<string, unknown> = { ...(logs && typeof logs === 'object' ? logs : {}) };
+      const discardedKey = `${idx}-${setsCount - 1}`;
+      try {
+        delete nextLogs[discardedKey];
+      } catch { }
+
+      props.onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+    } catch (e: unknown) {
+      try {
+        const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
+        await alert('Não foi possível remover a série: ' + msg);
+      } catch { }
     }
   };
 
@@ -1146,7 +1215,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
         await alert('Não foi possível abrir a edição do exercício: ' + msg);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -1158,7 +1227,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     if (!name) {
       try {
         await alert('Informe o nome do exercício.', 'Editar exercício');
-      } catch {}
+      } catch { }
       return;
     }
     const desiredSets = Math.max(1, Math.min(MAX_EXTRA_SETS_PER_EXERCISE, Number.parseInt(String(editExerciseDraft?.sets || '1'), 10) || 1));
@@ -1201,7 +1270,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         for (let i = desiredSets; i < previousSetsCount; i += 1) {
           try {
             delete nextLogs[`${idx}-${i}`];
-          } catch {}
+          } catch { }
         }
       }
 
@@ -1212,7 +1281,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
         await alert('Não foi possível salvar a edição do exercício: ' + msg);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -1223,7 +1292,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     if (!name) {
       try {
         await alert('Informe o nome do exercício.', 'Exercício extra');
-      } catch {}
+      } catch { }
       return;
     }
     const sets = Math.max(1, Number.parseInt(String(addExerciseDraft?.sets || '3'), 10) || 1);
@@ -1244,7 +1313,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
         await alert('Não foi possível adicionar exercício extra: ' + msg);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -1301,7 +1370,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       setOrganizeOpen(false);
       try {
         await alert('Ordem dos exercícios salva com sucesso.');
-      } catch {}
+      } catch { }
     } catch (e: unknown) {
       const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || 'Falha ao salvar a ordem.');
       setOrganizeError(msg);
@@ -1337,9 +1406,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       ok =
         typeof confirm === 'function'
           ? await confirm('Deseja finalizar o treino?', 'Finalizar treino', {
-              confirmText: 'Sim',
-              cancelText: 'Não',
-            })
+            confirmText: 'Sim',
+            cancelText: 'Não',
+          })
           : false;
     } catch {
       ok = false;
@@ -1355,13 +1424,13 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         allowSaveShort =
           typeof confirm === 'function'
             ? await confirm(
-                'Esse treino durou menos de 30 minutos. Deseja adicioná-lo no histórico?',
-                'Treino curto (< 30 min)',
-                {
-                  confirmText: 'Sim',
-                  cancelText: 'Não',
-                }
-              )
+              'Esse treino durou menos de 30 minutos. Deseja adicioná-lo no histórico?',
+              'Treino curto (< 30 min)',
+              {
+                confirmText: 'Sim',
+                cancelText: 'Não',
+              }
+            )
             : false;
       } catch {
         allowSaveShort = false;
@@ -1373,9 +1442,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       showReport =
         typeof confirm === 'function'
           ? await confirm('Deseja o relatório desse treino?', 'Gerar relatório?', {
-              confirmText: 'Sim',
-              cancelText: 'Não',
-            })
+            confirmText: 'Sim',
+            cancelText: 'Não',
+          })
           : true;
     } catch {
       showReport = true;
@@ -1401,46 +1470,46 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       if (shouldSaveHistory) {
         const idempotencyKey = `finish_${workout?.id || 'unknown'}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         const submission = { session: payload, idempotencyKey };
-        
+
         try {
           let onlineSuccess = false;
           if (isOnline()) {
-             try {
-                const resp = await fetch('/api/workouts/finish', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(submission),
-                });
-                
-                if (resp.ok) {
-                    const json = await resp.json();
-                    savedId = json?.saved?.id ?? null;
-                    onlineSuccess = true;
-                } else {
-                    if (resp.status >= 400 && resp.status < 500) {
-                        const errText = await resp.text();
-                        throw new Error(`Erro de validação: ${errText}`);
-                    }
-                    throw new Error(`Erro do servidor: ${resp.status}`);
+            try {
+              const resp = await fetch('/api/workouts/finish', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(submission),
+              });
+
+              if (resp.ok) {
+                const json = await resp.json();
+                savedId = json?.saved?.id ?? null;
+                onlineSuccess = true;
+              } else {
+                if (resp.status >= 400 && resp.status < 500) {
+                  const errText = await resp.text();
+                  throw new Error(`Erro de validação: ${errText}`);
                 }
-             } catch (fetchErr: unknown) {
-                 if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
-                 logWarn('warn', 'Online save failed, attempting offline queue', fetchErr);
-             }
+                throw new Error(`Erro do servidor: ${resp.status}`);
+              }
+            } catch (fetchErr: unknown) {
+              if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
+              logWarn('warn', 'Online save failed, attempting offline queue', fetchErr);
+            }
           }
 
           if (!onlineSuccess) {
-              await queueFinishWorkout(submission);
-              await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline');
-              savedId = 'offline-pending';
+            await queueFinishWorkout(submission);
+            await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline');
+            savedId = 'offline-pending';
           }
 
         } catch (e: unknown) {
           const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
           if (msg.includes('Erro de validação')) {
-              await alert(msg);
-              setFinishing(false);
-              return;
+            await alert(msg);
+            setFinishing(false);
+            return;
           }
           await alert('CRÍTICO: Erro ao salvar treino: ' + (msg || 'erro inesperado'));
           setFinishing(false);
@@ -1457,7 +1526,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         if (typeof props?.onFinish === 'function') {
           props.onFinish(sessionForReport, showReport);
         }
-      } catch {}
+      } catch { }
     } catch (e: unknown) {
       const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
       await alert('Erro ao finalizar: ' + (msg || 'erro inesperado'));
@@ -1534,7 +1603,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         advanced_config: baseAdvanced,
       });
       setClusterModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveRestPauseModal = () => {
@@ -1587,7 +1656,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         advanced_config: cfg,
       });
       setRestPauseModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveDropSetModal = () => {
@@ -1630,7 +1699,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         drop_set: { stages },
       });
       setDropSetModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveStrippingModal = () => {
@@ -1671,7 +1740,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         stripping: { stages },
       });
       setStrippingModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveFst7Modal = () => {
@@ -1713,7 +1782,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         fst7: { blocks, intra_sec },
       });
       setFst7Modal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveHeavyDutyModal = () => {
@@ -1750,7 +1819,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         heavy_duty,
       });
       setHeavyDutyModal(null);
-    } catch {}
+    } catch { }
   };
 
   const savePontoZeroModal = () => {
@@ -1782,7 +1851,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         ponto_zero: { weight, reps, hold_sec, rpe },
       });
       setPontoZeroModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveForcedRepsModal = () => {
@@ -1817,7 +1886,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         forced_reps: { weight, reps_failure, forced_count, rpe },
       });
       setForcedRepsModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveNegativeRepsModal = () => {
@@ -1852,7 +1921,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         negative_reps: { weight, reps, eccentric_sec, rpe },
       });
       setNegativeRepsModal(null);
-    } catch {}
+    } catch { }
   };
 
   const savePartialRepsModal = () => {
@@ -1888,7 +1957,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         partial_reps: { weight, full_reps, partial_count, rpe },
       });
       setPartialRepsModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveSistema21Modal = () => {
@@ -1921,7 +1990,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         sistema21: { weight, phase1, phase2, phase3, rpe },
       });
       setSistema21Modal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveWaveModal = () => {
@@ -1965,7 +2034,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         wave: { weight, waves, rpe },
       });
       setWaveModal(null);
-    } catch {}
+    } catch { }
   };
 
   const saveGroupMethodModal = () => {
@@ -1994,7 +2063,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         rpe,
       });
       setGroupMethodModal(null);
-    } catch {}
+    } catch { }
   };
 
   const currentExercise = exercises[currentExerciseIdx] ?? null;
@@ -2084,7 +2153,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     setEditExerciseIdx,
     editExerciseDraft,
     setEditExerciseDraft,
-    
+    linkedWeightExercises,
+    toggleLinkWeights,
+
     // Refs
     restPauseRefs,
     clusterRefs,
@@ -2103,6 +2174,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     getPlannedSet,
     toggleCollapse,
     addExtraSetToExercise,
+    removeExtraSetFromExercise,
     openEditExercise,
     saveEditExercise,
     addExtraExerciseToWorkout,
