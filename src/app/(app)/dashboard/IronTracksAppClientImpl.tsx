@@ -58,6 +58,7 @@ import { estimateExerciseSeconds, toMinutesRounded, calculateExerciseDuration } 
 import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { BackButton } from '@/components/ui/BackButton';
+import DashboardModals from './DashboardModals';
 const StudentDashboard = dynamic(() => import('@/components/dashboard/StudentDashboard'), { ssr: false });
 const WorkoutWizardModal = dynamic(() => import('@/components/dashboard/WorkoutWizardModal'), { ssr: false });
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
@@ -1604,420 +1605,68 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             )}
                         </div>
 
-                        {/* Modals & Overlays */}
-                        {showCompleteProfile && (
-                            <div className="fixed inset-0 z-[85] bg-black/80 flex items-center justify-center p-4">
-                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
-                                    <div className="flex items-center justify-between gap-3 mb-4">
-                                        <h3 className="font-black text-white">Completar Perfil</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCompleteProfile(false)}
-                                            className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
-                                            aria-label="Fechar"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-
-                                    <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">
-                                        Nome de Exibição
-                                    </label>
-                                    <input
-                                        value={profileDraftName}
-                                        onChange={(e) => setProfileDraftName(e.target.value)}
-                                        placeholder="Ex: João Silva"
-                                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
-                                    />
-
-                                    <div className="flex gap-2 mt-5">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowCompleteProfile(false)}
-                                            disabled={savingProfile}
-                                            className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50"
-                                        >
-                                            Cancelar
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleSaveProfile}
-                                            disabled={savingProfile}
-                                            className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50"
-                                        >
-                                            {savingProfile ? 'Salvando...' : 'Salvar'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                        {showImportModal && (
-                            <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
-                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
-                                    <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
-                                    <input
-                                        value={importCode}
-                                        onChange={e => setImportCode(e.target.value)}
-                                        placeholder="Cole o código do treino aqui"
-                                        className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase"
-                                    />
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
-                                        <button onClick={handleImportWorkout} className="flex-1 p-3 bg-blue-600 rounded-xl font-bold text-white">Importar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {showJsonImportModal && (
-                            <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
-                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
-                                    <Upload size={48} className="mx-auto text-blue-500 mb-4" />
-                                    <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
-                                    <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
-
-                                    <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
-                                        Selecionar Arquivo
-                                        <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
-                                    </label>
-
-                                    <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
-                                </div>
-                            </div>
-                        )}
-
-                        {shareCode && (
-                            <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
-                                <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
-                                    <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4 text-black"><Check size={32} /></div>
-                                    <h3 className="font-bold text-white mb-2">Link Gerado!</h3>
-                                    <p className="text-neutral-400 text-sm mb-6">Envie este código para seu aluno ou amigo.</p>
-                                    <div className="bg-black p-4 rounded-xl font-mono text-yellow-500 text-xl mb-4 tracking-widest select-all">
-                                        {shareCode}
-                                    </div>
-                                    <button onClick={() => setShareCode(null)} className="w-full p-3 bg-neutral-800 rounded-xl font-bold text-white">Fechar</button>
-                                </div>
-                            </div>
-                        )}
-
-                        {quickViewWorkout && (
-                            <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setQuickViewWorkout(null)}>
-                                <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                    <div className="p-4 flex justify-between items-center border-b border-neutral-800">
-                                        <h3 className="font-bold text-white">{String(quickViewWorkout?.title || '')}</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setQuickViewWorkout(null)}
-                                            className="flex items-center gap-2 text-yellow-500 hover:text-yellow-400 transition-colors py-2 px-3 rounded-xl hover:bg-neutral-800 active:opacity-70"
-                                            aria-label="Voltar"
-                                        >
-                                            <ArrowLeft size={20} />
-                                            <span className="font-semibold text-sm">Voltar</span>
-                                        </button>
-                                    </div>
-                                    <div className="p-4 max-h-[60vh] overflow-y-auto space-y-3 custom-scrollbar">
-                                        {(Array.isArray(quickViewWorkout?.exercises) ? quickViewWorkout.exercises : []).map((ex: unknown, idx: number) => {
-                                            const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                            return (
-                                                <div key={idx} className="p-3 rounded-xl bg-neutral-800/50 border border-neutral-700">
-                                                    <div className="flex justify-between items-center">
-                                                        <h4 className="font-bold text-white text-sm">{String(e?.name || '—')}</h4>
-                                                        <span className="text-xs text-neutral-400">{(parseInt(String(e?.sets ?? '')) || 0)} x {String(e?.reps || '-')}</span>
-                                                    </div>
-                                                    <div className="text-xs text-neutral-400 mt-1 flex items-center gap-2">
-                                                        <Clock size={14} className="text-yellow-500" /><span>Descanso: {e?.restTime ? `${parseInt(String(e.restTime))}s` : '-'}</span>
-                                                    </div>
-                                                    {!!e?.notes && <p className="text-sm text-neutral-300 mt-2">{String(e.notes || '')}</p>}
-                                                </div>
-                                            )
-                                        })}
-                                        {(!Array.isArray(quickViewWorkout?.exercises) || quickViewWorkout.exercises.length === 0) && (
-                                            <p className="text-neutral-400 text-sm">Este treino não tem exercícios.</p>
-                                        )}
-                                    </div>
-                                    <div className="p-4 border-t border-neutral-800 flex gap-2">
-                                        <button onClick={() => { const w = quickViewWorkout; setQuickViewWorkout(null); handleStartSession(w); }} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl">Iniciar Treino</button>
-                                        <button onClick={() => setQuickViewWorkout(null)} className="flex-1 p-3 bg-neutral-800 text-white font-bold rounded-xl">Fechar</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {showNotifCenter && (
-                            <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setShowNotifCenter(false)}>
-                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                    <div className="p-4 flex justify-between items-center border-b border-neutral-800">
-                                        <h3 className="font-bold text-white">Notificações</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowNotifCenter(false)}
-                                            className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
-                                            aria-label="Fechar"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                    <div className="p-4 relative">
-                                        <SectionErrorBoundary section="Notificações" onReset={() => setShowNotifCenter(false)}>
-                                            <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen />
-                                        </SectionErrorBoundary>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {activeSession?.timerTargetTime && (
-                            <RestTimerOverlay
-                                targetTime={activeSession.timerTargetTime}
-                                context={activeSession.timerContext as unknown as Parameters<typeof import('@/components/RestTimerOverlay').default>[0]['context']}
-                                settings={userSettingsApi?.settings ?? null}
-                                onClose={handleCloseTimer}
-                                onFinish={handleCloseTimer}
-                                onStart={handleStartFromRestTimer}
-                            />
-                        )}
-
-                        {activeSession && view !== 'active' && (
-                            <div className="fixed bottom-0 left-0 right-0 z-[1100]">
-                                <div className="bg-neutral-900/95 backdrop-blur border-t border-neutral-800 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="font-bold text-white truncate">{activeSession.workout?.title || 'Treino em andamento'}</h3>
-                                            <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
-                                                <span className="font-mono text-yellow-500">{(() => { const startMs = parseStartedAtMs(activeSession.startedAt); const endMs = sessionTicker || startMs; const s = startMs > 0 ? Math.max(0, Math.floor((endMs - startMs) / 1000)) : 0; const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
-                                                <span className="text-neutral-500">tempo atual</span>
-                                                <span className="opacity-30">•</span>
-                                                <span className="font-mono text-neutral-200">{(() => { const list = Array.isArray(activeSession.workout?.exercises) ? activeSession.workout.exercises : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>
-                                                <span className="text-neutral-500">estimado total</span>
-                                            </div>
-                                            <div className="h-1 bg-neutral-700 rounded-full overflow-hidden mt-2">
-                                                {(() => {
-                                                    const exCount = (activeSession.workout?.exercises || []).length;
-                                                    let percent = 0;
-                                                    if (exCount) {
-                                                        const done = new Set();
-                                                        if (activeSession.logs) {
-                                                            Object.keys(activeSession.logs).forEach(k => {
-                                                                const i = parseInt(k.split('-')[0]) || 0;
-                                                                done.add(i);
-                                                            });
-                                                        }
-                                                        const current = Math.min(done.size, exCount);
-                                                        percent = Math.round((current / exCount) * 100);
-                                                    }
-                                                    return <div className="h-full bg-yellow-500" style={{ width: `${percent}%` }}></div>
-                                                })()}
-                                            </div>
-                                        </div>
-                                        <button className="shrink-0 px-4 py-2 bg-yellow-500 text-black font-black rounded-xl hover:bg-yellow-400" onClick={() => setView('active')}>Voltar pro treino</button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Admin Panel Modal controlled by State */}
-                        {showAdminPanel && (
-                            <SectionErrorBoundary section="Painel Admin" fullScreen onReset={closeAdminPanel}>
-                                <AdminPanelV2 user={user as unknown as AdminUser} onClose={closeAdminPanel} />
-                            </SectionErrorBoundary>
-                        )}
-
-                        {whatsNewOpen && (
-                            <WhatsNewModal
-                                isOpen={whatsNewOpen}
-                                entry={pendingUpdate ? null : getLatestWhatsNew()}
-                                update={pendingUpdate ? {
-                                    id: String(pendingUpdate?.id || ''),
-                                    version: pendingUpdate?.version || null,
-                                    title: String(pendingUpdate?.title || ''),
-                                    description: String(pendingUpdate?.description || ''),
-                                    release_date: String(pendingUpdate?.release_date || pendingUpdate?.releaseDate || '') || null,
-                                } : null}
-                                onClose={closeWhatsNew}
-                            />
-                        )}
-
-                        {preCheckinOpen && (
-                            <div
-                                className="fixed inset-0 z-[1300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
-                                onClick={() => {
-                                    setPreCheckinOpen(false)
-                                    const r = preCheckinResolveRef.current
-                                    preCheckinResolveRef.current = null
-                                    if (typeof r === 'function') r(null)
-                                }}
-                            >
-                                <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                    <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
-                                            <div className="text-white font-black text-lg truncate">Pré-treino</div>
-                                            <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setPreCheckinOpen(false)
-                                                const r = preCheckinResolveRef.current
-                                                preCheckinResolveRef.current = null
-                                                if (typeof r === 'function') r(null)
-                                            }}
-                                            className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
-                                            aria-label="Fechar"
-                                        >
-                                            <X size={18} />
-                                        </button>
-                                    </div>
-                                    <div className="p-4 space-y-4">
-                                        <div className="space-y-2">
-                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Energia (1–5)</div>
-                                            <div className="grid grid-cols-5 gap-2">
-                                                {[1, 2, 3, 4, 5].map((n) => (
-                                                    <button
-                                                        key={n}
-                                                        type="button"
-                                                        onClick={() => setPreCheckinDraft((prev) => ({ ...prev, energy: String(n) }))}
-                                                        className={
-                                                            String(preCheckinDraft?.energy || '') === String(n)
-                                                                ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                                                                : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                                                        }
-                                                    >
-                                                        {n}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Dor / Soreness (0–10)</div>
-                                            <select
-                                                value={String(preCheckinDraft?.soreness ?? '')}
-                                                onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
-                                                className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
-                                            >
-                                                <option value="">Não informar</option>
-                                                {Array.from({ length: 11 }).map((_, i) => (
-                                                    <option key={i} value={String(i)}>
-                                                        {i}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tempo disponível</div>
-                                            <div className="grid grid-cols-5 gap-2">
-                                                {[30, 45, 60, 90, 120].map((n) => (
-                                                    <button
-                                                        key={n}
-                                                        type="button"
-                                                        onClick={() => setPreCheckinDraft((prev) => ({ ...prev, timeMinutes: String(n) }))}
-                                                        className={
-                                                            String(preCheckinDraft?.timeMinutes || '') === String(n)
-                                                                ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                                                                : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                                                        }
-                                                    >
-                                                        {n}m
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>
-                                            <textarea
-                                                value={String(preCheckinDraft?.notes || '')}
-                                                onChange={(e) => setPreCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
-                                                className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
-                                                placeholder="Ex.: pouco sono, dor no joelho, viagem…"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="p-4 border-t border-neutral-800 flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setPreCheckinOpen(false)
-                                                const r = preCheckinResolveRef.current
-                                                preCheckinResolveRef.current = null
-                                                if (typeof r === 'function') r(null)
-                                            }}
-                                            className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
-                                        >
-                                            Pular
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setPreCheckinOpen(false)
-                                                const r = preCheckinResolveRef.current
-                                                preCheckinResolveRef.current = null
-                                                if (typeof r === 'function') r(preCheckinDraft)
-                                            }}
-                                            className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400"
-                                        >
-                                            Continuar
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {settingsOpen && (
-                            <SettingsModal
-                                isOpen={settingsOpen}
-                                onClose={() => setSettingsOpen(false)}
-                                settings={userSettingsApi?.settings ?? null}
-                                userRole={user?.role || ''}
-                                saving={Boolean(userSettingsApi?.saving)}
-                                onOpenWhatsNew={async () => {
-                                    setSettingsOpen(false)
-                                    if (!pendingUpdate) {
-                                        try {
-                                            const res = await fetch(`/api/updates/unseen?limit=1`)
-                                            const data = await res.json().catch(() => ({}))
-                                            const updates = Array.isArray(data?.updates) ? data.updates : []
-                                            const first = updates[0] || null
-                                            if (first) {
-                                                try {
-                                                    await fetch('/api/updates/mark-prompted', {
-                                                        method: 'POST',
-                                                        headers: { 'Content-Type': 'application/json' },
-                                                        body: JSON.stringify({ updateId: String(first.id) })
-                                                    })
-                                                } catch { }
-                                                setPendingUpdate(first)
-                                            }
-                                        } catch { }
-                                    }
-                                    setWhatsNewOpen(true)
-                                }}
-                                onSave={async (next: unknown) => {
-                                    try {
-                                        const safeNext = next && typeof next === 'object' ? next : (userSettingsApi?.settings ?? {})
-                                        const res = await userSettingsApi?.save?.(safeNext)
-                                        if (!res?.ok) {
-                                            await alert('Falha ao salvar: ' + (res?.error || ''))
-                                            return false
-                                        }
-                                        return true
-                                    } catch (e: unknown) {
-                                        await alert('Falha ao salvar: ' + getErrorMessage(e))
-                                        return false
-                                    }
-                                }}
-                            />
-                        )}
-
-                        <OfflineSyncModal
-                            open={offlineSyncOpen}
-                            onClose={() => setOfflineSyncOpen(false)}
-                            userId={user?.id}
+                        {/* Modals & Overlays — extracted to DashboardModals */}
+                        <DashboardModals
+                            user={user as Record<string, unknown> | null}
+                            showCompleteProfile={showCompleteProfile}
+                            setShowCompleteProfile={setShowCompleteProfile}
+                            profileDraftName={profileDraftName}
+                            setProfileDraftName={setProfileDraftName}
+                            savingProfile={savingProfile}
+                            handleSaveProfile={handleSaveProfile}
+                            showImportModal={showImportModal}
+                            setShowImportModal={setShowImportModal}
+                            importCode={importCode}
+                            setImportCode={setImportCode}
+                            handleImportWorkout={handleImportWorkout}
+                            showJsonImportModal={showJsonImportModal}
+                            setShowJsonImportModal={setShowJsonImportModal}
+                            handleJsonUpload={handleJsonUpload}
+                            shareCode={shareCode}
+                            setShareCode={setShareCode}
+                            quickViewWorkout={quickViewWorkout as Record<string, unknown> | null}
+                            setQuickViewWorkout={setQuickViewWorkout}
+                            handleStartSession={handleStartSession}
+                            showNotifCenter={showNotifCenter}
+                            setShowNotifCenter={setShowNotifCenter}
+                            activeSession={activeSession}
+                            handleCloseTimer={handleCloseTimer}
+                            handleStartFromRestTimer={handleStartFromRestTimer}
+                            view={view}
+                            setView={setView}
+                            sessionTicker={sessionTicker}
+                            parseStartedAtMs={parseStartedAtMs}
+                            calculateExerciseDuration={calculateExerciseDuration}
+                            toMinutesRounded={toMinutesRounded}
+                            showAdminPanel={showAdminPanel}
+                            closeAdminPanel={closeAdminPanel}
+                            whatsNewOpen={whatsNewOpen}
+                            setWhatsNewOpen={setWhatsNewOpen}
+                            pendingUpdate={pendingUpdate as Record<string, unknown> | null}
+                            setPendingUpdate={setPendingUpdate as (v: Record<string, unknown> | null) => void}
+                            closeWhatsNew={closeWhatsNew}
+                            preCheckinOpen={preCheckinOpen}
+                            setPreCheckinOpen={setPreCheckinOpen}
+                            preCheckinWorkout={preCheckinWorkout as Record<string, unknown> | null}
+                            preCheckinDraft={preCheckinDraft as Record<string, unknown> | null}
+                            setPreCheckinDraft={setPreCheckinDraft as unknown as (v: Record<string, unknown> | null) => void}
+                            preCheckinResolveRef={preCheckinResolveRef}
+                            settingsOpen={settingsOpen}
+                            setSettingsOpen={setSettingsOpen}
+                            userSettingsApi={userSettingsApi as Record<string, unknown> | null}
+                            offlineSyncOpen={offlineSyncOpen}
+                            setOfflineSyncOpen={setOfflineSyncOpen}
+                            openStudent={openStudent}
+                            setOpenStudent={setOpenStudent as (v: unknown) => void}
+                            showExportModal={showExportModal}
+                            setShowExportModal={setShowExportModal}
+                            exportWorkout={exportWorkout}
+                            handleExportPdf={handleExportPdf}
+                            handleExportJson={handleExportJson}
+                            vipAccess={vipAccess as unknown as Record<string, unknown> | null}
+                            openVipView={openVipView}
+                            alert={alert}
                         />
-
-                        <WelcomeFloatingWindow user={user as unknown as AdminUser} onClose={() => { }} />
                     </div>
                 </TeamWorkoutProvider>
             </InAppNotificationsProvider>

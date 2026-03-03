@@ -51,7 +51,7 @@ export interface DashboardModalsProps {
 
     // Quick View
     quickViewWorkout: Record<string, unknown> | null
-    setQuickViewWorkout: (v: unknown) => void
+    setQuickViewWorkout: (v: Record<string, unknown> | null) => void
     handleStartSession: (w: unknown) => void
 
     // Notification Center
@@ -69,7 +69,7 @@ export interface DashboardModalsProps {
     sessionTicker: number
     parseStartedAtMs: (raw: unknown) => number
     calculateExerciseDuration: (ex: Record<string, unknown>) => number
-    toMinutesRounded: (s: number) => number
+    toMinutesRounded: (s: number) => number | string
 
     // Admin Panel
     showAdminPanel: boolean
@@ -79,7 +79,7 @@ export interface DashboardModalsProps {
     whatsNewOpen: boolean
     setWhatsNewOpen: (v: boolean) => void
     pendingUpdate: Record<string, unknown> | null
-    setPendingUpdate: (v: unknown) => void
+    setPendingUpdate: (v: Record<string, unknown> | null) => void
     closeWhatsNew: () => void
 
     // PreCheckin
@@ -87,7 +87,7 @@ export interface DashboardModalsProps {
     setPreCheckinOpen: (v: boolean) => void
     preCheckinWorkout: Record<string, unknown> | null
     preCheckinDraft: Record<string, unknown> | null
-    setPreCheckinDraft: (v: unknown) => void
+    setPreCheckinDraft: (v: Record<string, unknown> | null) => void
     preCheckinResolveRef: React.MutableRefObject<((v: unknown) => void) | null>
 
     // Settings
@@ -115,7 +115,7 @@ export interface DashboardModalsProps {
     openVipView: () => void
 
     // Dialog
-    alert: (msg: string, title?: string) => Promise<void>
+    alert: (msg: string, title?: string) => Promise<unknown>
 }
 
 export default function DashboardModals(props: DashboardModalsProps) {
