@@ -38,14 +38,22 @@ export async function GET() {
         const iosTokenCount = Array.isArray(tokens) ? tokens.filter((t) => String(t.platform || '') === 'ios').length : 0
 
         // ── 3. Send test push if config is OK ──────────────────────────────────
-        let pushResult = 'skipped — APNs config missing or no iOS tokens'
+        let pushResult: unknown = 'skipped — APNs config missing or no iOS tokens'
         if (cfgOk && iosTokenCount > 0) {
-            await sendPushToUsers(
+            const delivery = await sendPushToUsers(
                 [user.id],
                 '🔔 IronTracks — Notificação de Teste',
                 'Se você está vendo isso, as push notifications estão funcionando!',
             )
-            pushResult = `Sent to ${iosTokenCount} iOS device(s) — check Vercel logs for APNs response`
+            pushResult = {
+                sent: true,
+                summary: `Attempted delivery to ${iosTokenCount} iOS device(s)`,
+                details: delivery.map(d => ({
+                    token: d.token.slice(0, 12) + '...',
+                    status: d.ok ? '✅ OK' : '❌ FAILED',
+                    error: d.error ?? null
+                }))
+            }
         }
 
         return NextResponse.json({
