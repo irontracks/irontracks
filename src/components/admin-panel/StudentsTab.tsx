@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Filter, UserPlus, MoreVertical, Trash2, Edit, Activity, User } from 'lucide-react';
+import { Search, Filter, UserPlus, Trash2, Edit, Activity, User } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 
@@ -26,11 +26,19 @@ export const StudentsTab: React.FC = () => {
     const renderStudentRow = (s: AdminUser) => {
         const statusColor =
             s.status === 'pago' ? 'text-green-500 bg-green-500/10 border-green-500/20' :
-            s.status === 'pendente' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
-            'text-red-500 bg-red-500/10 border-red-500/20';
+                s.status === 'pendente' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
+                    'text-red-500 bg-red-500/10 border-red-500/20';
 
         return (
-            <div key={s.id} className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-neutral-700 transition-all gap-4">
+            <div
+                key={s.id}
+                className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-yellow-500/40 transition-all gap-4 cursor-pointer"
+                onClick={() => setSelectedStudent(s)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStudent(s); }}
+                aria-label={`Ver detalhes de ${s.name || s.email || 'Aluno'}`}
+            >
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center font-black text-neutral-400 border border-neutral-700">
                         {(s.name || s.email || '?').charAt(0).toUpperCase()}
@@ -49,7 +57,8 @@ export const StudentsTab: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                {/* Stop propagation so selects/buttons don't trigger the card click */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3" onClick={(e) => e.stopPropagation()}>
                     {isAdmin && (
                         <select
                             className="bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none min-w-[140px]"
@@ -73,16 +82,18 @@ export const StudentsTab: React.FC = () => {
                             }}
                             className="p-2 text-neutral-400 hover:text-yellow-500 hover:bg-yellow-500/10 rounded-lg transition-colors"
                             title="Ver Histórico"
+                            aria-label="Ver Histórico"
                         >
                             <Activity size={18} />
                         </button>
-                        
+
                         {isAdmin && (
                             <>
                                 <button
                                     onClick={() => handleToggleStudentStatus(s)}
                                     className="p-2 text-neutral-400 hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors"
                                     title="Alterar Status"
+                                    aria-label="Alterar Status"
                                 >
                                     <Edit size={18} />
                                 </button>
@@ -90,6 +101,7 @@ export const StudentsTab: React.FC = () => {
                                     onClick={() => handleDeleteStudent(s.id)}
                                     className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
                                     title="Excluir Aluno"
+                                    aria-label="Excluir Aluno"
                                 >
                                     <Trash2 size={18} />
                                 </button>
@@ -150,7 +162,7 @@ export const StudentsTab: React.FC = () => {
                             {isTeacher ? 'Meus Alunos' : 'Alunos com Professor'}
                         </h3>
                         <div className="grid gap-3">
-                            {isTeacher 
+                            {isTeacher
                                 ? studentsWithTeacherFiltered
                                     .filter(s => s.teacher_id === user.id)
                                     .map(renderStudentRow)
@@ -176,9 +188,9 @@ export const StudentsTab: React.FC = () => {
                         </div>
                     </div>
                 )}
-                
+
                 {isAdmin && studentsWithTeacherFiltered.length === 0 && studentsWithoutTeacherFiltered.length === 0 && (
-                     <div className="text-center py-12 border border-dashed border-neutral-800 rounded-2xl">
+                    <div className="text-center py-12 border border-dashed border-neutral-800 rounded-2xl">
                         <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
                             <User size={32} className="text-neutral-600" />
                         </div>

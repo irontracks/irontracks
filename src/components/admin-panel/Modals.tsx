@@ -13,39 +13,36 @@ export const Modals: React.FC = () => {
         setNewStudent,
         handleRegisterStudent,
         registering,
-        
+
         showTeacherModal,
         setShowTeacherModal,
         newTeacher,
         setNewTeacher,
         handleAddTeacher,
         addingTeacher,
-        
+
         editingTeacher,
         setEditingTeacher,
         handleUpdateTeacher,
-        
+
         historyOpen,
         setHistoryOpen,
         selectedStudent,
         user,
-        
+
         editingTemplate,
         setEditingTemplate,
         // Preciso de handleSaveTemplate que estava inline.
         // Vou assumir que o hook exporta handleSaveTemplate ou similar.
         // Se não, vou usar placeholder.
-        
+
         executionVideoModalOpen,
         setExecutionVideoModalOpen,
         executionVideoModalUrl,
-        setExecutionVideoModalUrl
+        setExecutionVideoModalUrl,
+        handleSaveTemplate,
     } = useAdminPanel();
 
-    // Placeholder functions for now (move to hook later)
-    const handleSaveTemplate = async (data: unknown) => {
-         alert('Salvar template em implementação.');
-    };
 
     return (
         <>
@@ -151,7 +148,7 @@ export const Modals: React.FC = () => {
                                     className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
                                 />
                             </div>
-                             <div>
+                            <div>
                                 <label className="text-xs text-neutral-500 uppercase font-bold">Telefone</label>
                                 <input
                                     value={editingTeacher.phone || ''}
@@ -220,8 +217,8 @@ export const Modals: React.FC = () => {
                         user={user}
                         settings={{}}
                         vipLimits={{}}
-                        onViewReport={() => {}}
-                        onUpgrade={() => {}}
+                        onViewReport={() => { }}
+                        onUpgrade={() => { }}
                         targetId={String(selectedStudent?.user_id || selectedStudent?.id || '')}
                         targetEmail={String(selectedStudent?.email || '')}
                         readOnly
