@@ -104,7 +104,7 @@ export default async function NutritionPage() {
   try {
     const { data: row, error } = await supabase
       .from('nutrition_goals')
-      .select('*')
+      .select('id, user_id, date, meals, total_calories, total_protein, created_at')
       .eq('user_id', authUserId)
       .order('updated_at', { ascending: false })
       .limit(1)

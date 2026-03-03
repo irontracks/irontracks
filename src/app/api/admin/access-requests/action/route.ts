@@ -71,7 +71,7 @@ export async function POST(req: Request) {
     // Fetch request details
     const { data: request, error: fetchError } = await admin
       .from('access_requests')
-      .select('*')
+      .select('id, user_id, email, status, phone, full_name, role_requested, cref, created_at')
       .eq('id', requestId)
       .single()
 

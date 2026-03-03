@@ -45,7 +45,7 @@ export async function GET(req: Request) {
 
     const { data: msgs, error } = await supabase
       .from('messages')
-      .select('*')
+      .select('id, channel_id, sender_id, user_id, content, created_at, media_url, media_type, reply_to')
       .eq('channel_id', q.channel_id)
       .order('created_at', { ascending: false })
       .limit(q.limit)

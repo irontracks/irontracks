@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
     const { data: msg, error } = await admin
       .from(table)
-      .select('*')
+      .select('id, channel_id, sender_id, content, created_at')
       .eq('id', messageId)
       .maybeSingle()
 
