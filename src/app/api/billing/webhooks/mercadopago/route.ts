@@ -19,9 +19,16 @@ const parseSignature = (raw: string) => {
   return { ts, v1 }
 }
 
+const WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000 // 5 minutes
+
 const verifyWebhook = (opts: { secret: string; xSignature: string; xRequestId: string; dataId: string }) => {
   const { ts, v1 } = parseSignature(opts.xSignature)
   if (!ts || !v1) return false
+
+  // Replay protection: reject if timestamp is older than 5 minutes
+  const tsMs = Number(ts) * 1000
+  if (!Number.isFinite(tsMs) || Math.abs(Date.now() - tsMs) > WEBHOOK_TOLERANCE_MS) return false
+
   const manifest = `id:${opts.dataId};request-id:${opts.xRequestId};ts:${ts};`
   const hashed = crypto.createHmac('sha256', opts.secret).update(manifest).digest('hex')
   return hashed.toLowerCase() === v1.toLowerCase()
@@ -96,7 +103,7 @@ export async function POST(req: Request) {
           data_id: dataId,
           payload: body,
         })
-    } catch {}
+    } catch { }
 
     if (eventType === 'preapproval' || action.startsWith('preapproval.')) {
       const preapproval = await mercadopagoRequest<Record<string, unknown>>({
