@@ -59,15 +59,37 @@ export async function POST(req: Request) {
     // Fire push to other channel members
     try {
       const admin = createAdminClient()
+
+      // Try chat_members first (works for private DMs)
       const { data: members } = await admin
         .from('chat_members')
         .select('user_id')
         .eq('channel_id', channel_id)
         .neq('user_id', user.id)
         .limit(100)
-      const recipientIds = (Array.isArray(members) ? members : [])
+      let recipientIds = (Array.isArray(members) ? members : [])
         .map(m => String(m?.user_id || '').trim())
         .filter(Boolean)
+
+      // Fallback for global channels: query recent unique message senders
+      if (!recipientIds.length) {
+        const { data: recentMsgs } = await admin
+          .from('messages')
+          .select('user_id')
+          .eq('channel_id', channel_id)
+          .neq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(200)
+        const uniqueIds = new Set<string>()
+          ; (Array.isArray(recentMsgs) ? recentMsgs : []).forEach(m => {
+            const uid = String(m?.user_id || '').trim()
+            if (uid) uniqueIds.add(uid)
+          })
+        recipientIds = Array.from(uniqueIds)
+        // Don't spam too many people for global chat
+        if (recipientIds.length > 50) recipientIds = []
+      }
+
       if (recipientIds.length) {
         const { data: me } = await admin.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
         const senderName = String(me?.display_name || '').trim() || 'Alguém'
