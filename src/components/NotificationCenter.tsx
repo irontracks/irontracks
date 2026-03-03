@@ -43,7 +43,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
             try {
                 const { data } = await supabase
                     .from('notifications')
-                    .select('*')
+                    .select('id, user_id, type, title, body, message, data, read, is_read, read_at, created_at')
                     .eq('user_id', safeUserId)
                     .order('created_at', { ascending: false });
 
@@ -201,7 +201,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
         }
     };
 
-    const handleAccept = async (item: { data?: unknown; [key: string]: unknown }) => {
+    const handleAccept = async (item: { data?: unknown;[key: string]: unknown }) => {
         setIsOpen(false);
         try {
             const invite = item?.data ?? item?.metadata ?? null;
@@ -215,7 +215,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
         }
     };
 
-    const handleReject = async (item: { id?: unknown; [key: string]: unknown }) => {
+    const handleReject = async (item: { id?: unknown;[key: string]: unknown }) => {
         try {
             if (typeof rejectInvite === 'function') await rejectInvite(item?.id as string);
         } catch {

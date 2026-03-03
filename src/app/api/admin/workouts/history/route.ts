@@ -69,7 +69,7 @@ export async function GET(req: Request) {
 
     const { data: rows } = await supabase
       .from('workouts')
-      .select('*')
+      .select('id, name, notes, is_template, user_id, student_id, created_at, archived_at')
       .eq('is_template', false)
       .eq('user_id', targetUserId)
       .order('date', { ascending: false })

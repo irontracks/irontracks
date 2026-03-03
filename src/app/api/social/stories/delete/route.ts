@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     const { data: story, error: sErr } = await admin
       .from('social_stories')
-      .select('*')
+      .select('id, user_id, author_id, media_url, media_path, media_type, created_at, expires_at, text_overlay')
       .eq('id', storyId)
       .maybeSingle()
 
@@ -46,9 +46,9 @@ export async function POST(req: Request) {
     }
 
     const mediaPath = String(story.media_path || '').trim()
-    const { data: likes } = await admin.from('social_story_likes').select('*').eq('story_id', storyId).limit(2000)
-    const { data: comments } = await admin.from('social_story_comments').select('*').eq('story_id', storyId).limit(2000)
-    const { data: views } = await admin.from('social_story_views').select('*').eq('story_id', storyId).limit(2000)
+    const { data: likes } = await admin.from('social_story_likes').select('id, user_id, author_id, media_url, media_path, media_type, created_at, expires_at, text_overlay').eq('story_id', storyId).limit(2000)
+    const { data: comments } = await admin.from('social_story_comments').select('id, user_id, author_id, media_url, media_path, media_type, created_at, expires_at, text_overlay').eq('story_id', storyId).limit(2000)
+    const { data: views } = await admin.from('social_story_views').select('id, user_id, author_id, media_url, media_path, media_type, created_at, expires_at, text_overlay').eq('story_id', storyId).limit(2000)
 
     await admin.from('soft_delete_bin').insert({
       deleted_by: auth.user.id,

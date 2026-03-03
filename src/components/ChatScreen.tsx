@@ -392,7 +392,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             try {
                 const { data: pending } = await supabase
                     .from('chat_invites')
-                    .select('*')
+                    .select('id, channel_id, inviter_id, invitee_id, status, created_at')
                     .eq('sender_id', safeUserId)
                     .eq('receiver_id', targetId)
                     .eq('status', 'pending')

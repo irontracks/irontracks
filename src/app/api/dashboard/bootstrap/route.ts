@@ -32,7 +32,7 @@ const hydrateWorkouts = async (supabase: SupabaseClient, rows: unknown[]) => {
       try {
         const { data } = await supabase
           .from('exercises')
-          .select('*')
+          .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order"')
           .in('workout_id', workoutIds)
           .order('order', { ascending: true })
           .limit(5000)
@@ -44,7 +44,7 @@ const hydrateWorkouts = async (supabase: SupabaseClient, rows: unknown[]) => {
         // Fetch sets for all exercises in these workouts directly via workout_id join
         const { data } = await supabase
           .from('sets')
-          .select('*, exercises!inner(workout_id)')
+          .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config, exercises!inner(workout_id)')
           .in('exercises.workout_id', workoutIds)
           .order('set_number', { ascending: true })
           .limit(20000)
@@ -133,7 +133,7 @@ export async function GET() {
     // Fallback: multiple queries (profile + workouts in parallel)
     const [{ data: profile }, templateResult] = await Promise.all([
       supabase.from('profiles').select('id, display_name, photo_url, role').eq('id', user.id).maybeSingle(),
-      (async () => { try { return await supabase.from('workouts').select('*').eq('is_template', true).eq('user_id', user.id).order('name', { ascending: true }).limit(500) } catch { return { data: null } } })(),
+      (async () => { try { return await supabase.from('workouts').select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id').eq('is_template', true).eq('user_id', user.id).order('name', { ascending: true }).limit(500) } catch { return { data: null } } })(),
     ])
 
     let workouts: unknown[] = Array.isArray(templateResult.data) ? templateResult.data : []
@@ -142,7 +142,7 @@ export async function GET() {
       try {
         const { data } = await supabase
           .from('workouts')
-          .select('*')
+          .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
           .eq('user_id', user.id)
           .order('name', { ascending: true })
           .limit(500)
@@ -159,7 +159,7 @@ export async function GET() {
         if (studentId) {
           const { data } = await supabase
             .from('workouts')
-            .select('*')
+            .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
             .eq('is_template', true)
             .or(`user_id.eq.${studentId},student_id.eq.${studentId}`)
             .order('name', { ascending: true })
