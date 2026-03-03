@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
+import { hasValidInternalSecret, requireUser } from '@/utils/auth/route'
 
 export async function GET(req: Request) {
   try {
     if (!hasValidInternalSecret(req)) {
-      const auth = await requireRole(['admin'])
+      const auth = await requireUser()
       if (!auth.ok) return auth.response
     }
 
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     const { data: globals } = await admin
       .from('chat_channels')
       .select('id')
-      .eq('type','global')
+      .eq('type', 'global')
       .order('created_at', { ascending: true })
 
     let id: string
