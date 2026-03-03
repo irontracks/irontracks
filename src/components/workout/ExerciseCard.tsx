@@ -43,6 +43,8 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
     getLog,
     alert,
     removeExtraSetFromExercise,
+    linkedWeightExercises,
+    toggleLinkWeights,
   } = useWorkoutContext();
 
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
@@ -290,27 +292,17 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
                 e.preventDefault();
                 e.stopPropagation();
               } catch { }
-              const { toggleLinkWeights } = require('./WorkoutContext').useWorkoutContext(); // or get from destructuring at top of file
               toggleLinkWeights(exIdx);
             }}
-            className={`h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl border transition-colors active:scale-95 ${(() => {
-              const { linkedWeightExercises } = require('./WorkoutContext').useWorkoutContext();
-              return linkedWeightExercises.has(exIdx);
-            })()
+            className={`h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl border transition-colors active:scale-95 ${linkedWeightExercises?.has(exIdx)
               ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500'
               : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
               }`}
             title="Sincronizar pesos"
             aria-label="Sincronizar pesos em todas as séries"
           >
-            <Link size={14} className={(() => {
-              const { linkedWeightExercises } = require('./WorkoutContext').useWorkoutContext();
-              return linkedWeightExercises.has(exIdx) ? '' : 'opacity-60';
-            })()} />
-            <span className={`mt-0.5 text-[10px] leading-none ${(() => {
-              const { linkedWeightExercises } = require('./WorkoutContext').useWorkoutContext();
-              return linkedWeightExercises.has(exIdx) ? 'text-yellow-500' : 'text-neutral-400 opacity-60';
-            })()
+            <Link size={14} className={linkedWeightExercises?.has(exIdx) ? '' : 'opacity-60'} />
+            <span className={`mt-0.5 text-[10px] leading-none ${linkedWeightExercises?.has(exIdx) ? 'text-yellow-500' : 'text-neutral-400 opacity-60'
               }`}>Link</span>
           </button>
           <button
@@ -348,7 +340,6 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
             <button
               type="button"
               onClick={() => {
-                const { removeExtraSetFromExercise } = require('./WorkoutContext').useWorkoutContext(); // or get from destructuring at top of file
                 removeExtraSetFromExercise(exIdx);
               }}
               className="min-h-[44px] px-4 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900/50 border border-red-500/20 text-red-500 hover:bg-red-500/10 active:scale-95 transition-colors disabled:opacity-30"
