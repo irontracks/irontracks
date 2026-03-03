@@ -28,6 +28,8 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
   const [openAuthorId, setOpenAuthorId] = useState<string>('')
   const [isCreatorOpen, setIsCreatorOpen] = useState(false)
 
+
+
   const reload = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -44,6 +46,20 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       setLoading(false)
     }
   }, [])
+
+  const prevCreatorOpenRef = useRef(false)
+
+  // Auto-reload when StoryCreatorModal closes (covers iOS where reload() during
+  // open modal doesn't update the DOM behind the overlay)
+  useEffect(() => {
+    const wasOpen = prevCreatorOpenRef.current
+    prevCreatorOpenRef.current = isCreatorOpen
+    if (wasOpen && !isCreatorOpen) {
+      // Modal just closed — give CDN/Cloudinary 2s to propagate then reload
+      const t = setTimeout(() => reload(), 2000)
+      return () => clearTimeout(t)
+    }
+  }, [isCreatorOpen, reload])
 
   const uploadStory = async (file: File, metadata: Record<string, unknown> = {}) => {
     setUploading(true)
