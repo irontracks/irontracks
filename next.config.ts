@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
       process.env.VERCEL_DEPLOYMENT_ID ||
       process.env.npm_package_version ||
       'dev',
+    NEXT_PUBLIC_STORAGE_PROVIDER: process.env.NEXT_PUBLIC_STORAGE_PROVIDER || 'supabase',
   },
   images: {
     localPatterns: [
