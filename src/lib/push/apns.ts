@@ -54,7 +54,7 @@ async function sendOneApnsPush(
     body: string,
     cfg: { keyId: string; teamId: string; keyP8: string; bundleId: string },
     extra?: Record<string, unknown>
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string }> {
     const jwt = getJwt(cfg)
     const apnsPayload = JSON.stringify({
         aps: {
@@ -85,14 +85,23 @@ async function sendOneApnsPush(
         })
         if (!res.ok) {
             const errBody = await res.text().catch(() => '')
-            logWarn('apns', `[APNs] Push failed: HTTP ${res.status} — token=${token.slice(0, 8)}... — ${errBody}`)
+            let reason = ''
+            try {
+                const json = JSON.parse(errBody)
+                reason = json.reason || errBody
+            } catch {
+                reason = errBody || `HTTP ${res.status}`
+            }
+            logWarn('apns', `[APNs] Push failed: ${reason} — token=${token.slice(0, 8)}...`)
+            return { ok: false, error: reason }
         } else {
             logInfo('apns', `[APNs] Push sent OK — token=${token.slice(0, 8)}...`)
+            return { ok: true }
         }
-        return res.ok
     } catch (e) {
-        logError('apns', '[APNs] Network error sending push', { token: token.slice(0, 8), err: e })
-        return false
+        const msg = e instanceof Error ? e.message : String(e)
+        logError('apns', '[APNs] Network error sending push', { token: token.slice(0, 8), err: msg })
+        return { ok: false, error: msg }
     }
 }
 
@@ -108,16 +117,17 @@ export async function sendPushToUsers(
     title: string,
     body: string,
     extra?: Record<string, unknown>
-): Promise<void> {
+): Promise<Array<{ token: string; ok: boolean; error?: string }>> {
+    const results: Array<{ token: string; ok: boolean; error?: string }> = []
     try {
         const cfg = getApnsConfig()
         if (!cfg) {
             logWarn('apns', '[APNs] sendPushToUsers: config missing — set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_P8 in Vercel env vars')
-            return
+            return results
         }
 
         const ids = userIds.filter(Boolean)
-        if (!ids.length) return
+        if (!ids.length) return results
 
         const admin = createAdminClient()
         const { data: tokens, error: tokenErr } = await admin
@@ -129,25 +139,33 @@ export async function sendPushToUsers(
 
         if (tokenErr) {
             logError('apns', '[APNs] Failed to fetch device tokens', tokenErr)
-            return
+            return results
         }
         if (!Array.isArray(tokens) || !tokens.length) {
             logWarn('apns', `[APNs] No iOS tokens found for ${ids.length} user(s) — make sure @capacitor/push-notifications registered successfully`)
-            return
+            return results
         }
 
         logInfo('apns', `[APNs] Sending push to ${tokens.length} device(s) for ${ids.length} user(s): "${title}"`)
 
-        // Send in parallel, max 20 concurrent
         const allTokens = tokens.map((t) => String(t.token || '').trim()).filter(Boolean)
         const batchSize = 20
         for (let i = 0; i < allTokens.length; i += batchSize) {
             const batch = allTokens.slice(i, i + batchSize)
-            await Promise.allSettled(
+            const batchResults = await Promise.allSettled(
                 batch.map((t) => sendOneApnsPush(t, title, body, cfg, extra))
             )
+            batchResults.forEach((res, idx) => {
+                const token = batch[idx]
+                if (res.status === 'fulfilled') {
+                    results.push({ token, ...res.value })
+                } else {
+                    results.push({ token, ok: false, error: String(res.reason) })
+                }
+            })
         }
     } catch (e) {
         logError('apns', '[APNs] Unexpected error in sendPushToUsers', e)
     }
+    return results
 }
