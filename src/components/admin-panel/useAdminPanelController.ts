@@ -106,7 +106,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     const [registering, setRegistering] = useState<boolean>(false);
     const [editingStudent, setEditingStudent] = useState<boolean>(false);
     const [editedStudent, setEditedStudent] = useState<{ name: string; email: string }>({ name: '', email: '' });
-    
+
     const [showTeacherModal, setShowTeacherModal] = useState<boolean>(false);
     const [newTeacher, setNewTeacher] = useState<{ name: string; email: string; phone: string; birth_date: string }>({ name: '', email: '', phone: '', birth_date: '' });
     const [addingTeacher, setAddingTeacher] = useState<boolean>(false);
@@ -1068,6 +1068,51 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         });
     }, [getSetsCount, setEditingTemplate]);
 
+    // Bug #2 fix: real handleSaveTemplate — was a placeholder `alert()` in Modals.tsx
+    const handleSaveTemplate = useCallback(async (data: unknown) => {
+        if (!editingTemplate) return;
+        const d = data && typeof data === 'object' ? (data as UnknownRecord) : {};
+        const title = String(d.title || editingTemplate.title || '').trim();
+        if (!title) { await alert('Preencha o nome do treino.'); return; }
+        const exercises = Array.isArray(d.exercises) ? d.exercises : [];
+        try {
+            const workoutId = String(editingTemplate.id || '');
+            if (!workoutId) { await alert('ID do treino não encontrado.'); return; }
+            const { error: wErr } = await supabase
+                .from('workouts')
+                .update({ name: title })
+                .eq('id', workoutId);
+            if (wErr) throw wErr;
+            // For each exercise, upsert by position
+            for (let i = 0; i < exercises.length; i++) {
+                const ex = exercises[i] && typeof exercises[i] === 'object' ? (exercises[i] as UnknownRecord) : {};
+                if (ex.id) {
+                    await supabase.from('exercises').update({
+                        name: String(ex.name || ''),
+                        sets: getSetsCount(ex.sets) || 4,
+                        reps: ex.reps ?? '10',
+                        rpe: ex.rpe ?? 8,
+                        cadence: String(ex.cadence || '2020'),
+                        rest_time: ex.restTime ?? ex.rest_time ?? 60,
+                        method: String(ex.method || 'Normal'),
+                        video_url: String(ex.videoUrl || ex.video_url || ''),
+                        notes: String(ex.notes || '')
+                    }).eq('id', String(ex.id));
+                }
+            }
+            setTemplates(prev => prev.map(t =>
+                String((t as UnknownRecord).id) === workoutId
+                    ? { ...(t as UnknownRecord), name: title, exercises } as AdminWorkoutTemplate
+                    : t
+            ));
+            setEditingTemplate(null);
+            await alert('Treino atualizado com sucesso!', 'Sucesso');
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+            await alert('Erro ao salvar treino: ' + msg);
+        }
+    }, [alert, editingTemplate, supabase, getSetsCount, setTemplates, setEditingTemplate]);
+
     const handleAddTemplateToStudent = useCallback(async (template: UnknownRecord) => {
         if (!selectedStudent) return;
         const targetUserId = selectedStudent.user_id || '';
@@ -1343,7 +1388,11 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
             } finally { setLoading(false); }
         };
         fetchStudents();
-    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, teachersList.length, getAdminAuthHeaders, setLoading, setUsersList, setTeachersList]);
+        // Bug #3 fix: removed teachersList.length from deps — it caused an infinite re-fetch loop
+        // (fetchStudents sets teachersList → teachersList.length changes → re-triggers fetchStudents)
+        // Teachers are loaded independently via the dedicated fetchTeachers useEffect below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, getAdminAuthHeaders, setLoading, setUsersList, setTeachersList]);
 
     // fetchTeachers
     useEffect(() => {
@@ -1933,19 +1982,19 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         tab, setTab,
         subTab, setSubTab,
         loading, setLoading,
-        
+
         // Data
         usersList, setUsersList,
         teachersList, setTeachersList,
         templates, setTemplates,
         templatesUserId,
         myWorkoutsCount,
-        
+
         // Selections
         selectedTeacher, setSelectedTeacher,
         selectedStudent, setSelectedStudent,
         teacherDetailTab, setTeacherDetailTab,
-        
+
         // Details
         teacherStudents, setTeacherStudents,
         teacherStudentsLoading, setTeacherStudentsLoading,
@@ -1957,7 +2006,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         teacherHistoryCursor, setTeacherHistoryCursor,
         teacherInboxItems, setTeacherInboxItems,
         teacherInboxLoading, setTeacherInboxLoading,
-        
+
         studentWorkouts, setStudentWorkouts,
         syncedWorkouts, setSyncedWorkouts,
         assessments, setAssessments,
@@ -1967,7 +2016,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         studentCheckinsRange, setStudentCheckinsRange,
         studentCheckinsFilter, setStudentCheckinsFilter,
         loadedStudentInfo,
-        
+
         // Execution Videos
         executionVideos, setExecutionVideos,
         executionVideosLoading, setExecutionVideosLoading,
@@ -1975,7 +2024,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         executionVideoModalOpen, setExecutionVideoModalOpen,
         executionVideoModalUrl, setExecutionVideoModalUrl,
         executionVideoFeedbackDraft, setExecutionVideoFeedbackDraft,
-        
+
         // Modals & Forms
         showRegisterModal, setShowRegisterModal,
         newStudent, setNewStudent,
@@ -1989,14 +2038,14 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         editingTemplate, setEditingTemplate,
         editingStudentWorkout, setEditingStudentWorkout,
         viewWorkout, setViewWorkout,
-        
+
         // Filters
         studentQuery, setStudentQuery,
         studentStatusFilter, setStudentStatusFilter,
         teacherQuery, setTeacherQuery,
         teacherStatusFilter, setTeacherStatusFilter,
         templateQuery, setTemplateQuery,
-        
+
         // System
         dangerOpen, setDangerOpen,
         dangerActionLoading, setDangerActionLoading,
@@ -2009,7 +2058,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         systemExporting, setSystemExporting,
         systemImporting, setSystemImporting,
         systemFileInputRef,
-        
+
         // Priorities
         prioritiesItems, setPrioritiesItems,
         prioritiesLoading, setPrioritiesLoading,
@@ -2023,18 +2072,18 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         prioritiesComposeStudentId, setPrioritiesComposeStudentId,
         prioritiesComposeKind, setPrioritiesComposeKind,
         prioritiesComposeText, setPrioritiesComposeText,
-        
+
         // Broadcast
         broadcastTitle, setBroadcastTitle,
         broadcastMsg, setBroadcastMsg,
         sendingBroadcast, setSendingBroadcast,
-        
+
         // Errors
         errorReports, setErrorReports,
         errorsLoading, setErrorsLoading,
         errorsQuery, setErrorsQuery,
         errorsStatusFilter, setErrorsStatusFilter,
-        
+
         // Videos
         videoQueue, setVideoQueue,
         videoLoading, setVideoLoading,
@@ -2045,14 +2094,14 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         videoCycleRunning, setVideoCycleRunning,
         videoCycleStats, setVideoCycleStats,
         videoCycleStopRef,
-        
+
         // Aliases
         exerciseAliasesReview, setExerciseAliasesReview,
         exerciseAliasesLoading, setExerciseAliasesLoading,
         exerciseAliasesError, setExerciseAliasesError,
         exerciseAliasesBackfillLoading, setExerciseAliasesBackfillLoading,
         exerciseAliasesNotice, setExerciseAliasesNotice,
-        
+
         // User Activity
         userActivityQuery, setUserActivityQuery,
         userActivityRole, setUserActivityRole,
@@ -2069,7 +2118,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         userActivityErrors, setUserActivityErrors,
         userActivityErrorsLoading, setUserActivityErrorsLoading,
         userActivityQueryDebounceRef,
-        
+
         // Derived
         studentsWithTeacherFiltered,
         studentsWithoutTeacherFiltered,
@@ -2077,7 +2126,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         templatesFiltered,
         dashboardCharts,
         coachInboxItems,
-        
+
         // Actions
         handleRegisterStudent,
         handleAddTeacher,
@@ -2129,6 +2178,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         handleAddTemplateToStudent,
         handleEditStudent,
         handleSaveStudentEdit,
+        handleSaveTemplate,
         handleDangerAction,
         runDangerAction,
     };
