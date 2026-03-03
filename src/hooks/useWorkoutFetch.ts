@@ -123,7 +123,7 @@ export function useWorkoutFetch({
                 try {
                     const { data: exRows } = await supabase
                         .from('exercises')
-                        .select('*')
+                        .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order"')
                         .in('workout_id', workoutIds)
                         .order('order', { ascending: true })
                         .limit(5000)
@@ -138,7 +138,7 @@ export function useWorkoutFetch({
                     try {
                         const { data: setRows } = await supabase
                             .from('sets')
-                            .select('*')
+                            .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config')
                             .in('exercise_id', exIds)
                             .order('set_number', { ascending: true })
                             .limit(20000)
@@ -190,7 +190,7 @@ export function useWorkoutFetch({
                 // 2. Busca meus treinos (template)
                 const { data: myBase, error: myErr } = await supabase
                     .from('workouts')
-                    .select('*')
+                    .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                     .eq('is_template', true)
                     .eq('user_id', currentUser.id)
                     .order('name', { ascending: true })
@@ -201,7 +201,7 @@ export function useWorkoutFetch({
                     try {
                         const { data: myAllBase } = await supabase
                             .from('workouts')
-                            .select('*')
+                            .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                             .eq('user_id', currentUser.id)
                             .order('name', { ascending: true })
                             .limit(500)
@@ -219,7 +219,7 @@ export function useWorkoutFetch({
                     try {
                         const { data: swByUserBase } = await supabase
                             .from('workouts')
-                            .select('*')
+                            .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                             .eq('is_template', true)
                             .in('user_id', ids)
                             .order('name')
@@ -234,7 +234,7 @@ export function useWorkoutFetch({
                     try {
                         const { data: swByStudentBase } = await supabase
                             .from('workouts')
-                            .select('*')
+                            .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                             .eq('is_template', true)
                             .in('student_id', ids)
                             .order('name')
@@ -252,7 +252,7 @@ export function useWorkoutFetch({
                 // Aluno/usuário normal
                 const { data: baseRows, error } = await supabase
                     .from('workouts')
-                    .select('*')
+                    .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                     .eq('is_template', true)
                     .eq('user_id', currentUser.id)
                     .order('name', { ascending: true })
@@ -263,7 +263,7 @@ export function useWorkoutFetch({
                     try {
                         const { data: anyRows, error: anyErr } = await supabase
                             .from('workouts')
-                            .select('*')
+                            .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                             .eq('user_id', currentUser.id)
                             .order('name', { ascending: true })
                             .limit(500)
@@ -284,7 +284,7 @@ export function useWorkoutFetch({
                         if (studentId) {
                             const { data: legacyBase } = await supabase
                                 .from('workouts')
-                                .select('*')
+                                .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                                 .eq('is_template', true)
                                 .or(`user_id.eq.${studentId},student_id.eq.${studentId}`)
                                 .order('name', { ascending: true })

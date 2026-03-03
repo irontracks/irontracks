@@ -1,3 +1,5 @@
+import { logWarn } from '@/lib/logger'
+
 type CacheEntry = {
   value: string
   expiresAt: number
@@ -91,7 +93,7 @@ export const cacheSet = async (key: string, value: unknown, ttlSeconds: number):
       },
       body: payload,
     })
-  } catch { }
+  } catch (e) { logWarn('cache', `cacheSet failed for key=${key}`, e) }
 }
 
 export const cacheDelete = async (key: string): Promise<void> => {
@@ -103,7 +105,7 @@ export const cacheDelete = async (key: string): Promise<void> => {
       method: 'POST',
       headers: { Authorization: `Bearer ${cfg.token}` },
     })
-  } catch { }
+  } catch (e) { logWarn('cache', `cacheDelete failed for key=${key}`, e) }
 }
 
 export const cacheDeletePattern = async (pattern: string): Promise<void> => {
@@ -120,7 +122,7 @@ export const cacheDeletePattern = async (pattern: string): Promise<void> => {
     for (const k of keysToDelete) {
       localStore.delete(k)
     }
-  } catch { }
+  } catch (e) { logWarn('cache', 'cacheDeletePattern local cleanup failed', e) }
 
   const cfg = getUpstashConfig()
   if (!cfg) return
@@ -152,7 +154,7 @@ export const cacheDeletePattern = async (pattern: string): Promise<void> => {
       },
       body: JSON.stringify(body),
     })
-  } catch { }
+  } catch (e) { logWarn('cache', `cacheDeletePattern failed for pattern=${pattern}`, e) }
 }
 
 export const cacheSetNx = async (key: string, value: string, ttlSeconds: number): Promise<boolean> => {
