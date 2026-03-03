@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import type { RealtimeChannel } from '@supabase/supabase-js'
+
 import {
     RotateCcw,
     History,
@@ -96,8 +96,7 @@ import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
 import { useSessionSync } from '@/hooks/useSessionSync'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
-import { parseJsonWithSchema } from '@/utils/zod'
-import { z } from 'zod'
+
 
 import {
     DirectChatState,
