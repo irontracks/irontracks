@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useCallback, useRef } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -35,9 +36,9 @@ export function useSignOut({ userId, supabase, onClear }: UseSignOutOptions): Us
         try {
           document.cookie = `${name}=; Max-Age=0; path=/`
           document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
-        } catch { }
+        } catch (e) { logWarn('useSignOut', 'silenced error', e) }
       })
-    } catch { }
+    } catch (e) { logWarn('useSignOut', 'silenced error', e) }
   }, [])
 
   const clearSupabaseStorageBestEffort = useCallback(() => {
@@ -52,9 +53,9 @@ export function useSignOut({ userId, supabase, onClear }: UseSignOutOptions): Us
         if (k.startsWith('sb-') || k.includes('supabase') || k.includes('auth-token')) keys.push(k)
       }
       keys.forEach((k) => {
-        try { ls.removeItem(k) } catch { }
+        try { ls.removeItem(k) } catch (e) { logWarn('useSignOut', 'silenced error', e) }
       })
-    } catch { }
+    } catch (e) { logWarn('useSignOut', 'silenced error', e) }
   }, [])
 
   const clearClientSessionState = useCallback(() => {
@@ -65,7 +66,7 @@ export function useSignOut({ userId, supabase, onClear }: UseSignOutOptions): Us
         localStorage.removeItem(`irontracks.activeSession.v2.${userId}`)
         localStorage.removeItem(`irontracks.appView.v2.${userId}`)
       }
-    } catch { }
+    } catch (e) { logWarn('useSignOut', 'silenced error', e) }
     onClear()
   }, [userId, onClear])
 
@@ -80,7 +81,7 @@ export function useSignOut({ userId, supabase, onClear }: UseSignOutOptions): Us
       try {
         clearSupabaseCookiesBestEffort()
         clearSupabaseStorageBestEffort()
-      } catch { }
+      } catch (e) { logWarn('useSignOut', 'silenced error', e) }
     } finally {
       signOutInFlightRef.current = false
     }

@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useCallback } from 'react'
 import { updateWorkout } from '@/actions/workout-actions'
@@ -78,7 +79,7 @@ export function useWorkoutNormalize({
             }
             try {
                 await fetchWorkouts()
-            } catch { }
+            } catch (e) { logWarn('useWorkoutNormalize', 'silenced error', e) }
             await alert(`Padronização concluída: ${changed} treinos atualizados.`)
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
@@ -120,7 +121,7 @@ export function useWorkoutNormalize({
             }
             try {
                 await fetchWorkouts()
-            } catch { }
+            } catch (e) { logWarn('useWorkoutNormalize', 'silenced error', e) }
             await alert(`Padronização concluída: ${updated} treinos atualizados.`)
         } catch (e) {
             const message = e instanceof Error ? e.message : String(e)
@@ -183,7 +184,7 @@ export function useWorkoutNormalize({
             }
             try {
                 await fetchWorkouts()
-            } catch { }
+            } catch (e) { logWarn('useWorkoutNormalize', 'silenced error', e) }
             const lines = updatedWorkouts
                 .slice(0, 10)
                 .map(

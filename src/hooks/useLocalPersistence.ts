@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useEffect } from 'react'
 import type { ActiveWorkoutSession } from '@/types/app'
@@ -70,7 +71,7 @@ export function useLocalPersistence({
       if (!userId) return
       if (!view) return
       localStorage.setItem(`irontracks.appView.v2.${userId}`, view)
-    } catch { }
+    } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
   }, [view, userId])
 
   // ─── Persist active session (debounced 250 ms) ───────────────────────────
@@ -88,7 +89,7 @@ export function useLocalPersistence({
       const id = setTimeout(() => {
         try {
           localStorage.setItem(key, payload)
-        } catch { }
+        } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
       }, 250)
       return () => clearTimeout(id)
     } catch {

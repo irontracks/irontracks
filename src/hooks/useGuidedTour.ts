@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useState, useCallback, useEffect, type Dispatch, type SetStateAction } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -88,7 +89,7 @@ export function useGuidedTour({
           key,
           JSON.stringify({ version: TOUR_VERSION, status: safeStatus, at: Date.now() }),
         )
-      } catch { }
+      } catch (e) { logWarn('useGuidedTour', 'silenced error', e) }
     },
     [getTourLocalKey],
   )
@@ -118,7 +119,7 @@ export function useGuidedTour({
         const key = getTourSeenKey(safeUid)
         if (!key) return
         window.localStorage.setItem(key, '1')
-      } catch { }
+      } catch (e) { logWarn('useGuidedTour', 'silenced error', e) }
     },
     [getTourSeenKey],
   )
@@ -148,7 +149,7 @@ export function useGuidedTour({
         const key = getTourAutoOpenedKey(safeUid)
         if (!key) return
         window.sessionStorage.setItem(key, '1')
-      } catch { }
+      } catch (e) { logWarn('useGuidedTour', 'silenced error', e) }
     },
     [getTourAutoOpenedKey],
   )
@@ -180,7 +181,7 @@ export function useGuidedTour({
           event: ev,
           payload: enriched,
         })
-      } catch { }
+      } catch (e) { logWarn('useGuidedTour', 'silenced error', e) }
     },
     [supabase, userId, userRole],
   )

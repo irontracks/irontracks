@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -47,7 +48,7 @@ export function useUserSettings(userId: string | null | undefined) {
           setSettings((prev) => ({ ...prev, ...(cached as unknown as Partial<UserSettings>) }))
         }
       }
-    } catch {}
+    } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
 
     ;(async () => {
       try {
@@ -69,7 +70,7 @@ export function useUserSettings(userId: string | null | undefined) {
             tableMissingRef.current = true
             try {
               if (typeof window !== 'undefined') window.localStorage.setItem(TABLE_MISSING_KEY, '1')
-            } catch {}
+            } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
             return
           }
           throw error
@@ -112,10 +113,10 @@ export function useUserSettings(userId: string | null | undefined) {
           if (typeof window !== 'undefined') {
             window.localStorage.setItem(`${STORAGE_KEY}.${safeUserId}`, JSON.stringify(nextSettings))
           }
-        } catch {}
+        } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
         try {
           setSettings((prev) => ({ ...(prev || {}), ...(nextSettings || {}) }))
-        } catch {}
+        } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
         return { ok: true, localOnly: true }
       }
 
@@ -139,12 +140,12 @@ export function useUserSettings(userId: string | null | undefined) {
           tableMissingRef.current = true
           try {
             if (typeof window !== 'undefined') window.localStorage.setItem(TABLE_MISSING_KEY, '1')
-          } catch {}
+          } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
           try {
             if (typeof window !== 'undefined') {
               window.localStorage.setItem(`${STORAGE_KEY}.${safeUserId}`, JSON.stringify(nextSettings))
             }
-          } catch {}
+          } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
           return { ok: true, localOnly: true }
         }
         throw error
@@ -154,11 +155,11 @@ export function useUserSettings(userId: string | null | undefined) {
         if (typeof window !== 'undefined') {
           window.localStorage.setItem(`${STORAGE_KEY}.${safeUserId}`, JSON.stringify(nextSettings))
         }
-      } catch {}
+      } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
 
       try {
         setSettings((prev) => ({ ...(prev || {}), ...(nextSettings || {}) }))
-      } catch {}
+      } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
 
       return { ok: true }
     } catch (e) {

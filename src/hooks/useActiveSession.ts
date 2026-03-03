@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/logger'
 import { useState, useRef, useCallback } from 'react'
 import { ActiveSession, ActiveWorkoutSession } from '@/types/app'
 
@@ -136,7 +137,7 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
                     localStorage.removeItem(`irontracks.activeSession.v2.${userId}`)
                 }
                 localStorage.removeItem('activeSession')
-            } catch { }
+            } catch (e) { logWarn('useActiveSession', 'silenced error', e) }
             setActiveSession(null)
             if (showReport === false) {
                 setView('dashboard')

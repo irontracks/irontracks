@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useEffect } from 'react'
 import { isIosNative } from '@/utils/platform'
@@ -36,7 +37,7 @@ export function usePushNotifications(userId?: string | null) {
           }
           try {
             await PushNotifications.removeAllDeliveredNotifications().catch(() => { })
-          } catch { }
+          } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
 
           const platform = String(Capacitor.getPlatform?.() || 'ios').toLowerCase()
           const deviceId =
@@ -64,7 +65,7 @@ export function usePushNotifications(userId?: string | null) {
                 credentials: 'include',
                 cache: 'no-store',
               }).catch(() => { })
-            } catch { }
+            } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
           })
           if (registration?.remove) handles.push(registration)
 
@@ -72,7 +73,7 @@ export function usePushNotifications(userId?: string | null) {
           if (regError?.remove) handles.push(regError)
 
           await PushNotifications.register().catch(() => { })
-        } catch { }
+        } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
       })()
 
     return () => {
@@ -80,7 +81,7 @@ export function usePushNotifications(userId?: string | null) {
       handles.forEach((h) => {
         try {
           h.remove()
-        } catch { }
+        } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
       })
     }
   }, [userId])
