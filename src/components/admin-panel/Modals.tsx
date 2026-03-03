@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAdminPanel } from './AdminPanelContext';
 import { X, UserPlus, Edit3, ArrowLeft } from 'lucide-react';
 import HistoryList from '../HistoryList'; // Import relative or alias
@@ -213,6 +213,7 @@ export const Modals: React.FC = () => {
             {/* History List Modal */}
             {historyOpen && selectedStudent && (
                 <div className="fixed inset-0 z-[1500] bg-neutral-900 overflow-y-auto animate-in fade-in duration-200">
+                    <EscapeListener onEscape={() => setHistoryOpen(false)} />
                     <HistoryList
                         user={user}
                         settings={{}}
@@ -229,4 +230,14 @@ export const Modals: React.FC = () => {
             )}
         </>
     );
+};
+
+/** Bug #11 fix: mounts an ESC key listener while in scope, unmounts on cleanup. */
+const EscapeListener: React.FC<{ onEscape: () => void }> = ({ onEscape }) => {
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onEscape(); };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [onEscape]);
+    return null;
 };

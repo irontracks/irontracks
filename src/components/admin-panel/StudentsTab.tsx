@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Filter, UserPlus, Trash2, Edit, Activity, User } from 'lucide-react';
+import { Search, UserPlus, Trash2, Edit, Activity, User } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 
@@ -15,6 +15,7 @@ export const StudentsTab: React.FC = () => {
         studentsWithTeacherFiltered,
         studentsWithoutTeacherFiltered,
         teachersList,
+        usersList,
         handleUpdateStudentTeacher,
         handleToggleStudentStatus,
         handleDeleteStudent,
@@ -22,6 +23,17 @@ export const StudentsTab: React.FC = () => {
         setHistoryOpen,
         user
     } = useAdminPanel();
+
+    // Bug #10 fix: compute live counts from usersList so filter options show real numbers
+    const statusCounts = React.useMemo(() => {
+        const list = Array.isArray(usersList) ? usersList : [];
+        return list.reduce<Record<string, number>>((acc, s) => {
+            const key = String(s?.status || 'pendente').toLowerCase().trim();
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+    }, [usersList]);
+
 
     const renderStudentRow = (s: AdminUser) => {
         const statusColor =
@@ -127,27 +139,39 @@ export const StudentsTab: React.FC = () => {
                     />
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:flex-none">
-                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
-                        <select
-                            value={studentStatusFilter}
-                            onChange={(e) => setStudentStatusFilter(e.target.value)}
-                            className="w-full md:w-48 bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white appearance-none focus:border-yellow-500 focus:outline-none cursor-pointer"
-                        >
-                            <option value="all">Todos os Status</option>
-                            <option value="pago">Ativos</option>
-                            <option value="pendente">Pendentes</option>
-                            <option value="atrasado">Atrasados</option>
-                        </select>
-                    </div>
+                <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
+                    {/* Bug #10 fix: pill buttons with live counts — 'cancelar' was missing from old select */}
+                    {([
+                        { key: 'all', label: 'Todos', color: 'text-neutral-300 bg-neutral-800 border-neutral-700 hover:border-neutral-600' },
+                        { key: 'pago', label: 'Ativos', color: 'text-green-400  bg-green-500/10  border-green-500/20  hover:border-green-500/40' },
+                        { key: 'pendente', label: 'Pendentes', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20 hover:border-yellow-500/40' },
+                        { key: 'atrasado', label: 'Atrasados', color: 'text-red-400    bg-red-500/10    border-red-500/20    hover:border-red-500/40' },
+                        { key: 'cancelar', label: 'Cancelados', color: 'text-neutral-400 bg-neutral-700/30 border-neutral-600/30 hover:border-neutral-500/40' },
+                    ] as const).map(({ key, label, color }) => {
+                        const count = key === 'all'
+                            ? (Array.isArray(usersList) ? usersList.length : 0)
+                            : (statusCounts[key] || 0);
+                        const active = studentStatusFilter === key;
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => setStudentStatusFilter(key)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all ${color} ${active ? 'ring-2 ring-yellow-500/50 ring-offset-1 ring-offset-black' : ''}`}
+                            >
+                                {label}
+                                <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] rounded-full font-black ${active ? 'bg-yellow-500 text-black' : 'bg-black/40 text-current'}`}>
+                                    {count}
+                                </span>
+                            </button>
+                        );
+                    })}
 
                     {isAdmin && (
                         <button
                             onClick={() => setShowRegisterModal(true)}
-                            className="px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 whitespace-nowrap"
+                            className="ml-auto md:ml-0 px-4 py-2.5 bg-yellow-500 hover:bg-yellow-400 text-black font-black rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 whitespace-nowrap"
                         >
-                            <UserPlus size={18} />
+                            <UserPlus size={16} />
                             <span className="hidden sm:inline">Novo Aluno</span>
                         </button>
                     )}
