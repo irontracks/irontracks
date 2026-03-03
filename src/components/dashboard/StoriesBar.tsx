@@ -97,22 +97,38 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
   }
 
   useEffect(() => {
-    // 🔥 FRONTEND CACHE AVOIDANCE
-    // Impede o stories de recarregar toda vez que o usuário navega entre tabs (que é comum no app em react).
-    // Só faz fetch inicial se Groups estiver vazio, senão espera pelo pull-to-refresh / atualizar
+    // Initial load — only if empty to avoid unnecessary fetches on tab switches
     if (groups.length === 0) {
       reload()
     }
+    // Fast-path: local window event dispatched by StoryComposer after post
     const onRefresh = () => reload()
     try {
       window.addEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
     } catch { }
+
+    // Reliable path: Supabase Realtime subscription on the stories table.
+    // This handles the iOS native case where window events don't cross component
+    // boundaries after tab switches or component remounts.
+    const supabase = createClient()
+    const channel = supabase
+      .channel('stories-auto-refresh')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories' }, () => {
+        // Debounce slightly so CDN/Cloudinary has time to propagate before we fetch
+        setTimeout(() => reload(), 1500)
+      })
+      .subscribe()
+
     return () => {
       try {
         window.removeEventListener('irontracks:stories:refresh', onRefresh as EventListenerOrEventListenerObject)
       } catch { }
+      try {
+        supabase.removeChannel(channel)
+      } catch { }
     }
   }, [reload, groups.length])
+
 
   const ordered = useMemo(() => {
     const arr = Array.isArray(groups) ? groups : []
