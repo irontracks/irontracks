@@ -93,6 +93,7 @@ import { useWorkoutExport } from '@/hooks/useWorkoutExport'
 import { useWorkoutCrud } from '@/hooks/useWorkoutCrud'
 import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
 import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
+import { useSessionSync } from '@/hooks/useSessionSync'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -393,8 +394,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         reindexSessionLogsAfterWorkoutEdit,
     } = useWorkoutEditor({ supabase })
 
-    const serverSessionSyncRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastKey: string }>({ timer: null, lastKey: '' });
-    const serverSessionSyncWarnedRef = useRef(false);
 
     // Sign-out + session clear — extracted to useSignOut hook
     const { safeSignOut, clearClientSessionState } = useSignOut({
@@ -406,163 +405,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         },
     })
 
-    useEffect(() => {
-        let cancelled = false;
-        const userId = user?.id ? String(user.id) : '';
-        if (!userId) return;
+    // Session sync (localStorage, server, realtime, ticker) — extracted to useSessionSync
+    useSessionSync({
+        userId: user?.id,
+        supabase,
+        inAppNotify,
+        setActiveSession,
+        setView: setView as (v: string | ((prev: string) => string)) => void,
+        suppressForeignFinishToastUntilRef,
+        activeSession,
+        setSessionTicker,
+        view,
+    })
 
-        const scopedKey = `irontracks.activeSession.v2.${userId}`;
-        let localSavedAt = 0;
-
-        try {
-            const raw = localStorage.getItem(scopedKey) || localStorage.getItem('activeSession');
-            if (raw) {
-                const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()));
-                if (isRecord(parsed) && parsed?.startedAt && parsed?.workout) {
-                    localSavedAt = Number(parsed?._savedAt ?? 0) || 0;
-                    setActiveSession(parsed as unknown as ActiveWorkoutSession);
-                    setView('active');
-
-                    if (!localStorage.getItem(scopedKey)) {
-                        try {
-                            localStorage.setItem(scopedKey, JSON.stringify(parsed));
-                            localStorage.removeItem('activeSession');
-                        } catch { }
-                    }
-                }
-            }
-        } catch {
-            try {
-                localStorage.removeItem(scopedKey);
-                localStorage.removeItem('activeSession');
-            } catch { }
-        }
-
-        const loadServer = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from('active_workout_sessions')
-                    .select('state, updated_at')
-                    .eq('user_id', userId)
-                    .maybeSingle();
-                if (cancelled) return;
-                if (error) {
-                    const msg = String((error && typeof error === 'object' && 'message' in error ? error.message : '') || '').toLowerCase();
-                    const code = String((error && typeof error === 'object' && 'code' in error ? error.code : '') || '').toLowerCase();
-                    const isMissing = code === '42p01' || msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache');
-                    if (isMissing && !serverSessionSyncWarnedRef.current) {
-                        serverSessionSyncWarnedRef.current = true;
-                        try {
-                            inAppNotify({
-                                text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
-                                senderName: 'Aviso do Sistema',
-                                displayName: 'Sistema',
-                                photoURL: null,
-                            });
-                        } catch { }
-                    }
-                    return;
-                }
-
-                const state = data?.state;
-                if (!state || typeof state !== 'object') return;
-                if (!state?.startedAt || !state?.workout) return;
-
-                const updatedAtMs = (() => {
-                    const fromCol = typeof data?.updated_at === 'string' ? Date.parse(data.updated_at) : NaN;
-                    const fromState = Number(state?._savedAt ?? 0) || 0;
-                    return Math.max(Number.isFinite(fromCol) ? fromCol : 0, fromState);
-                })();
-
-                if (updatedAtMs <= localSavedAt) return;
-
-                setActiveSession(state);
-                setView('active');
-                try {
-                    localStorage.setItem(scopedKey, JSON.stringify(state));
-                } catch { }
-            } catch { }
-        };
-
-        loadServer();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [supabase, user?.id, inAppNotify, setActiveSession, setView, suppressForeignFinishToastUntilRef]);
-
-    useEffect(() => {
-        const userId = user?.id ? String(user.id) : '';
-        if (!userId) return;
-
-        let mounted = true;
-        let channel: RealtimeChannel | null = null;
-
-        try {
-            channel = supabase
-                .channel(`active-workout-session:${userId}`)
-                .on(
-                    'postgres_changes',
-                    {
-                        event: '*',
-                        schema: 'public',
-                        table: 'active_workout_sessions',
-                        filter: `user_id=eq.${userId}`,
-                    },
-                    (payload: Record<string, unknown>) => {
-                        try {
-                            if (!mounted) return;
-                            const ev = String(payload?.eventType || '').toUpperCase();
-                            if (ev === 'DELETE') {
-                                if (Date.now() < (suppressForeignFinishToastUntilRef.current || 0)) {
-                                    suppressForeignFinishToastUntilRef.current = 0;
-                                    return;
-                                }
-                                setActiveSession(null);
-                                setView((prev) => (prev === 'active' ? 'dashboard' : prev));
-                                try {
-                                    localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
-                                } catch { }
-                                try {
-                                    inAppNotify({
-                                        text: 'Treino finalizado em outro dispositivo.',
-                                        senderName: 'Aviso do Sistema',
-                                        displayName: 'Sistema',
-                                        photoURL: null,
-                                    });
-                                } catch { }
-                                return;
-                            }
-
-                            if (ev === 'UPDATE') {
-                                const rowNew = isRecord(payload?.new) ? (payload.new as Record<string, unknown>) : null
-                                const stateRaw = rowNew?.state
-                                const state = isRecord(stateRaw) ? stateRaw : null
-                                if (!state || !state?.startedAt || !state?.workout) {
-                                    setActiveSession(null);
-                                    setView((prev) => (prev === 'active' ? 'dashboard' : prev));
-                                    try {
-                                        localStorage.removeItem(`irontracks.activeSession.v2.${userId}`);
-                                    } catch { }
-                                }
-                            }
-                        } catch { }
-                    }
-                )
-                .subscribe();
-        } catch { }
-
-        return () => {
-            mounted = false;
-            try {
-                if (channel) supabase.removeChannel(channel);
-            } catch {
-                try {
-                    if (channel) createClient().removeChannel(channel);
-                } catch { }
-            }
-        };
-    }, [supabase, user?.id, inAppNotify, setActiveSession, setView, suppressForeignFinishToastUntilRef]);
 
     useEffect(() => {
         const handler = () => { try { unlockAudio(); } catch { } };
@@ -576,118 +431,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // View + activeSession persistence — handled by useLocalPersistence hook above
 
-    useEffect(() => {
-        const userId = user?.id ? String(user.id) : '';
-        if (!userId) return;
-
-        try {
-            if (serverSessionSyncRef.current?.timer) {
-                try {
-                    clearTimeout(serverSessionSyncRef.current.timer);
-                } catch { }
-            }
-        } catch { }
-
-        const key = (() => {
-            try {
-                return JSON.stringify(activeSession || null);
-            } catch {
-                return '';
-            }
-        })();
-
-        serverSessionSyncRef.current.lastKey = key;
-
-        const run = async () => {
-            try {
-                if (serverSessionSyncRef.current.lastKey !== key) return;
-
-                if (!activeSession) {
-                    const { error } = await supabase.from('active_workout_sessions').delete().eq('user_id', userId);
-                    if (error) {
-                        const msg = String((error && typeof error === 'object' && 'message' in error ? error.message : '') || '').toLowerCase();
-                        const code = String((error && typeof error === 'object' && 'code' in error ? error.code : '') || '').toLowerCase();
-                        const isMissing = code === '42p01' || msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache');
-                        if (isMissing && !serverSessionSyncWarnedRef.current) {
-                            serverSessionSyncWarnedRef.current = true;
-                            try {
-                                inAppNotify({
-                                    text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
-                                    senderName: 'Aviso do Sistema',
-                                    displayName: 'Sistema',
-                                    photoURL: null,
-                                });
-                            } catch { }
-                        }
-                    }
-                    return;
-                }
-
-                const startedAtRaw = activeSession?.startedAt;
-                const startedAtMs = typeof startedAtRaw === 'number' ? startedAtRaw : new Date(startedAtRaw || 0).getTime();
-                if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return;
-                if (!activeSession?.workout) return;
-
-                const state = { ...(activeSession || {}), _savedAt: Date.now() };
-
-                const { error } = await supabase
-                    .from('active_workout_sessions')
-                    .upsert(
-                        {
-                            user_id: userId,
-                            started_at: new Date(startedAtMs).toISOString(),
-                            state,
-                            updated_at: new Date().toISOString(),
-                        },
-                        { onConflict: 'user_id' }
-                    );
-                if (error) {
-                    const msg = String((error && typeof error === 'object' && 'message' in error ? error.message : '') || '').toLowerCase();
-                    const code = String((error && typeof error === 'object' && 'code' in error ? error.code : '') || '').toLowerCase();
-                    const isMissing = code === '42p01' || msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache');
-                    if (isMissing && !serverSessionSyncWarnedRef.current) {
-                        serverSessionSyncWarnedRef.current = true;
-                        try {
-                            inAppNotify({
-                                text: 'Sincronização do treino entre navegadores indisponível (migrations pendentes).',
-                                senderName: 'Aviso do Sistema',
-                                displayName: 'Sistema',
-                                photoURL: null,
-                            });
-                        } catch { }
-                    }
-                }
-            } catch { }
-        };
-
-        let timerId = null;
-
-        try {
-            timerId = setTimeout(() => {
-                try {
-                    run();
-                } catch { }
-            }, 900);
-            serverSessionSyncRef.current.timer = timerId as unknown as ReturnType<typeof setTimeout>;
-        } catch { }
-
-        return () => {
-            try {
-                if (timerId) clearTimeout(timerId);
-            } catch { }
-        };
-    }, [activeSession, supabase, user?.id, inAppNotify, setActiveSession, setView]);
-
-    useEffect(() => {
-        if (!activeSession) return;
-        const id = setInterval(() => {
-            try {
-                if (typeof document !== 'undefined' && document.hidden) return;
-            } catch { }
-            setSessionTicker(Date.now());
-        }, 1000);
-        return () => clearInterval(id);
-    }, [activeSession, view, setSessionTicker]);
 
     // Notification + DM badge useEffects — handled by useUnreadBadges hook above
 
