@@ -47,25 +47,31 @@ export async function POST(req: Request) {
 
     const { mediaPath, caption, meta } = validation.data
 
-    if (!isAllowedStoryPath(auth.user.id, mediaPath)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    // Cloudinary URLs (https://res.cloudinary.com/...) are already validated by the signed upload
+    // — skip path ownership check and Supabase MIME check for them
+    const isCloudinaryPath = mediaPath.startsWith('https://res.cloudinary.com/')
 
-    const ALLOWED_MIME_PREFIXES = [
-      'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-      'video/mp4', 'video/quicktime', 'video/webm',
-    ]
-    const mimeAdmin = createAdminClient()
-    const pathParts = mediaPath.split('/')
-    const fileName = pathParts.at(-1) ?? ''
-    const folderPath = pathParts.slice(0, -1).join('/')
-    // Timeout the storage list — if metadata isn't ready yet (e.g. just uploaded), skip MIME check
-    const listResult = await Promise.race([
-      mimeAdmin.storage.from('social-stories').list(folderPath, { search: fileName, limit: 1 }),
-      new Promise<{ data: null; error: null }>((resolve) => setTimeout(() => resolve({ data: null, error: null }), 8_000)),
-    ])
-    const storageMime = String(listResult.data?.[0]?.metadata?.mimetype || '').toLowerCase()
-    // Only block if we got a MIME and it's explicitly disallowed; skip check if list timed out / returned empty
-    if (storageMime && !ALLOWED_MIME_PREFIXES.some((m) => storageMime.startsWith(m))) {
-      return NextResponse.json({ ok: false, error: 'Tipo de arquivo não permitido.' }, { status: 400 })
+    if (!isCloudinaryPath) {
+      if (!isAllowedStoryPath(auth.user.id, mediaPath)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+
+      const ALLOWED_MIME_PREFIXES = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'video/mp4', 'video/quicktime', 'video/webm',
+      ]
+      const mimeAdmin = createAdminClient()
+      const pathParts = mediaPath.split('/')
+      const fileName = pathParts.at(-1) ?? ''
+      const folderPath = pathParts.slice(0, -1).join('/')
+      // Timeout the storage list — if metadata isn't ready yet (e.g. just uploaded), skip MIME check
+      const listResult = await Promise.race([
+        mimeAdmin.storage.from('social-stories').list(folderPath, { search: fileName, limit: 1 }),
+        new Promise<{ data: null; error: null }>((resolve) => setTimeout(() => resolve({ data: null, error: null }), 8_000)),
+      ])
+      const storageMime = String(listResult.data?.[0]?.metadata?.mimetype || '').toLowerCase()
+      // Only block if we got a MIME and it's explicitly disallowed; skip check if list timed out / returned empty
+      if (storageMime && !ALLOWED_MIME_PREFIXES.some((m) => storageMime.startsWith(m))) {
+        return NextResponse.json({ ok: false, error: 'Tipo de arquivo não permitido.' }, { status: 400 })
+      }
     }
 
     const { data, error } = await auth.supabase

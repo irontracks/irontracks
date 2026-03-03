@@ -7,6 +7,7 @@ type AnyObj = Record<string, unknown>
 interface ApplyState {
     status: 'idle' | 'loading' | 'success' | 'error'
     error: string
+    templateId?: string | null
 }
 
 interface ReportAiSectionProps {

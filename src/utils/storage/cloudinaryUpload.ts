@@ -1,4 +1,4 @@
-import { logError, logWarn } from '@/lib/logger'
+import { logWarn } from '@/lib/logger'
 
 interface CloudinaryUploadResult {
   /** Full public CDN URL — stored directly in social_stories.media_path */
@@ -8,7 +8,8 @@ interface CloudinaryUploadResult {
 
 /**
  * Upload a Blob to Cloudinary using a server-signed request.
- * Uses XMLHttpRequest so we get real upload progress (fetch doesn't support this).
+ * Uses fetch (not XHR) — XHR fails on iOS Capacitor WKWebView with remote server.url.
+ * Progress is simulated: 0% → 50% on start → 100% on completion.
  * The server signs the request — API secret never touches the client.
  */
 export async function uploadToCloudinary(
@@ -36,7 +37,10 @@ export async function uploadToCloudinary(
     cloudName: string; folder: string; publicId: string; uploadUrl: string
   }
 
-  // Step 2: Upload directly to Cloudinary CDN (bypasses our server = faster)
+  // Simulate progress start (fetch doesn't support upload progress events)
+  onProgress?.(0, blob.size)
+
+  // Step 2: Upload directly to Cloudinary CDN via fetch
   const form = new FormData()
   form.append('file', blob, `story.${ext}`)
   form.append('api_key', sign.apiKey)
@@ -45,36 +49,16 @@ export async function uploadToCloudinary(
   form.append('folder', sign.folder)
   form.append('public_id', sign.publicId)
 
-  const url = await new Promise<string>((resolve, reject) => {
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', sign.uploadUrl)
+  const res = await fetch(sign.uploadUrl, { method: 'POST', body: form })
+  const data = await res.json().catch(() => ({})) as { secure_url?: string; error?: { message?: string } }
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) onProgress?.(e.loaded, e.total)
-    }
+  if (!res.ok || !data.secure_url) {
+    const msg = data.error?.message || `Cloudinary error ${res.status}`
+    logWarn('cloudinaryUpload', msg)
+    throw new Error(msg)
+  }
 
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          const data = JSON.parse(xhr.responseText) as { secure_url?: string }
-          if (data.secure_url) return resolve(data.secure_url)
-        } catch { /* fall through */ }
-        reject(new Error('Resposta inválida do Cloudinary'))
-      } else {
-        let msg = `Cloudinary error ${xhr.status}`
-        try { msg = (JSON.parse(xhr.responseText) as { error?: { message?: string } }).error?.message || msg } catch { }
-        logWarn('cloudinaryUpload', msg)
-        reject(new Error(msg))
-      }
-    }
-
-    xhr.onerror = () => reject(new Error('Falha de rede no upload Cloudinary'))
-    xhr.ontimeout = () => reject(new Error('Timeout no upload Cloudinary'))
-    xhr.timeout = 120_000 // 2 min
-    xhr.send(form)
-  })
-
-  return { url, publicId: `${folder}/${sign.publicId}` }
+  return { url: data.secure_url, publicId: `${folder}/${sign.publicId}` }
 }
 
 /** Returns true if a media_path value is a Cloudinary URL (not a Supabase relative path) */

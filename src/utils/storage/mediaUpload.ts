@@ -44,7 +44,6 @@ export async function uploadStoryMedia(
       return url
     } catch (err) {
       logWarn('mediaUpload', 'Cloudinary upload failed, falling back to Supabase', err)
-      // Fallback to Supabase if Cloudinary fails
     }
   }
 

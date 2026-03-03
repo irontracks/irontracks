@@ -79,6 +79,8 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       const createJson = await createResp.json().catch((): null => null)
       if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
 
+      // Small delay for Cloudinary CDN propagation before refreshing the list
+      await new Promise((r) => setTimeout(r, 1500))
       await reload()
     } catch (e: unknown) {
       const msg = String(getErrorMessage(e) || e)
