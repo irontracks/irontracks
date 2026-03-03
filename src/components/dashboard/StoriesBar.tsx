@@ -113,7 +113,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     const supabase = createClient()
     const channel = supabase
       .channel('stories-auto-refresh')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stories' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_stories' }, () => {
         // Debounce slightly so CDN/Cloudinary has time to propagate before we fetch
         setTimeout(() => reload(), 1500)
       })
