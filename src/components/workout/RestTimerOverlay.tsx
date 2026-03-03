@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Timer, ArrowLeft } from 'lucide-react';
+import { Timer, X } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isIosNative } from '@/utils/platform';
 import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
@@ -170,7 +170,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     if (state?.isActive) stopAlarm(true);
                 }).then((h: { remove: () => void }) => {
                     handle = h;
-                }).catch(() => {});
+                }).catch(() => { });
             }
         } catch { }
         return () => {
@@ -205,7 +205,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     const byDuration = Math.ceil(maxSeconds / notifyEverySeconds);
                     const notifyCount = repeatAlarm ? Math.max(0, Math.min(maxCount, byDuration)) : 0;
                     scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!', notifyCount, notifyEverySeconds);
-                }).catch(() => {});
+                }).catch(() => { });
             }
             startRestLiveActivity(id, seconds, 'Descanso');
             setIdleTimerDisabled(true);
@@ -350,7 +350,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             }}
                             className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2"
                         >
-                            <ArrowLeft size={16} /> <span className="text-xs font-bold">Voltar</span>
+                            <X size={16} /> <span className="text-xs font-bold">Ocultar</span>
                         </button>
                     </div>
                 </div>

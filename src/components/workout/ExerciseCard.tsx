@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowDown, ChevronDown, ChevronUp, Dumbbell, Loader2, Pencil, Play, Plus } from 'lucide-react';
+import { ArrowDown, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import {
   NormalSet,
@@ -42,6 +42,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
     getPlanConfig,
     getLog,
     alert,
+    removeExtraSetFromExercise,
   } = useWorkoutContext();
 
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
@@ -185,7 +186,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
           if (key === 'Enter' || key === ' ') {
             try {
               e.preventDefault();
-            } catch {}
+            } catch { }
             setCurrentExerciseIdx(exIdx);
             toggleCollapse(exIdx);
           }
@@ -214,7 +215,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
                       ? 'cluster'
                       : methodLabel === 'Bi-Set'
                         ? 'biSet'
-                      : null;
+                        : null;
               const term = methodKey ? (HELP_TERMS as Record<string, { title?: string; text?: string; tooltip?: string }>)[methodKey] : null;
               return (
                 <span className="truncate inline-flex items-center gap-1 group">
@@ -238,7 +239,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
                 try {
                   e.preventDefault();
                   e.stopPropagation();
-                } catch {}
+                } catch { }
                 setCurrentExerciseIdx(exIdx);
                 try {
                   const win = typeof window !== 'undefined' ? window : null;
@@ -250,7 +251,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
                   logError('ExerciseCard', '[ActiveWorkout] video open failed', { exIdx, videoUrl, err });
                   try {
                     await alert('Não foi possível abrir o vídeo agora. Verifique o link e tente novamente.');
-                  } catch {}
+                  } catch { }
                 }
               }}
               className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
@@ -273,7 +274,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
               try {
                 e.preventDefault();
                 e.stopPropagation();
-              } catch {}
+              } catch { }
               setCurrentExerciseIdx(exIdx);
               await openDeloadModal(ex, exIdx);
             }}
@@ -284,11 +285,41 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
           </button>
           <button
             type="button"
+            onClick={(e) => {
+              try {
+                e.preventDefault();
+                e.stopPropagation();
+              } catch { }
+              const { toggleLinkWeights } = require('./WorkoutContext').useWorkoutContext(); // or get from destructuring at top of file
+              toggleLinkWeights(exIdx);
+            }}
+            className={`h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl border transition-colors active:scale-95 ${(() => {
+              const { linkedWeightExercises } = require('./WorkoutContext').useWorkoutContext();
+              return linkedWeightExercises.has(exIdx);
+            })()
+              ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500'
+              : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
+              }`}
+            title="Sincronizar pesos"
+            aria-label="Sincronizar pesos em todas as séries"
+          >
+            <Link size={14} className={(() => {
+              const { linkedWeightExercises } = require('./WorkoutContext').useWorkoutContext();
+              return linkedWeightExercises.has(exIdx) ? '' : 'opacity-60';
+            })()} />
+            <span className={`mt-0.5 text-[10px] leading-none ${(() => {
+              const { linkedWeightExercises } = require('./WorkoutContext').useWorkoutContext();
+              return linkedWeightExercises.has(exIdx) ? 'text-yellow-500' : 'text-neutral-400 opacity-60';
+            })()
+              }`}>Link</span>
+          </button>
+          <button
+            type="button"
             onClick={async (e) => {
               try {
                 e.preventDefault();
                 e.stopPropagation();
-              } catch {}
+              } catch { }
               setCurrentExerciseIdx(exIdx);
               await openEditExercise(exIdx);
             }}
@@ -305,14 +336,28 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
       {!collapsedNow && (
         <div className="mt-4 space-y-2">
           {Array.from({ length: setsCount }).map((_, setIdx) => renderSet(setIdx))}
-          <button
-            type="button"
-            onClick={() => addExtraSetToExercise(exIdx)}
-            className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 font-black hover:bg-neutral-800 active:scale-95 transition-transform"
-          >
-            <Plus size={16} />
-            <span className="text-sm">Série extra</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => addExtraSetToExercise(exIdx)}
+              className="flex-1 min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 font-black hover:bg-neutral-800 active:scale-95 transition-transform"
+            >
+              <Plus size={16} />
+              <span className="text-sm">Série extra</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const { removeExtraSetFromExercise } = require('./WorkoutContext').useWorkoutContext(); // or get from destructuring at top of file
+                removeExtraSetFromExercise(exIdx);
+              }}
+              className="min-h-[44px] px-4 inline-flex items-center justify-center gap-2 rounded-xl bg-neutral-900/50 border border-red-500/20 text-red-500 hover:bg-red-500/10 active:scale-95 transition-colors disabled:opacity-30"
+              disabled={setsCount <= 1}
+              title="Remover última série"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
       )}
     </div>
