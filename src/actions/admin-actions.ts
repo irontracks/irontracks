@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { requireRole } from '@/utils/auth/route'
 import type { ActionResult } from '@/types/actions'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { sendPushToUsers } from '@/lib/push/apns'
 
 type AdminActionResult<T = Record<string, unknown>> = ActionResult<T> & { success?: boolean; error?: string; data?: unknown }
 
@@ -43,13 +44,13 @@ export async function sendBroadcastMessage(title: string, message: string): Prom
         const notifications = safeProfiles
             .filter((p) => p && typeof p === 'object' && p.id)
             .map((p) => ({
-            user_id: p.id,
-            title,
-            message,
-            type: 'broadcast',
-            read: false,
-            created_at: new Date().toISOString()
-        }))
+                user_id: p.id,
+                title,
+                message,
+                type: 'broadcast',
+                read: false,
+                created_at: new Date().toISOString()
+            }))
 
         // 3. Insert in batches of 100 to avoid limits
         const batchSize = 100
@@ -57,6 +58,12 @@ export async function sendBroadcastMessage(title: string, message: string): Prom
             const batch = notifications.slice(i, i + batchSize)
             const { error: iError } = await adminDb.from('notifications').insert(batch)
             if (iError) throw iError
+        }
+
+        // 4. Fire push notification to all users
+        const allUserIds = safeProfiles.map(p => String(p.id)).filter(Boolean)
+        if (allUserIds.length && title && message) {
+            void sendPushToUsers(allUserIds, title, message).catch(() => { })
         }
 
         return { success: true, count: notifications.length } as unknown as AdminActionResult<Record<string, unknown>>
@@ -529,20 +536,21 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
                 exercises: (Array.isArray(w?.exercises) ? w.exercises : []).map((e) => {
                     const ex = e && typeof e === 'object' ? (e as Record<string, unknown>) : {}
                     return ({
-                    id: ex?.id,
-                    name: ex?.name ?? '',
-                    notes: ex?.notes ?? null,
-                    video_url: ex?.video_url ?? null,
-                    rest_time: ex?.rest_time ?? null,
-                    cadence: ex?.cadence ?? null,
-                    method: ex?.method ?? null,
-                    order: ex?.order ?? null,
-                    sets: (Array.isArray(ex?.sets) ? ex.sets : []).map((s: Record<string, unknown>) => ({
-                        reps: s?.reps ?? null,
-                        rpe: s?.rpe ?? null,
-                        set_number: s?.set_number ?? null
-                    }))
-                })})
+                        id: ex?.id,
+                        name: ex?.name ?? '',
+                        notes: ex?.notes ?? null,
+                        video_url: ex?.video_url ?? null,
+                        rest_time: ex?.rest_time ?? null,
+                        cadence: ex?.cadence ?? null,
+                        method: ex?.method ?? null,
+                        order: ex?.order ?? null,
+                        sets: (Array.isArray(ex?.sets) ? ex.sets : []).map((s: Record<string, unknown>) => ({
+                            reps: s?.reps ?? null,
+                            rpe: s?.rpe ?? null,
+                            set_number: s?.set_number ?? null
+                        }))
+                    })
+                })
             }))
         }
 

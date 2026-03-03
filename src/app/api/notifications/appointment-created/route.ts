@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
+import { sendPushToUsers } from '@/lib/push/apns'
 
 export const dynamic = 'force-dynamic'
 
@@ -79,6 +80,9 @@ export async function POST(req: Request) {
     if (insertError) {
       return NextResponse.json({ ok: false, error: insertError.message }, { status: 400 })
     }
+
+    // Fire push notification
+    void sendPushToUsers([targetUserId], title, message).catch(() => { })
 
     return NextResponse.json({ ok: true, notified: true })
   } catch (e: unknown) {
