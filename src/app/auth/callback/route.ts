@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
+import { warmupCacheForUser } from '@/utils/cacheWarmup'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,7 +16,7 @@ const resolvePublicOrigin = (request: Request) => {
   if (envOriginRaw) {
     try {
       return new URL(envOriginRaw).origin
-    } catch {}
+    } catch { }
   }
 
   const host = String(request.headers.get('x-forwarded-host') || request.headers.get('host') || '').trim()
@@ -74,7 +75,7 @@ export async function GET(request: Request) {
   try {
     const cookieStore = await cookies()
     nextFromCookie = String(cookieStore.get(nextCookieName)?.value || '')
-  } catch {}
+  } catch { }
   const rawNext = String(next || '')
   const fallbackNext = nextFromCookie || '/dashboard'
   const safeNext = rawNext.startsWith('/') ? rawNext : fallbackNext.startsWith('/') ? fallbackNext : '/dashboard'
@@ -91,7 +92,7 @@ export async function GET(request: Request) {
   })
   try {
     response.cookies.set(nextCookieName, '', { path: '/', maxAge: 0 })
-  } catch {}
+  } catch { }
 
   if (!code) {
     return NextResponse.redirect(new URL('/auth/error?error=missing_code', safeOrigin))
@@ -120,7 +121,7 @@ export async function GET(request: Request) {
           } catch {
             try {
               response.cookies.set(name, value)
-            } catch {}
+            } catch { }
           }
         })
       },
@@ -142,8 +143,12 @@ export async function GET(request: Request) {
       return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(error.message || 'exchange_failed')}`, safeOrigin))
     }
     try {
-      await supabase.auth.getUser()
-    } catch {}
+      const { data: { user } } = await supabase.auth.getUser()
+      // Pre-populate cache after successful login
+      if (user?.id) {
+        warmupCacheForUser(user.id).catch(() => { })
+      }
+    } catch { }
   } catch {
     return NextResponse.redirect(new URL('/auth/error?error=exchange_failed', safeOrigin))
   }
