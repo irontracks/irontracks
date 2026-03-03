@@ -9,6 +9,7 @@
  */
 import * as crypto from 'crypto'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { logInfo, logError, logWarn } from '@/lib/logger'
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -64,8 +65,7 @@ async function sendOneApnsPush(
         ...extra,
     })
 
-    // Use native fetch to APNs HTTP/2 endpoint (Node 18+ supports HTTP/2 via fetch)
-    const isProduction = true // Apple recommends always using production; sandbox only for dev builds
+    const isProduction = true
     const host = isProduction
         ? 'https://api.push.apple.com'
         : 'https://api.sandbox.push.apple.com'
@@ -83,8 +83,15 @@ async function sendOneApnsPush(
             },
             body: apnsPayload,
         })
+        if (!res.ok) {
+            const errBody = await res.text().catch(() => '')
+            logWarn('apns', `[APNs] Push failed: HTTP ${res.status} — token=${token.slice(0, 8)}... — ${errBody}`)
+        } else {
+            logInfo('apns', `[APNs] Push sent OK — token=${token.slice(0, 8)}...`)
+        }
         return res.ok
-    } catch {
+    } catch (e) {
+        logError('apns', '[APNs] Network error sending push', { token: token.slice(0, 8), err: e })
         return false
     }
 }
@@ -104,20 +111,32 @@ export async function sendPushToUsers(
 ): Promise<void> {
     try {
         const cfg = getApnsConfig()
-        if (!cfg) return // APNs not configured — silently skip
+        if (!cfg) {
+            logWarn('apns', '[APNs] sendPushToUsers: config missing — set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_P8 in Vercel env vars')
+            return
+        }
 
         const ids = userIds.filter(Boolean)
         if (!ids.length) return
 
         const admin = createAdminClient()
-        const { data: tokens } = await admin
+        const { data: tokens, error: tokenErr } = await admin
             .from('device_push_tokens')
             .select('token')
             .in('user_id', ids)
             .eq('platform', 'ios')
             .limit(500)
 
-        if (!Array.isArray(tokens) || !tokens.length) return
+        if (tokenErr) {
+            logError('apns', '[APNs] Failed to fetch device tokens', tokenErr)
+            return
+        }
+        if (!Array.isArray(tokens) || !tokens.length) {
+            logWarn('apns', `[APNs] No iOS tokens found for ${ids.length} user(s) — make sure @capacitor/push-notifications registered successfully`)
+            return
+        }
+
+        logInfo('apns', `[APNs] Sending push to ${tokens.length} device(s) for ${ids.length} user(s): "${title}"`)
 
         // Send in parallel, max 20 concurrent
         const allTokens = tokens.map((t) => String(t.token || '').trim()).filter(Boolean)
@@ -128,7 +147,7 @@ export async function sendPushToUsers(
                 batch.map((t) => sendOneApnsPush(t, title, body, cfg, extra))
             )
         }
-    } catch {
-        // Never throw — push failures must not break the calling flow
+    } catch (e) {
+        logError('apns', '[APNs] Unexpected error in sendPushToUsers', e)
     }
 }
