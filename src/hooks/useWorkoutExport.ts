@@ -1,3 +1,4 @@
+import { logWarn } from '@/lib/logger'
 import { useState, useCallback } from 'react'
 import { ActiveSession, UserRecord } from '@/types/app'
 import { workoutPlanHtml } from '@/utils/report/templates'
@@ -70,7 +71,7 @@ export function useWorkoutExport({
             win.document.close()
             win.focus()
             setTimeout(() => {
-                try { win.print() } catch { }
+                try { win.print() } catch (e) { logWarn('useWorkoutExport', 'silenced error', e) }
             }, 300)
             setShowExportModal(false)
         } catch (e) {
@@ -174,7 +175,7 @@ export function useWorkoutExport({
             if (!file) return
             try {
                 setShowJsonImportModal(false)
-            } catch { }
+            } catch (e) { logWarn('useWorkoutExport', 'silenced error', e) }
 
             const reader = new FileReader()
             reader.onload = async (event: ProgressEvent<FileReader>) => {
@@ -198,7 +199,7 @@ export function useWorkoutExport({
                 } finally {
                     try {
                         if (input) input.value = ''
-                    } catch { }
+                    } catch (e) { logWarn('useWorkoutExport', 'silenced error', e) }
                 }
             }
             reader.readAsText(file)

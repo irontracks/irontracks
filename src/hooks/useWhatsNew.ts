@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { getLatestWhatsNew } from '@/content/whatsNew'
@@ -56,12 +57,12 @@ export function useWhatsNew({ userId, userSettingsApi }: UseWhatsNewOptions): Us
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ updateId: String(first.id) }),
           })
-        } catch { }
+        } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
 
         shownRef.current = true
         setWhatsNewOpen(true)
         setPendingUpdate(first as PendingUpdate)
-      } catch { }
+      } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
     })()
   }, [userId, userSettingsApi?.loaded, userSettingsApi?.settings])
 
@@ -77,7 +78,7 @@ export function useWhatsNew({ userId, userSettingsApi }: UseWhatsNewOptions): Us
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ updateId }),
           })
-        } catch { }
+        } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
         setPendingUpdate(null)
         return
       }
@@ -100,13 +101,13 @@ export function useWhatsNew({ userId, userSettingsApi }: UseWhatsNewOptions): Us
         userSettingsApi?.setSettings?.(
           next as Parameters<NonNullable<typeof userSettingsApi>['setSettings']>[0],
         )
-      } catch { }
+      } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
       try {
         await userSettingsApi?.save?.(
           next as Parameters<NonNullable<typeof userSettingsApi>['save']>[0],
         )
-      } catch { }
-    } catch { }
+      } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
+    } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
   }, [userSettingsApi, pendingUpdate])
 
   return {

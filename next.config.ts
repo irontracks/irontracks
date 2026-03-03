@@ -118,7 +118,25 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/((?!_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml).*)',
-        headers: [{ key: 'cache-control', value: 'no-store, max-age=0' }],
+        headers: [
+          { key: 'cache-control', value: 'no-store, max-age=0' },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob: https://*.supabase.co https://res.cloudinary.com https://firebasestorage.googleapis.com https://*.googleusercontent.com https://www.gstatic.com https://media.tenor.com https://tenor.com https://media.giphy.com https://i.giphy.com",
+              "media-src 'self' blob: https://*.supabase.co https://firebasestorage.googleapis.com",
+              "connect-src 'self' https://*.supabase.co https://*.upstash.io wss://*.supabase.co https://api.mercadopago.com",
+              "frame-ancestors 'none'",
+            ].join('; '),
+          },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
       },
     ]
   },

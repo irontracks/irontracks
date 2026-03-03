@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { getMuscleMapWeek } from '@/actions/workout-actions'
@@ -387,7 +388,7 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
                             .gte('created_at', windowStartIso).lte('created_at', windowEndIso)
                             .order('created_at', { ascending: false }).limit(1).maybeSingle()
                         if (!cancelled && preRow) next.pre = preRow
-                    } catch { }
+                    } catch (e) { logWarn('useReportData', 'silenced error', e) }
                 }
                 setCheckinsByKind(next)
             } catch {
@@ -517,7 +518,7 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
                 const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
                 if (cancelled) return
                 if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
-            } catch { }
+            } catch (e) { logWarn('useReportData', 'silenced error', e) }
         })()
         return () => { cancelled = true }
     }, [session])
@@ -708,7 +709,7 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
             const fromPerExercise = prevByExercise?.logsByExercise && typeof prevByExercise.logsByExercise === 'object'
                 ? prevByExercise.logsByExercise : null
             if (fromPerExercise && Object.keys(fromPerExercise).length) return fromPerExercise
-        } catch { }
+        } catch (e) { logWarn('useReportData', 'silenced error', e) }
         const out: Record<string, unknown> = {}
         if (effectivePreviousSession && Array.isArray(effectivePreviousSession?.exercises)) {
             const safePrevLogs = prevSessionLogs as Record<string, unknown>;
@@ -741,7 +742,7 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
             const m = prevByExercise?.baseMsByExercise && typeof prevByExercise.baseMsByExercise === 'object'
                 ? prevByExercise.baseMsByExercise : null
             if (m && Object.keys(m).length) return m
-        } catch { }
+        } catch (e) { logWarn('useReportData', 'silenced error', e) }
         return {}
     })()
 

@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useState, useCallback } from 'react'
 
@@ -35,7 +36,7 @@ export function useAdminPanelState({
       const url = new URL(window.location.href)
       url.searchParams.set('tab', tabValue)
       window.history.replaceState({}, '', url)
-    } catch { }
+    } catch (e) { logWarn('useAdminPanelState', 'silenced error', e) }
   }, [])
 
   const removeUrlTabParam = useCallback(() => {
@@ -44,7 +45,7 @@ export function useAdminPanelState({
       const url = new URL(window.location.href)
       url.searchParams.delete('tab')
       window.history.replaceState({}, '', url)
-    } catch { }
+    } catch (e) { logWarn('useAdminPanelState', 'silenced error', e) }
   }, [])
 
   const openAdminPanel = useCallback((tab?: unknown) => {
@@ -55,7 +56,7 @@ export function useAdminPanelState({
         if (tab) sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, String(tab))
         if (tab) setUrlTabParam(tab)
       }
-    } catch { }
+    } catch (e) { logWarn('useAdminPanelState', 'silenced error', e) }
   }, [setUrlTabParam])
 
   const closeAdminPanel = useCallback(() => {
@@ -65,7 +66,7 @@ export function useAdminPanelState({
         sessionStorage.removeItem(ADMIN_PANEL_OPEN_KEY)
         sessionStorage.removeItem(ADMIN_PANEL_TAB_KEY)
       }
-    } catch { }
+    } catch (e) { logWarn('useAdminPanelState', 'silenced error', e) }
     removeUrlTabParam()
   }, [removeUrlTabParam])
 
@@ -98,11 +99,11 @@ export function useAdminPanelState({
         try {
           sessionStorage.setItem(ADMIN_PANEL_OPEN_KEY, '1')
           sessionStorage.setItem(ADMIN_PANEL_TAB_KEY, tab)
-        } catch { }
+        } catch (e) { logWarn('useAdminPanelState', 'silenced error', e) }
       }
 
       setShowAdminPanel(true)
-    } catch { }
+    } catch (e) { logWarn('useAdminPanelState', 'silenced error', e) }
   }, [userRole])
 
   return {

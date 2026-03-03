@@ -168,7 +168,7 @@ export function useWorkoutCrud({
             const resolved = await resolveExerciseVideos(exercisesList)
             resolvedExercises = Array.isArray(resolved?.exercises) ? resolved.exercises : exercisesList
             persistExerciseVideoUrls(resolved?.updates || [])
-        } catch { }
+        } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
 
         // Play start sound
         {
@@ -205,7 +205,7 @@ export function useWorkoutCrud({
                 headers: { 'content-type': 'application/json' },
                 body: JSON.stringify({ workout_id: wid, workout_title: title }),
             }).catch(() => { })
-        } catch { }
+        } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
 
         // Request notification permission
         {
@@ -240,7 +240,7 @@ export function useWorkoutCrud({
                 localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`)
             }
             localStorage.removeItem('activeSession')
-        } catch { }
+        } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
         setActiveSession(null)
         if (showReport === false) {
             setView('dashboard')
@@ -339,12 +339,12 @@ export function useWorkoutCrud({
 
             if (cleanedObj.id) {
                 await updateWorkout(String(cleanedObj.id), cleanedObj)
-                try { await fetchWorkouts() } catch { }
+                try { await fetchWorkouts() } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
                 return { ok: true, mode: 'update' }
             }
 
             const created = await createWorkout(cleanedObj)
-            try { await fetchWorkouts() } catch { }
+            try { await fetchWorkouts() } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
             return {
                 ok: true,
                 mode: 'create',
@@ -386,7 +386,7 @@ export function useWorkoutCrud({
             editActiveBaseRef.current = base
             setEditActiveDraft(nextBase)
             setEditActiveOpen(true)
-        } catch { }
+        } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
     }, [activeSession?.workout, editActiveAddExerciseRef, editActiveBaseRef, normalizeWorkoutForEditor, setEditActiveDraft, setEditActiveOpen])
 
     const handleCloseActiveWorkoutEditor = useCallback(() => {
@@ -395,7 +395,7 @@ export function useWorkoutCrud({
             setEditActiveDraft(null)
             editActiveBaseRef.current = null
             editActiveAddExerciseRef.current = false
-        } catch { }
+        } catch (e) { logWarn('useWorkoutCrud', 'silenced error', e) }
     }, [editActiveAddExerciseRef, editActiveBaseRef, setEditActiveDraft, setEditActiveOpen])
 
     const handleSaveActiveWorkoutEditor = useCallback(async (workoutFromEditor: unknown) => {

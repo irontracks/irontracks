@@ -64,7 +64,7 @@ export function useWorkoutFetch({
                     }
                 }
             }
-        } catch { }
+        } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
         return []
     })
     const [stats, setStats] = useState<WorkoutStats>({ workouts: 0, exercises: 0, activeStreak: 0 })
@@ -100,7 +100,7 @@ export function useWorkoutFetch({
                         )
                         setStats({ workouts: cachedWorkouts.length, exercises: totalEx, activeStreak: 0 })
                     }
-                } catch { }
+                } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 return
             }
 
@@ -206,7 +206,7 @@ export function useWorkoutFetch({
                             .order('name', { ascending: true })
                             .limit(500)
                         data = await hydrateWorkouts(Array.isArray(myAllBase) ? myAllBase : [])
-                    } catch { }
+                    } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 }
 
                 // 3. Busca treinos dos alunos
@@ -230,7 +230,7 @@ export function useWorkoutFetch({
                             if (!id) continue
                             if (!seen.has(id)) { seen.add(id); combined.push(w) }
                         }
-                    } catch { }
+                    } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                     try {
                         const { data: swByStudentBase } = await supabase
                             .from('workouts')
@@ -245,7 +245,7 @@ export function useWorkoutFetch({
                             if (!id) continue
                             if (!seen.has(id)) { seen.add(id); combined.push(w) }
                         }
-                    } catch { }
+                    } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                     studentData = combined
                 }
             } else {
@@ -270,7 +270,7 @@ export function useWorkoutFetch({
                         if (!anyErr && Array.isArray(anyRows) && anyRows.length) {
                             data = await hydrateWorkouts(anyRows)
                         }
-                    } catch { }
+                    } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 }
 
                 if (!data.length) {
@@ -301,7 +301,7 @@ export function useWorkoutFetch({
                             }
                             data = merged
                         }
-                    } catch { }
+                    } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 }
 
                 if (!data.length) {
@@ -332,7 +332,7 @@ export function useWorkoutFetch({
                                 } as Record<string, unknown>
                             })
                         }
-                    } catch { }
+                    } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 }
             }
 
@@ -349,11 +349,11 @@ export function useWorkoutFetch({
 
                 try {
                     await cacheSetWorkouts({ userId: currentUser?.id, workouts: mapped })
-                } catch { }
+                } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 // Persist to localStorage for synchronous startup hydration on next open
                 try {
                     localStorage.setItem('it_workouts_cache_v1', JSON.stringify(mapped))
-                } catch { }
+                } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
 
                 if (role === 'admin' || role === 'teacher') {
                     setWorkouts(mapped)
@@ -459,7 +459,7 @@ export function useWorkoutFetch({
                         )
                         setStats({ workouts: cachedWorkouts.length, exercises: totalEx, activeStreak: 0 })
                     }
-                } catch { }
+                } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 return
             }
             logError('Erro ao buscar:', { message: msg, error: e })
@@ -468,9 +468,15 @@ export function useWorkoutFetch({
         }
     }, [supabase, user])
 
-    // Dispara fetch ao montar / trocar usuário
+    // Dispara fetch ao montar / trocar usuário (com cleanup)
     useEffect(() => {
-        if (user) fetchWorkouts(user)
+        let cancelled = false
+        if (user) {
+            fetchWorkouts(user).catch((e) => {
+                if (!cancelled) logWarn('useWorkoutFetch', 'fetch failed on mount', e)
+            })
+        }
+        return () => { cancelled = true }
     }, [user, fetchWorkouts])
 
     // Restaura cache local se workouts ainda vazio
@@ -483,7 +489,7 @@ export function useWorkoutFetch({
                     const arr = parseJsonWithSchema(cached, z.array(z.record(z.unknown())))
                     if (Array.isArray(arr) && arr.length > 0) setWorkouts(arr)
                 }
-            } catch { }
+            } catch (e) { logWarn('useWorkoutFetch', 'localStorage cache restore failed', e) }
         }
     }, [user, workouts.length])
 

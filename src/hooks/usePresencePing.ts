@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useEffect } from 'react'
 
@@ -18,14 +19,14 @@ export function usePresencePing(userId?: string | null) {
         if (seen === '1') return
         window.sessionStorage.setItem(key, '1')
       }
-    } catch { }
+    } catch (e) { logWarn('usePresencePing', 'silenced error', e) }
 
     try {
       fetch('/api/social/presence/ping', { method: 'POST' }).catch(() => { })
-    } catch { }
+    } catch (e) { logWarn('usePresencePing', 'silenced error', e) }
 
     try {
       fetch('/api/profiles/ping', { method: 'POST' }).catch(() => { })
-    } catch { }
+    } catch (e) { logWarn('usePresencePing', 'silenced error', e) }
   }, [userId])
 }

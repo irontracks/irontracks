@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useCallback, useTransition } from 'react'
 import { isIosNative } from '@/utils/platform'
@@ -62,7 +63,7 @@ export function useViewNavigation({
   const handleOpenTour = useCallback(async () => {
     try {
       await logTourEvent('tour_started', { auto: false, version: tourVersion })
-    } catch { }
+    } catch (e) { logWarn('useViewNavigation', 'silenced error', e) }
     setTourOpen(true)
   }, [logTourEvent, tourVersion, setTourOpen])
 

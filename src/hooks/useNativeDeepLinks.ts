@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -50,10 +51,10 @@ export function useNativeDeepLinks() {
             const url = obj ? String(obj.url ?? '').trim() : ''
             const path = toInternalPath(url)
             if (path) router.push(path)
-          } catch {}
+          } catch (e) { logWarn('useNativeDeepLinks', 'silenced error', e) }
         })
         if (h?.remove) handles.push(h)
-      } catch {}
+      } catch (e) { logWarn('useNativeDeepLinks', 'silenced error', e) }
     })()
 
     return () => {
@@ -61,7 +62,7 @@ export function useNativeDeepLinks() {
       handles.forEach((h) => {
         try {
           h.remove()
-        } catch {}
+        } catch (e) { logWarn('useNativeDeepLinks', 'silenced error', e) }
       })
     }
   }, [router])

@@ -20,10 +20,7 @@ ON sets (exercise_id, set_number);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_created
 ON notifications (user_id, created_at DESC);
 
--- 5. History by user + date (report & history list)
-CREATE INDEX IF NOT EXISTS idx_history_user_date
-ON history (user_id, date DESC);
-
+-- 5. (Removed: history table does not exist in current schema)
 -- 6. Students by teacher (teacher dashboard)
 CREATE INDEX IF NOT EXISTS idx_students_teacher
 ON students (teacher_id);

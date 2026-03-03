@@ -1,4 +1,5 @@
 'use client'
+import { logWarn } from '@/lib/logger'
 
 import { useCallback } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -116,7 +117,7 @@ export function useWorkoutEditor({ supabase }: UseWorkoutEditorOptions): UseWork
                         supabase.from('exercises').update({ video_url: r.url }).eq('id', r.id)
                     )
                 )
-            } catch { }
+            } catch (e) { logWarn('useWorkoutEditor', 'silenced error', e) }
         },
         [supabase]
     )
@@ -125,7 +126,7 @@ export function useWorkoutEditor({ supabase }: UseWorkoutEditorOptions): UseWork
         try {
             if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
                 return crypto.randomUUID()
-        } catch { }
+        } catch (e) { logWarn('useWorkoutEditor', 'silenced error', e) }
         return `ex_${Date.now()}_${Math.random().toString(16).slice(2)}`
     }, [])
 
