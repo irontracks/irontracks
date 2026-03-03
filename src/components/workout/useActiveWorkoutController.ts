@@ -149,7 +149,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const [reportHistoryStatus, setReportHistoryStatus] = useState<ReportHistoryStatus>({ status: 'idle', error: '', source: '' });
   const [reportHistoryUpdatedAt, setReportHistoryUpdatedAt] = useState<number>(0);
   const [deloadSuggestions, setDeloadSuggestions] = useState<Record<string, unknown>>({});
-  const [timerMinimized, setTimerMinimized] = useState<boolean>(false);
+  const [timerMinimized, setTimerMinimized] = useState<boolean>(true);
   const [currentExerciseIdx, setCurrentExerciseIdx] = useState<number>(0);
   const [editExerciseOpen, setEditExerciseOpen] = useState<boolean>(false);
   const [editExerciseIdx, setEditExerciseIdx] = useState<number | null>(null);
