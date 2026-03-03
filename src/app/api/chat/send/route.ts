@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { createAdminClient } from '@/utils/supabase/admin'
+import { sendPushToUsers } from '@/lib/push/apns'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +55,27 @@ export async function POST(req: Request) {
       .single()
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+
+    // Fire push to other channel members
+    try {
+      const admin = createAdminClient()
+      const { data: members } = await admin
+        .from('chat_members')
+        .select('user_id')
+        .eq('channel_id', channel_id)
+        .neq('user_id', user.id)
+        .limit(100)
+      const recipientIds = (Array.isArray(members) ? members : [])
+        .map(m => String(m?.user_id || '').trim())
+        .filter(Boolean)
+      if (recipientIds.length) {
+        const { data: me } = await admin.from('profiles').select('display_name').eq('id', user.id).maybeSingle()
+        const senderName = String(me?.display_name || '').trim() || 'Alguém'
+        const preview = content.length > 100 ? content.slice(0, 100) + '…' : content
+        void sendPushToUsers(recipientIds, `💬 ${senderName}`, preview).catch(() => { })
+      }
+    } catch { }
+
     return NextResponse.json({ ok: true, message: data })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })

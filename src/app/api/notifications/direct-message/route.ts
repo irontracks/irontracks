@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { sendPushToUsers } from '@/lib/push/apns'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,6 +63,9 @@ export async function POST(req: Request) {
     })
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+
+    // Fire push notification
+    void sendPushToUsers([user.id], `💬 ${safeSenderName}`, safePreview).catch(() => { })
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
