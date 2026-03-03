@@ -9,11 +9,11 @@ import AssessmentButton from '@/components/assessment/AssessmentButton';
 import HistoryList from '@/components/HistoryList';
 import AdminWorkoutEditor, { AdminWorkout } from '@/components/AdminWorkoutEditor';
 import { workoutPlanHtml } from '@/utils/report/templates';
-import { updateWorkout } from '@/actions/workout-actions';
-import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { parseJsonWithSchema } from '@/utils/zod';
 import { z } from 'zod';
+import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
+import { updateWorkout } from '@/actions/workout-actions';
 import type { AdminUser, AdminWorkoutTemplate } from '@/types/admin';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
@@ -72,16 +72,24 @@ export const StudentDetailPanel: React.FC = () => {
         supabase,
         getAdminAuthHeaders,
         setUsersList,
-        handleUpdateStudentTeacher, // will be added to controller
-        handleToggleStudentStatus, // will be added to controller
-        handleDeleteStudent, // will be added to controller
+        handleUpdateStudentTeacher,
+        handleToggleStudentStatus,
+        handleDeleteStudent,
+        // Bug #4 fix: using memoized versions from controller instead of inline re-definitions
+        handleEditStudent,
+        handleSaveStudentEdit,
+        handleAddTemplateToStudent,
+        handleExportPdf,
+        handleExportJson,
+        openEditWorkout,
+        getSetsCount,
     } = useAdminPanel();
 
     const normalizeText = useCallback((value: unknown) => String(value || '').toLowerCase(), []);
 
     if (!selectedStudent) return null;
 
-    // Local computations for selected student status
+    // Local computed vars (derived from context state — belong in render body)
     const selectedStatus = normalizeText(selectedStudent?.status || '');
     const selectedStatusLabel = String(selectedStudent?.status || 'pendente');
     const selectedStatusTone = selectedStatus === 'pago'
@@ -98,209 +106,10 @@ export const StudentDetailPanel: React.FC = () => {
             if (raw === 'false') return false;
             if (raw === 'true') return true;
             return true;
-        } catch {
-            return true;
-        }
+        } catch { return true; }
     })();
 
-    const getSetsCount = (value: unknown): number => {
-        if (Array.isArray(value)) return value.length;
-        if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-        if (typeof value === 'string') {
-            const n = Number(value);
-            return Number.isFinite(n) ? n : 0;
-        }
-        return 0;
-    };
 
-    // Handlers defined inline in AdminPanelV2.tsx (will be added to controller)
-    const handleEditStudent = () => {
-        if (!selectedStudent) return;
-        setEditedStudent({ name: String(selectedStudent.name || ''), email: String(selectedStudent.email || '') });
-        setEditingStudent(true);
-    };
-
-    const handleSaveStudentEdit = async () => {
-        if (!selectedStudent || !editedStudent.name || !editedStudent.email) return await alert('Preencha todos os campos.');
-        try {
-            const { error } = await supabase
-                .from('students')
-                .update({ name: editedStudent.name, email: editedStudent.email })
-                .eq('id', selectedStudent.id);
-            if (error) throw error;
-            setSelectedStudent(prev => (prev ? { ...prev, name: editedStudent.name, email: editedStudent.email } : prev));
-            setUsersList(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, name: editedStudent.name, email: editedStudent.email } : s));
-            setEditingStudent(false);
-            await alert('Dados do aluno atualizados.');
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao salvar: ' + msg);
-        }
-    };
-
-    const handleAddTemplateToStudent = async (template: UnknownRecord) => { // will be added to controller
-        if (!selectedStudent) return;
-        const targetUserId = selectedStudent.user_id || '';
-        if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
-        if (!(await confirm(`Adicionar treino "${template?.name || 'Treino'}" para ${selectedStudent.name || selectedStudent.email}?`))) return;
-        try {
-            const templateExercises: UnknownRecord[] = Array.isArray(template.exercises) ? (template.exercises as UnknownRecord[]) : [];
-            const payload = {
-                user_id: targetUserId,
-                created_by: user?.id,
-                is_template: true,
-                name: template?.name || '',
-                notes: template?.notes || ''
-            };
-            const { data: newWorkout, error: wErr } = await supabase
-                .from('workouts')
-                .insert(payload)
-                .select()
-                .single();
-            if (wErr) throw wErr;
-            const toInsert = templateExercises.map((e: UnknownRecord) => ({
-                workout_id: newWorkout.id,
-                name: e?.name || '',
-                sets: getSetsCount(e?.sets) || 4,
-                reps: e?.reps ?? '10',
-                rpe: e?.rpe ?? 8,
-                cadence: e?.cadence || '2020',
-                rest_time: e?.rest_time ?? 60,
-                method: e?.method || 'Normal',
-                video_url: e?.video_url || '',
-                notes: e?.notes || ''
-            }));
-            let newExs = [];
-            if (toInsert.length) {
-                const { data: exRows, error: exErr } = await supabase.from('exercises').insert(toInsert).select();
-                if (exErr) throw exErr;
-                newExs = exRows || [];
-            }
-            for (let i = 0; i < templateExercises.length; i++) {
-                const srcEx: UnknownRecord = templateExercises[i] || ({} as UnknownRecord);
-                const dstEx = newExs[i] || null;
-                const setsArr: UnknownRecord[] = Array.isArray(srcEx.sets) ? (srcEx.sets as UnknownRecord[]) : [];
-                if (dstEx && setsArr.length) {
-                    const newSets = setsArr.map((s: UnknownRecord) => ({
-                        exercise_id: dstEx.id,
-                        weight: s?.weight ?? null,
-                        reps: s?.reps ?? null,
-                        rpe: s?.rpe ?? null,
-                        set_number: s?.set_number ?? 1,
-                        completed: s?.completed ?? false
-                    }));
-                    if (newSets.length) {
-                        const { error: setErr } = await supabase.from('sets').insert(newSets);
-                        if (setErr) throw setErr;
-                    }
-                }
-            }
-            let refreshed = [];
-            if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
-            const { data } = await supabase
-                .from('workouts')
-                .select('*, exercises(*, sets(*))')
-                .eq('user_id', targetUserId)
-                .eq('is_template', true)
-                .order('name');
-            refreshed = data || [];
-            refreshed = (Array.isArray(refreshed) ? refreshed : []).filter((w: UnknownRecord) => w && typeof w === 'object' && w.is_template === true);
-            const synced = (refreshed || []).filter((w: UnknownRecord) => (String(w?.created_by || '') === String(user.id)) && (String(w?.user_id || '') === String(targetUserId)));
-            const syncedIds = new Set((synced || []).map((w: UnknownRecord) => w?.id).filter(Boolean));
-            const others = (refreshed || []).filter((w: UnknownRecord) => !syncedIds.has(w?.id));
-            setStudentWorkouts(others || []);
-            setSyncedWorkouts(synced || []);
-            await alert('Treino enviado com sucesso!', 'Sucesso');
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao enviar: ' + msg);
-        }
-    };
-
-    const handleExportPdf = async () => { // will be added to controller
-        try {
-            const safeWorkout = {
-                title: escapeHtml(viewWorkout?.name || ''),
-                exercises: (Array.isArray(viewWorkout?.exercises) ? viewWorkout.exercises : []).map((ex: UnknownRecord) => ({
-                    name: escapeHtml(ex?.name),
-                    sets: getSetsCount(ex?.sets),
-                    reps: escapeHtml(ex?.reps ?? '10'),
-                    rpe: escapeHtml(ex?.rpe ?? 8),
-                    cadence: escapeHtml(ex?.cadence || '2020'),
-                    restTime: escapeHtml(ex?.rest_time ?? ex?.restTime),
-                    method: escapeHtml(ex?.method),
-                    notes: escapeHtml(ex?.notes)
-                }))
-            };
-            const baseUser: UnknownRecord = user && typeof user === 'object' ? user : {};
-            const safeUser = {
-                ...baseUser,
-                displayName: escapeHtml(baseUser.displayName ?? baseUser.name ?? ''),
-                name: escapeHtml(baseUser.name ?? baseUser.displayName ?? ''),
-                email: escapeHtml(baseUser.email ?? '')
-            };
-            const html = workoutPlanHtml(safeWorkout, safeUser);
-            const win = window.open('', '_blank');
-            if (!win) return;
-            win.document.open();
-            win.document.write(html);
-            win.document.close();
-            win.focus();
-            setTimeout(() => { try { win.print(); } catch { } }, 300);
-            setExportOpen(false);
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao gerar PDF: ' + msg);
-        }
-    };
-
-    const handleExportJson = () => { // will be added to controller
-        if (!viewWorkout) return;
-        const json = JSON.stringify({
-            workout: {
-                title: String(viewWorkout.name || ''),
-                exercises: (Array.isArray(viewWorkout.exercises) ? viewWorkout.exercises : []).map((ex: UnknownRecord) => ({
-                    name: String(ex.name || ''),
-                    sets: getSetsCount(ex?.sets),
-                    reps: ex.reps,
-                    rpe: ex.rpe,
-                    cadence: ex.cadence,
-                    restTime: ex.rest_time ?? ex.restTime,
-                    method: ex.method,
-                    videoUrl: ex.video_url || ex.videoUrl,
-                    notes: ex.notes
-                }))
-            }
-        }, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${String(viewWorkout.name || 'treino').replace(/\s+/g, '_')}.json`;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-        setExportOpen(false);
-    };
-
-    const openEditWorkout = (e: React.MouseEvent, w: Record<string, unknown>) => { // will be added to controller
-        try {
-            e?.stopPropagation?.();
-        } catch { }
-        setEditingStudentWorkout({
-            id: w.id,
-            title: w.name || w.title,
-            exercises: (Array.isArray(w.exercises) ? w.exercises : []).map((ex: Record<string, unknown>) => ({
-                name: ex.name || '',
-                sets: getSetsCount(ex?.sets) || 4,
-                reps: ex.reps ?? '10',
-                rpe: ex.rpe ?? 8,
-                cadence: ex.cadence || '2020',
-                restTime: ex.rest_time ?? 60,
-                method: ex.method || 'Normal',
-                videoUrl: ex.video_url || '',
-                notes: ex.notes || ''
-            }))
-        });
-    };
 
     return (
         <>
