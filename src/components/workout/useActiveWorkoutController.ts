@@ -1091,6 +1091,36 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     } catch { }
   };
 
+  /**
+   * Called when the rest timer finishes or is dismissed (onFinish / onClose
+   * of RestTimerOverlay via onStartTimer parent). The context carries the
+   * log `key` (`"exIdx-setIdx"`) so we can:
+   *   1. Compute restSeconds = now - restStartMs (stored in that log)
+   *   2. Write restSeconds back to the log
+   *   3. Set setStartMs = now on that same log so the NEXT set's
+   *      execution time can be correctly measured
+   */
+  const handleTimerFinish = useCallback((context: unknown) => {
+    try {
+      const ctx = isObject(context) ? (context as UnknownRecord) : null;
+      const key = ctx?.key ? String(ctx.key) : null;
+      if (!key) return;
+      const log = getLog(key);
+      const rawRestStart = log.restStartMs;
+      const restStartMs = typeof rawRestStart === 'number' && rawRestStart > 0 ? rawRestStart : null;
+      const now = Date.now();
+      const patch: UnknownRecord = { setStartMs: now };
+      if (restStartMs) {
+        const restSec = Math.round((now - restStartMs) / 1000);
+        if (restSec > 0 && restSec < 86400) {
+          patch.restSeconds = restSec;
+        }
+      }
+      updateLog(key, patch);
+    } catch { }
+  }, [getLog, updateLog]);
+
+
   const toggleCollapse = (exIdx: number) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -2184,6 +2214,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     finishWorkout,
     openDeloadModal,
     startTimer,
+    handleTimerFinish,
     saveClusterModal,
     saveRestPauseModal,
     saveDropSetModal,

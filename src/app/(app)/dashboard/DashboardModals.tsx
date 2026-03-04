@@ -61,6 +61,7 @@ export interface DashboardModalsProps {
     // Rest Timer
     activeSession: ActiveWorkoutSession | null
     handleCloseTimer: () => void
+    handleTimerFinish: (context?: unknown) => void
     handleStartFromRestTimer: () => void
 
     // Session Floating Bar
@@ -124,7 +125,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
         savingProfile, handleSaveProfile, showImportModal, setShowImportModal, importCode, setImportCode,
         handleImportWorkout, showJsonImportModal, setShowJsonImportModal, handleJsonUpload,
         shareCode, setShareCode, quickViewWorkout, setQuickViewWorkout, handleStartSession,
-        showNotifCenter, setShowNotifCenter, activeSession, handleCloseTimer, handleStartFromRestTimer,
+        showNotifCenter, setShowNotifCenter, activeSession, handleCloseTimer, handleTimerFinish, handleStartFromRestTimer,
         view, setView, sessionTicker, parseStartedAtMs, calculateExerciseDuration, toMinutesRounded,
         showAdminPanel, closeAdminPanel, whatsNewOpen, setWhatsNewOpen, pendingUpdate,
         setPendingUpdate, closeWhatsNew, preCheckinOpen, setPreCheckinOpen, preCheckinWorkout,
@@ -322,7 +323,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     context={activeSession.timerContext as unknown as Parameters<typeof import('@/components/workout/RestTimerOverlay').default>[0]['context']}
                     settings={settings as Record<string, unknown> | null}
                     onClose={handleCloseTimer}
-                    onFinish={handleCloseTimer}
+                    onFinish={(ctx) => { handleTimerFinish(ctx); handleCloseTimer(); }}
                     onStart={handleStartFromRestTimer}
                 />
             )}

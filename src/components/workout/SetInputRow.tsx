@@ -133,7 +133,35 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
             type="button"
             onClick={() => {
               const nextDone = !done;
-              updateLog(key, { done: nextDone, advanced_config: cfg ?? log.advanced_config ?? null });
+              const now = Date.now();
+              // --- timing patch ---
+              // executionSeconds = how long it took to execute this set
+              //   (from when the previous rest ended, stored as setStartMs)
+              // restStartMs = when this set's rest started (written now so
+              //   the RestTimerOverlay can compute restSeconds on finish)
+              const timingPatch: Record<string, unknown> = {};
+              if (nextDone) {
+                const rawStartMs = log.setStartMs;
+                const startMs = typeof rawStartMs === 'number' && rawStartMs > 0
+                  ? rawStartMs
+                  : null;
+                if (startMs) {
+                  const execSec = Math.round((now - startMs) / 1000);
+                  if (execSec > 0 && execSec < 86400) {
+                    timingPatch.executionSeconds = execSec;
+                  }
+                }
+                if (restTime && restTime > 0) {
+                  timingPatch.restStartMs = now;
+                }
+              } else {
+                // un-doing: reset timing so it can be re-measured
+                timingPatch.executionSeconds = null;
+                timingPatch.restStartMs = null;
+                // re-set the start timestamp so re-timing works properly
+                timingPatch.setStartMs = now;
+              }
+              updateLog(key, { done: nextDone, ...timingPatch, advanced_config: cfg ?? log.advanced_config ?? null });
               if (nextDone && restTime && restTime > 0) {
                 startTimer(restTime, { kind: 'rest', key });
               }
