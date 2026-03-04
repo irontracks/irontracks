@@ -59,6 +59,7 @@ type ApiPayload = ApiPayloadWeek | ApiPayloadDay
 type Props = {
   onOpenWizard?: () => void
   defaultViewMode?: 'day' | 'week'
+  onUpgrade?: () => void
 }
 
 const localIsoDate = () => {
@@ -504,6 +505,15 @@ export default function MuscleMapCard(props: Props) {
                   if (!isVip) return (
                     <div className="min-h-[40px] px-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 font-black text-xs uppercase tracking-widest inline-flex items-center gap-2">
                       <Crown size={14} /> VIP
+                      {props.onUpgrade && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); props.onUpgrade!() }}
+                          className="ml-1 underline underline-offset-2 text-yellow-300 hover:text-yellow-100 transition-colors"
+                        >
+                          Assinar
+                        </button>
+                      )}
                     </div>
                   )
                   return (
@@ -646,6 +656,15 @@ export default function MuscleMapCard(props: Props) {
                         <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Insights da IA</div>
                       </div>
                       <div className="mt-2 text-xs text-neutral-400">Análise de desequilíbrios e recomendações personalizadas disponíveis no plano VIP.</div>
+                      {props.onUpgrade && (
+                        <button
+                          type="button"
+                          onClick={props.onUpgrade}
+                          className="mt-3 w-full min-h-[36px] rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Crown size={12} /> Assinar VIP
+                        </button>
+                      )}
                     </div>
                   )
                   return (
