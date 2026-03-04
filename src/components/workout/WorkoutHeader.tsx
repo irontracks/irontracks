@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ArrowDown, Clock, GripVertical, Plus, UserPlus, X } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
@@ -19,7 +19,26 @@ export default function WorkoutHeader() {
     formatElapsed,
     sendInvite,
     alert,
+    logs,
   } = useWorkoutContext();
+
+  // ── Real-time workout progress ─────────────────────────
+  const { completedSets, totalSets, progressPct } = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    exercises.forEach((ex, exIdx) => {
+      const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
+      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray((ex as Record<string, unknown>)?.set_details) ? (ex as Record<string, unknown>).set_details as unknown[] : [];
+      const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+      total += count;
+      for (let i = 0; i < count; i++) {
+        const log = (logs as Record<string, Record<string, unknown>>)[`${exIdx}-${i}`];
+        if (log?.done) done++;
+      }
+    });
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { completedSets: done, totalSets: total, progressPct: pct };
+  }, [exercises, logs]);
 
   // Helper function extracted from ActiveWorkout_OLD
   const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -66,12 +85,26 @@ export default function WorkoutHeader() {
           <div className="min-w-0 flex-1">
             <div className="font-black text-white truncate text-right">{String(workout?.title || 'Treino')}</div>
             <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-1">
+              {totalSets > 0 && (
+                <span className="font-mono text-neutral-500">
+                  {completedSets}/{totalSets} séries
+                </span>
+              )}
               <Clock size={14} className="text-yellow-500" />
               <span className="font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
             </div>
           </div>
         </div>
       </div>
+      {/* Progress bar — bottom of header */}
+      {totalSets > 0 && (
+        <div className="h-[3px] bg-neutral-800 w-full">
+          <div
+            className="h-full bg-gradient-to-r from-yellow-500 to-amber-400 transition-all duration-500 ease-out"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      )}
 
       <InviteManager
         isOpen={inviteOpen}
