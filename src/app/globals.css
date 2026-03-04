@@ -93,23 +93,25 @@
   padding-top: 80px;
 }
 
-/* ── Premium global scrollbar ────────────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
+/* ── Premium global scrollbar (desktop only — iOS scroll breaks with custom scrollbar) ── */
+@media (hover: hover) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(234, 179, 8, 0.22);
-  border-radius: 9999px;
-}
+  ::-webkit-scrollbar-thumb {
+    background: rgba(234, 179, 8, 0.22);
+    border-radius: 9999px;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(234, 179, 8, 0.45);
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(234, 179, 8, 0.45);
+  }
 }
 
 /* ── Micro-animation: all buttons press down on tap ─────── */
