@@ -2,6 +2,8 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolveRoleByUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import OfflineBanner from '@/components/OfflineBanner'
+import React from 'react'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -9,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (user?.id) {
     const { role } = await resolveRoleByUser(user)
-    
+
     // Admins e Professores sempre têm acesso liberado
     if (role === 'admin' || role === 'teacher') {
       return children
@@ -73,11 +75,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             }
           }
         }
-      } catch {}
+      } catch { }
 
       if (!allowByRequest) redirect('/wait-approval')
     }
   }
 
-  return children
+  return (
+    <>
+      <OfflineBanner />
+      {children}
+    </>
+  )
 }

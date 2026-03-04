@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
-import { AlertCircle, HelpCircle, X, MessageSquare } from 'lucide-react';
+import { AlertCircle, HelpCircle, X, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 const GlobalDialog = () => {
 	const { dialog, closeDialog } = useDialog();
@@ -22,7 +22,7 @@ const GlobalDialog = () => {
 				dialog.onCancel();
 				return;
 			}
-		} catch {}
+		} catch { }
 		closeDialog();
 	};
 
@@ -35,76 +35,97 @@ const GlobalDialog = () => {
 		}
 	};
 
-	const getIcon = () => {
+	// Big centered icon config per dialog type
+	const iconConfig = (() => {
 		switch (dialog.type) {
 			case 'confirm':
-				return <HelpCircle className="text-yellow-500" size={20} />;
+				return {
+					bg: 'bg-yellow-500/15 border border-yellow-500/30',
+					icon: <HelpCircle className="text-yellow-400" size={32} />,
+					confirmCls: 'bg-yellow-500 hover:bg-yellow-400 shadow-lg shadow-yellow-900/30 text-black',
+				};
 			case 'prompt':
-				return <MessageSquare className="text-purple-500" size={20} />;
+				return {
+					bg: 'bg-purple-500/15 border border-purple-500/30',
+					icon: <MessageSquare className="text-purple-400" size={32} />,
+					confirmCls: 'bg-purple-500 hover:bg-purple-400 shadow-lg shadow-purple-900/30 text-white',
+				};
+			case 'loading':
+				return {
+					bg: 'bg-blue-500/15 border border-blue-500/30',
+					icon: <AlertCircle className="text-blue-400 animate-pulse" size={32} />,
+					confirmCls: 'bg-blue-500 hover:bg-blue-400 shadow-lg shadow-blue-900/30 text-white',
+				};
 			default:
-				return <AlertCircle className="text-blue-500" size={20} />;
+				return {
+					bg: 'bg-green-500/15 border border-green-500/30',
+					icon: <CheckCircle2 className="text-green-400" size={32} />,
+					confirmCls: 'bg-green-500 hover:bg-green-400 shadow-lg shadow-green-900/30 text-black',
+				};
 		}
-	};
-
-	const getConfirmButtonColor = () => {
-		switch (dialog.type) {
-			case 'confirm':
-				return 'bg-yellow-500 hover:bg-yellow-400 shadow-yellow-900/20';
-			case 'prompt':
-				return 'bg-purple-500 hover:bg-purple-400 shadow-purple-900/20';
-			default:
-				return 'bg-blue-500 hover:bg-blue-400 shadow-blue-900/20';
-		}
-	};
+	})();
 
 	return (
 		<div className="fixed inset-0 z-[5000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe animate-fade-in">
-			<div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-scale-in">
-				<div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-800/50">
-					<h3 className="font-bold text-white flex items-center gap-2">
-						{getIcon()}
-						{dialog.title}
-					</h3>
-				<button onClick={handleClose} className="text-neutral-500 hover:text-white transition-colors">
-					<X size={20} />
-				</button>
-			</div>
+			<div className="bg-gradient-to-b from-neutral-900 to-neutral-950 border border-neutral-800/80 rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-slide-up">
 
-				<div className="p-6">
-					<p className="text-neutral-300 text-center text-sm leading-relaxed whitespace-pre-line mb-4">
+				{/* Premium header with big centered icon */}
+				<div className="px-6 pt-6 pb-4 text-center relative">
+					<button
+						onClick={handleClose}
+						className="absolute top-4 right-4 text-neutral-600 hover:text-white transition-colors p-1 rounded-lg hover:bg-neutral-800"
+					>
+						<X size={18} />
+					</button>
+
+					{/* Big icon */}
+					<div className={`w-16 h-16 rounded-2xl ${iconConfig.bg} flex items-center justify-center mx-auto mb-4`}>
+						{iconConfig.icon}
+					</div>
+
+					<h3 className="font-black text-white text-lg tracking-tight">{dialog.title}</h3>
+				</div>
+
+				{/* Message */}
+				<div className="px-6 pb-2">
+					<p className="text-neutral-400 text-center text-sm leading-relaxed whitespace-pre-line">
 						{dialog.message}
 					</p>
+				</div>
 
-					{dialog.type === 'prompt' && (
+				{/* Prompt input */}
+				{dialog.type === 'prompt' && (
+					<div className="px-6 pb-4">
 						<input
 							key={`${dialog.type}:${dialog.title}:${dialog.message}:${dialog.defaultValue ?? ''}`}
 							ref={inputRef}
 							defaultValue={dialog.defaultValue ?? ''}
 							onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
-							className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white text-center font-bold outline-none focus:border-purple-500 transition-colors"
+							className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white text-center font-bold outline-none focus:border-purple-500 transition-colors mt-2"
 							placeholder="Digite aqui..."
 						/>
-					)}
-				</div>
+					</div>
+				)}
 
+				{/* Action buttons */}
 				{dialog.type !== 'loading' && (
-					<div className="p-4 bg-neutral-950/50 flex gap-3">
+					<div className="p-4 flex gap-3">
 						{(dialog.type === 'confirm' || dialog.type === 'prompt') && (
+							<button
+								onClick={dialog.onCancel}
+								className="flex-1 py-3.5 rounded-xl bg-neutral-800/80 text-neutral-400 font-black hover:bg-neutral-700 hover:text-white transition-all duration-200 text-sm active:scale-95"
+							>
+								{dialog.cancelText || 'Cancelar'}
+							</button>
+						)}
 						<button
-							onClick={dialog.onCancel}
-							className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-400 font-bold hover:bg-neutral-700 transition-colors text-sm"
+							onClick={handleConfirm}
+							className={`flex-1 py-3.5 rounded-xl font-black transition-all duration-200 text-sm active:scale-95 ${iconConfig.confirmCls}`}
 						>
-							{dialog.cancelText || 'Cancelar'}
+							{dialog.type === 'confirm' ? (dialog.confirmText || 'Confirmar') : (dialog.confirmText || 'OK')}
 						</button>
-					)}
-					<button
-						onClick={handleConfirm}
-						className={`flex-1 py-3 rounded-xl font-bold text-black transition-colors text-sm shadow-lg ${getConfirmButtonColor()}`}
-					>
-						{dialog.type === 'confirm' ? (dialog.confirmText || 'Confirmar') : (dialog.confirmText || 'OK')}
-					</button>
-				</div>
-			)}
+					</div>
+				)}
 			</div>
 		</div>
 	);
