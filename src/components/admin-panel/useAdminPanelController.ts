@@ -21,15 +21,6 @@ import type { Exercise } from '@/types/app';
 
 type UnknownRecord = Record<string, unknown>;
 
-const COACH_INBOX_INACTIVE_THRESHOLD_DAYS = 7;
-const COACH_INBOX_DEFAULTS = {
-    churnDays: 7,
-    volumeDropPct: 30,
-    loadSpikePct: 60,
-    minPrev7Volume: 500,
-    minCurrent7VolumeSpike: 800,
-    snoozeDefaultMinutes: 1440,
-};
 
 export type AdminPanelProps = {
     user: AdminUser;
