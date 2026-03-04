@@ -1292,6 +1292,29 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                                     const session = visibleHistory[row.index]
                                     const minutes = Math.floor((Number(session?.totalTime) || 0) / 60)
                                     const isSelected = selectedIds.has(session.id)
+
+                                    // Week group header — show when week changes from previous item
+                                    const getWeekStart = (dateVal: unknown): string | null => {
+                                        try {
+                                            const t = toDateMs(dateVal)
+                                            if (!t || !Number.isFinite(t)) return null
+                                            const d = new Date(t)
+                                            const dayOfWeek = d.getDay() // 0=Sun
+                                            const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
+                                            const monday = new Date(d.setDate(diff))
+                                            return monday.toISOString().slice(0, 10) // YYYY-MM-DD
+                                        } catch { return null }
+                                    }
+                                    const currentWeek = getWeekStart(session?.date ?? session?.dateMs)
+                                    const prevSession = row.index > 0 ? visibleHistory[row.index - 1] : null
+                                    const prevWeek = prevSession ? getWeekStart(prevSession?.date ?? prevSession?.dateMs) : '__NONE__'
+                                    const showWeekHeader = currentWeek && currentWeek !== prevWeek
+                                    const weekHeaderLabel = (() => {
+                                        if (!currentWeek) return ''
+                                        const d = new Date(currentWeek + 'T12:00:00')
+                                        return `Semana de ${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
+                                    })()
+
                                     return (
                                         <div
                                             key={row.key}
@@ -1306,6 +1329,16 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                                                 paddingBottom: '12px',
                                             }}
                                         >
+                                            {/* Week group separator */}
+                                            {showWeekHeader && (
+                                                <div className="flex items-center gap-2 mb-2 pt-1">
+                                                    <div className="h-px flex-1 bg-neutral-800" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500 px-2">
+                                                        {weekHeaderLabel}
+                                                    </span>
+                                                    <div className="h-px flex-1 bg-neutral-800" />
+                                                </div>
+                                            )}
                                             <div
                                                 onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
                                                 className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}

@@ -216,33 +216,32 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       ) : null}
 
       <div className="mt-2 flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+        {/* Shimmer skeleton placeholders while loading */}
         {!ordered.length && loading ? (
           <>
-            <div className="shrink-0 w-[72px]">
-              <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 mx-auto" />
-              <div className="mt-1 h-3 w-12 bg-neutral-900 border border-neutral-800 rounded-md mx-auto" />
-            </div>
-            <div className="shrink-0 w-[72px]">
-              <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 mx-auto" />
-              <div className="mt-1 h-3 w-12 bg-neutral-900 border border-neutral-800 rounded-md mx-auto" />
-            </div>
-            <div className="shrink-0 w-[72px]">
-              <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 mx-auto" />
-              <div className="mt-1 h-3 w-12 bg-neutral-900 border border-neutral-800 rounded-md mx-auto" />
-            </div>
+            {[0, 1, 2].map(i => (
+              <div key={i} className="shrink-0 w-[72px]">
+                <div className="w-16 h-16 rounded-full mx-auto bg-neutral-800 animate-pulse" />
+                <div className="mt-1.5 h-2.5 w-10 bg-neutral-800 animate-pulse rounded-full mx-auto" />
+              </div>
+            ))}
           </>
         ) : null}
         {ordered.map((g) => {
           const hasStories = Array.isArray(g.stories) && g.stories.length > 0
           const hasUnseen = !!g.hasUnseen
-          const ringCls = !hasStories
-            ? 'border-transparent'
-            : hasUnseen
-              ? 'border-red-500'
-              : 'border-neutral-400/60'
-
           const name = String(g.displayName || '').trim() || (g.authorId === myId ? 'Você' : 'Amigo')
           const isMine = g.authorId === myId
+
+          // Premium ring logic:
+          // - Own avatar without stories: pulsating yellow ring
+          // - Unseen stories: animated gradient ring (Instagram-style)
+          // - Seen stories: neutral ring
+          // - No stories (other): transparent
+          const ringType = !hasStories
+            ? (isMine ? 'own-empty' : 'none')
+            : hasUnseen ? 'unseen' : 'seen'
+
           return (
             <div key={g.authorId} className="shrink-0 w-[72px] relative">
               <button
@@ -255,8 +254,28 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
                 className="w-[72px] focus:outline-none"
                 aria-label={hasStories ? `Abrir stories de ${name}` : `Sem stories de ${name}`}
               >
-                <div className={`w-16 h-16 rounded-full border-2 ${ringCls} p-1 mx-auto relative`}>
-                  <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+                {/* Gradient ring wrapper */}
+                <div className="relative w-16 h-16 mx-auto">
+                  {ringType === 'unseen' && (
+                    <div
+                      className="absolute inset-0 rounded-full animate-spin-slow"
+                      style={{
+                        background: 'conic-gradient(from 0deg, #f59e0b, #ef4444, #8b5cf6, #3b82f6, #f59e0b)',
+                        padding: '2px',
+                        borderRadius: '9999px',
+                      }}
+                    />
+                  )}
+                  {ringType === 'seen' && (
+                    <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #525252, #737373)', padding: '2px', borderRadius: '9999px' }} />
+                  )}
+                  {ringType === 'own-empty' && (
+                    <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: 'conic-gradient(from 0deg, #eab308, #f59e0b)', padding: '2px', borderRadius: '9999px', opacity: 0.7 }} />
+                  )}
+                  <div className={[
+                    'absolute rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center',
+                    ringType !== 'none' ? 'inset-[3px]' : 'inset-0 border border-neutral-800',
+                  ].join(' ')}>
                     {g.photoUrl ? (
                       <Image src={g.photoUrl} alt={name} width={64} height={64} className="w-full h-full object-cover" />
                     ) : (
@@ -274,11 +293,11 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
                     if (uploading) return
                     setIsCreatorOpen(true)
                   }}
-                  className="absolute left-[calc(50%+18px)] top-[44px] w-6 h-6 rounded-full bg-yellow-500 border-2 border-black flex items-center justify-center"
+                  className="absolute left-[calc(50%+18px)] top-[40px] w-6 h-6 rounded-full bg-yellow-500 border-2 border-neutral-950 flex items-center justify-center shadow-sm shadow-yellow-500/40"
                   aria-label="Adicionar story (foto ou vídeo)"
                   disabled={uploading}
                 >
-                  <Plus size={14} className="text-black" />
+                  <Plus size={13} className="text-black" />
                 </button>
               ) : null}
             </div>
