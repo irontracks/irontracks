@@ -30,11 +30,12 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
 
 
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (skipCache = false) => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/social/stories/list', { method: 'GET' })
+      const url = skipCache ? '/api/social/stories/list?nocache=1' : '/api/social/stories/list'
+      const res = await fetch(url, { method: 'GET' })
       const json = await res.json().catch((): null => null)
       if (!res.ok || !json?.ok) throw new Error(String(json?.error || 'Falha ao carregar stories'))
       const arr = Array.isArray(json?.data) ? (json.data as StoryGroup[]) : []
@@ -55,8 +56,8 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
     const wasOpen = prevCreatorOpenRef.current
     prevCreatorOpenRef.current = isCreatorOpen
     if (wasOpen && !isCreatorOpen) {
-      // Modal just closed — give CDN/Cloudinary 2s to propagate then reload
-      const t = setTimeout(() => reload(), 2000)
+      // Modal just closed — give CDN/Cloudinary 2s to propagate then reload (skip cache)
+      const t = setTimeout(() => reload(true), 2000)
       return () => clearTimeout(t)
     }
   }, [isCreatorOpen, reload])
@@ -97,7 +98,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
 
       // Small delay for Cloudinary CDN propagation before refreshing the list
       await new Promise((r) => setTimeout(r, 1500))
-      await reload()
+      await reload(true)
     } catch (e: unknown) {
       const msg = String(getErrorMessage(e) || e)
       logError('error', 'Story upload error:', e)
@@ -131,7 +132,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       .channel('stories-auto-refresh')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'social_stories' }, () => {
         // Debounce slightly so CDN/Cloudinary has time to propagate before we fetch
-        setTimeout(() => reload(), 1500)
+        setTimeout(() => reload(true), 1500)
       })
       .subscribe()
 
@@ -183,8 +184,10 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
           return { ...g, stories: nextStories, hasUnseen }
         })
       )
+      // Force a no-cache reload so next "Atualizar" also shows fresh data
+      setTimeout(() => reload(true), 500)
     },
-    [openAuthorId]
+    [openAuthorId, reload]
   )
 
   return (
@@ -198,7 +201,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
         <div className="text-xs font-bold text-neutral-500 uppercase tracking-widest">Stories</div>
         <button
           type="button"
-          onClick={reload}
+          onClick={() => reload(true)}
           className="text-[11px] font-black text-neutral-400 hover:text-white"
           disabled={loading || uploading}
         >
