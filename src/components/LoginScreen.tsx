@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert } from 'lucide-react';
+import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/client';
 import LoadingScreen from '@/components/LoadingScreen';
@@ -717,8 +717,16 @@ const LoginScreen = () => {
                                             value={emailData.password}
                                             onChange={e => setEmailData({ ...emailData, password: e.target.value })}
                                             onBlur={e => authMode !== 'login' && validateField('password', e.target.value)}
-                                            className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${validationErrors.password ? 'border-red-500/60' : 'border-neutral-800'}`}
+                                            className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-12 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${validationErrors.password ? 'border-red-500/60' : 'border-neutral-800'}`}
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(v => !v)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-yellow-400 transition-colors p-1"
+                                            aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                                        >
+                                            {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                                        </button>
                                     </div>
                                     {validationErrors.password && <p id="error-password" className="mt-1 text-xs text-red-400">{validationErrors.password}</p>}
                                 </div>
