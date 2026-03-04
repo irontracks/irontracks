@@ -37,6 +37,7 @@ interface RestTimerOverlayProps {
 const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onClose, settings }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
+    const totalDurationRef = useRef(60); // for SVG ring — total seconds when timer started
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
     const safeSettings = settings && typeof settings === 'object' ? settings : null;
@@ -78,6 +79,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             warnedRef.current = false;
         } catch { }
     }, [targetTime]);
+
 
     useEffect(() => {
         try {
@@ -181,6 +183,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         };
 
+        // Capture total duration for SVG ring progress
+        const initialRemaining = Math.max(1, Math.ceil((targetTime - Date.now()) / 1000));
+        totalDurationRef.current = initialRemaining;
+
         updateTimer();
         const interval = setInterval(updateTimer, 100);
         return () => {
@@ -193,6 +199,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         };
     }, [allowNotify, repeatAlarm, repeatIntervalMs, repeatMaxCount, repeatMaxSeconds, soundsEnabled, targetTime, context?.exerciseId, context?.kind, context?.setId]);
 
+
     useEffect(() => {
         if (!isFinished) return;
         setIdleTimerDisabled(false);
@@ -203,6 +210,19 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }, [isFinished]);
 
     if (!targetTime) return null;
+
+    // SVG ring progress
+    // eslint-disable-next-line react-hooks/refs
+    const totalSeconds = totalDurationRef.current;
+    const progress = Math.max(0, Math.min(1, timeLeft / totalSeconds));
+    const radius = 44;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference * (1 - progress);
+    const isUrgent = timeLeft > 0 && timeLeft <= 3;
+
+    // Extract exercise context from timerContext key (format: exIdx-setIdx)
+    const ctxKey = String((context as Record<string, unknown> | null)?.key ?? '');
+    const exerciseName = String((context as Record<string, unknown> | null)?.exerciseName ?? '');
 
     if (isFinished) {
         return (
@@ -236,39 +256,80 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-5 shadow-2xl z-[2100] animate-slide-up pb-safe">
-            <div className="flex items-center justify-between max-w-md mx-auto gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-yellow-500 blur-lg opacity-20 animate-pulse"></div>
-                        <Timer className="text-yellow-500 relative z-10" size={36} />
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Recuperação</p>
-                        <p className="text-4xl font-mono font-black text-white tabular-nums leading-none">{formatDuration(timeLeft)}</p>
+        <div className={[
+            'fixed bottom-0 left-0 right-0 backdrop-blur-xl border-t shadow-2xl z-[2100] animate-slide-up pb-safe transition-colors duration-500',
+            isUrgent
+                ? 'bg-red-950/95 border-red-500/50'
+                : 'bg-neutral-900/95 border-yellow-500/30',
+        ].join(' ')}>
+            <div className="flex items-center gap-4 max-w-md mx-auto p-4">
+                {/* SVG circular ring */}
+                <div className="relative flex-shrink-0 w-[100px] h-[100px]">
+                    <svg width="100" height="100" viewBox="0 0 100 100" className="-rotate-90">
+                        {/* Background ring */}
+                        <circle
+                            cx="50" cy="50" r={radius}
+                            fill="none"
+                            stroke={isUrgent ? 'rgba(239,68,68,0.15)' : 'rgba(234,179,8,0.12)'}
+                            strokeWidth="6"
+                        />
+                        {/* Progress ring */}
+                        <circle
+                            cx="50" cy="50" r={radius}
+                            fill="none"
+                            stroke={isUrgent ? '#ef4444' : '#eab308'}
+                            strokeWidth="6"
+                            strokeLinecap="round"
+                            strokeDasharray={circumference}
+                            strokeDashoffset={strokeDashoffset}
+                            className="transition-[stroke-dashoffset] duration-300"
+                        />
+                    </svg>
+                    {/* Countdown inside ring */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <p className={['text-2xl font-mono font-black tabular-nums leading-none transition-colors', isUrgent ? 'text-red-400' : 'text-white'].join(' ')}>
+                            {formatDuration(timeLeft)}
+                        </p>
+                        <p className={['text-[9px] uppercase font-bold tracking-widest mt-0.5 transition-colors', isUrgent ? 'text-red-400/70' : 'text-yellow-500'].join(' ')}>
+                            {isUrgent ? 'BORA!' : 'Descanso'}
+                        </p>
                     </div>
                 </div>
-                <div className="flex gap-2 flex-shrink-0">
-                    <button
-                        onClick={() => {
-                            try {
-                                if (typeof onFinish === 'function') onFinish(context);
-                            } catch { }
-                        }}
-                        className="min-h-[52px] px-6 bg-yellow-500 rounded-xl text-black font-black border border-yellow-400 hover:bg-yellow-400 inline-flex items-center gap-2 active:scale-95 transition-transform"
-                    >
-                        <span className="text-sm font-black">START</span>
-                    </button>
-                    <button
-                        onClick={() => {
-                            try {
-                                if (typeof onClose === 'function') onClose();
-                            } catch { }
-                        }}
-                        className="min-h-[52px] px-3 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2 active:scale-95 transition-transform"
-                    >
-                        <ArrowLeft size={16} /> <span className="text-xs font-bold">Ocultar</span>
-                    </button>
+
+                {/* Context + actions */}
+                <div className="flex-1 min-w-0">
+                    {exerciseName ? (
+                        <p className="text-xs text-neutral-400 font-bold uppercase tracking-widest truncate mb-0.5">{exerciseName}</p>
+                    ) : (
+                        <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest mb-0.5">Recuperação</p>
+                    )}
+                    {ctxKey ? (
+                        <p className="text-[10px] text-neutral-500 font-mono mb-3">
+                            Série {(ctxKey.split('-')[1] ? Number(ctxKey.split('-')[1]) + 1 : 1)}
+                        </p>
+                    ) : null}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => {
+                                try {
+                                    if (typeof onFinish === 'function') onFinish(context);
+                                } catch { }
+                            }}
+                            className="flex-1 min-h-[48px] bg-yellow-500 rounded-xl text-black font-black border border-yellow-400 hover:bg-yellow-400 inline-flex items-center justify-center gap-2 active:scale-95 transition-transform text-sm"
+                        >
+                            START
+                        </button>
+                        <button
+                            onClick={() => {
+                                try {
+                                    if (typeof onClose === 'function') onClose();
+                                } catch { }
+                            }}
+                            className="min-h-[48px] px-3 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-1.5 active:scale-95 transition-transform"
+                        >
+                            <ArrowLeft size={14} /> <span className="text-xs font-bold">Ocultar</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1009,141 +1009,160 @@ export default function StudentDashboard(props: Props) {
               </div>
             )}
 
-            {visibleWorkouts.map((w, idx) => (
-              <div
-                key={String(w?.id ?? idx)}
-                className={
-                  density === 'compact'
-                    ? 'bg-neutral-800 rounded-xl p-3 border-l-4 border-neutral-600 md:hover:border-yellow-500 transition-all group relative overflow-hidden cursor-pointer'
-                    : 'bg-neutral-800 rounded-xl p-4 border-l-4 border-neutral-600 md:hover:border-yellow-500 transition-all group relative overflow-hidden cursor-pointer'
-                }
-                onClick={() => {
-                  const key = getWorkoutKey(w, idx)
-                  if (isWorkoutBusy(key)) return
-                  if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
-                    runWorkoutAction(key, 'open', async () => {
-                      const id = String(w?.id || '').trim()
-                      const full = await loadWorkoutFullById(id)
-                      if (!full) {
-                        setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
-                        return
-                      }
-                      if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
-                        setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
-                        return
-                      }
-                      setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
-                      props.onQuickView(full)
-                    })
-                    return
-                  }
-                  props.onQuickView(w)
-                }}
-              >
-                <div className="relative z-10">
-                  <h3 className="font-bold text-white text-lg uppercase mb-1 pr-32 leading-tight">{String(w?.title || 'Treino')}</h3>
-                  <p className="text-xs text-neutral-400 font-mono mb-4">
-                    {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} EXERCÍCIOS
-                  </p>
-                  {w?.archived_at ? (
-                    <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
-                      ARQUIVADO
-                    </div>
-                  ) : null}
+            {visibleWorkouts.map((w, idx) => {
+              // Dynamic accent color per workout (cycles through brand palette)
+              const accentColors = [
+                { border: 'border-yellow-500', gradient: 'from-yellow-500/5' },
+                { border: 'border-orange-500', gradient: 'from-orange-500/5' },
+                { border: 'border-amber-500', gradient: 'from-amber-500/5' },
+                { border: 'border-purple-500', gradient: 'from-purple-500/5' },
+              ]
+              const accent = accentColors[idx % accentColors.length]
+              const isActive = false // TODO: hook to active session id if available
+              return (
+                <div
+                  key={String(w?.id ?? idx)}
+                  className={[
+                    'rounded-xl p-4 border-l-4 transition-all group relative overflow-hidden cursor-pointer shadow-sm shadow-black/30',
+                    `bg-gradient-to-r ${accent.gradient} via-neutral-800/80 to-neutral-800`,
+                    accent.border,
+                    isActive ? 'ring-2 ring-green-500/60' : '',
+                    density === 'compact' ? 'p-3' : 'p-4',
+                  ].join(' ')}
+                  onClick={() => {
+                    const key = getWorkoutKey(w, idx)
+                    if (isWorkoutBusy(key)) return
+                    if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                      runWorkoutAction(key, 'open', async () => {
+                        const id = String(w?.id || '').trim()
+                        const full = await loadWorkoutFullById(id)
+                        if (!full) {
+                          setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                          return
+                        }
+                        if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                          setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                          return
+                        }
+                        setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                        props.onQuickView(full)
+                      })
+                      return
+                    }
+                    props.onQuickView(w)
+                  }}
+                >
+                  <div className="relative z-10">
+                    {isActive && (
+                      <div className="absolute -top-1 -left-1 w-3 h-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                      </div>
+                    )}
+                    <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight">{String(w?.title || 'Treino')}</h3>
+                    <p className="text-[11px] text-neutral-500 font-mono mb-3">
+                      {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} exercícios
+                    </p>
+                    {w?.archived_at ? (
+                      <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
+                        ARQUIVADO
+                      </div>
+                    ) : null}
 
-                  <div className="flex gap-2 mt-2">
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const key = getWorkoutKey(w, idx)
+                          if (w?.archived_at) {
+                            if (typeof props.onRestoreWorkout !== 'function') return
+                            await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
+                            return
+                          }
+                          await runWorkoutAction(key, 'start', async () => {
+                            if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                              const id = String(w?.id || '').trim()
+                              const full = await loadWorkoutFullById(id)
+                              if (!full) {
+                                setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                                return
+                              }
+                              if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                                setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                                return
+                              }
+                              setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                              await props.onStartSession(full)
+                              return
+                            }
+                            await props.onStartSession(w)
+                          })
+                        }}
+                        data-tour="workout-start"
+                        disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
+                        className="relative z-30 flex-1 bg-yellow-500/90 hover:bg-yellow-400 py-2.5 rounded-xl flex items-center justify-center gap-2 text-black font-black text-sm transition-all border border-yellow-400/50 active:scale-95 touch-manipulation disabled:opacity-60 shadow-sm shadow-yellow-500/20"
+                      >
+                        {w?.archived_at ? (
+                          isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
+                            <>
+                              <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
+                            </>
+                          ) : (
+                            <>
+                              <Undo2 size={16} /> RESTAURAR
+                            </>
+                          )
+                        ) : isActionBusy(getWorkoutKey(w, idx), 'start') ? (
+                          <>
+                            <Loader2 size={16} className="text-yellow-500 animate-spin" /> INICIANDO...
+                          </>
+                        ) : (
+                          <>
+                            <Play size={16} className="fill-white" /> INICIAR TREINO
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
                     <button
                       onClick={async (e) => {
                         e.stopPropagation()
                         const key = getWorkoutKey(w, idx)
-                        if (w?.archived_at) {
-                          if (typeof props.onRestoreWorkout !== 'function') return
-                          await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
-                          return
-                        }
-                        await runWorkoutAction(key, 'start', async () => {
-                          if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
-                            const id = String(w?.id || '').trim()
-                            const full = await loadWorkoutFullById(id)
-                            if (!full) {
-                              setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
-                              return
-                            }
-                            if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
-                              setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
-                              return
-                            }
-                            setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
-                            await props.onStartSession(full)
-                            return
-                          }
-                          await props.onStartSession(w)
-                        })
+                        await runWorkoutAction(key, 'share', () => props.onShareWorkout(w))
                       }}
-                      data-tour="workout-start"
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
-                      className="relative z-30 flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg flex items-center justify-center gap-2 text-white font-bold text-sm transition-colors border border-white/10 active:scale-95 touch-manipulation disabled:opacity-60"
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
                     >
-                      {w?.archived_at ? (
-                        isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
-                          <>
-                            <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
-                          </>
-                        ) : (
-                          <>
-                            <Undo2 size={16} /> RESTAURAR
-                          </>
-                        )
-                      ) : isActionBusy(getWorkoutKey(w, idx), 'start') ? (
-                        <>
-                          <Loader2 size={16} className="text-yellow-500 animate-spin" /> INICIANDO...
-                        </>
-                      ) : (
-                        <>
-                          <Play size={16} className="fill-white" /> INICIAR TREINO
-                        </>
-                      )}
+                      {isActionBusy(getWorkoutKey(w, idx), 'share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const key = getWorkoutKey(w, idx)
+                        await runWorkoutAction(key, 'edit', () => props.onEditWorkout(w))
+                      }}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                    >
+                      {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const key = getWorkoutKey(w, idx)
+                        await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
+                      }}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
+                    >
+                      {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
                     </button>
                   </div>
                 </div>
-
-                <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      const key = getWorkoutKey(w, idx)
-                      await runWorkoutAction(key, 'share', () => props.onShareWorkout(w))
-                    }}
-                    disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-                  >
-                    {isActionBusy(getWorkoutKey(w, idx), 'share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
-                  </button>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      const key = getWorkoutKey(w, idx)
-                      await runWorkoutAction(key, 'edit', () => props.onEditWorkout(w))
-                    }}
-                    disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
-                  >
-                    {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
-                  </button>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      const key = getWorkoutKey(w, idx)
-                      await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
-                    }}
-                    disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
-                  >
-                    {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}
