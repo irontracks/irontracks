@@ -45,7 +45,7 @@ interface InAppNotificationsProviderProps {
   onOpenNotifications?: () => void
 }
 
-const InAppNotificationsContext = createContext<InAppNotificationsContextValue>({ notify: () => {}, clear: () => {} });
+const InAppNotificationsContext = createContext<InAppNotificationsContextValue>({ notify: () => { }, clear: () => { } });
 
 export function useInAppNotifications() {
   return useContext(InAppNotificationsContext);
@@ -97,7 +97,7 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
         const { data } = await supabase.auth.getUser();
         const id = data?.user?.id ? String(data.user.id) : '';
         if (!cancelled && id) setAuthUserId(id);
-      } catch {}
+      } catch { }
     })();
     return () => {
       cancelled = true;
@@ -121,7 +121,19 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
     if (last.key === key && now - last.at < 1500) return;
     lastKeyRef.current = { key, at: now };
     setToast(normalized);
+
+    // Fire native iOS notification so it shows in the system banner/notification center.
+    // Uses dynamic import to avoid SSR issues and bundle size overhead.
+    import('@/utils/platform').then(({ isIosNative }) => {
+      if (!isIosNative()) return;
+      import('@/utils/native/irontracksNative').then(({ scheduleAppNotification }) => {
+        const title = normalized.senderName || 'IronTracks';
+        const body = normalized.text;
+        scheduleAppNotification({ title, body, delaySeconds: 0 }).catch(() => { });
+      }).catch(() => { });
+    }).catch(() => { });
   }, []);
+
 
   const onToastClick = useCallback(() => {
     const n = toast && typeof toast === 'object' ? toast : null;
@@ -137,21 +149,21 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
         clear();
         return;
       }
-    } catch {}
+    } catch { }
     try {
       if (link) {
         router.push(link);
         clear();
         return;
       }
-    } catch {}
+    } catch { }
     try {
       if (typeof props?.onOpenNotifications === 'function') {
         props.onOpenNotifications();
         clear();
         return;
       }
-    } catch {}
+    } catch { }
     clear();
   }, [toast, clear, props, router]);
 
