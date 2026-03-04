@@ -15,7 +15,7 @@ type IronTracksNativePlugin = {
   cancelRestTimer: (opts: { id: string }) => Promise<void>
   // Live Activity
   startRestLiveActivity: (opts: { id: string; seconds: number; title?: string }) => Promise<void>
-  updateRestLiveActivity: (opts: { id: string; isFinished: boolean }) => Promise<void>
+  updateRestLiveActivity: (opts: { id: string; isFinished: boolean; elapsedSeconds?: number }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
   // Generic app notification
   scheduleAppNotification: (opts: { id?: string; title: string; body: string; delaySeconds?: number }) => Promise<{ id: string }>
@@ -51,25 +51,25 @@ export type HapticStyle =
 
 const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
   web: {
-    setIdleTimerDisabled: async () => {},
+    setIdleTimerDisabled: async () => { },
     requestNotificationPermission: async () => ({ granted: false }),
     checkNotificationPermission: async () => ({ status: 'notDetermined' }),
-    setupNotificationActions: async () => {},
-    scheduleRestTimer: async () => {},
-    cancelRestTimer: async () => {},
-    startRestLiveActivity: async () => {},
-    updateRestLiveActivity: async () => {},
-    endRestLiveActivity: async () => {},
+    setupNotificationActions: async () => { },
+    scheduleRestTimer: async () => { },
+    cancelRestTimer: async () => { },
+    startRestLiveActivity: async () => { },
+    updateRestLiveActivity: async () => { },
+    endRestLiveActivity: async () => { },
     scheduleAppNotification: async () => ({ id: '' }),
-    stopAlarmSound: async () => {},
-    triggerHaptic: async () => {},
+    stopAlarmSound: async () => { },
+    triggerHaptic: async () => { },
     checkBiometricsAvailable: async () => ({ available: false, biometryType: 'none' as const }),
     authenticateWithBiometrics: async () => ({ success: false, error: 'Not available on web' }),
-    indexWorkout: async () => {},
-    removeWorkoutIndex: async () => {},
-    clearAllWorkoutIndexes: async () => {},
-    startAccelerometer: async () => {},
-    stopAccelerometer: async () => {},
+    indexWorkout: async () => { },
+    removeWorkoutIndex: async () => { },
+    clearAllWorkoutIndexes: async () => { },
+    startAccelerometer: async () => { },
+    stopAccelerometer: async () => { },
     isHealthKitAvailable: async () => ({ available: false }),
     requestHealthKitPermission: async () => ({ granted: false, error: 'Not available on web' }),
     saveWorkoutToHealth: async () => ({ saved: false, error: 'Not available on web' }),
@@ -85,7 +85,7 @@ export const setIdleTimerDisabled = async (enabled: boolean) => {
   try {
     if (!isIosNative()) return
     await Native.setIdleTimerDisabled({ enabled: Boolean(enabled) })
-  } catch {}
+  } catch { }
 }
 
 export const openAppSettings = async () => {
@@ -121,11 +121,11 @@ export const setupNativeNotificationActions = async () => {
   try {
     if (!isIosNative()) return
     await Native.setupNotificationActions()
-  } catch {}
+  } catch { }
 }
 
 export const onNativeNotificationAction = (handler: (actionId: string) => void) => {
-  if (!isIosNative()) return () => {}
+  if (!isIosNative()) return () => { }
   type ListenerHandle = { remove: () => void }
   type MaybePromise<T> = T | Promise<T>
   const isPromise = (v: unknown): v is Promise<ListenerHandle> => {
@@ -141,17 +141,17 @@ export const onNativeNotificationAction = (handler: (actionId: string) => void) 
       const obj = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
       const actionId = String(obj.actionId ?? '').trim()
       if (actionId) handler(actionId)
-    } catch {}
+    } catch { }
   })
   return () => {
     try {
       if (!listener) return
       if (isPromise(listener)) {
-        listener.then((x) => x?.remove?.()).catch(() => {})
+        listener.then((x) => x?.remove?.()).catch(() => { })
       } else {
         listener.remove()
       }
-    } catch {}
+    } catch { }
   }
 }
 
@@ -178,7 +178,7 @@ export const scheduleRestNotification = async (
       repeatCount: safeRepeatCount,
       repeatEverySeconds: safeRepeatEverySeconds,
     })
-  } catch {}
+  } catch { }
 }
 
 export const cancelRestNotification = async (id: string) => {
@@ -186,7 +186,7 @@ export const cancelRestNotification = async (id: string) => {
     if (!isIosNative()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     await Native.cancelRestTimer({ id: safeId })
-  } catch {}
+  } catch { }
 }
 
 // ─── Live Activity ────────────────────────────────────────────────────────────
@@ -198,15 +198,15 @@ export const startRestLiveActivity = async (id: string, seconds: number, title?:
     const safeSeconds = Math.max(1, Math.round(Number(seconds) || 0))
     if (!safeSeconds) return
     await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title })
-  } catch {}
+  } catch { }
 }
 
-export const updateRestLiveActivity = async (id: string, isFinished: boolean) => {
+export const updateRestLiveActivity = async (id: string, isFinished: boolean, elapsedSeconds?: number) => {
   try {
     if (!isIosNative()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
-    await Native.updateRestLiveActivity({ id: safeId, isFinished })
-  } catch {}
+    await Native.updateRestLiveActivity({ id: safeId, isFinished, elapsedSeconds })
+  } catch { }
 }
 
 export const endRestLiveActivity = async (id: string) => {
@@ -214,7 +214,7 @@ export const endRestLiveActivity = async (id: string) => {
     if (!isIosNative()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     await Native.endRestLiveActivity({ id: safeId })
-  } catch {}
+  } catch { }
 }
 
 // ─── Generic App Notification ────────────────────────────────────────────────
@@ -240,7 +240,7 @@ export const stopAlarmSound = async () => {
   try {
     if (!isIosNative()) return
     await Native.stopAlarmSound()
-  } catch {}
+  } catch { }
 }
 
 // ─── Haptics ──────────────────────────────────────────────────────────────────
@@ -249,7 +249,7 @@ export const triggerHaptic = async (style: HapticStyle = 'medium') => {
   try {
     if (!isIosNative()) return
     await Native.triggerHaptic({ style })
-  } catch {}
+  } catch { }
 }
 
 // ─── Biometrics ───────────────────────────────────────────────────────────────
@@ -283,21 +283,21 @@ export const indexWorkoutInSpotlight = async (opts: {
   try {
     if (!isIosNative()) return
     await Native.indexWorkout(opts)
-  } catch {}
+  } catch { }
 }
 
 export const removeWorkoutFromSpotlight = async (id: string) => {
   try {
     if (!isIosNative()) return
     await Native.removeWorkoutIndex({ id })
-  } catch {}
+  } catch { }
 }
 
 export const clearAllWorkoutsFromSpotlight = async () => {
   try {
     if (!isIosNative()) return
     await Native.clearAllWorkoutIndexes()
-  } catch {}
+  } catch { }
 }
 
 // ─── Accelerometer ────────────────────────────────────────────────────────────
@@ -306,14 +306,14 @@ export const startAccelerometer = async (intervalMs = 100) => {
   try {
     if (!isIosNative()) return
     await Native.startAccelerometer({ intervalMs })
-  } catch {}
+  } catch { }
 }
 
 export const stopAccelerometer = async () => {
   try {
     if (!isIosNative()) return
     await Native.stopAccelerometer()
-  } catch {}
+  } catch { }
 }
 
 // ─── HealthKit ────────────────────────────────────────────────────────────────
