@@ -87,39 +87,44 @@ const defaultOffsetsBack: ViewOffsets = {
 };
 
 export default function BodyMapSvg({ view, muscles, onSelect, selected, calibrationMode = false }: Props) {
-  const [frontOffsets, setFrontOffsets] = useState<ViewOffsets>(defaultOffsetsFront)
-  const [backOffsets, setBackOffsets] = useState<ViewOffsets>(defaultOffsetsBack)
-  const [intensity, setIntensity] = useState(0.9)
+  const [frontOffsets, setFrontOffsets] = useState<ViewOffsets>(() => {
+    try {
+      if (typeof window === 'undefined') return defaultOffsetsFront
+      const saved = window.localStorage.getItem('calibration_front')
+      if (saved) return { ...defaultOffsetsFront, ...JSON.parse(saved) }
+    } catch { }
+    return defaultOffsetsFront
+  })
+  const [backOffsets, setBackOffsets] = useState<ViewOffsets>(() => {
+    try {
+      if (typeof window === 'undefined') return defaultOffsetsBack
+      const saved = window.localStorage.getItem('calibration_back')
+      if (saved) return { ...defaultOffsetsBack, ...JSON.parse(saved) }
+    } catch { }
+    return defaultOffsetsBack
+  })
+  const [intensity, setIntensity] = useState<number>(() => {
+    try {
+      if (typeof window === 'undefined') return 0.9
+      const saved = window.localStorage.getItem('calibration_intensity')
+      if (saved) {
+        const n = Number(saved)
+        if (Number.isFinite(n)) return n
+      }
+    } catch { }
+    return 0.9
+  })
   const [showAll, setShowAll] = useState(true)
   const [editingMuscle, setEditingMuscle] = useState<string>('global')
 
-  // NEW: Load from localStorage on mount
+  // Persist to localStorage whenever calibration values change
   useEffect(() => {
     try {
-      const savedFront = localStorage.getItem('calibration_front');
-      const savedBack = localStorage.getItem('calibration_back');
-      const savedInt = localStorage.getItem('calibration_intensity');
-
-      setTimeout(() => {
-        if (savedFront) setFrontOffsets(JSON.parse(savedFront));
-        if (savedBack) setBackOffsets(JSON.parse(savedBack));
-        if (savedInt) setIntensity(Number(savedInt));
-      }, 0);
-    } catch (e) {
-      console.warn('Could not load calibration from local storge', e)
-    }
-  }, []);
-
-  // NEW: Save to localStorage when changed
-  useEffect(() => {
-    try {
-      localStorage.setItem('calibration_front', JSON.stringify(frontOffsets));
-      localStorage.setItem('calibration_back', JSON.stringify(backOffsets));
-      localStorage.setItem('calibration_intensity', String(intensity));
-    } catch (e) {
-      // ignore
-    }
-  }, [frontOffsets, backOffsets, intensity]);
+      window.localStorage.setItem('calibration_front', JSON.stringify(frontOffsets))
+      window.localStorage.setItem('calibration_back', JSON.stringify(backOffsets))
+      window.localStorage.setItem('calibration_intensity', String(intensity))
+    } catch { }
+  }, [frontOffsets, backOffsets, intensity])
 
   const offsets = view === 'front' ? frontOffsets : backOffsets;
   const setOffsets = view === 'front' ? setFrontOffsets : setBackOffsets;
