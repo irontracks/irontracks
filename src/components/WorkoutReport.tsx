@@ -1,5 +1,6 @@
 "use client"
 import React, { useRef, useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { Download, ArrowLeft, FileText, Code, Users, Sparkles, Loader2, Check, MessageSquare } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
@@ -16,13 +17,14 @@ import {
     normalizeExerciseKey,
 } from '@/utils/report/formatters'
 import { ReportMetricsPanel } from '@/components/workout-report/ReportMetricsPanel'
-import { MuscleTrendPanel } from '@/components/workout-report/MuscleTrendPanel'
-import { MuscleTrend4wPanel } from '@/components/workout-report/MuscleTrend4wPanel'
-import { ExerciseTrendPanel } from '@/components/workout-report/ExerciseTrendPanel'
-import { ReportCheckinPanel } from '@/components/workout-report/ReportCheckinPanel'
-import { ReportAiSection } from '@/components/workout-report/ReportAiSection'
 import { ReportSummaryCards } from '@/components/workout-report/ReportSummaryCards'
 import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCard'
+// Lazy-loaded panels (secondary data, deferred rendering)
+const MuscleTrendPanel = dynamic(() => import('@/components/workout-report/MuscleTrendPanel').then(m => ({ default: m.MuscleTrendPanel })), { ssr: false })
+const MuscleTrend4wPanel = dynamic(() => import('@/components/workout-report/MuscleTrend4wPanel').then(m => ({ default: m.MuscleTrend4wPanel })), { ssr: false })
+const ExerciseTrendPanel = dynamic(() => import('@/components/workout-report/ExerciseTrendPanel').then(m => ({ default: m.ExerciseTrendPanel })), { ssr: false })
+const ReportCheckinPanel = dynamic(() => import('@/components/workout-report/ReportCheckinPanel').then(m => ({ default: m.ReportCheckinPanel })), { ssr: false })
+const ReportAiSection = dynamic(() => import('@/components/workout-report/ReportAiSection').then(m => ({ default: m.ReportAiSection })), { ssr: false })
 import {
     useReportData,
     remapPrevLogsByCanonical,
