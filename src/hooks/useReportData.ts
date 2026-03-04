@@ -1,8 +1,8 @@
 'use client'
 import { logWarn } from '@/lib/logger'
-import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { getMuscleMapWeek } from '@/actions/workout-actions'
+import { getMuscleMapWeek, getReportPreviousData } from '@/actions/workout-actions'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -234,7 +234,7 @@ export interface UseReportDataReturn {
     supabase: ReturnType<typeof createClient> | null
     // Resolved previous session
     effectivePreviousSession: AnyObj | null
-    resolvePreviousFromHistory: () => Promise<AnyObj | null>
+
     // Target user
     targetUserId: string | null
     // Check-ins
@@ -291,12 +291,11 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     const [pdfBlob, setPdfBlob] = useState<Blob | null>(null)
     const pdfFrameRef = useRef<HTMLIFrameElement | null>(null)
 
-    // ── Previous session resolution ────────────────────────────────────────
-    const previousFetchInFlightRef = useRef(false)
+    // ── Previous session state ──────────────────────────────────────────
     const [resolvedPreviousSession, setResolvedPreviousSession] = useState<AnyObj | null>(null)
 
     // ── Per-exercise previous data ─────────────────────────────────────────
-    const prevByExerciseFetchInFlightRef = useRef(false)
+    const prevDataFetchRef = useRef(false)
     const [prevByExercise, setPrevByExercise] = useState<{ logsByExercise: Record<string, unknown>; baseMsByExercise: Record<string, unknown> }>({ logsByExercise: {}, baseMsByExercise: {} })
 
     // ── Check-ins ──────────────────────────────────────────────────────────
@@ -398,116 +397,49 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         return () => { cancelled = true }
     }, [session?.id, session?.originWorkoutId, session?.date, session?.completed_at, session?.completedAt, supabase, targetUserId])
 
-    // ── Resolve previous session from history ──────────────────────────────
-    const resolvePreviousFromHistory = useCallback(async () => {
-        try {
-            if (!supabase) return null
-            if (previousSession) return previousSession
-            if (resolvedPreviousSession) return resolvedPreviousSession
-            if (!targetUserId) return null
-            if (!session || typeof session !== 'object') return null
-            if (previousFetchInFlightRef.current) return null
-            const currentMs = toDateMs(session?.date) ?? toDateMs(session?.completed_at) ?? toDateMs(session?.completedAt) ?? null
-            const { originId: currentOriginId, titleKey: currentTitleKey } = computeMatchKey(session)
-            if (!currentOriginId && !currentTitleKey) return null
-            previousFetchInFlightRef.current = true
-            let query = supabase.from('workouts').select('id, date, created_at, notes, name')
-                .eq('user_id', targetUserId).eq('is_template', false)
-                .order('date', { ascending: false }).limit(200)
-            const currentId = typeof session?.id === 'string' && session.id ? session.id : null
-            if (currentId) query = query.neq('id', currentId)
-            const { data: rows, error } = await query
-            if (error) throw error
-            const candidates = Array.isArray(rows) ? rows : []
-            let best = null
-            let bestMs = -1
-            for (const r of candidates) {
-                if (!r || typeof r !== 'object') continue
-                const parsed = parseSessionNotes(r.notes)
-                if (!parsed || typeof parsed !== 'object') continue
-                const candidateMs = toDateMs(parsed?.date) ?? toDateMs(r?.date) ?? toDateMs(r?.created_at) ?? null
-                if (typeof candidateMs !== 'number' || !Number.isFinite(candidateMs)) continue
-                if (typeof currentMs === 'number' && Number.isFinite(currentMs) && candidateMs >= currentMs) continue
-                const { originId: candOriginId, titleKey: candTitleKey } = computeMatchKey(parsed)
-                const originMatches = !!(currentOriginId && candOriginId && currentOriginId === candOriginId)
-                const titleMatches = !!(currentTitleKey && candTitleKey && currentTitleKey === candTitleKey)
-                if (!originMatches && !titleMatches) continue
-                if (candidateMs > bestMs) {
-                    bestMs = candidateMs
-                    best = { ...parsed, id: parsed?.id ?? r?.id ?? null }
-                }
-            }
-            if (best && typeof best === 'object') {
-                setResolvedPreviousSession(best)
-                return best
-            }
-            return null
-        } catch { return null } finally { previousFetchInFlightRef.current = false }
-    }, [previousSession, resolvedPreviousSession, session, supabase, targetUserId])
+    // ── Effect: Consolidated previous session + per-exercise data (G1+G2) ──
+    useEffect(() => {
+        let cancelled = false
+        if (!targetUserId || !session || typeof session !== 'object') return
+        if (prevDataFetchRef.current) return
+        if (previousSession) {
+            // If previousSession was passed as prop, still resolve per-exercise data
+            setResolvedPreviousSession(null)
+        }
+        const exercisesArr = Array.isArray(session?.exercises) ? session.exercises as unknown[] : []
+        const exerciseNames = exercisesArr
+            .map((ex: unknown) => String((ex as AnyObj)?.name || '').trim())
+            .filter(Boolean)
 
-    useEffect(() => { resolvePreviousFromHistory().catch(() => { }) }, [resolvePreviousFromHistory])
-
-    // ── Resolve per-exercise previous logs ─────────────────────────────────
-    const resolvePrevByExerciseFromHistory = useCallback(async () => {
-        try {
-            if (!supabase || !targetUserId || !session || typeof session !== 'object') return
-            if (prevByExerciseFetchInFlightRef.current) return
-            const exercisesArr = Array.isArray(session?.exercises) ? session.exercises : []
-            if (!exercisesArr.length) return
-            const wanted = new Map()
-            exercisesArr.forEach((ex: unknown) => {
-                const name = String((ex as AnyObj)?.name || '').trim()
-                if (!name) return
-                const key = normalizeExerciseKey(name)
-                if (!key) return
-                if (!wanted.has(key)) wanted.set(key, name)
-            })
-            if (!wanted.size) return
-            const currentMs = toDateMs(session?.date) ?? toDateMs(session?.completed_at) ?? toDateMs(session?.completedAt) ?? Date.now()
-            prevByExerciseFetchInFlightRef.current = true
-            let query = supabase.from('workouts').select('id, date, created_at, notes')
-                .eq('user_id', targetUserId).eq('is_template', false)
-                .order('date', { ascending: false }).limit(350)
-            const currentId = typeof session?.id === 'string' && session.id ? session.id : null
-            if (currentId) query = query.neq('id', currentId)
-            const { data: rows, error } = await query
-            if (error) throw error
-            const candidates = Array.isArray(rows) ? rows : []
-            const resolvedLogs: Record<string, unknown> = {}
-            const resolvedBaseMs: Record<string, number> = {}
-            const remaining = new Set(Array.from(wanted.keys()))
-            for (const r of candidates) {
-                if (!remaining.size) break
-                if (!r || typeof r !== 'object') continue
-                const parsed = parseSessionNotes(r.notes)
-                if (!parsed || typeof parsed !== 'object') continue
-                const candidateMs = toDateMs(parsed?.date) ?? toDateMs(r?.date) ?? toDateMs(r?.created_at) ?? null
-                const validCandidateMs = (typeof candidateMs === 'number' && Number.isFinite(candidateMs)) ? candidateMs : null
-                if (validCandidateMs === null) continue
-                const validCurrentMs = (typeof currentMs === 'number' && Number.isFinite(currentMs)) ? currentMs : null
-                if (validCurrentMs !== null && validCandidateMs >= validCurrentMs) continue
-                const exArr = Array.isArray(parsed?.exercises) ? parsed.exercises : []
-                if (!exArr.length) continue
-                exArr.forEach((ex: unknown, exIdx: number) => {
-                    if (!remaining.size) return
-                    const name = String((ex as AnyObj)?.name || '').trim()
-                    if (!name) return
-                    const key = normalizeExerciseKey(name)
-                    if (!key || !remaining.has(key)) return
-                    const logs = extractExerciseLogsByIndex(parsed, exIdx)
-                    if (!hasAnyComparableLog(logs)) return
-                    resolvedLogs[key] = logs
-                    resolvedBaseMs[key] = validCandidateMs
-                    remaining.delete(key)
+        prevDataFetchRef.current = true;
+        (async () => {
+            try {
+                const result = await getReportPreviousData({
+                    userId: targetUserId,
+                    currentSessionId: typeof session?.id === 'string' && session.id ? session.id : null,
+                    currentDate: session?.date ? String(session.date) : null,
+                    currentOriginId: session?.originWorkoutId ? String(session.originWorkoutId) : null,
+                    currentTitle: session?.workoutTitle ? String(session.workoutTitle) : null,
+                    exerciseNames,
                 })
+                if (cancelled) return
+                if (!previousSession && result.previousSession) {
+                    setResolvedPreviousSession(result.previousSession)
+                }
+                setPrevByExercise({
+                    logsByExercise: result.prevLogsByExercise,
+                    baseMsByExercise: result.prevBaseMsByExercise,
+                })
+            } catch {
+                if (!cancelled) {
+                    setPrevByExercise({ logsByExercise: {}, baseMsByExercise: {} })
+                }
+            } finally {
+                prevDataFetchRef.current = false
             }
-            setPrevByExercise({ logsByExercise: resolvedLogs, baseMsByExercise: resolvedBaseMs })
-        } catch {
-            setPrevByExercise({ logsByExercise: {}, baseMsByExercise: {} })
-        } finally { prevByExerciseFetchInFlightRef.current = false }
-    }, [session, supabase, targetUserId])
-
-    useEffect(() => { resolvePrevByExerciseFromHistory().catch(() => { }) }, [resolvePrevByExerciseFromHistory])
+        })()
+        return () => { cancelled = true }
+    }, [session, previousSession, targetUserId])
 
     // ── Effect: Kcal estimate ──────────────────────────────────────────────
     useEffect(() => {
@@ -749,7 +681,7 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     return {
         supabase,
         effectivePreviousSession,
-        resolvePreviousFromHistory,
+
         targetUserId,
         preCheckin: checkinsByKind.pre,
         postCheckin: checkinsByKind.post,

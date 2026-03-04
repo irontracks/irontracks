@@ -77,7 +77,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const {
         supabase,
         effectivePreviousSession,
-        resolvePreviousFromHistory,
         targetUserId,
         preCheckin: rawPreCheckin,
         postCheckin: rawPostCheckin,
@@ -138,7 +137,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         try {
             setIsGenerating(true);
             try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch { }
-            const prev = effectivePreviousSession ?? (await resolvePreviousFromHistory());
+            const prev = effectivePreviousSession;
             let canonicalMap: Record<string, unknown> = {};
             try {
                 const currentNames = (Array.isArray(session?.exercises) ? (session.exercises as unknown[]) : [])
