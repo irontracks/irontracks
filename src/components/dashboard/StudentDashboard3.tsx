@@ -271,9 +271,9 @@ export default function StudentDashboard(props: Props) {
   const [savingListEdits, setSavingListEdits] = useState(false)
   const [pendingAction, setPendingAction] = useState<
     | {
-        workoutKey: string
-        type: 'open' | 'start' | 'restore' | 'share' | 'duplicate' | 'edit' | 'delete'
-      }
+      workoutKey: string
+      type: 'open' | 'start' | 'restore' | 'share' | 'duplicate' | 'edit' | 'delete'
+    }
     | null
   >(null)
   const TABS_BAR_MIN_HEIGHT_PX = 60
@@ -321,41 +321,41 @@ export default function StudentDashboard(props: Props) {
     let cancelled = false
     setPeriodizedLoading(true)
     setPeriodizedError('')
-    ;(async () => {
-      try {
-        const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const jsonUnknown: unknown = await res.json().catch(() => null)
-        const jsonParsed = PeriodizationActiveResponseSchema.safeParse(jsonUnknown)
-        const json = jsonParsed.success ? jsonParsed.data : null
-        if (cancelled) return
-        if (!json?.ok) {
-          const msg = json?.error != null ? String(json.error) : 'Falha ao carregar periodização.'
-          setPeriodizedWorkouts([])
-          setPeriodizedLoaded(true)
-          setPeriodizedError(msg)
-          return
-        }
-        const rows = Array.isArray(json?.workouts) ? json.workouts : []
-        const ids = rows.map((r) => String(r?.workout_id || '').trim()).filter(Boolean)
-        const countById = new Map<string, number>()
-        rows.forEach((r) => {
-          const id = String(r?.workout_id || '').trim()
-          const n = Number(r?.exercise_count)
-          if (!id) return
-          if (!Number.isFinite(n)) return
-          countById.set(id, Math.max(0, Math.floor(n)))
-        })
-        if (ids.length === 0) {
-          setPeriodizedWorkouts([])
-          setPeriodizedLoaded(true)
-          setPeriodizedError(json?.program?.id ? 'Programa encontrado, mas sem treinos vinculados.' : '')
-          return
-        }
+      ; (async () => {
+        try {
+          const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
+          const jsonUnknown: unknown = await res.json().catch(() => null)
+          const jsonParsed = PeriodizationActiveResponseSchema.safeParse(jsonUnknown)
+          const json = jsonParsed.success ? jsonParsed.data : null
+          if (cancelled) return
+          if (!json?.ok) {
+            const msg = json?.error != null ? String(json.error) : 'Falha ao carregar periodização.'
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError(msg)
+            return
+          }
+          const rows = Array.isArray(json?.workouts) ? json.workouts : []
+          const ids = rows.map((r) => String(r?.workout_id || '').trim()).filter(Boolean)
+          const countById = new Map<string, number>()
+          rows.forEach((r) => {
+            const id = String(r?.workout_id || '').trim()
+            const n = Number(r?.exercise_count)
+            if (!id) return
+            if (!Number.isFinite(n)) return
+            countById.set(id, Math.max(0, Math.floor(n)))
+          })
+          if (ids.length === 0) {
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError(json?.program?.id ? 'Programa encontrado, mas sem treinos vinculados.' : '')
+            return
+          }
 
-        const { data, error } = await supabase
-          .from('workouts')
-          .select(
-            `
+          const { data, error } = await supabase
+            .from('workouts')
+            .select(
+              `
             id,
             user_id,
             created_by,
@@ -365,59 +365,59 @@ export default function StudentDashboard(props: Props) {
             sort_order,
             created_at
           `,
-          )
-          .in('id', ids)
-          .limit(ids.length)
+            )
+            .in('id', ids)
+            .limit(ids.length)
 
-        if (cancelled) return
-        if (error) {
-          setPeriodizedWorkouts([])
-          setPeriodizedLoaded(true)
-          setPeriodizedError(String(getErrorMessage(error) || 'Falha ao carregar treinos periodizados.'))
-          return
-        }
+          if (cancelled) return
+          if (error) {
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError(String(getErrorMessage(error) || 'Falha ao carregar treinos periodizados.'))
+            return
+          }
 
-        const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
-        const mapped = (Array.isArray(data) ? data : [])
-          .filter((w) => isRecord(w))
-          .map((w): DashboardWorkout | null => {
-            const parsed = WorkoutListRowSchema.safeParse(w)
-            if (!parsed.success) return null
-            const workout = parsed.data
-            const wid = String(workout.id || '').trim()
-            return {
-              id: workout.id ?? undefined,
-              title: String(workout.name ?? ''),
-              notes: workout.notes,
-              exercises: [],
-              exercises_count: wid ? (countById.get(wid) ?? null) : null,
-              user_id: workout.user_id,
-              created_by: workout.created_by ?? null,
-              archived_at: workout.archived_at ?? null,
-              sort_order: workout.sort_order == null ? 0 : toIntOrZero(workout.sort_order),
-              created_at: workout.created_at ?? null,
-            } satisfies DashboardWorkout
+          const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+          const mapped = (Array.isArray(data) ? data : [])
+            .filter((w) => isRecord(w))
+            .map((w): DashboardWorkout | null => {
+              const parsed = WorkoutListRowSchema.safeParse(w)
+              if (!parsed.success) return null
+              const workout = parsed.data
+              const wid = String(workout.id || '').trim()
+              return {
+                id: workout.id ?? undefined,
+                title: String(workout.name ?? ''),
+                notes: workout.notes,
+                exercises: [],
+                exercises_count: wid ? (countById.get(wid) ?? null) : null,
+                user_id: workout.user_id,
+                created_by: workout.created_by ?? null,
+                archived_at: workout.archived_at ?? null,
+                sort_order: workout.sort_order == null ? 0 : toIntOrZero(workout.sort_order),
+                created_at: workout.created_at ?? null,
+              } satisfies DashboardWorkout
+            })
+            .filter((w): w is DashboardWorkout => Boolean(w))
+
+          const byId = new Map<string, DashboardWorkout>()
+          mapped.forEach((w: DashboardWorkout) => {
+            const id = String(w?.id || '').trim()
+            if (id) byId.set(id, w)
           })
-          .filter((w): w is DashboardWorkout => Boolean(w))
-
-        const byId = new Map<string, DashboardWorkout>()
-        mapped.forEach((w: DashboardWorkout) => {
-          const id = String(w?.id || '').trim()
-          if (id) byId.set(id, w)
-        })
-        const ordered = ids.map((id: string) => byId.get(id)).filter(Boolean) as DashboardWorkout[]
-        setPeriodizedWorkouts(ordered)
-        setPeriodizedLoaded(true)
-      } catch {
-        if (!cancelled) {
-          setPeriodizedWorkouts([])
+          const ordered = ids.map((id: string) => byId.get(id)).filter(Boolean) as DashboardWorkout[]
+          setPeriodizedWorkouts(ordered)
           setPeriodizedLoaded(true)
-          setPeriodizedError('Falha ao carregar treinos periodizados.')
+        } catch {
+          if (!cancelled) {
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError('Falha ao carregar treinos periodizados.')
+          }
+        } finally {
+          if (!cancelled) setPeriodizedLoading(false)
         }
-      } finally {
-        if (!cancelled) setPeriodizedLoading(false)
-      }
-    })()
+      })()
     return () => {
       cancelled = true
     }
@@ -550,11 +550,11 @@ export default function StudentDashboard(props: Props) {
     }
     try {
       window.addEventListener('keydown', onKeyDown)
-    } catch {}
+    } catch { }
     return () => {
       try {
         window.removeEventListener('keydown', onKeyDown)
-      } catch {}
+      } catch { }
     }
   }, [toolsOpen])
 
@@ -567,51 +567,51 @@ export default function StudentDashboard(props: Props) {
     }
     const supabase = createClient()
     let cancelled = false
-    ;(async () => {
-      try {
-        setCheckinsLoading(true)
-        const days = checkinsRange === '30d' ? 30 : 7
-        const startIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-        const { data, error } = await supabase
-          .from('workout_checkins')
-          .select('id, kind, created_at, energy, mood, soreness, notes, answers, workout_id, planned_workout_id')
-          .eq('user_id', uid)
-          .gte('created_at', startIso)
-          .order('created_at', { ascending: false })
-          .limit(400)
-        if (error) throw error
-        if (cancelled) return
-        const rows: WorkoutCheckinRow[] = (Array.isArray(data) ? data : [])
-          .filter((row) => isPlainRecord(row))
-          .map((row) => {
-            const toNumberOrStringOrNull = (v: unknown): number | string | null => {
-              if (v == null) return null
-              if (typeof v === 'number') return v
-              const s = String(v)
-              return s ? s : null
-            }
-            const answers = isPlainRecord(row.answers) ? row.answers : null
-            return {
-              id: row.id != null ? String(row.id) : undefined,
-              kind: row.kind != null ? String(row.kind) : undefined,
-              created_at: row.created_at != null ? String(row.created_at) : null,
-              energy: toNumberOrStringOrNull(row.energy),
-              mood: toNumberOrStringOrNull(row.mood),
-              soreness: toNumberOrStringOrNull(row.soreness),
-              notes: row.notes != null ? String(row.notes) : null,
-              answers,
-              workout_id: row.workout_id != null ? String(row.workout_id) : null,
-              planned_workout_id: row.planned_workout_id != null ? String(row.planned_workout_id) : null,
-            }
-          })
-        setCheckinsRows(rows)
-      } catch {
-        if (cancelled) return
-        setCheckinsRows([])
-      } finally {
-        if (!cancelled) setCheckinsLoading(false)
-      }
-    })()
+      ; (async () => {
+        try {
+          setCheckinsLoading(true)
+          const days = checkinsRange === '30d' ? 30 : 7
+          const startIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+          const { data, error } = await supabase
+            .from('workout_checkins')
+            .select('id, kind, created_at, energy, mood, soreness, notes, answers, workout_id, planned_workout_id')
+            .eq('user_id', uid)
+            .gte('created_at', startIso)
+            .order('created_at', { ascending: false })
+            .limit(400)
+          if (error) throw error
+          if (cancelled) return
+          const rows: WorkoutCheckinRow[] = (Array.isArray(data) ? data : [])
+            .filter((row) => isPlainRecord(row))
+            .map((row) => {
+              const toNumberOrStringOrNull = (v: unknown): number | string | null => {
+                if (v == null) return null
+                if (typeof v === 'number') return v
+                const s = String(v)
+                return s ? s : null
+              }
+              const answers = isPlainRecord(row.answers) ? row.answers : null
+              return {
+                id: row.id != null ? String(row.id) : undefined,
+                kind: row.kind != null ? String(row.kind) : undefined,
+                created_at: row.created_at != null ? String(row.created_at) : null,
+                energy: toNumberOrStringOrNull(row.energy),
+                mood: toNumberOrStringOrNull(row.mood),
+                soreness: toNumberOrStringOrNull(row.soreness),
+                notes: row.notes != null ? String(row.notes) : null,
+                answers,
+                workout_id: row.workout_id != null ? String(row.workout_id) : null,
+                planned_workout_id: row.planned_workout_id != null ? String(row.planned_workout_id) : null,
+              }
+            })
+          setCheckinsRows(rows)
+        } catch {
+          if (cancelled) return
+          setCheckinsRows([])
+        } finally {
+          if (!cancelled) setCheckinsLoading(false)
+        }
+      })()
     return () => {
       cancelled = true
     }
@@ -751,14 +751,14 @@ export default function StudentDashboard(props: Props) {
             onClick={() => {
               setCreatingWorkout(true)
               try {
-                try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch {}
+                try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
                 props.onCreateWorkout()
               } catch {
                 setCreatingWorkout(false)
               }
               try {
                 window.setTimeout(() => setCreatingWorkout(false), CREATE_WORKOUT_LOADING_TIMEOUT_MS)
-              } catch {}
+              } catch { }
             }}
             disabled={creatingWorkout}
             className="w-full min-h-[44px] bg-yellow-500 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 hover:bg-yellow-400 transition-transform active:scale-95 disabled:opacity-70"
@@ -824,7 +824,7 @@ export default function StudentDashboard(props: Props) {
               ) : null}
               <button
                 onClick={() => {
-                  try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch {}
+                  try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch { }
                   const items = visibleWorkouts
                     .map((w, idx) => {
                       const id = String(w?.id || '').trim()
@@ -848,128 +848,128 @@ export default function StudentDashboard(props: Props) {
                 >
                   Ferramentas
                 </button>
-                  {toolsOpen && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
-                      <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden text-neutral-300">
-                        <div className="p-2 space-y-1">
-                          <button
-                            onClick={() => {
-                              setToolsOpen(false)
-                              props.onCreateWorkout()
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
-                          >
-                            <span className="font-bold text-white">Criar automaticamente</span>
-                            <Sparkles size={16} className="text-yellow-500" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setToolsOpen(false)
-                              setCalendarOpen(true)
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
-                          >
-                            <span className="font-bold text-white">Calendário</span>
-                            <CalendarDays size={16} className="text-yellow-500" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setToolsOpen(false)
-                              setCheckinsOpen(true)
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
-                          >
-                            <span className="font-bold text-white">Check-ins</span>
-                            <Activity size={16} className="text-yellow-500" />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setToolsOpen(false)
-                              props.onOpenIronScanner()
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
-                          >
-                            <span className="font-bold text-white">Scanner de Treino (Imagem)</span>
-                            <span className="text-yellow-500">📷</span>
-                          </button>
-                          <button
-                            onClick={() => {
-                              setToolsOpen(false)
-                              props.onOpenJsonImport()
-                            }}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
-                          >
-                            <span className="font-bold text-white">Importar JSON</span>
-                            <span className="text-yellow-500">↵</span>
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setToolsOpen(false)
-                              if (typeof props.onNormalizeAiWorkoutTitles !== 'function') return
-                              try {
-                                setNormalizingAiTitles(true)
-                                await props.onNormalizeAiWorkoutTitles()
-                              } finally {
-                                setNormalizingAiTitles(false)
-                              }
-                            }}
-                            disabled={normalizingAiTitles}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
-                          >
-                            <span className="font-bold text-white">{normalizingAiTitles ? 'Padronizando...' : 'Padronizar nomes IA'}</span>
-                            {normalizingAiTitles ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Sparkles size={16} className="text-yellow-500" />}
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setToolsOpen(false)
-                              if (typeof props.onNormalizeExercises !== 'function') return
-                              try {
-                                setNormalizingExercises(true)
-                                await props.onNormalizeExercises()
-                              } finally {
-                                setNormalizingExercises(false)
-                              }
-                            }}
-                            disabled={normalizingExercises}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
-                          >
-                            <span className="font-bold text-white">{normalizingExercises ? 'Normalizando...' : 'Normalizar exercícios'}</span>
-                            {normalizingExercises ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">✦</span>}
-                          </button>
-                          <button
-                            onClick={async () => {
-                              setToolsOpen(false)
-                              if (typeof props.onApplyTitleRule !== 'function') return
-                              try {
-                                setApplyingTitleRule(true)
-                                await props.onApplyTitleRule()
-                              } finally {
-                                setApplyingTitleRule(false)
-                              }
-                            }}
-                            disabled={applyingTitleRule}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
-                          >
-                            <span className="font-bold text-white">{applyingTitleRule ? 'Aplicando...' : 'Padronizar títulos (A/B/C)'}</span>
-                            {applyingTitleRule ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">A</span>}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setToolsOpen(false)
-                              props.onExportAll()
-                            }}
-                            disabled={!!props.exportingAll}
-                            className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
-                          >
-                            <span className="text-neutral-200">{props.exportingAll ? 'Exportando...' : 'Exportar JSON'}</span>
-                            {props.exportingAll ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-neutral-500">↓</span>}
-                          </button>
-                        </div>
+                {toolsOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
+                    <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-neutral-800 rounded-xl shadow-2xl z-50 overflow-hidden text-neutral-300">
+                      <div className="p-2 space-y-1">
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            props.onCreateWorkout()
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Criar automaticamente</span>
+                          <Sparkles size={16} className="text-yellow-500" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            setCalendarOpen(true)
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Calendário</span>
+                          <CalendarDays size={16} className="text-yellow-500" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            setCheckinsOpen(true)
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Check-ins</span>
+                          <Activity size={16} className="text-yellow-500" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            props.onOpenIronScanner()
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Scanner de Treino (Imagem)</span>
+                          <span className="text-yellow-500">📷</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            props.onOpenJsonImport()
+                          }}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm"
+                        >
+                          <span className="font-bold text-white">Importar JSON</span>
+                          <span className="text-yellow-500">↵</span>
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setToolsOpen(false)
+                            if (typeof props.onNormalizeAiWorkoutTitles !== 'function') return
+                            try {
+                              setNormalizingAiTitles(true)
+                              await props.onNormalizeAiWorkoutTitles()
+                            } finally {
+                              setNormalizingAiTitles(false)
+                            }
+                          }}
+                          disabled={normalizingAiTitles}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{normalizingAiTitles ? 'Padronizando...' : 'Padronizar nomes IA'}</span>
+                          {normalizingAiTitles ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Sparkles size={16} className="text-yellow-500" />}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setToolsOpen(false)
+                            if (typeof props.onNormalizeExercises !== 'function') return
+                            try {
+                              setNormalizingExercises(true)
+                              await props.onNormalizeExercises()
+                            } finally {
+                              setNormalizingExercises(false)
+                            }
+                          }}
+                          disabled={normalizingExercises}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{normalizingExercises ? 'Normalizando...' : 'Normalizar exercícios'}</span>
+                          {normalizingExercises ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">✦</span>}
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setToolsOpen(false)
+                            if (typeof props.onApplyTitleRule !== 'function') return
+                            try {
+                              setApplyingTitleRule(true)
+                              await props.onApplyTitleRule()
+                            } finally {
+                              setApplyingTitleRule(false)
+                            }
+                          }}
+                          disabled={applyingTitleRule}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="font-bold text-white">{applyingTitleRule ? 'Aplicando...' : 'Padronizar títulos (A/B/C)'}</span>
+                          {applyingTitleRule ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-yellow-500">A</span>}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setToolsOpen(false)
+                            props.onExportAll()
+                          }}
+                          disabled={!!props.exportingAll}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg hover:bg-neutral-800 text-sm disabled:opacity-50"
+                        >
+                          <span className="text-neutral-200">{props.exportingAll ? 'Exportando...' : 'Exportar JSON'}</span>
+                          {props.exportingAll ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <span className="text-neutral-500">↓</span>}
+                        </button>
                       </div>
-                    </>
-                  )}
-                </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             {visibleWorkouts.length === 0 && (
@@ -1107,7 +1107,7 @@ export default function StudentDashboard(props: Props) {
                   </div>
                 </div>
 
-                <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5">
+                <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
                   <button
                     onClick={async (e) => {
                       e.stopPropagation()
@@ -1137,7 +1137,7 @@ export default function StudentDashboard(props: Props) {
                       await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
                     }}
                     disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                    className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
                   >
                     {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
                   </button>

@@ -27,7 +27,7 @@ if (typeof window !== 'undefined') {
 const LoginScreen = () => {
     const router = useRouter();
     useNativeAppSetup(null)
-    const appVersionLabel = useMemo(() => 'v1..0', []);
+    const appVersionLabel = useMemo(() => 'v1.0', []);
     // Lazy initializer: verifica localStorage SINCRONAMENTE no primeiro render.
     // Se houver backup de sessão (iOS cookie wipe), começa já com isLoading=true
     // para exibir o LoadingScreen antes de qualquer frame de login — elimina o flash.
@@ -39,7 +39,7 @@ const LoginScreen = () => {
                 const backup = JSON.parse(raw) as Record<string, unknown>
                 return !!(backup?.access_token && backup?.refresh_token)
             }
-        } catch {}
+        } catch { }
         return false
     });
     const [errorMsg, setErrorMsg] = useState('');
@@ -805,8 +805,8 @@ const LoginScreen = () => {
                             disabled={isLoading || (authMode === 'recover' && recoverCooldownLeft > 0)}
                             aria-label={
                                 authMode === 'login' ? 'Entrar na conta' :
-                                authMode === 'signup' ? 'Criar conta' :
-                                authMode === 'recover_code' ? 'Redefinir senha' : 'Enviar link de recuperação'
+                                    authMode === 'signup' ? 'Criar conta' :
+                                        authMode === 'recover_code' ? 'Redefinir senha' : 'Enviar link de recuperação'
                             }
                             aria-busy={isLoading}
                             className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-6 py-3.5 rounded-xl font-black text-lg shadow-lg hover:shadow-yellow-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"

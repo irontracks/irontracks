@@ -6,6 +6,13 @@ import type { ReactNode } from 'react';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { headers } from 'next/headers'
 import { ToastProvider } from '@/contexts/ToastContext'
+import { Inter } from 'next/font/google'
+
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
 
 export const metadata = {
   title: "IronTracks - Alta Performance",
@@ -320,7 +327,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           />
         ) : null}
       </head>
-      <body className="antialiased bg-neutral-950 text-white">
+      <body className={`${inter.variable} font-sans antialiased bg-neutral-950 text-white`}>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-yellow-500 focus:text-black focus:font-bold focus:rounded-xl focus:outline-none">
           Pular para conteúdo
         </a>
