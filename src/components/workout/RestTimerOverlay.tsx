@@ -387,13 +387,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     {/* Right side: label + buttons */}
                     <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-yellow-500 uppercase font-black tracking-widest mb-1">Recuperação</p>
-                        <p className="text-3xl font-mono font-black text-white tabular-nums leading-none">
-                            {formatDuration(baseSeconds)}
-                            {extraSeconds > 0 && (
-                                <span className="ml-1 text-base font-black text-green-400">{`(+${formatDuration(extraSeconds)})`}</span>
-                            )}
-                        </p>
-                        <div className="flex gap-2 mt-3">
+                        {extraSeconds > 0 && (
+                            <p className="text-sm font-black text-green-400 mb-2">{`+${formatDuration(extraSeconds)} além do planejado`}</p>
+                        )}
+                        <div className="flex gap-2 mt-1">
                             <button
                                 onClick={handleStart}
                                 className="flex-1 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-400 rounded-xl text-black font-black text-sm shadow-lg shadow-yellow-900/30 hover:shadow-yellow-500/40 transition-shadow active:scale-95"

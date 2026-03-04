@@ -113,14 +113,16 @@
 }
 
 /* ── Micro-animation: all buttons press down on tap ─────── */
+/* touch-action: manipulation prevents double-tap zoom without blocking scroll */
 button,
 [role="button"] {
-  transition: transform 0.1s ease, opacity 0.1s ease;
+  touch-action: manipulation;
 }
 
 button:active,
 [role="button"]:active {
   transform: scale(0.96);
+  transition: transform 0.08s ease;
 }
 
 /* Custom Utilities */
