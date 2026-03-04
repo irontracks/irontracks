@@ -450,12 +450,18 @@ export default function StoryViewer({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ storyId: story.id }),
       })
-      if (res.ok) {
+      const json = await res.json().catch(() => null)
+      if (res.ok && json?.ok) {
         onStoryDeleted(story.id)
         onClose()
+      } else {
+        const errMsg = json?.error || `Status ${res.status}`
+        console.error('[StoryViewer] delete failed:', res.status, json)
+        await alert(`Erro ao deletar: ${errMsg}`)
       }
-    } catch {
-      alert('Erro ao deletar story.')
+    } catch (e) {
+      console.error('[StoryViewer] delete exception:', e)
+      await alert('Erro ao deletar story. Verifique sua conexão.')
     } finally {
       setDeleting(false)
     }
