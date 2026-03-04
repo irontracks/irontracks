@@ -180,24 +180,29 @@ export default function HeaderActionsMenu({
 
   return (
     <div className="relative">
-      {/* Avatar trigger */}
+      {/* Avatar trigger — relative wrapper so badge can overflow outside the circle */}
       <button
         type="button"
         data-tour="header-menu"
         aria-label="Menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-yellow-500 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
+        className="relative w-10 h-10 rounded-full border-2 border-yellow-500 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
       >
-        {user?.photoURL ? (
-          <Image src={user.photoURL} width={40} height={40} className="w-full h-full object-cover" alt="Perfil" unoptimized />
-        ) : (
-          <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-sm">
-            {initial}
-          </div>
-        )}
-        {(hasUnreadChat || hasUnreadNotification) && (
-          <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-neutral-950 animate-pulse-fast" />
+        {/* Photo / initial — overflow-hidden applied only here */}
+        <div className="w-full h-full rounded-full overflow-hidden">
+          {user?.photoURL ? (
+            <Image src={user.photoURL} width={40} height={40} className="w-full h-full object-cover" alt="Perfil" unoptimized />
+          ) : (
+            <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-sm">
+              {initial}
+            </div>
+          )}
+        </div>
+
+        {/* Notification badge — outside overflow-hidden, only when menu is closed and there are unreads */}
+        {!open && (hasUnreadChat || hasUnreadNotification) && (
+          <span className="pointer-events-none absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-neutral-950 shadow-lg shadow-red-900/60 animate-pulse" />
         )}
       </button>
 
