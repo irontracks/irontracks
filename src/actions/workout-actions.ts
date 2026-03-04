@@ -722,3 +722,158 @@ export async function generateAssessmentPlanAi(input: unknown) {
 
   return { ok: true, plan, usedAi: false, reason: 'fallback' }
 }
+
+// ─── Consolidated report previous data (G1+G2 merged) ───────────────────────
+
+interface ReportPreviousParams {
+  userId: string
+  currentSessionId: string | null
+  currentDate: string | null
+  currentOriginId: string | null
+  currentTitle: string | null
+  exerciseNames: string[]
+}
+
+interface ReportPreviousResult {
+  previousSession: Record<string, unknown> | null
+  prevLogsByExercise: Record<string, unknown>
+  prevBaseMsByExercise: Record<string, number>
+}
+
+const parseNotesField = (notes: unknown): Record<string, unknown> | null => {
+  try {
+    if (typeof notes === 'string') {
+      const trimmed = notes.trim()
+      if (!trimmed) return null
+      return parseJsonWithSchema(trimmed, z.record(z.unknown()))
+    }
+    if (notes && typeof notes === 'object') return notes as Record<string, unknown>
+    return null
+  } catch { return null }
+}
+
+const extractDateMs = (v: unknown): number | null => {
+  try {
+    if (!v) return null
+    if (v instanceof Date) return Number.isFinite(v.getTime()) ? v.getTime() : null
+    const ms = new Date(v as string | number | Date).getTime()
+    return Number.isFinite(ms) ? ms : null
+  } catch { return null }
+}
+
+const extractLogsByExIdx = (parsed: Record<string, unknown>, exIdx: number): unknown[] => {
+  try {
+    const logs = parsed?.logs && typeof parsed.logs === 'object' ? (parsed.logs as Record<string, unknown>) : {}
+    const out: unknown[] = []
+    for (const key of Object.keys(logs)) {
+      const parts = key.split('-')
+      const eIdx = Number(parts[0])
+      const sIdx = Number(parts[1])
+      if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx) || eIdx !== exIdx) continue
+      out[sIdx] = logs[key]
+    }
+    return out
+  } catch { return [] }
+}
+
+const hasComparableLog = (logsArr: unknown[]): boolean => {
+  for (const l of logsArr) {
+    if (!l || typeof l !== 'object') continue
+    const obj = l as Record<string, unknown>
+    const w = Number(String(obj?.weight ?? '').replace(',', '.'))
+    const r = Number(String(obj?.reps ?? '').replace(',', '.'))
+    if ((Number.isFinite(w) && w > 0) || (Number.isFinite(r) && r > 0)) return true
+  }
+  return false
+}
+
+export async function getReportPreviousData(params: ReportPreviousParams): Promise<ReportPreviousResult> {
+  const empty: ReportPreviousResult = { previousSession: null, prevLogsByExercise: {}, prevBaseMsByExercise: {} }
+  try {
+    const { userId, currentSessionId, currentDate, currentOriginId, currentTitle, exerciseNames } = params
+    if (!userId) return empty
+    const supabase = createClient()
+
+    // Single query — 200 rows is enough for both previous session and per-exercise lookup
+    let query = supabase.from('workouts').select('id, date, created_at, notes, name')
+      .eq('user_id', userId).eq('is_template', false)
+      .order('date', { ascending: false }).limit(200)
+    if (currentSessionId) query = query.neq('id', currentSessionId)
+    const { data: rows, error } = await query
+    if (error) return empty
+    const candidates = Array.isArray(rows) ? rows : []
+
+    const currentMs = extractDateMs(currentDate)
+    const currentOriginIdStr = currentOriginId ? String(currentOriginId) : null
+    const currentTitleKey = currentTitle ? String(currentTitle).trim().toLowerCase() : ''
+
+    // Build wanted exercise keys
+    const wantedExercises = new Map<string, string>()
+    for (const name of exerciseNames) {
+      const trimmed = String(name || '').trim()
+      if (!trimmed) continue
+      const key = normalizeExerciseKey(trimmed)
+      if (key && !wantedExercises.has(key)) wantedExercises.set(key, trimmed)
+    }
+    const remainingExercises = new Set(Array.from(wantedExercises.keys()))
+
+    // Single pass through all candidates
+    let bestPreviousSession: Record<string, unknown> | null = null
+    let bestPreviousMs = -1
+    const resolvedLogs: Record<string, unknown> = {}
+    const resolvedBaseMs: Record<string, number> = {}
+
+    for (const r of candidates) {
+      if (!r || typeof r !== 'object') continue
+      const parsed = parseNotesField((r as Record<string, unknown>).notes)
+      if (!parsed) continue
+      const candidateMs = extractDateMs(parsed?.date) ?? extractDateMs((r as Record<string, unknown>)?.date) ?? extractDateMs((r as Record<string, unknown>)?.created_at) ?? null
+      if (typeof candidateMs !== 'number' || !Number.isFinite(candidateMs)) continue
+      if (typeof currentMs === 'number' && Number.isFinite(currentMs) && candidateMs >= currentMs) continue
+
+      // G1: Find best previous session (same workout)
+      if (!bestPreviousSession) {
+        const candOrigin = parsed?.originWorkoutId ?? parsed?.workoutId ?? null
+        const candTitle = String(parsed?.workoutTitle ?? parsed?.name ?? '').trim().toLowerCase()
+        const originMatch = !!(currentOriginIdStr && candOrigin && String(candOrigin) === currentOriginIdStr)
+        const titleMatch = !!(currentTitleKey && candTitle && currentTitleKey === candTitle)
+        if (originMatch || titleMatch) {
+          if (candidateMs > bestPreviousMs) {
+            bestPreviousMs = candidateMs
+            bestPreviousSession = { ...parsed, id: parsed?.id ?? (r as Record<string, unknown>)?.id ?? null }
+          }
+        }
+      }
+
+      // G2: Find per-exercise previous logs
+      if (remainingExercises.size > 0) {
+        const exArr = Array.isArray(parsed?.exercises) ? parsed.exercises as unknown[] : []
+        for (let exIdx = 0; exIdx < exArr.length; exIdx++) {
+          if (!remainingExercises.size) break
+          const ex = exArr[exIdx]
+          if (!ex || typeof ex !== 'object') continue
+          const exName = String((ex as Record<string, unknown>)?.name || '').trim()
+          if (!exName) continue
+          const key = normalizeExerciseKey(exName)
+          if (!key || !remainingExercises.has(key)) continue
+          const logs = extractLogsByExIdx(parsed, exIdx)
+          if (!hasComparableLog(logs)) continue
+          resolvedLogs[key] = logs
+          resolvedBaseMs[key] = candidateMs
+          remainingExercises.delete(key)
+        }
+      }
+
+      // Early exit if we have everything
+      if (bestPreviousSession && remainingExercises.size === 0) break
+    }
+
+    return {
+      previousSession: bestPreviousSession,
+      prevLogsByExercise: resolvedLogs,
+      prevBaseMsByExercise: resolvedBaseMs,
+    }
+  } catch {
+    return empty
+  }
+}
