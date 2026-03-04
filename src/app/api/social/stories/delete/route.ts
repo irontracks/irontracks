@@ -31,62 +31,45 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
-    const { data: story, error: sErr } = await admin
+    // ---- Primary: soft-delete via is_deleted flag (matches list API filter) ----
+    // Only allow the author to soft-delete their own stories
+    const { data: updated, error: updErr } = await admin
       .from('social_stories')
-      .select('*')
+      .update({ is_deleted: true })
       .eq('id', storyId)
+      .eq('author_id', auth.user.id)
+      .select('id, media_path')
       .maybeSingle()
 
-    if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 })
-    if (!story?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
-
-    const authorId = String(story.author_id || '').trim()
-    if (!authorId || authorId !== String(auth.user.id || '').trim()) {
-      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    if (updErr) {
+      return NextResponse.json({ ok: false, error: updErr.message }, { status: 400 })
     }
 
-    const mediaPath = String(story.media_path || '').trim()
-    const { data: likes } = await admin.from('social_story_likes').select('*').eq('story_id', storyId).limit(2000)
-    const { data: comments } = await admin.from('social_story_comments').select('*').eq('story_id', storyId).limit(2000)
-    const { data: views } = await admin.from('social_story_views').select('*').eq('story_id', storyId).limit(2000)
+    // Fallback: if soft-delete didn't match (is_deleted column might not exist or
+    // the row was already hard-deleted), try a hard DELETE as last resort
+    if (!updated?.id) {
+      const { error: hardErr, count } = await admin
+        .from('social_stories')
+        .delete({ count: 'exact' })
+        .eq('id', storyId)
+        .eq('author_id', auth.user.id)
 
-    // Soft-delete backup & audit — best-effort, must never block actual deletion
-    try {
-      await admin.from('soft_delete_bin').insert({
-        deleted_by: auth.user.id,
-        delete_reason: 'user_manual_delete',
-        entity_type: 'social_story',
-        entity_id: storyId,
-        payload: { story, likes: likes || [], comments: comments || [], views: views || [] },
-        media_paths: mediaPath ? [mediaPath] : [],
-      })
-    } catch { }
+      if (hardErr) {
+        return NextResponse.json({ ok: false, error: hardErr.message }, { status: 400 })
+      }
+      if (!count || count === 0) {
+        return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+      }
+    }
 
-    try {
-      await admin.from('audit_events').insert({
-        actor_id: auth.user.id,
-        actor_email: String(auth.user.email || '').trim() || null,
-        actor_role: 'user',
-        action: 'social_story_delete',
-        entity_type: 'social_story',
-        entity_id: storyId,
-        metadata: { mediaPath: mediaPath || null },
-      })
-    } catch { }
-
+    // Best-effort cleanup — none of these should block success
+    const mediaPath = String(updated?.media_path || '').trim()
     if (mediaPath) {
-      try {
-        await admin.storage.from('social-stories').remove([mediaPath])
-      } catch { }
+      try { await admin.storage.from('social-stories').remove([mediaPath]) } catch { }
     }
-
-    // Cleanup related records — best-effort
     try { await admin.from('social_story_views').delete().eq('story_id', storyId) } catch { }
     try { await admin.from('social_story_likes').delete().eq('story_id', storyId) } catch { }
     try { await admin.from('social_story_comments').delete().eq('story_id', storyId) } catch { }
-
-    const { error: dErr } = await admin.from('social_stories').delete().eq('id', storyId)
-    if (dErr) return NextResponse.json({ ok: false, error: dErr.message }, { status: 400 })
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
