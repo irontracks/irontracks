@@ -593,36 +593,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                             onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowStory(true); }}
                             className="min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
                         >
-                            <span className="text-xs uppercase tracking-widest">Foto</span>
+                            <span className="text-xs uppercase tracking-widest">Storie</span>
                         </button>
                     </div>
-                    {storiesV2Enabled && showStoryPrompt && !showStory ? (
-                        <div className="max-w-4xl mx-auto mt-3">
-                            <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">1 clique</div>
-                                    <div className="text-sm font-black text-white">Quer criar um story deste treino agora?</div>
-                                    <div className="text-xs text-neutral-300">Gera a arte e você escolhe publicar ou só compartilhar.</div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => { setShowStoryPrompt(false); setShowStory(true); }}
-                                        className="min-h-[40px] px-4 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-colors"
-                                    >
-                                        Criar story
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowStoryPrompt(false)}
-                                        className="min-h-[40px] px-4 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 transition-colors"
-                                    >
-                                        Agora não
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ) : null}
+
                 </div>
             </div>
 
