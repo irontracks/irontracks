@@ -1051,7 +1051,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     }}
                                     onBulkEditWorkouts={handleBulkEditWorkouts}
                                     currentUserId={String(user?.id || initialUserObj?.id || '')}
-                                    userRole={String(user?.role || '').toLowerCase()}
                                     exportingAll={Boolean(exportingAll)}
                                     onExportAll={handleExportAllWorkouts}
                                     streakStats={streakStats}
