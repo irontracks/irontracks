@@ -1087,7 +1087,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       if (typeof props?.onStartTimer !== 'function') return;
       const s = Number(seconds);
       if (!Number.isFinite(s) || s <= 0) return;
-      props.onStartTimer(s, context);
+      // Auto-inject exerciseName from key ("exIdx-setIdx") if not already provided
+      const ctx = isObject(context) ? { ...(context as Record<string, unknown>) } : {};
+      if (!ctx.exerciseName) {
+        const key = String(ctx.key || '').trim();
+        const exIdx = key ? Number(key.split('-')[0]) : NaN;
+        if (Number.isFinite(exIdx) && exIdx >= 0 && exercises[exIdx]) {
+          ctx.exerciseName = String(exercises[exIdx]?.name || '').trim() || undefined;
+        }
+      }
+      props.onStartTimer(s, ctx);
     } catch { }
   };
 

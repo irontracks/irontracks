@@ -202,7 +202,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     useEffect(() => {
         const off = onNativeNotificationAction((actionId) => {
             if (!actionId) return
-            if (actionId === 'SKIP_REST') {
+            if (actionId === 'SKIP_REST' || actionId === 'START_REST') {
                 handleCloseTimer()
                 return
             }
