@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { createRef } from 'react'
-import { WorkoutHeader } from '@/components/ExerciseEditor/WorkoutHeader'
+import { WorkoutHeader } from '@/components/ExerciseEditor/EditorHeader'
 
 const noop = () => { }
 
