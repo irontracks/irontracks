@@ -10,6 +10,7 @@ import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications
 interface RestTimerContext {
     kind?: string;
     exerciseId?: string;
+    exerciseName?: string;
     setId?: string;
 }
 
@@ -195,6 +196,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
         try {
             const seconds = Math.max(1, Math.ceil((targetTime - Date.now()) / 1000));
+            const exerciseName = String(context?.exerciseName || '').trim();
+            const liveTitle = exerciseName ? exerciseName : 'Descanso';
+            const notifyTitle = exerciseName ? `⏰ Próximo: ${exerciseName}` : '⏰ Tempo Esgotado!';
+            const notifyBody = exerciseName ? 'Hora de iniciar a próxima série!' : 'Hora de voltar para o treino!';
             const shouldNotify = (allowNotify || (isIosNative() && soundsEnabled)) && seconds > 0;
             if (shouldNotify) {
                 requestNativeNotifications().then((res) => {
@@ -204,10 +209,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     const maxCount = continuousAlarm ? 120 : repeatMaxCount;
                     const byDuration = Math.ceil(maxSeconds / notifyEverySeconds);
                     const notifyCount = repeatAlarm ? Math.max(0, Math.min(maxCount, byDuration)) : 0;
-                    scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!', notifyCount, notifyEverySeconds);
+                    scheduleRestNotification(id, seconds, notifyTitle, notifyBody, notifyCount, notifyEverySeconds);
                 }).catch(() => { });
             }
-            startRestLiveActivity(id, seconds, 'Descanso');
+            startRestLiveActivity(id, seconds, liveTitle);
             setIdleTimerDisabled(true);
         } catch { }
 

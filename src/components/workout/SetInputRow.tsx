@@ -195,7 +195,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
               }
               updateLog(key, { done: nextDone, ...timingPatch, advanced_config: cfg ?? log.advanced_config ?? null });
               if (nextDone && restTime && restTime > 0) {
-                startTimer(restTime, { kind: 'rest', key });
+                startTimer(restTime, { kind: 'rest', key, exerciseName: String(ex?.name || '').trim() });
               }
             }}
             className={[
