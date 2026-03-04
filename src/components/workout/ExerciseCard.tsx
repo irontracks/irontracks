@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowDown, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import {
   NormalSet,
@@ -56,6 +56,12 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
   const videoUrl = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
   const isReportLoading = reportHistoryStatus?.status === 'loading' && reportHistoryLoadingRef.current;
+
+  // Compute whether all sets in this exercise are marked done
+  const allSetsDone = setsCount > 0 && Array.from({ length: setsCount }).every((_, setIdx) => {
+    const log = getLog(`${exIdx}-${setIdx}`);
+    return !!log.done;
+  });
 
   // Parse SST config from exercise description (e.g. "SST na última: Falha > 10s > Falha > 10s > Falha")
   const parsedSSTConfig = (() => {
@@ -175,7 +181,12 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
   };
 
   return (
-    <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800/80 p-4 shadow-[0_10px_28px_rgba(0,0,0,0.35)]">
+    <div className={[
+      'rounded-2xl bg-neutral-900/70 border p-4 shadow-[0_10px_28px_rgba(0,0,0,0.35)] transition-all duration-300',
+      allSetsDone
+        ? 'border-emerald-500/40 shadow-[0_0_20px_-4px_rgba(52,211,153,0.18)]'
+        : 'border-neutral-800/80',
+    ].join(' ')}>
       <div
         role="button"
         tabIndex={0}
@@ -197,8 +208,15 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
       >
         <div className="min-w-0 text-left flex-1">
           <div className="flex items-center gap-2 min-w-0">
-            <Dumbbell size={16} className="text-yellow-500" />
-            <h3 className="font-black text-white truncate flex-1">{name}</h3>
+            {allSetsDone ? (
+              <div className="relative flex-shrink-0">
+                <CheckCircle2 size={18} className="text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
+                <span className="absolute inset-0 rounded-full animate-ping bg-emerald-400/20" />
+              </div>
+            ) : (
+              <Dumbbell size={16} className="text-yellow-500" />
+            )}
+            <h3 className={['font-black truncate flex-1', allSetsDone ? 'text-emerald-300' : 'text-white'].join(' ')}>{name}</h3>
             {collapsedNow ? <ChevronDown size={18} className="text-neutral-400" /> : <ChevronUp size={18} className="text-neutral-400" />}
           </div>
           <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
