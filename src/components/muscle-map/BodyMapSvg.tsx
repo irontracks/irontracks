@@ -19,27 +19,30 @@ type Props = {
   calibrationMode?: boolean
 }
 
-function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: MuscleId | null, showAll?: boolean, intensity: number = 0.9) {
+function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: MuscleId | null, showAll?: boolean, intensity: number = 0.72) {
   const m = muscles?.[id] || {}
   const isSelected = selected === id
+  const hasColor = Boolean(m.color)
 
-  let fillAlpha = m.color ? String(intensity) : '0.0'
+  let fillAlpha = hasColor ? String(intensity) : '0.0'
   let fill = m.color || 'transparent'
 
   if (showAll) {
-    fillAlpha = String(intensity > 0.6 ? intensity - 0.2 : intensity)
-    fill = m.color || '#ef4444'
+    fillAlpha = String(intensity > 0.6 ? intensity - 0.15 : intensity)
+    fill = m.color || '#f59e0b'
   }
 
   return {
     fill,
     fillOpacity: fillAlpha,
-    stroke: showAll ? 'rgba(255,255,255,0.6)' : 'transparent',
+    stroke: showAll ? 'rgba(255,255,255,0.5)' : 'transparent',
     strokeWidth: showAll ? 1 : 0,
     className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-100',
     style: {
-      mixBlendMode: (showAll ? 'normal' : 'multiply') as React.CSSProperties['mixBlendMode'],
-      filter: isSelected && !showAll ? 'drop-shadow(0 0 6px rgba(245,158,11,0.8)) blur(3.5px)' : (showAll ? 'none' : 'blur(3.5px)'),
+      mixBlendMode: (showAll ? 'normal' : 'screen') as React.CSSProperties['mixBlendMode'],
+      filter: isSelected && !showAll
+        ? 'drop-shadow(0 0 8px rgba(245,158,11,0.9)) blur(5px)'
+        : showAll ? 'none' : 'blur(5px)',
       transformOrigin: 'auto'
     }
   }

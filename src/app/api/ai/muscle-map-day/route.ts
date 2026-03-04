@@ -108,13 +108,13 @@ const parseEffortFactor = (log: unknown) => {
 
 const colorForRatio = (ratio: number) => {
   const r = Number.isFinite(ratio) ? ratio : 0
-  if (r <= 0) return '#1a2744'       // sem treino: azul-marinho escuro
-  if (r <= 0.25) return '#1e3a5f'    // muito baixo: azul escuro
-  if (r <= 0.5) return '#1d4ed8'     // baixo: azul
-  if (r <= 0.75) return '#0ea5e9'    // abaixo da meta: azul-claro
-  if (r <= 1.0) return '#f59e0b'     // na meta: amarelo dourado
-  if (r <= 1.3) return '#f97316'     // levemente acima: laranja
-  return '#ef4444'                   // muito acima: vermelho
+  if (r <= 0) return ''           // sem treino: transparente
+  if (r <= 0.25) return '#fde68a'   // muito baixo: amarelo suave
+  if (r <= 0.5) return '#fbbf24'   // baixo: amarelo
+  if (r <= 0.75) return '#f59e0b'   // moderado: âmbar
+  if (r <= 1.0) return '#ea580c'   // na meta: laranja
+  if (r <= 1.3) return '#dc2626'   // alto: vermelho
+  return '#991b1b'                   // muito alto: vermelho escuro
 }
 
 const normalizeAiExerciseMap = (obj: unknown) => {

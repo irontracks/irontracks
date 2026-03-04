@@ -557,7 +557,7 @@ export default function MuscleMapCard(props: Props) {
                 <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] font-black uppercase tracking-widest">
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
                     <div className="text-neutral-500">Baixo</div>
-                    <div className="h-2 rounded-full mt-1 bg-[#1d4ed8]" />
+                    <div className="h-2 rounded-full mt-1 bg-[#fbbf24]" />
                   </div>
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
                     <div className="text-neutral-500">Na meta</div>
@@ -565,11 +565,11 @@ export default function MuscleMapCard(props: Props) {
                   </div>
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
                     <div className="text-neutral-500">Alto</div>
-                    <div className="h-2 rounded-full mt-1 bg-[#f97316]" />
+                    <div className="h-2 rounded-full mt-1 bg-[#ea580c]" />
                   </div>
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
                     <div className="text-neutral-500">Acima</div>
-                    <div className="h-2 rounded-full mt-1 bg-[#ef4444]" />
+                    <div className="h-2 rounded-full mt-1 bg-[#dc2626]" />
                   </div>
                 </div>
               </motion.div>
@@ -727,9 +727,10 @@ export default function MuscleMapCard(props: Props) {
                   </button>
                 ))}
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          </motion.div >
+        )
+        }
+      </AnimatePresence >
+    </div >
   )
 }
