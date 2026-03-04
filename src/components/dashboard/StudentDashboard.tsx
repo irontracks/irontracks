@@ -240,6 +240,7 @@ type Props = {
     badges: { id: string; label: string; kind: string }[]
   } | null
   streakLoading?: boolean
+  userRole?: string | null
 }
 
 const isPeriodizedWorkout = (w: DashboardWorkout) =>
@@ -745,7 +746,7 @@ export default function StudentDashboard(props: Props) {
             />
           )}
 
-          <MuscleMapCard onOpenWizard={props.onCreateWorkout} />
+          <MuscleMapCard onOpenWizard={props.onCreateWorkout} userRole={props.userRole} />
 
           <button
             onClick={() => {
