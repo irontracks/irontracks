@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { cacheDeletePattern } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,10 @@ export async function POST(req: Request) {
     try { await admin.from('social_story_views').delete().eq('story_id', storyId) } catch { }
     try { await admin.from('social_story_likes').delete().eq('story_id', storyId) } catch { }
     try { await admin.from('social_story_comments').delete().eq('story_id', storyId) } catch { }
+
+    // Invalidate stories list cache for all users so the deleted story
+    // disappears immediately on next load (cache TTL is 120s)
+    try { await cacheDeletePattern('social:stories:list:*') } catch { }
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
