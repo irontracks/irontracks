@@ -1,4 +1,4 @@
-import { type FinishWorkoutInput } from '@/schemas/workout'
+import { type FinishWorkoutInput } from '@/types/workout'
 
 type AnyRecord = Record<string, unknown>
 
