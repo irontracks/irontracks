@@ -512,7 +512,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const ai = aiState?.result && typeof aiState.result === 'object' ? (aiState.result as AnyObj) : null
 
     return (
-        <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white flex flex-col">
+        <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white overflow-y-auto">
             {/* 8.1 — Celebration Splash Overlay */}
             {showSplash && (
                 <div
@@ -557,7 +557,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     </div>
                 </div>
             )}
-            <div className={`sticky top-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-4 md:px-6 pt-safe pb-3 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+            {/* Fixed header bar */}
+            <div className={`fixed top-0 left-0 right-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-4 md:px-6 pt-safe pb-3 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
                     <button
                         onClick={onClose}
@@ -627,256 +628,255 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         </div>
                     ) : null}
                 </div>
+            </div>
 
-                <div className="flex-1 overflow-y-auto bg-neutral-950" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
-                    <div ref={reportRef} className="min-h-screen bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto">
-                        <div className="pb-8 mb-8">
-                            <div className="flex items-start justify-between gap-6">
-                                <div className="min-w-0">
-                                    <div className="flex flex-col">
-                                        <div className="text-xl font-black tracking-tight leading-none">
-                                            <span className="text-neutral-100">IRON</span>
-                                            <span className="text-yellow-500">TRACKS</span>
-                                        </div>
-                                        <div className="mt-1 text-[9px] font-black uppercase tracking-[0.24em] text-neutral-400 leading-none">
-                                            Relatório de Performance
-                                        </div>
-                                    </div>
-
-                                    <div className="mt-4 min-w-0">
-                                        <h1 className="text-4xl sm:text-5xl font-black uppercase leading-tight tracking-tight text-white text-balance break-normal hyphens-none">
-                                            {workoutTitleMain}
-                                        </h1>
-                                    </div>
+            {/* Report content — starts below fixed header with pt for safe offset */}
+            <div ref={reportRef} className="bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 80px)' }}>
+                <div className="pb-8 mb-8">
+                    <div className="flex items-start justify-between gap-6">
+                        <div className="min-w-0">
+                            <div className="flex flex-col">
+                                <div className="text-xl font-black tracking-tight leading-none">
+                                    <span className="text-neutral-100">IRON</span>
+                                    <span className="text-yellow-500">TRACKS</span>
                                 </div>
-
-                                <div className="shrink-0 text-right">
-                                    <div className="font-mono text-xs font-semibold text-neutral-300">
-                                        {formatDate(safeSession?.date)}
-                                    </div>
+                                <div className="mt-1 text-[9px] font-black uppercase tracking-[0.24em] text-neutral-400 leading-none">
+                                    Relatório de Performance
                                 </div>
                             </div>
 
-                            <div className="relative mt-6">
-                                <div className="h-px bg-neutral-800" />
-                                <div className="absolute left-0 top-0 h-px w-28 bg-yellow-500" />
+                            <div className="mt-4 min-w-0">
+                                <h1 className="text-4xl sm:text-5xl font-black uppercase leading-tight tracking-tight text-white text-balance break-normal hyphens-none">
+                                    {workoutTitleMain}
+                                </h1>
                             </div>
                         </div>
 
-                        {reportMeta && (
-                            <ReportMetricsPanel
-                                reportTotals={reportTotals}
-                                reportRest={reportRest}
-                                reportWeekly={reportWeekly}
-                                reportLoadFlags={reportLoadFlags}
-                            />
-                        )}
-
-                        {muscleTrend.status === 'ready' && muscleTrend.data && (
-                            <MuscleTrendPanel data={muscleTrend.data} muscleById={MUSCLE_BY_ID} />
-                        )}
-
-                        {muscleTrend4w.status === 'ready' && muscleTrend4w.data && (
-                            <MuscleTrend4wPanel
-                                data={muscleTrend4w.data}
-                                muscleById={MUSCLE_BY_ID}
-                                buildSparklinePoints={buildSparklinePoints}
-                            />
-                        )}
-
-                        {exerciseTrend.status === 'ready' && exerciseTrend.data && exerciseTrend.data.series.length > 0 && (
-                            <ExerciseTrendPanel data={exerciseTrend.data} buildSparklinePoints={buildSparklinePoints} />
-                        )}
-
-                        {reportMeta && Array.isArray(reportMeta.exercises) && reportMeta.exercises.length > 0 && (
-                            <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
-                                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                                    <div className="min-w-0">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Ordem e execução</div>
-                                        <div className="text-lg font-black text-white">Detalhe por exercício</div>
-                                        <div className="text-xs text-neutral-300">Ordem, descanso e volume executado.</div>
-                                    </div>
-                                </div>
-                                <div className="mt-4 overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
-                                            <tr>
-                                                <th className="px-3 py-2">#</th>
-                                                <th className="px-3 py-2">Exercício</th>
-                                                <th className="px-3 py-2 text-center">Séries</th>
-                                                <th className="px-3 py-2 text-center">Reps</th>
-                                                <th className="px-3 py-2 text-center">Execução</th>
-                                                <th className="px-3 py-2 text-center">Descanso (real)</th>
-                                                <th className="px-3 py-2 text-center">Descanso (plan)</th>
-                                                <th className="px-3 py-2 text-right">Peso médio</th>
-                                                <th className="px-3 py-2 text-right">Volume</th>
-                                                <th className="px-3 py-2 text-right">Δ Volume</th>
-                                                <th className="px-3 py-2 text-right">Δ Reps</th>
-                                                <th className="px-3 py-2 text-right">Δ Peso</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-neutral-800">
-                                            {(reportMeta.exercises as unknown[]).map((raw, idx) => {
-                                                const ex = raw && typeof raw === 'object' ? (raw as AnyObj) : null
-                                                if (!ex) return null
-                                                const name = String(ex.name || '').trim() || '—'
-                                                const order = Number(ex.order || idx + 1)
-                                                const setsDone = Number(ex.setsDone || 0)
-                                                const repsDone = Number(ex.repsDone || 0)
-                                                const executionMinutes = Number(ex.executionMinutes || 0)
-                                                const restMinutes = Number(ex.restMinutes || 0)
-                                                const rest = Number(ex.restTimePlannedSec || 0)
-                                                const avgWeight = Number(ex.avgWeightKg || 0)
-                                                const volume = Number(ex.volumeKg || 0)
-                                                const deltaVolume = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).volumeKg) : NaN
-                                                const deltaReps = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).reps) : NaN
-                                                const deltaWeight = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).avgWeightKg) : NaN
-                                                const deltaVolumeLabel = Number.isFinite(deltaVolume) ? `${deltaVolume > 0 ? '+' : ''}${deltaVolume.toFixed(1)} kg` : '—'
-                                                const deltaRepsLabel = Number.isFinite(deltaReps) ? `${deltaReps > 0 ? '+' : ''}${Math.round(deltaReps)}` : '—'
-                                                const deltaWeightLabel = Number.isFinite(deltaWeight) ? `${deltaWeight > 0 ? '+' : ''}${deltaWeight.toFixed(1)} kg` : '—'
-                                                const deltaVolumeClass = Number.isFinite(deltaVolume) && deltaVolume < 0 ? 'text-red-300' : 'text-emerald-300'
-                                                const deltaRepsClass = Number.isFinite(deltaReps) && deltaReps < 0 ? 'text-red-300' : 'text-emerald-300'
-                                                const deltaWeightClass = Number.isFinite(deltaWeight) && deltaWeight < 0 ? 'text-red-300' : 'text-emerald-300'
-                                                return (
-                                                    <tr key={`${name}-${idx}`} className="hover:bg-neutral-800/40">
-                                                        <td className="px-3 py-2 font-mono text-neutral-300">{Number.isFinite(order) ? order : idx + 1}</td>
-                                                        <td className="px-3 py-2 font-semibold text-white">{name}</td>
-                                                        <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(setsDone) && setsDone > 0 ? setsDone : '—'}</td>
-                                                        <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(repsDone) && repsDone > 0 ? repsDone : '—'}</td>
-                                                        <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(executionMinutes) && executionMinutes > 0 ? `${executionMinutes.toFixed(1)} min` : '—'}</td>
-                                                        <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(restMinutes) && restMinutes > 0 ? `${restMinutes.toFixed(1)} min` : '—'}</td>
-                                                        <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(rest) && rest > 0 ? `${Math.round(rest)}s` : '—'}</td>
-                                                        <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(avgWeight) && avgWeight > 0 ? `${avgWeight.toFixed(1)} kg` : '—'}</td>
-                                                        <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(volume) && volume > 0 ? `${volume.toLocaleString('pt-BR')} kg` : '—'}</td>
-                                                        <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
-                                                        <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
-                                                        <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
+                        <div className="shrink-0 text-right">
+                            <div className="font-mono text-xs font-semibold text-neutral-300">
+                                {formatDate(safeSession?.date)}
                             </div>
-                        )}
-
-                        <ReportCheckinPanel
-                            preCheckin={preCheckin}
-                            postCheckin={postCheckin}
-                            recommendations={checkinRecommendations}
-                        />
-
-                        <ReportAiSection
-                            ai={ai}
-                            aiState={{ loading: aiState.loading, error: aiState.error, cached: aiState.cached }}
-                            credits={credits}
-                            applyState={applyState}
-                            onGenerateAi={handleGenerateAi}
-                            onApplyProgression={handleApplyProgression}
-                            onOpenChat={() => setShowCoachChat(true)}
-                            renderAiRating={renderAiRating}
-                        />
-
-                        {isTeamSession && (
-                            <div className="mb-8 p-4 rounded-lg border border-neutral-800 bg-neutral-900/60 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center">
-                                        <Users size={18} />
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">Treino em Equipe</p>
-                                        <p className="text-sm font-semibold text-neutral-100">
-                                            {partners.length === 1 ? '1 parceiro treinando com você' : `${partners.length} parceiros treinando com você`}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {partners.map((p: unknown, idx: number) => {
-                                        const part = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
-                                        return (
-                                            <button
-                                                key={String(part.uid || part.id || idx)}
-                                                onClick={() => handlePartnerPlan(part)}
-                                                className="px-3 py-2 rounded-full bg-black text-white text-xs font-bold uppercase tracking-wide hover:bg-neutral-900"
-                                            >
-                                                Ver PDF de {String(part.name || 'Parceiro')}
-                                            </button>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        <ReportSummaryCards
-                            session={safeSession}
-                            currentVolume={currentVolume}
-                            volumeDelta={volumeDelta}
-                            calories={calories}
-                            outdoorBike={outdoorBike}
-                            hasPreviousSession={!!effectivePreviousSession}
-                        />
-
-                        <div className="space-y-8">
-                            {exercisesList.length === 0 && (
-                                <div className="text-neutral-300 p-4 bg-neutral-900/60 rounded-lg border border-neutral-800">
-                                    Nenhum dado de exercício registrado para este treino.
-                                </div>
-                            )}
-                            {exercisesList.map((ex, exIdx) => {
-                                const obj = (ex && typeof ex === 'object' ? ex as Record<string, unknown> : {}) as Record<string, unknown>;
-                                const exKey = normalizeExerciseKey(obj?.name);
-                                return (
-                                    <ReportExerciseCard
-                                        key={exIdx}
-                                        exercise={obj}
-                                        exIdx={exIdx}
-                                        sessionLogs={sessionLogs}
-                                        prevLogs={(Array.isArray(prevLogsMap[exKey]) ? prevLogsMap[exKey] : []) as unknown[]}
-                                        baseMs={prevBaseMsMap[exKey] ?? null}
-                                    />
-                                );
-                            })}
                         </div>
-                        <div className="mt-12 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-400 uppercase tracking-widest">
-                            IronTracks System • {getCurrentDate()}
-                        </div>
+                    </div>
+
+                    <div className="relative mt-6">
+                        <div className="h-px bg-neutral-800" />
+                        <div className="absolute left-0 top-0 h-px w-28 bg-yellow-500" />
                     </div>
                 </div>
 
-                {pdfUrl && (
-                    <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur flex flex-col">
-                        <div className="p-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between h-16 pt-safe">
-                            <h3 className="text-white font-bold">Pré-visualização</h3>
-                            <button onClick={closePreview} className="bg-neutral-800 text-white px-4 py-2 rounded-lg font-bold border border-neutral-700 hover:bg-neutral-700">Fechar</button>
+                {reportMeta && (
+                    <ReportMetricsPanel
+                        reportTotals={reportTotals}
+                        reportRest={reportRest}
+                        reportWeekly={reportWeekly}
+                        reportLoadFlags={reportLoadFlags}
+                    />
+                )}
+
+                {muscleTrend.status === 'ready' && muscleTrend.data && (
+                    <MuscleTrendPanel data={muscleTrend.data} muscleById={MUSCLE_BY_ID} />
+                )}
+
+                {muscleTrend4w.status === 'ready' && muscleTrend4w.data && (
+                    <MuscleTrend4wPanel
+                        data={muscleTrend4w.data}
+                        muscleById={MUSCLE_BY_ID}
+                        buildSparklinePoints={buildSparklinePoints}
+                    />
+                )}
+
+                {exerciseTrend.status === 'ready' && exerciseTrend.data && exerciseTrend.data.series.length > 0 && (
+                    <ExerciseTrendPanel data={exerciseTrend.data} buildSparklinePoints={buildSparklinePoints} />
+                )}
+
+                {reportMeta && Array.isArray(reportMeta.exercises) && reportMeta.exercises.length > 0 && (
+                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0">
+                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Ordem e execução</div>
+                                <div className="text-lg font-black text-white">Detalhe por exercício</div>
+                                <div className="text-xs text-neutral-300">Ordem, descanso e volume executado.</div>
+                            </div>
                         </div>
-                        <div className="flex-1 bg-white">
-                            <iframe ref={pdfFrameRef} src={pdfUrl} className="w-full h-full" />
-                        </div>
-                        <div className="p-4 bg-neutral-900 border-t border-neutral-800 flex items-center justify-end gap-2 pb-safe">
-                            <button onClick={handleShare} className="bg-neutral-800 text-white px-4 py-2 rounded-lg">Compartilhar</button>
-                            <button onClick={handlePrintIframe} className="bg-yellow-500 text-black px-4 py-2 rounded-lg font-bold">Imprimir</button>
+                        <div className="mt-4 overflow-x-auto">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
+                                    <tr>
+                                        <th className="px-3 py-2">#</th>
+                                        <th className="px-3 py-2">Exercício</th>
+                                        <th className="px-3 py-2 text-center">Séries</th>
+                                        <th className="px-3 py-2 text-center">Reps</th>
+                                        <th className="px-3 py-2 text-center">Execução</th>
+                                        <th className="px-3 py-2 text-center">Descanso (real)</th>
+                                        <th className="px-3 py-2 text-center">Descanso (plan)</th>
+                                        <th className="px-3 py-2 text-right">Peso médio</th>
+                                        <th className="px-3 py-2 text-right">Volume</th>
+                                        <th className="px-3 py-2 text-right">Δ Volume</th>
+                                        <th className="px-3 py-2 text-right">Δ Reps</th>
+                                        <th className="px-3 py-2 text-right">Δ Peso</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-neutral-800">
+                                    {(reportMeta.exercises as unknown[]).map((raw, idx) => {
+                                        const ex = raw && typeof raw === 'object' ? (raw as AnyObj) : null
+                                        if (!ex) return null
+                                        const name = String(ex.name || '').trim() || '—'
+                                        const order = Number(ex.order || idx + 1)
+                                        const setsDone = Number(ex.setsDone || 0)
+                                        const repsDone = Number(ex.repsDone || 0)
+                                        const executionMinutes = Number(ex.executionMinutes || 0)
+                                        const restMinutes = Number(ex.restMinutes || 0)
+                                        const rest = Number(ex.restTimePlannedSec || 0)
+                                        const avgWeight = Number(ex.avgWeightKg || 0)
+                                        const volume = Number(ex.volumeKg || 0)
+                                        const deltaVolume = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).volumeKg) : NaN
+                                        const deltaReps = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).reps) : NaN
+                                        const deltaWeight = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).avgWeightKg) : NaN
+                                        const deltaVolumeLabel = Number.isFinite(deltaVolume) ? `${deltaVolume > 0 ? '+' : ''}${deltaVolume.toFixed(1)} kg` : '—'
+                                        const deltaRepsLabel = Number.isFinite(deltaReps) ? `${deltaReps > 0 ? '+' : ''}${Math.round(deltaReps)}` : '—'
+                                        const deltaWeightLabel = Number.isFinite(deltaWeight) ? `${deltaWeight > 0 ? '+' : ''}${deltaWeight.toFixed(1)} kg` : '—'
+                                        const deltaVolumeClass = Number.isFinite(deltaVolume) && deltaVolume < 0 ? 'text-red-300' : 'text-emerald-300'
+                                        const deltaRepsClass = Number.isFinite(deltaReps) && deltaReps < 0 ? 'text-red-300' : 'text-emerald-300'
+                                        const deltaWeightClass = Number.isFinite(deltaWeight) && deltaWeight < 0 ? 'text-red-300' : 'text-emerald-300'
+                                        return (
+                                            <tr key={`${name}-${idx}`} className="hover:bg-neutral-800/40">
+                                                <td className="px-3 py-2 font-mono text-neutral-300">{Number.isFinite(order) ? order : idx + 1}</td>
+                                                <td className="px-3 py-2 font-semibold text-white">{name}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(setsDone) && setsDone > 0 ? setsDone : '—'}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(repsDone) && repsDone > 0 ? repsDone : '—'}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(executionMinutes) && executionMinutes > 0 ? `${executionMinutes.toFixed(1)} min` : '—'}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(restMinutes) && restMinutes > 0 ? `${restMinutes.toFixed(1)} min` : '—'}</td>
+                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(rest) && rest > 0 ? `${Math.round(rest)}s` : '—'}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(avgWeight) && avgWeight > 0 ? `${avgWeight.toFixed(1)} kg` : '—'}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(volume) && volume > 0 ? `${volume.toLocaleString('pt-BR')} kg` : '—'}</td>
+                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
+                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
+                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>
+                                            </tr>
+                                        )
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
-                {showStory ? <StoryComposer open={showStory} session={session} onClose={() => setShowStory(false)} /> : null}
-                {showCoachChat && (
-                    <CoachChatModal
-                        isOpen={showCoachChat}
-                        onClose={() => setShowCoachChat(false)}
-                        session={session}
-                        previousSession={effectivePreviousSession ?? undefined}
-                        isVip={isVip}
-                        onUpgrade={onUpgrade}
-                        onSaveToReport={(summary: unknown) => {
-                            setAiState((prev: AiState) => {
-                                const ai = prev?.result && typeof prev.result === 'object' ? (prev.result as AnyObj) : {}
-                                const current = Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []
-                                return { ...prev, result: { ...ai, summary: [...current, summary] } }
-                            })
-                        }}
-                    />
+
+                <ReportCheckinPanel
+                    preCheckin={preCheckin}
+                    postCheckin={postCheckin}
+                    recommendations={checkinRecommendations}
+                />
+
+                <ReportAiSection
+                    ai={ai}
+                    aiState={{ loading: aiState.loading, error: aiState.error, cached: aiState.cached }}
+                    credits={credits}
+                    applyState={applyState}
+                    onGenerateAi={handleGenerateAi}
+                    onApplyProgression={handleApplyProgression}
+                    onOpenChat={() => setShowCoachChat(true)}
+                    renderAiRating={renderAiRating}
+                />
+
+                {isTeamSession && (
+                    <div className="mb-8 p-4 rounded-lg border border-neutral-800 bg-neutral-900/60 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center">
+                                <Users size={18} />
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">Treino em Equipe</p>
+                                <p className="text-sm font-semibold text-neutral-100">
+                                    {partners.length === 1 ? '1 parceiro treinando com você' : `${partners.length} parceiros treinando com você`}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {partners.map((p: unknown, idx: number) => {
+                                const part = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
+                                return (
+                                    <button
+                                        key={String(part.uid || part.id || idx)}
+                                        onClick={() => handlePartnerPlan(part)}
+                                        className="px-3 py-2 rounded-full bg-black text-white text-xs font-bold uppercase tracking-wide hover:bg-neutral-900"
+                                    >
+                                        Ver PDF de {String(part.name || 'Parceiro')}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
                 )}
+
+                <ReportSummaryCards
+                    session={safeSession}
+                    currentVolume={currentVolume}
+                    volumeDelta={volumeDelta}
+                    calories={calories}
+                    outdoorBike={outdoorBike}
+                    hasPreviousSession={!!effectivePreviousSession}
+                />
+
+                <div className="space-y-8">
+                    {exercisesList.length === 0 && (
+                        <div className="text-neutral-300 p-4 bg-neutral-900/60 rounded-lg border border-neutral-800">
+                            Nenhum dado de exercício registrado para este treino.
+                        </div>
+                    )}
+                    {exercisesList.map((ex, exIdx) => {
+                        const obj = (ex && typeof ex === 'object' ? ex as Record<string, unknown> : {}) as Record<string, unknown>;
+                        const exKey = normalizeExerciseKey(obj?.name);
+                        return (
+                            <ReportExerciseCard
+                                key={exIdx}
+                                exercise={obj}
+                                exIdx={exIdx}
+                                sessionLogs={sessionLogs}
+                                prevLogs={(Array.isArray(prevLogsMap[exKey]) ? prevLogsMap[exKey] : []) as unknown[]}
+                                baseMs={prevBaseMsMap[exKey] ?? null}
+                            />
+                        );
+                    })}
+                </div>
+                <div className="mt-12 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-400 uppercase tracking-widest">
+                    IronTracks System • {getCurrentDate()}
+                </div>
             </div>
+
+            {pdfUrl && (
+                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur flex flex-col">
+                    <div className="p-4 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between h-16 pt-safe">
+                        <h3 className="text-white font-bold">Pré-visualização</h3>
+                        <button onClick={closePreview} className="bg-neutral-800 text-white px-4 py-2 rounded-lg font-bold border border-neutral-700 hover:bg-neutral-700">Fechar</button>
+                    </div>
+                    <div className="flex-1 bg-white">
+                        <iframe ref={pdfFrameRef} src={pdfUrl} className="w-full h-full" />
+                    </div>
+                    <div className="p-4 bg-neutral-900 border-t border-neutral-800 flex items-center justify-end gap-2 pb-safe">
+                        <button onClick={handleShare} className="bg-neutral-800 text-white px-4 py-2 rounded-lg">Compartilhar</button>
+                        <button onClick={handlePrintIframe} className="bg-yellow-500 text-black px-4 py-2 rounded-lg font-bold">Imprimir</button>
+                    </div>
+                </div>
+            )}
+            {showStory ? <StoryComposer open={showStory} session={session} onClose={() => setShowStory(false)} /> : null}
+            {showCoachChat && (
+                <CoachChatModal
+                    isOpen={showCoachChat}
+                    onClose={() => setShowCoachChat(false)}
+                    session={session}
+                    previousSession={effectivePreviousSession ?? undefined}
+                    isVip={isVip}
+                    onUpgrade={onUpgrade}
+                    onSaveToReport={(summary: unknown) => {
+                        setAiState((prev: AiState) => {
+                            const ai = prev?.result && typeof prev.result === 'object' ? (prev.result as AnyObj) : {}
+                            const current = Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []
+                            return { ...prev, result: { ...ai, summary: [...current, summary] } }
+                        })
+                    }}
+                />
+            )}
         </div>
     );
 };
