@@ -557,7 +557,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     </div>
                 </div>
             )}
-            <div className={`sticky top-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-4 md:px-6 pt-2 pb-3 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className={`sticky top-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-4 md:px-6 pt-safe pb-3 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
                     <button
                         onClick={onClose}
@@ -628,8 +628,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     ) : null}
                 </div>
 
-                <div className="flex-1 overflow-y-auto overflow-x-hidden bg-neutral-950">
-                    <div ref={reportRef} className="min-h-full bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto">
+                <div className="flex-1 overflow-y-auto bg-neutral-950" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+                    <div ref={reportRef} className="min-h-screen bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto">
                         <div className="pb-8 mb-8">
                             <div className="flex items-start justify-between gap-6">
                                 <div className="min-w-0">
