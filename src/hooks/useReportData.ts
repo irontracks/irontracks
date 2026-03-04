@@ -455,64 +455,53 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         return () => { cancelled = true }
     }, [session])
 
-    // ── Effect: Muscle trend (current vs previous week) ────────────────────
+    // ── Effect: Combined muscle trend (current vs prev) + 4w ──────────────
     useEffect(() => {
         let cancelled = false
         if (!session?.date) return
         const run = async () => {
             setMuscleTrend({ status: 'loading', data: null })
-            try {
-                const base = new Date(String(session.date))
-                const weekStart = getWeekStartIso(base)
-                const prevWeek = new Date(`${weekStart}T00:00:00.000Z`)
-                prevWeek.setDate(prevWeek.getDate() - 7)
-                const prevWeekStart = prevWeek.toISOString().slice(0, 10)
-                const [curRes, prevRes] = await Promise.all([
-                    getMuscleMapWeek({ weekStart }),
-                    getMuscleMapWeek({ weekStart: prevWeekStart }),
-                ])
-                if (cancelled) return
-                const curMuscles = (curRes?.ok && curRes.muscles && typeof curRes.muscles === 'object') ? (curRes.muscles as Record<string, unknown>) : {}
-                const prevMuscles = (prevRes?.ok && prevRes.muscles && typeof prevRes.muscles === 'object') ? (prevRes.muscles as Record<string, unknown>) : {}
-                const current = Object.fromEntries(Object.entries(curMuscles).map(([id, v]) => [id, Number((v as AnyObj)?.sets || 0)]))
-                const previous = Object.fromEntries(Object.entries(prevMuscles).map(([id, v]) => [id, Number((v as AnyObj)?.sets || 0)]))
-                setMuscleTrend({ status: 'ready', data: { current, previous } })
-            } catch {
-                if (!cancelled) setMuscleTrend({ status: 'error', data: null })
-            }
-        }
-        run()
-        return () => { cancelled = true }
-    }, [session?.date])
-
-    // ── Effect: Muscle trend 4w ────────────────────────────────────────────
-    useEffect(() => {
-        let cancelled = false
-        if (!session?.date) return
-        const run = async () => {
             setMuscleTrend4w({ status: 'loading', data: null })
             try {
                 const base = new Date(String(session.date))
                 const baseWeek = getWeekStartIso(base)
-                const weekDates: string[] = [0, 1, 2, 3].map((idx) => {
+                // Generate 5 week dates: W0, W-1, W-2, W-3, W-4
+                const weekDates: string[] = [0, 1, 2, 3, 4].map((idx) => {
                     const d = new Date(`${baseWeek}T00:00:00.000Z`)
                     d.setDate(d.getDate() - idx * 7)
                     return d.toISOString().slice(0, 10)
                 })
+                // Single batch fetch — 5 weeks in parallel
                 const responses = await Promise.all(weekDates.map((weekStart) => getMuscleMapWeek({ weekStart })))
                 if (cancelled) return
+                const getMuscles = (res: unknown) => {
+                    const r = res && typeof res === 'object' ? (res as AnyObj) : null
+                    return (r?.ok && r?.muscles && typeof r.muscles === 'object') ? (r.muscles as Record<string, unknown>) : {}
+                }
+                // G3: muscleTrend — W0 vs W-1
+                const curMuscles = getMuscles(responses[0])
+                const prevMuscles = getMuscles(responses[1])
+                const current = Object.fromEntries(Object.entries(curMuscles).map(([id, v]) => [id, Number((v as AnyObj)?.sets || 0)]))
+                const previous = Object.fromEntries(Object.entries(prevMuscles).map(([id, v]) => [id, Number((v as AnyObj)?.sets || 0)]))
+                setMuscleTrend({ status: 'ready', data: { current, previous } })
+                // G4: muscleTrend4w — W0..W-3 (first 4 responses)
+                const trend4wResponses = responses.slice(0, 4)
+                const trend4wWeeks = weekDates.slice(0, 4)
                 const series: Record<string, number[]> = {}
                 Object.keys(MUSCLE_BY_ID).forEach((id) => {
-                    series[id] = responses.map((res) => {
-                        const muscles = res?.ok && res.muscles && typeof res.muscles === 'object' ? (res.muscles as Record<string, unknown>) : {}
+                    series[id] = trend4wResponses.map((res) => {
+                        const muscles = getMuscles(res)
                         const entry = muscles[id]
                         const sets = entry && typeof entry === 'object' ? Number((entry as AnyObj).sets || 0) : 0
                         return Number.isFinite(sets) ? sets : 0
                     }).reverse()
                 })
-                setMuscleTrend4w({ status: 'ready', data: { weeks: weekDates.reverse(), series } })
+                setMuscleTrend4w({ status: 'ready', data: { weeks: [...trend4wWeeks].reverse(), series } })
             } catch {
-                if (!cancelled) setMuscleTrend4w({ status: 'error', data: null })
+                if (!cancelled) {
+                    setMuscleTrend({ status: 'error', data: null })
+                    setMuscleTrend4w({ status: 'error', data: null })
+                }
             }
         }
         run()
