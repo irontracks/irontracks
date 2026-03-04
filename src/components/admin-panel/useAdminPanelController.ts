@@ -553,13 +553,23 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
 
     const handleUpdateStudentStatus = async (student: AdminUser, newStatus: string) => {
         if (!newStatus || newStatus === student.status) return;
-        if (!(await confirm(`Mudar status de ${student.name || student.email} para "${newStatus}"?`))) return;
+        const statusLabels: Record<string, string> = {
+            pago: 'Pago ✅',
+            pendente: 'Pendente ⏳',
+            atrasado: 'Atrasado ⚠️',
+            cancelar: 'Cancelado ❌',
+        };
+        const label = statusLabels[newStatus] || newStatus;
+        if (!(await confirm(`Mudar status de "${student.name || student.email}" para ${label}?`))) return;
         try {
-            const { error } = await supabase
-                .from('students')
-                .update({ status: newStatus })
-                .eq('id', student.id);
-            if (error) throw error;
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch('/api/admin/students/status', {
+                method: 'POST',
+                headers: { ...authHeaders, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: student.id, status: newStatus }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
             setUsersList((prev) =>
                 prev.map((u) => (u.id === student.id ? { ...u, status: newStatus } : u))
             );
