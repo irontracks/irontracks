@@ -428,7 +428,7 @@ export async function POST(req: Request) {
 
       cachedPayload = cached?.payload && typeof cached.payload === 'object' ? cached.payload : null
       cachedUpdatedAtMs = cached?.updated_at ? new Date(String(cached.updated_at)).getTime() : 0
-      const fresh = Number.isFinite(cachedUpdatedAtMs) && Date.now() - cachedUpdatedAtMs < 6 * 60 * 60 * 1000
+      const fresh = Number.isFinite(cachedUpdatedAtMs) && Date.now() - cachedUpdatedAtMs < 30 * 60 * 1000
       if (cachedPayload && fresh) return NextResponse.json(cachedPayload)
     }
 

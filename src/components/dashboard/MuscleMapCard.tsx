@@ -99,7 +99,7 @@ const PREFILL_KEY = 'irontracks_wizard_prefill_v1'
 const CACHE_PREFIX = 'irontracks_muscle_map_cache_v1'
 const AUTO_SYNC_INTERVAL_MS = 5 * 60 * 1000
 const MIN_FETCH_INTERVAL_MS = 60 * 1000
-const CACHE_TTL_MS = 10 * 60 * 1000
+const CACHE_TTL_MS = 5 * 60 * 1000
 
 const buildCacheKey = (period: 'day' | 'week', date: string) => `${CACHE_PREFIX}_${period}_${period === 'day' ? date : 'week'}`
 
