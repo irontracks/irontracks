@@ -950,6 +950,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                 return 'dashboard';
                                             })();
                                             openAdminPanel(tab);
+                                            setView('admin');
                                         }}
                                         onOpenChatList={handleOpenChatList}
                                         onOpenGlobalChat={handleOpenGlobalChat}
