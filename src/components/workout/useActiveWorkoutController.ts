@@ -1,5 +1,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useWorkoutTicker } from './hooks/useWorkoutTicker';
+import { useWorkoutModals } from './hooks/useWorkoutModals';
 import { useDialog } from '@/contexts/DialogContext';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync';
@@ -96,103 +98,70 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   type ReportHistoryStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; error: string; source: string };
   type InputRefMap = Record<string, Array<HTMLInputElement | null>>;
 
-  const [ticker, setTicker] = useState<number>(Date.now());
+  const { ticker, timerMinimized, setTimerMinimized } = useWorkoutTicker();
 
   // Persist collapsed card indices across app restarts
   const collapsedKey = (() => {
     const id = String(session?.id || (session as Record<string, unknown>)?.startedAt || '').trim();
     return id ? `irontracks.collapsed.v1.${id}` : null;
   })();
-  const [collapsed, setCollapsed] = useState<Set<number>>(() => {
-    if (!collapsedKey) return new Set<number>();
-    try {
-      if (typeof window === 'undefined') return new Set<number>();
-      const raw = window.localStorage.getItem(collapsedKey);
-      if (!raw) return new Set<number>();
-      const arr: unknown = JSON.parse(raw);
-      return new Set<number>(Array.isArray(arr) ? arr.filter((n): n is number => typeof n === 'number') : []);
-    } catch {
-      return new Set<number>();
-    }
-  });
-  const [finishing, setFinishing] = useState<boolean>(false);
-  const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(() => new Set<string>());
-  const [inviteOpen, setInviteOpen] = useState<boolean>(false);
-  const [addExerciseOpen, setAddExerciseOpen] = useState<boolean>(false);
-  const [addExerciseDraft, setAddExerciseDraft] = useState<{ name: string; sets: string; restTime: string }>(() => ({
-    name: '',
-    sets: '3',
-    restTime: '60',
-  }));
-  const [organizeOpen, setOrganizeOpen] = useState<boolean>(false);
-  const [organizeDraft, setOrganizeDraft] = useState<UnknownRecord[]>([]);
-  const [organizeSaving, setOrganizeSaving] = useState<boolean>(false);
-  const [organizeError, setOrganizeError] = useState<string>('');
-  const [deloadModal, setDeloadModal] = useState<UnknownRecord | null>(null);
-  const [clusterModal, setClusterModal] = useState<UnknownRecord | null>(null);
-  const [restPauseModal, setRestPauseModal] = useState<UnknownRecord | null>(null);
-  const [dropSetModal, setDropSetModal] = useState<UnknownRecord | null>(null);
-  const [strippingModal, setStrippingModal] = useState<UnknownRecord | null>(null);
-  const [fst7Modal, setFst7Modal] = useState<UnknownRecord | null>(null);
-  const [heavyDutyModal, setHeavyDutyModal] = useState<UnknownRecord | null>(null);
-  const [pontoZeroModal, setPontoZeroModal] = useState<UnknownRecord | null>(null);
-  const [forcedRepsModal, setForcedRepsModal] = useState<UnknownRecord | null>(null);
-  const [negativeRepsModal, setNegativeRepsModal] = useState<UnknownRecord | null>(null);
-  const [partialRepsModal, setPartialRepsModal] = useState<UnknownRecord | null>(null);
-  const [sistema21Modal, setSistema21Modal] = useState<UnknownRecord | null>(null);
-  const [waveModal, setWaveModal] = useState<UnknownRecord | null>(null);
-  const [groupMethodModal, setGroupMethodModal] = useState<UnknownRecord | null>(null);
-  const [postCheckinOpen, setPostCheckinOpen] = useState<boolean>(false);
-  const [postCheckinDraft, setPostCheckinDraft] = useState<PostCheckinDraft>({ rpe: '', satisfaction: '', soreness: '', notes: '' });
-  const postCheckinResolveRef = useRef<((value: unknown) => void) | null>(null);
+
+  const {
+    collapsed, setCollapsed,
+    openNotesKeys, setOpenNotesKeys,
+    inviteOpen, setInviteOpen,
+    linkedWeightExercises, setLinkedWeightExercises,
+    currentExerciseIdx, setCurrentExerciseIdx,
+    finishing, setFinishing,
+    addExerciseOpen, setAddExerciseOpen,
+    addExerciseDraft, setAddExerciseDraft,
+    editExerciseOpen, setEditExerciseOpen,
+    editExerciseIdx, setEditExerciseIdx,
+    editExerciseDraft, setEditExerciseDraft,
+    organizeOpen, setOrganizeOpen,
+    organizeDraft, setOrganizeDraft,
+    organizeSaving, setOrganizeSaving,
+    organizeError, setOrganizeError,
+    organizeBaseKeysRef,
+    organizeDirty,
+    postCheckinOpen, setPostCheckinOpen,
+    postCheckinDraft, setPostCheckinDraft,
+    postCheckinResolveRef,
+    deloadModal, setDeloadModal,
+    clusterModal, setClusterModal,
+    restPauseModal, setRestPauseModal,
+    dropSetModal, setDropSetModal,
+    strippingModal, setStrippingModal,
+    fst7Modal, setFst7Modal,
+    heavyDutyModal, setHeavyDutyModal,
+    pontoZeroModal, setPontoZeroModal,
+    forcedRepsModal, setForcedRepsModal,
+    negativeRepsModal, setNegativeRepsModal,
+    partialRepsModal, setPartialRepsModal,
+    sistema21Modal, setSistema21Modal,
+    waveModal, setWaveModal,
+    groupMethodModal, setGroupMethodModal,
+    restPauseRefs,
+    clusterRefs,
+  } = useWorkoutModals(collapsedKey);
+
+  const MAX_EXTRA_SETS_PER_EXERCISE = 50;
+  const MAX_EXTRA_EXERCISES_PER_SETS_PER_EXERCISE = 50;
+  const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
+  const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;
+
+  // Report history state — kept here because deload engine depends on it deeply
   const [reportHistory, setReportHistory] = useState<ReportHistory>({ version: 1, exercises: {} });
   const [reportHistoryStatus, setReportHistoryStatus] = useState<ReportHistoryStatus>({ status: 'idle', error: '', source: '' });
   const [reportHistoryUpdatedAt, setReportHistoryUpdatedAt] = useState<number>(0);
   const [deloadSuggestions, setDeloadSuggestions] = useState<Record<string, unknown>>({});
-  const [timerMinimized, setTimerMinimized] = useState<boolean>(true);
-  const [currentExerciseIdx, setCurrentExerciseIdx] = useState<number>(0);
-  const [editExerciseOpen, setEditExerciseOpen] = useState<boolean>(false);
-  const [editExerciseIdx, setEditExerciseIdx] = useState<number | null>(null);
-  const [editExerciseDraft, setEditExerciseDraft] = useState<{ name: string; sets: string; restTime: string; method: string }>(() => ({
-    name: '',
-    sets: '3',
-    restTime: '60',
-    method: 'Normal',
-  }));
-  const [linkedWeightExercises, setLinkedWeightExercises] = useState<Set<number>>(new Set());
 
-  const restPauseRefs = useRef<InputRefMap>({});
-  const clusterRefs = useRef<InputRefMap>({});
-  const organizeBaseKeysRef = useRef<string[]>([]);
   const reportHistoryLoadingRef = useRef<boolean>(false);
   const reportHistoryLoadingSinceRef = useRef<number>(0);
   const reportHistoryStatusRef = useRef<ReportHistoryStatus>({ status: 'idle', error: '', source: '' });
   const reportHistoryUpdatedAtRef = useRef<number>(0);
   const deloadAiCacheRef = useRef<Record<string, unknown>>({});
   const supabase = useStableSupabaseClient();
-
-  // Persist collapsed indices whenever they change
-  useEffect(() => {
-    if (!collapsedKey) return;
-    try {
-      if (typeof window === 'undefined') return;
-      window.localStorage.setItem(collapsedKey, JSON.stringify([...collapsed]));
-    } catch { }
-  }, [collapsed, collapsedKey]);
-
-  const MAX_EXTRA_SETS_PER_EXERCISE = 50;
-  const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
-  const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      try {
-        if (typeof document !== 'undefined' && document.hidden) return;
-      } catch { }
-      setTicker(Date.now());
-    }, 1000);
-    return () => clearInterval(id);
-  }, []);
 
   useEffect(() => {
     reportHistoryStatusRef.current = reportHistoryStatus && typeof reportHistoryStatus === 'object' ? reportHistoryStatus : { status: 'idle', error: '', source: '' };
@@ -202,15 +171,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistoryUpdatedAtRef.current = Number(reportHistoryUpdatedAt || 0);
   }, [reportHistoryUpdatedAt]);
 
-  const organizeDirty = useMemo(() => {
-    const baseKeys = Array.isArray(organizeBaseKeysRef.current) ? organizeBaseKeysRef.current : [];
-    const draftKeys = draftOrderKeys(organizeDraft);
-    if (draftKeys.length !== baseKeys.length) return true;
-    for (let i = 0; i < draftKeys.length; i += 1) {
-      if (draftKeys[i] !== baseKeys[i]) return true;
-    }
-    return false;
-  }, [organizeDraft]);
 
   const getLog = (key: string): UnknownRecord => {
     const v = logs[key];
