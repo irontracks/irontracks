@@ -394,11 +394,9 @@ export async function POST(req: Request) {
     const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
     const access = await checkVipFeatureAccess(supabase, userId, 'analytics')
-    if (!access.allowed) {
-      return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
-    }
+    const isVip = Boolean(access.allowed)
     const ip = getRequestIp(req)
-    const rl = await checkRateLimitAsync(`ai:muscle-map-week:${userId}:${ip}`, 20, 60_000)
+    const rl = await checkRateLimitAsync(`ai:muscle-map-week:${userId}:${ip}`, 30, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     const admin = createAdminClient()
 
@@ -510,8 +508,8 @@ export async function POST(req: Request) {
       .map((it) => it.canonical)
 
     const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean)))
-    const mappingBatchLimit = refreshAi ? 60 : 20
-    const toMapWithAi = apiKey ? missingUnique.slice(0, mappingBatchLimit) : []
+    const mappingBatchLimit = isVip ? (refreshAi ? 60 : 20) : 0
+    const toMapWithAi = (apiKey && isVip) ? missingUnique.slice(0, mappingBatchLimit) : []
     let newlyMapped: Array<Record<string, unknown>> = []
     if (toMapWithAi.length) {
       try {
@@ -690,14 +688,14 @@ export async function POST(req: Request) {
 
     let insightsFromAi = null
     let aiError = ''
-    if (refreshAi && apiKey) {
+    if (isVip && refreshAi && apiKey) {
       try {
         insightsFromAi = await generateWeeklyInsightsWithAi(apiKey, insightInput)
       } catch (e: unknown) {
         aiError = String((e as Error)?.message ?? e)
       }
     }
-    const cachedInsights = cachedPayload?.insights && typeof cachedPayload.insights === 'object' ? cachedPayload.insights : null
+    const cachedInsights = isVip && cachedPayload?.insights && typeof cachedPayload.insights === 'object' ? cachedPayload.insights : null
     const insights = insightsFromAi || cachedInsights || { summary: [], imbalanceAlerts: [], recommendations: [] }
     const aiStatus = refreshAi
       ? apiKey
@@ -710,7 +708,7 @@ export async function POST(req: Request) {
       : 'skipped'
     const insightsStale = !insightsFromAi && !!cachedInsights && !!cachedUpdatedAtMs
 
-    const topExercisesByMuscle = Object.fromEntries(
+    const topExercisesByMuscle = isVip ? Object.fromEntries(
       MUSCLE_GROUPS.map((m) => {
         const entries = Array.from((byMuscleByExercise.get(m.id) || new Map()).entries())
           .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
@@ -718,10 +716,11 @@ export async function POST(req: Request) {
           .map(([name, setsEq]) => ({ name, setsEq: Math.round(Number(setsEq || 0) * 10) / 10 }))
         return [m.id, entries]
       })
-    )
+    ) : undefined
 
     const payload = {
       ok: true,
+      isVip,
       weekStartDate,
       weekEndDate: isoDate(weekEnd),
       workoutsCount: sessions.length,
@@ -729,17 +728,17 @@ export async function POST(req: Request) {
       topMuscles: sorted,
       unknownExercises: Array.from(new Set(unknownExercises)).slice(0, 25),
       topExercisesByMuscle,
-      diagnostics: {
+      diagnostics: isVip ? {
         estimatedSetsUsed: diagnostics.estimatedSetsUsed,
         sessionsWithNoLogs: diagnostics.sessionsWithNoLogs,
         exercisesWithoutMapping: Array.from(diagnostics.exercisesWithoutMapping).slice(0, 40),
         exercisesWithEstimatedSets: Array.from(diagnostics.exercisesWithEstimatedSets).slice(0, 40),
-      },
-      insights,
+      } : undefined,
+      insights: isVip ? insights : undefined,
       ai: {
-        requested: refreshAi,
-        status: aiStatus,
-        insightsStale,
+        requested: isVip ? refreshAi : false,
+        status: isVip ? aiStatus : 'skipped',
+        insightsStale: isVip ? insightsStale : false,
       },
     }
 

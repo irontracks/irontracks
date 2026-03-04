@@ -21,6 +21,7 @@ type ApiMuscle = {
 
 type ApiPayloadWeek = {
   ok: boolean
+  isVip?: boolean
   weekStartDate: string
   weekEndDate: string
   workoutsCount: number
@@ -34,7 +35,7 @@ type ApiPayloadWeek = {
     exercisesWithoutMapping?: string[]
     exercisesWithEstimatedSets?: string[]
   }
-  insights: {
+  insights?: {
     summary: string[]
     imbalanceAlerts: { type: string; severity: string; muscles: string[]; evidence: string; suggestion: string }[]
     recommendations: { title: string; actions: string[] }[]
@@ -44,6 +45,7 @@ type ApiPayloadWeek = {
 
 type ApiPayloadDay = {
   ok: boolean
+  isVip?: boolean
   date: string
   workoutsCount: number
   muscles: Record<string, ApiMuscle>
@@ -57,7 +59,6 @@ type ApiPayload = ApiPayloadWeek | ApiPayloadDay
 type Props = {
   onOpenWizard?: () => void
   defaultViewMode?: 'day' | 'week'
-  userRole?: string | null
 }
 
 const localIsoDate = () => {
@@ -498,18 +499,28 @@ export default function MuscleMapCard(props: Props) {
                   {state.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
                   Atualizar
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    load({ refreshCache: true, refreshAi: true, source: 'manual' })
-                  }}
-                  disabled={state.status === 'loading'}
-                  className="min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-60 inline-flex items-center gap-2"
-                >
-                  {state.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                  Gerar com IA
-                </button>
+                {(() => {
+                  const isVip = Boolean((state.data as Record<string, unknown>)?.isVip)
+                  if (!isVip) return (
+                    <div className="min-h-[40px] px-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 font-black text-xs uppercase tracking-widest inline-flex items-center gap-2">
+                      <Crown size={14} /> VIP
+                    </div>
+                  )
+                  return (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        load({ refreshCache: true, refreshAi: true, source: 'manual' })
+                      }}
+                      disabled={state.status === 'loading'}
+                      className="min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-60 inline-flex items-center gap-2"
+                    >
+                      {state.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                      Gerar com IA
+                    </button>
+                  )
+                })()}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -552,7 +563,6 @@ export default function MuscleMapCard(props: Props) {
                   onSelect={(id) => {
                     setSelected((prev) => (prev === id ? null : id))
                   }}
-                  calibrationMode={String(props.userRole || '').toLowerCase() === 'admin'}
                 />
                 <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] font-black uppercase tracking-widest">
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
@@ -625,50 +635,62 @@ export default function MuscleMapCard(props: Props) {
                   )}
                 </div>
 
-                <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
-                      <Sparkles size={14} /> Insights da IA
+                {/* AI Insights — VIP only */}
+                {(() => {
+                  const isVip = Boolean((state.data as Record<string, unknown>)?.isVip)
+                  const insights = isWeekPayload(state.data) ? state.data.insights : undefined
+                  if (!isVip) return (
+                    <div className="bg-neutral-950 rounded-2xl border border-yellow-500/10 p-4">
+                      <div className="flex items-center gap-2">
+                        <Crown size={14} className="text-yellow-500" />
+                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Insights da IA</div>
+                      </div>
+                      <div className="mt-2 text-xs text-neutral-400">Análise de desequilíbrios e recomendações personalizadas disponíveis no plano VIP.</div>
                     </div>
-                    {state.status === 'loading' ? <Loader2 size={16} className="animate-spin text-neutral-400" /> : null}
-                  </div>
-
-                  {isWeekPayload(state.data) && state.data.insights?.summary?.length ? (
-                    <ul className="mt-3 space-y-2">
-                      {state.data.insights.summary.map((item, idx) => (
-                        <li key={idx} className="text-sm text-neutral-100">
-                          • {String(item || '')}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="mt-3 text-sm text-neutral-400">Sem insights suficientes para essa semana.</div>
-                  )}
-
-                  {isWeekPayload(state.data) && state.data.insights?.imbalanceAlerts?.length ? (
-                    <div className="mt-4 space-y-2">
-                      {state.data.insights.imbalanceAlerts.slice(0, 4).map((a, idx) => (
-                        <div key={idx} className="rounded-xl border border-neutral-800 bg-black p-3">
-                          <div className="text-xs font-black uppercase tracking-widest text-neutral-300">{String(a.type || 'Alerta')}</div>
-                          <div className="mt-1 text-sm text-neutral-100">{String(a.suggestion || '').trim()}</div>
-                          {String(a.evidence || '').trim() ? <div className="mt-1 text-xs text-neutral-500">{String(a.evidence || '').trim()}</div> : null}
+                  )
+                  return (
+                    <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
+                          <Sparkles size={14} /> Insights da IA
                         </div>
-                      ))}
+                        {state.status === 'loading' ? <Loader2 size={16} className="animate-spin text-neutral-400" /> : null}
+                      </div>
+                      {insights?.summary?.length ? (
+                        <ul className="mt-3 space-y-2">
+                          {insights.summary.map((item, idx) => (
+                            <li key={idx} className="text-sm text-neutral-100">• {String(item || '')}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="mt-3 text-sm text-neutral-400">Sem insights suficientes para essa semana.</div>
+                      )}
+                      {insights?.imbalanceAlerts?.length ? (
+                        <div className="mt-4 space-y-2">
+                          {insights.imbalanceAlerts.slice(0, 4).map((a, idx) => (
+                            <div key={idx} className="rounded-xl border border-neutral-800 bg-black p-3">
+                              <div className="text-xs font-black uppercase tracking-widest text-neutral-300">{String(a.type || 'Alerta')}</div>
+                              <div className="mt-1 text-sm text-neutral-100">{String(a.suggestion || '').trim()}</div>
+                              {String(a.evidence || '').trim() ? <div className="mt-1 text-xs text-neutral-500">{String(a.evidence || '').trim()}</div> : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
+                  )
+                })()}
 
-                  {state.data?.unknownExercises?.length ? (
-                    <div className="mt-4 text-xs text-neutral-500">
-                      Exercícios sem mapeamento completo: {state.data.unknownExercises.slice(0, 6).join(', ')}
-                    </div>
-                  ) : null}
+                {state.data?.unknownExercises?.length ? (
+                  <div className="mt-2 text-xs text-neutral-500">
+                    Exercícios sem mapeamento: {state.data.unknownExercises.slice(0, 6).join(', ')}
+                  </div>
+                ) : null}
 
-                  {Number(state.data?.diagnostics?.estimatedSetsUsed || 0) > 0 ? (
-                    <div className="mt-2 text-xs text-neutral-600">
-                      Estimativa aplicada: {Number(state.data?.diagnostics?.estimatedSetsUsed || 0).toLocaleString('pt-BR')} set(s) (sem logs completos).
-                    </div>
-                  ) : null}
-                </div>
+                {Number(state.data?.diagnostics?.estimatedSetsUsed || 0) > 0 ? (
+                  <div className="mt-1 text-xs text-neutral-600">
+                    Estimativa aplicada: {Number(state.data?.diagnostics?.estimatedSetsUsed || 0).toLocaleString('pt-BR')} set(s).
+                  </div>
+                ) : null}
 
                 <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
                   <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top músculos</div>

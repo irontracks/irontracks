@@ -270,11 +270,9 @@ export async function POST(req: Request) {
     const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
     const access = await checkVipFeatureAccess(supabase, userId, 'analytics')
-    if (!access.allowed) {
-      return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
-    }
+    const isVip = Boolean(access.allowed)
     const ip = getRequestIp(req)
-    const rl = await checkRateLimitAsync(`ai:muscle-map-day:${userId}:${ip}`, 30, 60_000)
+    const rl = await checkRateLimitAsync(`ai:muscle-map-day:${userId}:${ip}`, 40, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     const admin = createAdminClient()
 
@@ -367,9 +365,9 @@ export async function POST(req: Request) {
     const missingCanonicals = missingPairs.filter((it) => !mapByKey.get(it.key)).map((it) => it.canonical)
     const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean)))
 
-    const ai = { requested: refreshAi, status: refreshAi ? (apiKey ? 'pending' : 'missing_api_key') : 'skipped', mapped: 0, remaining: missingUnique.length, error: '' }
+    const ai = { requested: refreshAi, status: refreshAi ? (apiKey && isVip ? 'pending' : (isVip ? 'missing_api_key' : 'locked')) : 'skipped', mapped: 0, remaining: missingUnique.length, error: '' }
 
-    if (refreshAi && apiKey && missingUnique.length && maxAi > 0) {
+    if (isVip && refreshAi && apiKey && missingUnique.length && maxAi > 0) {
       let cursor = 0
       let aiBudgetUsed = 0
       let aiError = ''
@@ -536,16 +534,17 @@ export async function POST(req: Request) {
 
     const payload = {
       ok: true,
+      isVip,
       date,
       workoutsCount: sessions.length,
       muscles,
       unknownExercises: Array.from(new Set(unknownExercises)).slice(0, 80),
-      diagnostics,
+      diagnostics: isVip ? diagnostics : undefined,
       ai: {
-        requested: refreshAi,
-        status: ai.status,
-        mapped: ai.mapped,
-        remaining: Array.from(new Set(missingCanonicals.filter((it) => !mapByKey.get(normalizeExerciseName(it))))).length,
+        requested: isVip ? refreshAi : false,
+        status: isVip ? ai.status : 'skipped',
+        mapped: isVip ? ai.mapped : 0,
+        remaining: isVip ? Array.from(new Set(missingCanonicals.filter((it) => !mapByKey.get(normalizeExerciseName(it))))).length : 0,
       },
     }
 
