@@ -512,7 +512,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const ai = aiState?.result && typeof aiState.result === 'object' ? (aiState.result as AnyObj) : null
 
     return (
-        <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white overflow-y-auto">
+        <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white overflow-y-auto overflow-x-hidden">
             {/* 8.1 — Celebration Splash Overlay */}
             {showSplash && (
                 <div
@@ -558,22 +558,22 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 </div>
             )}
             {/* Fixed header bar */}
-            <div className={`fixed top-0 left-0 right-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-4 md:px-6 pt-safe pb-3 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
+            <div className={`fixed top-0 left-0 right-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-3 md:px-6 pt-safe pb-1.5 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="max-w-4xl mx-auto flex items-center justify-between gap-1.5">
                     <button
                         onClick={onClose}
-                        className="flex items-center gap-2 text-neutral-400 hover:text-white transition-colors text-sm font-black"
+                        className="flex items-center gap-1.5 text-neutral-400 hover:text-white transition-colors text-sm font-black"
                     >
                         <ArrowLeft size={16} /> Fechar
                     </button>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         <div className="relative">
                             <button
                                 onClick={() => setShowExportMenu(v => !v)}
-                                className="min-h-[44px] flex items-center gap-2 px-4 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 rounded-xl transition-colors border border-neutral-800"
+                                className="min-h-[36px] flex items-center gap-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 rounded-xl transition-colors border border-neutral-800"
                             >
-                                <Download size={16} className="text-yellow-500" />
-                                <span className="text-sm font-black">Salvar</span>
+                                <Download size={14} className="text-yellow-500" />
+                                <span className="text-xs font-black">Salvar</span>
                             </button>
                             {showExportMenu && (
                                 <div className="absolute right-0 mt-2 w-52 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
@@ -591,13 +591,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         <button
                             type="button"
                             onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowStory(true); }}
-                            className="min-h-[44px] bg-yellow-500 hover:bg-yellow-400 text-black px-4 rounded-xl font-black shadow-lg inline-flex items-center gap-2"
+                            className="min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
                         >
                             <span className="text-xs uppercase tracking-widest">Foto</span>
-                        </button>
-                        <button onClick={onClose} className="min-h-[44px] bg-neutral-900 hover:bg-neutral-800 text-white px-4 rounded-xl font-black shadow-lg inline-flex items-center gap-2 border border-neutral-800">
-                            <ArrowLeft size={18} />
-                            <span className="text-xs uppercase tracking-widest">Voltar</span>
                         </button>
                     </div>
                     {storiesV2Enabled && showStoryPrompt && !showStory ? (
@@ -631,7 +627,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             </div>
 
             {/* Report content — starts below fixed header with pt for safe offset */}
-            <div ref={reportRef} className="bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 80px)' }}>
+            <div ref={reportRef} className="bg-neutral-950 text-white p-6 md:p-8 max-w-4xl mx-auto" style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 60px)' }}>
                 <div className="pb-8 mb-8">
                     <div className="flex items-start justify-between gap-6">
                         <div className="min-w-0">
