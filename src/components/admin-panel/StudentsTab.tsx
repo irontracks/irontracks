@@ -1,7 +1,25 @@
 import React from 'react';
-import { Search, UserPlus, Trash2, Edit, Activity, User } from 'lucide-react';
+import { Search, UserPlus, Trash2, Activity, User } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
+
+const STATUS_OPTIONS = [
+    { value: 'pago', label: 'Pago', color: 'text-green-400' },
+    { value: 'pendente', label: 'Pendente', color: 'text-yellow-400' },
+    { value: 'atrasado', label: 'Atrasado', color: 'text-red-400' },
+    { value: 'cancelar', label: 'Cancelado', color: 'text-neutral-400' },
+] as const;
+
+type StatusValue = typeof STATUS_OPTIONS[number]['value'];
+
+const statusBadgeClass = (status: string) => {
+    switch (status) {
+        case 'pago': return 'text-green-500  bg-green-500/10  border-green-500/20';
+        case 'atrasado': return 'text-red-500    bg-red-500/10    border-red-500/20';
+        case 'cancelar': return 'text-neutral-400 bg-neutral-700/30 border-neutral-600/30';
+        default: return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+    }
+};
 
 export const StudentsTab: React.FC = () => {
     const {
@@ -17,14 +35,14 @@ export const StudentsTab: React.FC = () => {
         teachersList,
         usersList,
         handleUpdateStudentTeacher,
-        handleToggleStudentStatus,
+        handleUpdateStudentStatus,
         handleDeleteStudent,
         setSelectedStudent,
         setHistoryOpen,
-        user
+        user,
     } = useAdminPanel();
 
-    // Bug #10 fix: compute live counts from usersList so filter options show real numbers
+    // Live counts for filter pills
     const statusCounts = React.useMemo(() => {
         const list = Array.isArray(usersList) ? usersList : [];
         return list.reduce<Record<string, number>>((acc, s) => {
@@ -34,99 +52,106 @@ export const StudentsTab: React.FC = () => {
         }, {});
     }, [usersList]);
 
-
-    const renderStudentRow = (s: AdminUser) => {
-        const statusColor =
-            s.status === 'pago' ? 'text-green-500 bg-green-500/10 border-green-500/20' :
-                s.status === 'pendente' ? 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20' :
-                    'text-red-500 bg-red-500/10 border-red-500/20';
-
-        return (
-            <div
-                key={s.id}
-                className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-yellow-500/40 transition-all gap-4 cursor-pointer"
-                onClick={() => setSelectedStudent(s)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStudent(s); }}
-                aria-label={`Ver detalhes de ${s.name || s.email || 'Aluno'}`}
-            >
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center font-black text-neutral-400 border border-neutral-700">
-                        {(s.name || s.email || '?').charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                        <div className="font-bold text-white group-hover:text-yellow-500 transition-colors">
-                            {s.name || s.email || 'Sem Nome'}
-                        </div>
-                        <div className="text-xs text-neutral-500 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                            <span>{s.email}</span>
-                            <span className="hidden sm:inline">•</span>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider w-fit ${statusColor}`}>
-                                {s.status}
-                            </span>
-                        </div>
-                    </div>
+    const renderStudentRow = (s: AdminUser) => (
+        <div
+            key={s.id}
+            className="group flex flex-col gap-3 p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-yellow-500/40 transition-all cursor-pointer"
+            onClick={() => setSelectedStudent(s)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStudent(s); }}
+            aria-label={`Ver detalhes de ${s.name || s.email || 'Aluno'}`}
+        >
+            {/* Top row: avatar + info */}
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 flex-shrink-0 rounded-full bg-neutral-800 flex items-center justify-center font-black text-neutral-400 border border-neutral-700">
+                    {(s.name || s.email || '?').charAt(0).toUpperCase()}
                 </div>
-
-                {/* Stop propagation so selects/buttons don't trigger the card click */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3" onClick={(e) => e.stopPropagation()}>
-                    {isAdmin && (
-                        <select
-                            className="bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none min-w-[140px]"
-                            value={s.teacher_id || ''}
-                            onChange={(e) => handleUpdateStudentTeacher(s.id, e.target.value || null)}
-                        >
-                            <option value="">Sem professor</option>
-                            {teachersList.map((t) => (
-                                <option key={t.id} value={t.id}>
-                                    {t.name}
-                                </option>
-                            ))}
-                        </select>
-                    )}
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <button
-                            onClick={() => {
-                                setSelectedStudent(s);
-                                setHistoryOpen(true);
-                            }}
-                            className="p-2 text-neutral-400 hover:text-yellow-500 hover:bg-yellow-500/10 rounded-lg transition-colors"
-                            title="Ver Histórico"
-                            aria-label="Ver Histórico"
-                        >
-                            <Activity size={18} />
-                        </button>
-
-                        {isAdmin && (
-                            <>
-                                <button
-                                    onClick={() => handleToggleStudentStatus(s)}
-                                    className="p-2 text-neutral-400 hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors"
-                                    title="Alterar Status"
-                                    aria-label="Alterar Status"
-                                >
-                                    <Edit size={18} />
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteStudent(s.id)}
-                                    className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                                    title="Excluir Aluno"
-                                    aria-label="Excluir Aluno"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </>
-                        )}
+                <div className="min-w-0">
+                    <div className="font-bold text-white group-hover:text-yellow-500 transition-colors truncate">
+                        {s.name || s.email || 'Sem Nome'}
                     </div>
+                    <div className="text-xs text-neutral-500 truncate">{s.email}</div>
+                </div>
+                {/* Status badge (read-only display) */}
+                <span className={`ml-auto flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${statusBadgeClass(s.status || 'pendente')}`}>
+                    {s.status || 'pendente'}
+                </span>
+            </div>
+
+            {/* Controls row — stop propagation so selects/buttons don't trigger card click */}
+            <div
+                className="flex flex-wrap items-center gap-2"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+                role="none"
+            >
+                {/* Status select — ALL transitions */}
+                {isAdmin && (
+                    <select
+                        className="flex-1 min-w-[120px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
+                        value={s.status || 'pendente'}
+                        onChange={(e) => {
+                            e.stopPropagation();
+                            handleUpdateStudentStatus(s, e.target.value as StatusValue);
+                        }}
+                        title="Alterar status de pagamento"
+                        aria-label="Status de pagamento"
+                    >
+                        {STATUS_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                )}
+
+                {/* Teacher select */}
+                {isAdmin && (
+                    <select
+                        className="flex-1 min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
+                        value={s.teacher_id || ''}
+                        onChange={(e) => {
+                            e.stopPropagation();
+                            handleUpdateStudentTeacher(s.id, e.target.value || null);
+                        }}
+                        title="Atribuir professor"
+                        aria-label="Professor responsável"
+                    >
+                        <option value="">Sem professor</option>
+                        {teachersList.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                    </select>
+                )}
+
+                {/* Icon actions */}
+                <div className="flex items-center gap-1 ml-auto">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setHistoryOpen(true); }}
+                        className="p-2 text-neutral-400 hover:text-yellow-500 hover:bg-yellow-500/10 rounded-lg transition-colors"
+                        title="Ver Histórico"
+                        aria-label="Ver Histórico"
+                    >
+                        <Activity size={16} />
+                    </button>
+
+                    {isAdmin && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }}
+                            className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                            title="Excluir Aluno"
+                            aria-label="Excluir Aluno"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    )}
                 </div>
             </div>
-        );
-    };
+        </div>
+    );
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Search + Filters */}
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 backdrop-blur-sm">
                 <div className="relative w-full md:w-96">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
@@ -140,12 +165,11 @@ export const StudentsTab: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap gap-2 w-full md:w-auto items-center">
-                    {/* Bug #10 fix: pill buttons with live counts — 'cancelar' was missing from old select */}
                     {([
-                        { key: 'all', label: 'Todos', color: 'text-neutral-300 bg-neutral-800 border-neutral-700 hover:border-neutral-600' },
-                        { key: 'pago', label: 'Ativos', color: 'text-green-400  bg-green-500/10  border-green-500/20  hover:border-green-500/40' },
-                        { key: 'pendente', label: 'Pendentes', color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20 hover:border-yellow-500/40' },
-                        { key: 'atrasado', label: 'Atrasados', color: 'text-red-400    bg-red-500/10    border-red-500/20    hover:border-red-500/40' },
+                        { key: 'all', label: 'Todos', color: 'text-neutral-300  bg-neutral-800   border-neutral-700   hover:border-neutral-600' },
+                        { key: 'pago', label: 'Ativos', color: 'text-green-400   bg-green-500/10   border-green-500/20  hover:border-green-500/40' },
+                        { key: 'pendente', label: 'Pendentes', color: 'text-yellow-400  bg-yellow-500/10  border-yellow-500/20 hover:border-yellow-500/40' },
+                        { key: 'atrasado', label: 'Atrasados', color: 'text-red-400     bg-red-500/10     border-red-500/20    hover:border-red-500/40' },
                         { key: 'cancelar', label: 'Cancelados', color: 'text-neutral-400 bg-neutral-700/30 border-neutral-600/30 hover:border-neutral-500/40' },
                     ] as const).map(({ key, label, color }) => {
                         const count = key === 'all'
@@ -178,8 +202,9 @@ export const StudentsTab: React.FC = () => {
                 </div>
             </div>
 
+            {/* Lists */}
             <div className="space-y-8">
-                {/* Meus Alunos (Teacher View) ou Alunos com Professor (Admin View) */}
+                {/* Com Professor */}
                 {(isTeacher || (isAdmin && studentsWithTeacherFiltered.length > 0)) && (
                     <div className="space-y-4">
                         <h3 className="text-sm font-black text-neutral-500 uppercase tracking-widest px-1">
@@ -201,7 +226,7 @@ export const StudentsTab: React.FC = () => {
                     </div>
                 )}
 
-                {/* Alunos Sem Professor (Admin View) */}
+                {/* Sem Professor */}
                 {isAdmin && studentsWithoutTeacherFiltered.length > 0 && (
                     <div className="space-y-4">
                         <h3 className="text-sm font-black text-neutral-500 uppercase tracking-widest px-1">
@@ -213,6 +238,7 @@ export const StudentsTab: React.FC = () => {
                     </div>
                 )}
 
+                {/* Empty state */}
                 {isAdmin && studentsWithTeacherFiltered.length === 0 && studentsWithoutTeacherFiltered.length === 0 && (
                     <div className="text-center py-12 border border-dashed border-neutral-800 rounded-2xl">
                         <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
