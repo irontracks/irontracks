@@ -1058,11 +1058,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
                                     onNormalizeExercises={handleNormalizeExercises}
                                     onApplyTitleRule={handleApplyTitleRule}
-                                    onOpenIronScanner={async () => {
-                                        try {
-                                            openManualWorkoutEditor()
-                                            await alert('No editor, clique em Scanner de Treino (Imagem).', 'Scanner')
-                                        } catch { }
+                                    onOpenIronScanner={() => {
+                                        try { openManualWorkoutEditor() } catch { }
                                     }}
                                 />
                             )}
