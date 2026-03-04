@@ -188,53 +188,59 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 ai: aiToUse || null,
             });
 
-            // Client-side PDF: open HTML in hidden iframe and trigger browser print dialog
-            // This works on both iOS (WKWebView/Safari) and desktop browsers
-            // The browser's native "Save as PDF" handles the conversion
-            try {
-                const printWindow = window.open('', '_blank');
-                if (printWindow) {
-                    printWindow.document.open();
-                    printWindow.document.write(html);
-                    printWindow.document.close();
-                    // Wait for content to render before triggering print
-                    setTimeout(() => {
-                        try {
-                            printWindow.focus();
-                            printWindow.print();
-                        } catch { }
-                    }, 500);
-                } else {
-                    // Fallback: use a hidden iframe if popup is blocked
-                    const iframe = document.createElement('iframe');
-                    iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:none;';
-                    document.body.appendChild(iframe);
-                    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-                    if (iframeDoc) {
-                        iframeDoc.open();
-                        iframeDoc.write(html);
-                        iframeDoc.close();
-                        setTimeout(() => {
-                            try {
-                                iframe.contentWindow?.focus();
-                                iframe.contentWindow?.print();
-                            } catch { }
-                            setTimeout(() => { try { iframe.remove(); } catch { } }, 5000);
-                        }, 500);
+            const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
+            const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`
+
+            // iOS WKWebView blocks window.open() and print().
+            // Web Share API: opens native share sheet → user taps "Print" → save as PDF.
+            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+            if (canShare) {
+                try {
+                    const blob = new Blob([html], { type: 'text/html' })
+                    const file = new File([blob], fileName, { type: 'text/html' })
+                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
+                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
+                    if (canShareFiles) {
+                        await navigator.share({ files: [file], title: `${title} • IronTracks` })
+                    } else {
+                        const url = URL.createObjectURL(blob)
+                        await navigator.share({ title: `${title} • IronTracks`, url })
+                        URL.revokeObjectURL(url)
                     }
+                    setShowExportMenu(false)
+                    return
+                } catch (shareErr) {
+                    const msg = shareErr instanceof Error ? shareErr.message : ''
+                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
+                    // other error: fall through to desktop fallback
                 }
-            } catch {
-                // Last resort: create downloadable HTML file
+            }
+
+            // Desktop fallback: open new tab + native print dialog (Save as PDF)
+            const printWindow = window.open('', '_blank');
+            if (printWindow) {
+                printWindow.document.open();
+                printWindow.document.write(html);
+                printWindow.document.close();
+                setTimeout(() => {
+                    try {
+                        printWindow.focus();
+                        printWindow.print();
+                    } catch { }
+                }, 500);
+            } else {
+                // Last resort: downloadable HTML file
                 const blob = new Blob([html], { type: 'text/html' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'relatorio-irontracks.html';
+                a.download = fileName;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
                 URL.revokeObjectURL(url);
             }
+
         } catch (e: unknown) {
             alert('Não foi possível abrir impressão: ' + (getErrorMessage(e)) + '\nPermita pop-ups para este site.');
         } finally {
