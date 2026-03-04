@@ -36,8 +36,21 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
   const level = getLevel(totalVolumeKg)
   const nextLevelVol = [5000, 20000, 50000, 100000, 250000, 500000, 1000000, 10000000][level - 1] || 10000000
   const prevLevelVol = [0, 5000, 20000, 50000, 100000, 250000, 500000, 1000000][level - 1] || 0
-  
+
   const progressPercent = Math.min(100, Math.max(0, ((totalVolumeKg - prevLevelVol) / (nextLevelVol - prevLevelVol)) * 100))
+
+  // Epic level names
+  const levelNames = [
+    'Iniciante das Ferros',
+    'Soldado de Aço',
+    'Guerreiro de Ferro',
+    'Cavaleiro Blindado',
+    'Titã da Força',
+    'Senhor das Barras',
+    'Mestre Supremo',
+    'Lenda Imortal',
+  ]
+  const levelName = levelNames[(level - 1) % levelNames.length]
 
   const [rankOpen, setRankOpen] = useState(false)
   const [rankLoading, setRankLoading] = useState(false)
@@ -63,11 +76,11 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
     }
     try {
       window.addEventListener('keydown', onKeyDown)
-    } catch {}
+    } catch { }
     return () => {
       try {
         window.removeEventListener('keydown', onKeyDown)
-      } catch {}
+      } catch { }
     }
   }, [rankOpen])
 
@@ -155,39 +168,52 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
         <button
           type="button"
           onClick={() => setRankOpen(true)}
-          className="w-full text-left cursor-pointer bg-neutral-900 border border-neutral-800 rounded-xl p-3 relative overflow-hidden hover:border-yellow-500/30 hover:bg-neutral-900/80 transition-colors active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-yellow-500/40"
+          className="w-full text-left cursor-pointer bg-gradient-to-br from-neutral-900 to-neutral-950 border border-neutral-700/80 rounded-2xl p-4 relative overflow-hidden hover:border-yellow-500/50 transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-yellow-500/40 shadow-lg"
           aria-label="Abrir ranking Iron Rank"
         >
-          <div className="absolute top-0 right-0 p-3 opacity-10">
-            <Crown size={48} />
+          {/* Gold glow background for high levels */}
+          {level >= 5 && (
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-amber-500/3 to-transparent pointer-events-none" />
+          )}
+          <div className="absolute top-0 right-0 p-4 opacity-8">
+            <Crown size={52} className={level >= 5 ? 'text-yellow-500' : 'text-neutral-600'} />
           </div>
-          
-          <div className="flex items-center gap-3 mb-2 relative z-10">
-            <div className="bg-yellow-500 text-black font-black text-xs px-2 py-1 rounded">
-              NÍVEL {level}
+
+          <div className="flex items-center gap-3 mb-3 relative z-10">
+            <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-black text-xs px-2.5 py-1 rounded-lg shadow-sm shadow-yellow-500/20">
+              NIV {level}
             </div>
-            <span className="text-neutral-400 text-xs font-bold uppercase tracking-wider">
-              Iron Rank
-            </span>
+            <div>
+              <div className="text-yellow-500 text-[11px] font-black uppercase tracking-widest">Iron Rank</div>
+              <div className="text-white font-black text-sm leading-tight">{levelName}</div>
+            </div>
             {currentStreak > 0 && (
-              <span className="ml-auto text-[11px] text-neutral-400 font-bold">
-                <span className="text-orange-400">{currentStreak}</span> dia(s)
-              </span>
+              <div className="ml-auto flex items-center gap-1 bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1">
+                <span className="text-base leading-none">🔥</span>
+                <span className="text-orange-400 font-black text-xs">{currentStreak}d</span>
+              </div>
             )}
           </div>
 
           <div className="relative z-10">
-            <div className="flex justify-between text-[11px] text-neutral-500 mb-1">
+            <div className="flex justify-between text-[10px] text-neutral-500 mb-1.5">
               <span>{totalVolumeKg.toLocaleString('pt-BR')}kg levantados</span>
-              <span>{nextLevelVol.toLocaleString('pt-BR')}kg</span>
+              <span className="text-yellow-500/70 font-bold">{Math.round(progressPercent)}%</span>
             </div>
-            <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
-              <motion.div 
+            {/* Taller progress bar with shimmer */}
+            <div className="h-3 bg-neutral-800 rounded-full overflow-hidden">
+              <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progressPercent}%` }}
                 transition={{ duration: 1, ease: "easeOut" }}
-                className="h-full bg-gradient-to-r from-yellow-600 to-yellow-400"
-              />
+                className="h-full bg-gradient-to-r from-yellow-600 via-amber-400 to-yellow-300 rounded-full relative"
+              >
+                {/* Shimmer overlay */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_ease-in-out_infinite]" />
+              </motion.div>
+            </div>
+            <div className="text-[10px] text-neutral-600 mt-1 text-right">
+              Próximo nível: {nextLevelVol.toLocaleString('pt-BR')}kg
             </div>
           </div>
         </button>
@@ -253,14 +279,26 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
                     const isMe = safeCurrentUserId && row.userId === safeCurrentUserId
                     const role = roleLabel(row.role)
                     const name = row.displayName || `Usuário ${row.userId.slice(0, 6)}`
+                    const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null
                     return (
                       <div
                         key={row.userId}
-                        className={`flex items-center gap-3 bg-neutral-800 border rounded-xl p-3 ${
-                          isMe ? 'border-yellow-500/40' : 'border-neutral-700'
-                        }`}
+                        className={[
+                          'flex items-center gap-3 border rounded-xl p-3 transition-colors',
+                          isMe
+                            ? 'bg-yellow-500/10 border-yellow-500/40 shadow-sm shadow-yellow-500/10'
+                            : idx < 3
+                              ? 'bg-neutral-800/80 border-neutral-700'
+                              : 'bg-neutral-900/50 border-neutral-800',
+                        ].join(' ')}
                       >
-                        <div className="w-8 text-center font-black text-neutral-400 tabular-nums">#{idx + 1}</div>
+                        <div className="w-8 text-center font-black tabular-nums">
+                          {medal ? (
+                            <span className="text-lg leading-none">{medal}</span>
+                          ) : (
+                            <span className="text-neutral-500 text-sm">#{idx + 1}</span>
+                          )}
+                        </div>
                         <div className="w-10 h-10 rounded-xl overflow-hidden bg-neutral-900 border border-neutral-700 flex items-center justify-center shrink-0">
                           {row.photoUrl ? (
                             <Image src={row.photoUrl} alt="Perfil" width={40} height={40} className="w-full h-full object-cover" />
@@ -271,15 +309,15 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-black text-white truncate">{name}</div>
-                          <div className="mt-1">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-lg border text-[10px] font-black uppercase tracking-widest ${role.cls}`}>
+                          <div className={['text-sm font-black truncate', isMe ? 'text-yellow-400' : 'text-white'].join(' ')}>{name}{isMe ? ' (você)' : ''}</div>
+                          <div className="mt-0.5">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md border text-[10px] font-black uppercase tracking-widest ${role.cls}`}>
                               {role.label}
                             </span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <div className="text-[11px] text-neutral-500 font-bold uppercase tracking-widest">Volume</div>
+                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-widest">Volume</div>
                           <div className="text-sm font-black text-yellow-500 tabular-nums">
                             {Math.round(row.totalVolumeKg).toLocaleString('pt-BR')}kg
                           </div>
