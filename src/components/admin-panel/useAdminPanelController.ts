@@ -551,9 +551,9 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         }
     };
 
-    const handleToggleStudentStatus = async (student: AdminUser) => {
-        const newStatus = student.status === 'pago' ? 'pendente' : 'pago';
-        if (!(await confirm(`Mudar status de ${student.name} para ${newStatus}?`))) return;
+    const handleUpdateStudentStatus = async (student: AdminUser, newStatus: string) => {
+        if (!newStatus || newStatus === student.status) return;
+        if (!(await confirm(`Mudar status de ${student.name || student.email} para "${newStatus}"?`))) return;
         try {
             const { error } = await supabase
                 .from('students')
@@ -567,6 +567,12 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
             await alert('Erro ao atualizar status: ' + msg);
         }
+    };
+
+    // Keep legacy alias for backward compat
+    const handleToggleStudentStatus = async (student: AdminUser) => {
+        const newStatus = student.status === 'pago' ? 'pendente' : 'pago';
+        return handleUpdateStudentStatus(student, newStatus);
     };
 
     const handleDeleteStudent = async (studentId: string) => {
@@ -2134,6 +2140,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         handleSendBroadcast,
         handleUpdateStudentTeacher,
         handleToggleStudentStatus,
+        handleUpdateStudentStatus,
         handleDeleteStudent,
         getAdminAuthHeaders,
 
