@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
     const { data: story, error: sErr } = await admin
       .from('social_stories')
-      .select('id, user_id, author_id, media_url, media_path, media_type, created_at, expires_at, text_overlay')
+      .select('*')
       .eq('id', storyId)
       .maybeSingle()
 
@@ -80,9 +80,10 @@ export async function POST(req: Request) {
       } catch { }
     }
 
-    await admin.from('social_story_views').delete().eq('story_id', storyId)
-    await admin.from('social_story_likes').delete().eq('story_id', storyId)
-    await admin.from('social_story_comments').delete().eq('story_id', storyId)
+    // Cleanup related records — best-effort
+    try { await admin.from('social_story_views').delete().eq('story_id', storyId) } catch { }
+    try { await admin.from('social_story_likes').delete().eq('story_id', storyId) } catch { }
+    try { await admin.from('social_story_comments').delete().eq('story_id', storyId) } catch { }
 
     const { error: dErr } = await admin.from('social_stories').delete().eq('id', storyId)
     if (dErr) return NextResponse.json({ ok: false, error: dErr.message }, { status: 400 })
