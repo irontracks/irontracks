@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Crown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
@@ -128,7 +128,7 @@ const writeCache = (key: string, data: ApiPayload) => {
   } catch { }
 }
 
-export default function MuscleMapCard(props: Props) {
+const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
   const [period, setPeriod] = useState<'day' | 'week'>(props.defaultViewMode || 'week')
   const [selectedDate, setSelectedDate] = useState(localIsoDate)
   const [view, setView] = useState<'front' | 'back'>('front')
@@ -774,4 +774,6 @@ export default function MuscleMapCard(props: Props) {
       </AnimatePresence >
     </div >
   )
-}
+});
+
+export default MuscleMapCard;

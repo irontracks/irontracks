@@ -100,8 +100,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     // Use shared formatters
     const formatDate = sharedFormatDate;
-    const formatDuration = sharedFormatDuration;
-    const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {};
 

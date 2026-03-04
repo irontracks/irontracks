@@ -4,6 +4,7 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
 import { classifyError, hashString } from '@/utils/errorClassification';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 const getAppVersion = () => {
   try {
@@ -13,16 +14,6 @@ const getAppVersion = () => {
   }
 };
 
-const getErrorMessage = (errLike: unknown) => {
-  try {
-    if (!errLike) return 'Erro desconhecido';
-    if (typeof errLike === 'string') return errLike;
-    if ((errLike as Error)?.message) return String((errLike as Error).message);
-    return String(errLike);
-  } catch {
-    return 'Erro desconhecido';
-  }
-};
 
 const getErrorStack = (errLike: unknown) => {
   try {

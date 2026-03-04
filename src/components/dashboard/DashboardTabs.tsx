@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 type DashboardTabsProps = {
   view: 'dashboard' | 'assessments' | 'community' | 'vip'
   onChangeView: (next: 'dashboard' | 'assessments' | 'community' | 'vip') => void
@@ -9,7 +10,7 @@ type DashboardTabsProps = {
   vipLocked: boolean
 }
 
-export const DashboardTabs = ({
+export const DashboardTabs = memo(({
   view,
   onChangeView,
   showCommunityTab,
@@ -80,4 +81,5 @@ export const DashboardTabs = ({
       </div>
     </div>
   )
-}
+})  // end memo
+

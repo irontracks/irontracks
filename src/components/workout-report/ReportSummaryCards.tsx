@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { memo, useEffect, useRef, useState } from 'react'
 import { TrendingUp, TrendingDown, Flame, Clock, Dumbbell, Trophy } from 'lucide-react'
 import { formatDuration, formatKm, formatKmh } from '@/utils/report/formatters'
 
@@ -31,7 +31,7 @@ function useCountUp(target: number, duration = 900) {
     return value
 }
 
-export const ReportSummaryCards = ({
+export const ReportSummaryCards = memo(({
     session,
     currentVolume,
     volumeDelta,
@@ -127,4 +127,5 @@ export const ReportSummaryCards = ({
             )}
         </>
     )
-}
+})  // end memo
+

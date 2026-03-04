@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { memo, useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
@@ -36,7 +36,7 @@ const formatMonthTitle = (d: Date) => {
   }
 }
 
-export default function WorkoutCalendarModal(props: Props) {
+const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
   const isOpen = !!props.isOpen
   const uid = props.userId ? String(props.userId) : ''
   const [view, setView] = useState<'month' | 'week'>('month')
@@ -83,53 +83,53 @@ export default function WorkoutCalendarModal(props: Props) {
     if (!uid) return
     const supabase = createClient()
     let cancelled = false
-    ;(async () => {
-      try {
-        setLoading(true)
-        const startIso = range.start.toISOString()
-        const endIso = new Date(range.end.getTime() + 24 * 60 * 60 * 1000 - 1).toISOString()
-        const { data, error } = await supabase
-          .from('workouts')
-          .select('id, user_id, date, name, notes')
-          .eq('user_id', uid)
-          .eq('is_template', false)
-          .gte('date', startIso)
-          .lte('date', endIso)
-          .order('date', { ascending: true })
-          .limit(2000)
-        if (error) throw error
-        if (cancelled) return
-        const list = Array.isArray(data) ? data : []
-        setRows(list)
-        const ids = list.map((w) => String(w?.id || '').trim()).filter(Boolean)
-        if (!ids.length) {
+      ; (async () => {
+        try {
+          setLoading(true)
+          const startIso = range.start.toISOString()
+          const endIso = new Date(range.end.getTime() + 24 * 60 * 60 * 1000 - 1).toISOString()
+          const { data, error } = await supabase
+            .from('workouts')
+            .select('id, user_id, date, name, notes')
+            .eq('user_id', uid)
+            .eq('is_template', false)
+            .gte('date', startIso)
+            .lte('date', endIso)
+            .order('date', { ascending: true })
+            .limit(2000)
+          if (error) throw error
+          if (cancelled) return
+          const list = Array.isArray(data) ? data : []
+          setRows(list)
+          const ids = list.map((w) => String(w?.id || '').trim()).filter(Boolean)
+          if (!ids.length) {
+            setCheckinsByWorkoutId({})
+            return
+          }
+          const { data: chkData } = await supabase
+            .from('workout_checkins')
+            .select('workout_id, kind')
+            .in('workout_id', ids)
+            .limit(5000)
+          if (cancelled) return
+          const map: Record<string, { pre: boolean; post: boolean }> = {}
+          for (const r of Array.isArray(chkData) ? chkData : []) {
+            const wid = String((r as Record<string, unknown>)?.workout_id || '').trim()
+            if (!wid) continue
+            const kind = String((r as Record<string, unknown>)?.kind || '').trim()
+            if (!map[wid]) map[wid] = { pre: false, post: false }
+            if (kind === 'pre') map[wid].pre = true
+            if (kind === 'post') map[wid].post = true
+          }
+          setCheckinsByWorkoutId(map)
+        } catch {
+          if (cancelled) return
+          setRows([])
           setCheckinsByWorkoutId({})
-          return
+        } finally {
+          if (!cancelled) setLoading(false)
         }
-        const { data: chkData } = await supabase
-          .from('workout_checkins')
-          .select('workout_id, kind')
-          .in('workout_id', ids)
-          .limit(5000)
-        if (cancelled) return
-        const map: Record<string, { pre: boolean; post: boolean }> = {}
-        for (const r of Array.isArray(chkData) ? chkData : []) {
-          const wid = String((r as Record<string, unknown>)?.workout_id || '').trim()
-          if (!wid) continue
-          const kind = String((r as Record<string, unknown>)?.kind || '').trim()
-          if (!map[wid]) map[wid] = { pre: false, post: false }
-          if (kind === 'pre') map[wid].pre = true
-          if (kind === 'post') map[wid].post = true
-        }
-        setCheckinsByWorkoutId(map)
-      } catch {
-        if (cancelled) return
-        setRows([])
-        setCheckinsByWorkoutId({})
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    })()
+      })()
     return () => {
       cancelled = true
     }
@@ -153,8 +153,8 @@ export default function WorkoutCalendarModal(props: Props) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe">
-      <div className="w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div role="presentation" className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe">
+      <div role="dialog" aria-modal="true" aria-label="Calendário de treinos" className="w-full max-w-3xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Calendário</div>
@@ -246,19 +246,18 @@ export default function WorkoutCalendarModal(props: Props) {
               const hasWorkout = dayWorkouts.length > 0
               const hasAnyCheckin = hasWorkout
                 ? dayWorkouts.some((w) => {
-                    const wid = String(w?.id || '').trim()
-                    const chk = wid ? checkinsByWorkoutId[wid] : null
-                    return !!(chk?.pre || chk?.post)
-                  })
+                  const wid = String(w?.id || '').trim()
+                  const chk = wid ? checkinsByWorkoutId[wid] : null
+                  return !!(chk?.pre || chk?.post)
+                })
                 : false
               return (
                 <button
                   key={iso}
                   type="button"
                   onClick={() => setSelectedDayIso(iso)}
-                  className={`min-h-[54px] rounded-xl border text-left p-2 transition-colors ${
-                    selectedDayIso === iso ? 'border-yellow-500/50 bg-yellow-500/10' : 'border-neutral-800 bg-neutral-950/30 hover:bg-neutral-950/50'
-                  }`}
+                  className={`min-h-[54px] rounded-xl border text-left p-2 transition-colors ${selectedDayIso === iso ? 'border-yellow-500/50 bg-yellow-500/10' : 'border-neutral-800 bg-neutral-950/30 hover:bg-neutral-950/50'
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className={`text-sm font-black ${inMonth ? 'text-white' : 'text-neutral-600'}`}>{d.getDate()}</div>
@@ -321,4 +320,6 @@ export default function WorkoutCalendarModal(props: Props) {
       </div>
     </div>
   )
-}
+});
+
+export default WorkoutCalendarModal;

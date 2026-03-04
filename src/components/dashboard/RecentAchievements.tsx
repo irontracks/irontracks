@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { memo, useEffect, useState } from 'react'
 import { Trophy, TrendingUp, X, ChevronDown } from 'lucide-react'
 import { getLatestWorkoutPrs } from '@/actions/workout-actions'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -26,7 +26,7 @@ type RecentAchievementsProps = {
   reloadKey?: number
 }
 
-export default function RecentAchievements({ userId, badges, showBadges = false, reloadKey }: RecentAchievementsProps) {
+const RecentAchievements = memo(function RecentAchievements({ userId, badges, showBadges = false, reloadKey }: RecentAchievementsProps) {
   const [prs, setPrs] = useState<PrData[]>([])
   const [workoutTitle, setWorkoutTitle] = useState<string>('')
   const [workoutDateIso, setWorkoutDateIso] = useState<string>('')
@@ -219,4 +219,6 @@ export default function RecentAchievements({ userId, badges, showBadges = false,
       )}
     </AnimatePresence>
   )
-}
+});
+
+export default RecentAchievements;
