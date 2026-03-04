@@ -248,12 +248,25 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     useEffect(() => {
         if (!isFinished) return;
-        if (notifyIdRef.current) {
-            cancelRestNotification(notifyIdRef.current);
-            // Update Live Activity to finished state (green "BORAAAA" + count up)
-            updateRestLiveActivity(notifyIdRef.current, true);
-        }
-    }, [isFinished]);
+        if (!notifyIdRef.current) return;
+
+        // Immediately mark Live Activity as finished and start count-up
+        const id = notifyIdRef.current;
+        cancelRestNotification(id);
+
+        // Update every second with elapsedSeconds so the Lock Screen shows count-up
+        const startedFinishAt = targetTime ?? Date.now();
+        const tick = () => {
+            const elapsed = Math.round((Date.now() - startedFinishAt) / 1000);
+            updateRestLiveActivity(id, true, Math.max(0, elapsed));
+        };
+        tick(); // immediate first update
+        const liveActivityInterval = setInterval(tick, 1000);
+
+        return () => {
+            clearInterval(liveActivityInterval);
+        };
+    }, [isFinished, targetTime]);
 
     // Wake Lock: keep screen on while timer is running, re-acquire on page visible
     useEffect(() => {
