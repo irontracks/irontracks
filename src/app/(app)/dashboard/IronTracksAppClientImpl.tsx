@@ -193,6 +193,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleUpdateSessionLog,
         handleStartTimer,
         handleCloseTimer,
+        handleTimerFinish,
     } = useActiveSession({ userId: user?.id })
 
     useNativeDeepLinks()
@@ -1375,6 +1376,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             activeSession={activeSession}
                             handleCloseTimer={handleCloseTimer}
                             handleStartFromRestTimer={handleStartFromRestTimer}
+                            handleTimerFinish={handleTimerFinish}
                             view={view}
                             setView={setView}
                             sessionTicker={sessionTicker}

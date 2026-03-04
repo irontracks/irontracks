@@ -43,6 +43,8 @@ export type UseActiveSessionReturn = {
     handleUpdateSessionLog: (key: string, data: unknown) => void
     handleStartTimer: (duration: number, context: unknown) => void
     handleCloseTimer: () => void
+    handleTimerFinish: (context?: unknown) => void
+    handleStartFromRestTimer: (context?: unknown) => void
     handleFinishSession: (
         sessionData: unknown,
         showReport: boolean | undefined,
@@ -123,6 +125,46 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
         )
     }, [])
 
+    /**
+     * Called by RestTimerOverlay.onFinish (and onClose).
+     * Calculates restSeconds from restStartMs stored in the log and writes
+     * setStartMs = now so the next set's execution time can be tracked.
+     */
+    const handleTimerFinish = useCallback((context?: unknown) => {
+        // 1. Close the timer UI
+        setActiveSession((prev) => {
+            if (!prev) return prev
+            // 2. Read key from context (prefer arg, fall back to stored timerContext)
+            const ctx = context && typeof context === 'object' ? context as Record<string, unknown>
+                : prev.timerContext && typeof prev.timerContext === 'object' ? prev.timerContext as Record<string, unknown>
+                    : null
+            const key = ctx?.key ? String(ctx.key) : null
+            const now = Date.now()
+            let next = { ...prev, timerTargetTime: null as number | null, timerContext: null as unknown }
+            if (key) {
+                // 3. Find restStartMs in current logs
+                const logs = prev.logs && typeof prev.logs === 'object' ? prev.logs as Record<string, unknown> : {}
+                const logEntry = logs[key] && typeof logs[key] === 'object' ? logs[key] as Record<string, unknown> : null
+                const restStartMs = logEntry && typeof logEntry.restStartMs === 'number' && logEntry.restStartMs > 0 ? logEntry.restStartMs : null
+                const patch: Record<string, unknown> = { setStartMs: now }
+                if (restStartMs) {
+                    const restSec = Math.round((now - restStartMs) / 1000)
+                    if (restSec > 0 && restSec < 86400) patch.restSeconds = restSec
+                }
+                next = {
+                    ...next,
+                    logs: { ...logs, [key]: { ...(logEntry || {}), ...patch } },
+                } as unknown as typeof next
+            }
+            return next as unknown as ActiveWorkoutSession
+        })
+    }, [])
+
+    /** Called by RestTimerOverlay.onStart (user taps START before timer ends) */
+    const handleStartFromRestTimer = useCallback((context?: unknown) => {
+        handleTimerFinish(context)
+    }, [handleTimerFinish])
+
     const handleFinishSession = useCallback(
         (
             sessionData: unknown,
@@ -173,6 +215,8 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
         handleUpdateSessionLog,
         handleStartTimer,
         handleCloseTimer,
+        handleTimerFinish,
+        handleStartFromRestTimer,
         handleFinishSession,
     }
 }
