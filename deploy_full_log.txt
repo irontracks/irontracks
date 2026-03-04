@@ -1,0 +1,638 @@
+
+> iron-tracks@4.0.0 deploy
+> npm run lint && npx tsc --noEmit && git add -A && (git diff-index --quiet HEAD || git commit -m "deploy: $(date +%Y-%m-%d-%H%M)") && git push origin main
+
+
+> iron-tracks@4.0.0 lint
+> node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs .
+
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/app/(app)/dashboard/IronTracksAppClientImpl.tsx
+   243:8   warning  React Hook useEffect has a missing dependency: 'openVipView'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  1027:37  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  1029:37  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  1031:37  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/app/auth/recovery/recovery-client.tsx
+  178:15  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  180:17  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  200:15  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  201:15  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/AdminWorkoutEditor.tsx
+   99:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  123:29  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  131:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  133:41  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  149:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  150:37  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  157:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  158:37  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  167:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  168:37  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  176:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  177:37  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  184:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  200:33  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  201:33  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  209:33  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  210:33  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/ChatDirectScreen.tsx
+  632:83  warning  A control must be associated with a text label                               jsx-a11y/control-has-associated-label
+  632:83  warning  Media elements such as <audio> and <video> must have a <track> for captions  jsx-a11y/media-has-caption
+  683:6   warning  A control must be associated with a text label                               jsx-a11y/control-has-associated-label
+  684:6   warning  A control must be associated with a text label                               jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/ChatListScreen.tsx
+  214:29  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  241:29  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/ChatScreen.tsx
+  561:45  warning  A control must be associated with a text label                               jsx-a11y/control-has-associated-label
+  561:45  warning  Media elements such as <audio> and <video> must have a <track> for captions  jsx-a11y/media-has-caption
+  598:25  warning  A control must be associated with a text label                               jsx-a11y/control-has-associated-label
+  603:29  warning  A control must be associated with a text label                               jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/CoachChatModal.tsx
+  282:29  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/ExecutionVideoCapture.tsx
+  343:7  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/ExerciseEditor.tsx
+   949:29  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   952:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1020:49  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1033:49  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1057:57  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1059:61  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1075:57  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1076:57  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1084:57  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1088:57  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1097:57  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1098:57  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1106:57  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1110:57  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1160:65  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1181:61  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1189:61  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1190:61  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/ExerciseEditor/CardioFields.tsx
+   66:21  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   81:21  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   98:33  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  109:33  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  120:33  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  131:33  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  164:29  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  175:29  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  187:29  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  198:29  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/ExerciseEditor/SetDetailsSection.tsx
+   86:41  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   96:41  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  106:41  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  138:45  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  152:45  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  191:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  197:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  203:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  209:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  221:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  227:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  233:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  239:37  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/GlobalDialog.tsx
+  79:7  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/HistoryList.tsx
+  1309:45  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1309:45  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1369:33  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1369:33  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1409:17  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1409:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1410:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1410:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1420:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1421:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1424:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1425:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1428:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1429:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1433:37  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1454:61  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1455:61  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1458:61  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1459:61  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1462:61  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1463:61  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1466:61  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1467:61  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1471:57  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1474:65  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1479:57  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1482:65  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1517:17  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1517:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1518:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1518:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1621:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1695:17  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1695:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1696:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1696:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1703:37  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1704:37  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1707:37  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1708:37  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1712:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1713:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1716:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1717:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1725:49  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1726:49  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1729:49  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1730:49  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1733:49  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1734:49  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1737:49  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1738:49  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1742:45  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1745:53  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1750:45  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  1753:53  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1769:17  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1769:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1770:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1770:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/InviteManager.tsx
+  277:25  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  282:29  warning  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/LoginScreen.tsx
+   646:45  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   661:45  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   755:41  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   974:41  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   975:41  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   986:41  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   987:41  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1000:45  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1001:45  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1011:45  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1012:45  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1026:49  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1041:49  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  1042:49  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/NotificationCenter.tsx
+  376:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  376:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/NotificationToast.tsx
+  66:5  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  66:5  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/OfflineSyncModal.tsx
+  60:5  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  60:5  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  61:7  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  61:7  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/RestTimerOverlay.tsx
+  194:8   warning  React Hook useEffect has a missing dependency: 'continuousAlarm'. Either include it or remove the dependency array                                                                                 react-hooks/exhaustive-deps
+  209:13  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  209:13  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/SettingsModal.tsx
+    32:3   warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   491:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1188:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1188:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1189:13  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1189:13  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/StoryComposer.tsx
+  1373:23  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  1387:21  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  1452:23  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  1688:11  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/VipHub.tsx
+  652:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/WorkoutReport.tsx
+  793:25  warning  <iframe> elements must have a unique title property  jsx-a11y/iframe-has-title
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/AdminPanelHeader.tsx
+  116:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  116:9   warning  Non-interactive elements should not be assigned mouse or keyboard event listeners                                                                                                                  jsx-a11y/no-noninteractive-element-interactions
+  123:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  123:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/ErrorsTab.tsx
+  26:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/Modals.tsx
+   58:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+   59:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   66:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+   67:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   93:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+   94:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  101:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  102:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  109:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  110:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  136:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  137:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  144:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  145:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  152:33  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+  153:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  172:17  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  172:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  173:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  173:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  186:29  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  186:29  warning  Media elements such as <audio> and <video> must have a <track> for captions                                                                                                                        jsx-a11y/media-has-caption
+  194:17  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  194:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  195:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  195:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/StudentDetailPanel.tsx
+   137:37  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+   138:37  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   141:37  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+   142:37  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   477:49  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   477:49  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   495:37  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   495:37  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   721:61  warning  A form label must be associated with a control                                                                                                                                                     jsx-a11y/label-has-associated-control
+   722:61  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1023:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1023:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1025:25  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1025:25  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1087:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1087:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1089:25  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1089:25  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1119:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1119:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1121:25  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1121:25  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1141:21  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1141:21  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1143:25  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1143:25  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1156:33  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1156:33  warning  Media elements such as <audio> and <video> must have a <track> for captions                                                                                                                        jsx-a11y/media-has-caption
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/StudentsTab.tsx
+   73:17  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   73:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  133:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/SystemTab.tsx
+  236:25  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  264:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  270:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  294:25  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  309:25  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  310:25  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  318:25  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  319:25  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  327:25  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  339:25  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  340:25  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  482:33  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  506:33  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  530:33  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/TeachersTab.tsx
+  54:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  75:25  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  75:25  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/TemplatesTab.tsx
+  43:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin-panel/VideosTab.tsx
+  58:26  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/admin/AdminVipReports.tsx
+  386:37  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  405:37  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/AssessmentButton.tsx
+  227:7   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  227:7   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  228:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  228:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  295:11  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  303:13  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  369:9   warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/AssessmentForm.tsx
+  329:15  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/AssessmentHeader.tsx
+  83:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/AssessmentHistory.tsx
+  1071:15  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1441:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1441:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1442:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1442:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1598:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1598:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1599:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1599:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1618:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1618:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1619:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1619:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/BasicInfoStep.tsx
+   50:11  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   54:11  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   70:11  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   75:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   94:11  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+   99:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  118:11  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  123:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  142:11  warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  148:15  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  159:15  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/MeasurementStep.tsx
+  104:15  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  170:9   warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  173:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/PhotoUploadStep.tsx
+  164:17  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  195:7   warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/assessment/SkinfoldStep.tsx
+  180:19  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  264:9   warning  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  267:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/dashboard/MuscleMapCard.tsx
+  337:7   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  432:19  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  660:19  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/dashboard/StudentDashboard3.tsx
+   131:7   warning  A control must be associated with a text label                                                                                                                                                                                    jsx-a11y/control-has-associated-label
+   250:9   warning  The 'workouts' conditional could make the dependencies of useMemo Hook (at line 291) change on every render. Move it inside the useMemo callback. Alternatively, wrap the initialization of 'workouts' in its own useMemo() Hook  react-hooks/exhaustive-deps
+   662:13  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                                                    jsx-a11y/click-events-have-key-events
+   662:13  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element                                 jsx-a11y/no-static-element-interactions
+   663:15  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                                                    jsx-a11y/click-events-have-key-events
+   663:15  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element                                 jsx-a11y/no-static-element-interactions
+   853:23  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                                                    jsx-a11y/click-events-have-key-events
+   853:23  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element                                 jsx-a11y/no-static-element-interactions
+  1013:15  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                                                    jsx-a11y/click-events-have-key-events
+  1013:15  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element                                 jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/dashboard/WorkoutWizardModal.tsx
+  455:19  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/dashboard/nutrition/NutritionMixer.tsx
+  488:11  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/muscle-map/BodyMapSvg.tsx
+  144:7   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  144:7   warning  Non-interactive elements should not be assigned mouse or keyboard event listeners                                                                                                                                                                                                        jsx-a11y/no-noninteractive-element-interactions
+  335:7   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                                                                                                           jsx-a11y/click-events-have-key-events
+  335:7   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element                                                                                        jsx-a11y/no-static-element-interactions
+  374:9   warning  A form label must be associated with a control                                                                                                                                                                                                                                           jsx-a11y/label-has-associated-control
+  388:9   warning  A form label must be associated with a control                                                                                                                                                                                                                                           jsx-a11y/label-has-associated-control
+  390:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  391:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  394:9   warning  A form label must be associated with a control                                                                                                                                                                                                                                           jsx-a11y/label-has-associated-control
+  396:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  397:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  400:9   warning  A form label must be associated with a control                                                                                                                                                                                                                                           jsx-a11y/label-has-associated-control
+  402:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  403:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  406:9   warning  A form label must be associated with a control                                                                                                                                                                                                                                           jsx-a11y/label-has-associated-control
+  408:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  409:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+  414:9   warning  A form label must be associated with a control                                                                                                                                                                                                                                           jsx-a11y/label-has-associated-control
+  416:11  warning  A control must be associated with a text label                                                                                                                                                                                                                                           jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/onboarding/GuidedTour.tsx
+  124:7  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  124:7  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/stories/StoryCreatorModal.tsx
+  446:25  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  463:33  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  516:37  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  517:41  warning  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+  526:45  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  595:45  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  614:45  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  648:41  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+  670:41  warning  A control must be associated with a text label                                                 jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/stories/StoryViewer.tsx
+  267:5   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+  470:7   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener  jsx-a11y/click-events-have-key-events
+  543:23  warning  A control must be associated with a text label                                                  jsx-a11y/control-has-associated-label
+  543:23  warning  Media elements such as <audio> and <video> must have a <track> for captions                     jsx-a11y/media-has-caption
+  664:19  warning  A control must be associated with a text label                                                  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/vip/VipPeriodizationPanel.tsx
+  557:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  567:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/workout-report/ExerciseTrendPanel.tsx
+  35:19  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/workout-report/MuscleTrend4wPanel.tsx
+  44:21  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/workout/Modals.tsx
+   172:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   172:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   181:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   181:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   299:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   299:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   327:15  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   327:15  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   364:23  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   375:23  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   425:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   425:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   426:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   426:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   443:17  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   454:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   465:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   497:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   497:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   498:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   498:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   516:17  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   527:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   538:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   587:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   587:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   588:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   588:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   651:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   651:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   655:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   655:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   714:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   728:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   742:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   830:25  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   846:25  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   877:17  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   917:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   917:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   921:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+   921:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+   953:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   963:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+   973:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1034:25  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1044:25  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1068:17  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1103:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1103:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1116:15  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1116:15  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1187:29  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1203:29  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1255:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1255:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1256:13  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1256:13  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1275:23  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1276:23  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1297:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1297:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1298:13  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1298:13  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1324:23  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1325:23  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1341:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1341:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1342:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1342:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1356:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1360:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1368:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1372:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1376:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1380:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1395:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1395:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1396:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1396:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1410:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1414:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1430:17  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1443:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1443:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1444:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1444:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1458:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1462:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1466:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1470:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1484:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1484:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1485:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1485:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1499:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1503:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1507:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1511:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1525:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1525:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1526:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1526:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1540:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1544:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1548:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1552:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1566:9   warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1566:9   warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1567:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1567:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1580:17  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1585:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1590:17  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1607:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1607:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1608:13  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1608:13  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1622:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1639:25  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1643:25  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1647:25  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1654:19  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1680:11  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1680:11  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1681:13  warning  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  1681:13  warning  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  1695:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1699:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+  1703:21  warning  A control must be associated with a text label                                                                                                                                                     jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/workout/SetInputRow.tsx
+  154:11  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/components/workout/SetRenderers.tsx
+    91:11  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   102:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   119:13  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   174:11  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   252:11  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   346:7   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   436:11  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   545:17  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   574:7   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   717:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   802:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   866:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   927:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+   983:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1039:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1095:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1151:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1209:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1273:23  warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1312:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1320:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1328:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+  1370:9   warning  A control must be associated with a text label  jsx-a11y/control-has-associated-label
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/contexts/ToastContext.tsx
+  30:14  warning  The ref value 'timers.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'timers.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+/Users/macmini/Documents/Projetos programação (trae)/App IronTracks/src/hooks/useOfflineSync.ts
+  94:11  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+✖ 512 problems (0 errors, 512 warnings)
+  0 errors and 5 warnings potentially fixable with the `--fix` option.
+
