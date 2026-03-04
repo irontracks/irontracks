@@ -1,5 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useAdminNavigation } from './hooks/useAdminNavigation';
+import { useAdminTeacherDetail } from './hooks/useAdminTeacherDetail';
+import { useAdminUserActivity } from './hooks/useAdminUserActivity';
 
 import { useRouter } from 'next/navigation';
 import { AdminUser, AdminTeacher, ErrorReport, ExecutionVideo, AdminWorkoutTemplate } from '@/types/admin';
@@ -86,19 +88,25 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     // Selected Items
     const [selectedTeacher, setSelectedTeacher] = useState<AdminTeacher | null>(null);
     const [selectedStudent, setSelectedStudent] = useState<AdminUser | null>(null);
-    const [teacherDetailTab, setTeacherDetailTab] = useState<string>('students');
 
-    // Teacher Details
-    const [teacherStudents, setTeacherStudents] = useState<AdminUser[]>([]);
-    const [teacherStudentsLoading, setTeacherStudentsLoading] = useState<boolean>(false);
-    const [teacherTemplatesRows, setTeacherTemplatesRows] = useState<AdminWorkoutTemplate[]>([]);
-    const [teacherTemplatesLoading, setTeacherTemplatesLoading] = useState<boolean>(false);
-    const [teacherTemplatesCursor, setTeacherTemplatesCursor] = useState<string | null>(null);
-    const [teacherHistoryRows, setTeacherHistoryRows] = useState<UnknownRecord[]>([]);
-    const [teacherHistoryLoading, setTeacherHistoryLoading] = useState<boolean>(false);
-    const [teacherHistoryCursor, setTeacherHistoryCursor] = useState<{ cursor_date?: string; cursor_created_at?: string } | null>(null);
-    const [teacherInboxItems, setTeacherInboxItems] = useState<AdminUser[]>([]);
-    const [teacherInboxLoading, setTeacherInboxLoading] = useState<boolean>(false);
+    const {
+        teacherDetailTab, setTeacherDetailTab,
+        teacherStudents, setTeacherStudents,
+        teacherStudentsLoading, setTeacherStudentsLoading,
+        teacherTemplatesRows, setTeacherTemplatesRows,
+        teacherTemplatesLoading, setTeacherTemplatesLoading,
+        teacherTemplatesCursor, setTeacherTemplatesCursor,
+        teacherHistoryRows, setTeacherHistoryRows,
+        teacherHistoryLoading, setTeacherHistoryLoading,
+        teacherHistoryCursor, setTeacherHistoryCursor,
+        teacherInboxItems, setTeacherInboxItems,
+        teacherInboxLoading, setTeacherInboxLoading,
+        loadTeacherStudents,
+        loadTeacherTemplates,
+        loadTeacherHistory,
+        loadTeacherInbox,
+    } = useAdminTeacherDetail(selectedTeacher, isAdmin, getAdminAuthHeaders);
+
 
     // Student Details
     const [studentWorkouts, setStudentWorkouts] = useState<UnknownRecord[]>([]);
@@ -188,22 +196,29 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     const [exerciseAliasesBackfillLoading, setExerciseAliasesBackfillLoading] = useState<boolean>(false);
     const [exerciseAliasesNotice, setExerciseAliasesNotice] = useState<string>('');
 
-    // User Activity
-    const [userActivityQuery, setUserActivityQuery] = useState<string>('');
-    const [userActivityRole, setUserActivityRole] = useState<string>('all');
-    const [userActivityUsers, setUserActivityUsers] = useState<AdminUser[]>([]);
-    const [userActivityLoading, setUserActivityLoading] = useState<boolean>(false);
-    const [userActivityError, setUserActivityError] = useState<string>('');
-    const [userActivitySelected, setUserActivitySelected] = useState<AdminUser | null>(null);
-    const [userActivityDays, setUserActivityDays] = useState<number>(7);
-    const [userActivitySummary, setUserActivitySummary] = useState<UnknownRecord | null>(null);
-    const [userActivitySummaryLoading, setUserActivitySummaryLoading] = useState<boolean>(false);
-    const [userActivityEvents, setUserActivityEvents] = useState<UnknownRecord[]>([]);
-    const [userActivityEventsLoading, setUserActivityEventsLoading] = useState<boolean>(false);
-    const [userActivityEventsBefore, setUserActivityEventsBefore] = useState<string | null>(null);
-    const [userActivityErrors, setUserActivityErrors] = useState<UnknownRecord[]>([]);
-    const [userActivityErrorsLoading, setUserActivityErrorsLoading] = useState<boolean>(false);
-    const userActivityQueryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const {
+        userActivityQuery, setUserActivityQuery,
+        userActivityRole, setUserActivityRole,
+        userActivityUsers, setUserActivityUsers,
+        userActivityLoading, setUserActivityLoading,
+        userActivityError, setUserActivityError,
+        userActivitySelected, setUserActivitySelected,
+        userActivityDays, setUserActivityDays,
+        userActivitySummary, setUserActivitySummary,
+        userActivitySummaryLoading, setUserActivitySummaryLoading,
+        userActivityEvents, setUserActivityEvents,
+        userActivityEventsLoading, setUserActivityEventsLoading,
+        userActivityEventsBefore, setUserActivityEventsBefore,
+        userActivityErrors, setUserActivityErrors,
+        userActivityErrorsLoading, setUserActivityErrorsLoading,
+        userActivityQueryDebounceRef,
+        loadUserActivityUsers,
+        loadUserActivitySummary,
+        loadUserActivityEvents,
+        loadUserActivityErrors,
+        openUserActivityUser,
+    } = useAdminUserActivity({ isAdmin, tab, getAdminAuthHeaders, supabase });
+
 
     // System
     const [systemExporting, setSystemExporting] = useState<boolean>(false);
@@ -357,99 +372,6 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         }
     };
 
-    // ── Teacher detail loaders ─────────────────────────────────────────────────
-
-    const loadTeacherStudents = useCallback(async (teacher: UnknownRecord) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherStudents([]); return; }
-        setTeacherStudentsLoading(true);
-        try {
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/students?teacher_user_id=${encodeURIComponent(uid)}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) { setTeacherStudents([]); return; }
-            setTeacherStudents(Array.isArray(json.students) ? json.students : []);
-        } finally {
-            setTeacherStudentsLoading(false);
-        }
-    }, [getAdminAuthHeaders]);
-
-    const loadTeacherTemplates = useCallback(async (teacher: UnknownRecord, reset: boolean = false) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); return; }
-        if (reset) { setTeacherTemplatesRows([]); setTeacherTemplatesCursor(null); }
-        setTeacherTemplatesLoading(true);
-        try {
-            const cursor = reset ? '' : String(teacherTemplatesCursor || '');
-            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
-            if (cursor) qs.set('cursor', cursor);
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/workouts/templates?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) return;
-            const rows = Array.isArray(json.rows) ? json.rows : [];
-            setTeacherTemplatesRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
-            setTeacherTemplatesCursor(json.next_cursor || null);
-        } finally {
-            setTeacherTemplatesLoading(false);
-        }
-    }, [teacherTemplatesCursor, getAdminAuthHeaders]);
-
-    const loadTeacherHistory = useCallback(async (teacher: UnknownRecord, reset: boolean = false) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); return; }
-        if (reset) { setTeacherHistoryRows([]); setTeacherHistoryCursor(null); }
-        setTeacherHistoryLoading(true);
-        try {
-            const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
-            const cur = reset ? null : teacherHistoryCursor;
-            if (cur?.cursor_date) qs.set('cursor_date', String(cur.cursor_date));
-            if (cur?.cursor_created_at) qs.set('cursor_created_at', String(cur.cursor_created_at));
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/workouts/history?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) return;
-            const rows = Array.isArray(json.rows) ? json.rows : [];
-            setTeacherHistoryRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
-            setTeacherHistoryCursor(json.next_cursor || null);
-        } finally {
-            setTeacherHistoryLoading(false);
-        }
-    }, [teacherHistoryCursor, getAdminAuthHeaders]);
-
-    const loadTeacherInbox = useCallback(async (teacher: UnknownRecord) => {
-        const uid = String(teacher?.user_id || '').trim();
-        if (!uid) { setTeacherInboxItems([]); return; }
-        setTeacherInboxLoading(true);
-        try {
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/inbox?teacher_user_id=${encodeURIComponent(uid)}&limit=80`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
-            if (!json?.ok) { setTeacherInboxItems([]); return; }
-            setTeacherInboxItems(Array.isArray(json.items) ? json.items : []);
-        } finally {
-            setTeacherInboxLoading(false);
-        }
-    }, [getAdminAuthHeaders]);
-
-    useEffect(() => {
-        if (!selectedTeacher || !isAdmin) return;
-        setTeacherDetailTab('students');
-        setTeacherTemplatesRows([]);
-        setTeacherTemplatesCursor(null);
-        setTeacherHistoryRows([]);
-        setTeacherHistoryCursor(null);
-        setTeacherInboxItems([]);
-        loadTeacherStudents(selectedTeacher as unknown as UnknownRecord).catch(() => { });
-    }, [isAdmin, loadTeacherStudents, selectedTeacher]);
-
-    useEffect(() => {
-        if (!selectedTeacher || !isAdmin) return;
-        if (teacherDetailTab === 'templates' && teacherTemplatesRows.length === 0) loadTeacherTemplates(selectedTeacher as unknown as UnknownRecord, true).catch(() => { });
-        if (teacherDetailTab === 'history' && teacherHistoryRows.length === 0) loadTeacherHistory(selectedTeacher as unknown as UnknownRecord, true).catch(() => { });
-        if (teacherDetailTab === 'inbox' && teacherInboxItems.length === 0) loadTeacherInbox(selectedTeacher as unknown as UnknownRecord).catch(() => { });
-    }, [isAdmin, loadTeacherHistory, loadTeacherInbox, loadTeacherTemplates, selectedTeacher, teacherDetailTab, teacherHistoryRows.length, teacherInboxItems.length, teacherTemplatesRows.length]);
-
     // ── Priorities ─────────────────────────────────────────────────────────────
 
     const fetchPriorities = useCallback(async () => {
@@ -561,124 +483,6 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         if (tab !== 'priorities') return;
         fetchPriorities();
     }, [tab, fetchPriorities]);
-
-    // ── User Activity ──────────────────────────────────────────────────────────
-
-    const loadUserActivityUsers = useCallback(async ({ q, role }: { q?: unknown; role?: unknown } = {}) => {
-        if (!isAdmin) return;
-        setUserActivityLoading(true);
-        setUserActivityError('');
-        try {
-            const qs = new URLSearchParams();
-            const qq = String(q ?? '').trim();
-            const rr = String(role ?? '').trim();
-            if (qq) qs.set('q', qq);
-            if (rr && rr !== 'all') qs.set('role', rr);
-            qs.set('limit', '200');
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/users?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) {
-                setUserActivityUsers([]);
-                setUserActivityError(String(json?.error || `Falha ao carregar usuários (${res.status})`));
-                return;
-            }
-            setUserActivityUsers(Array.isArray(json?.users) ? json.users : []);
-        } catch (e: unknown) {
-            setUserActivityUsers([]);
-            setUserActivityError(getErrorMessage(e) || String(e));
-        } finally {
-            setUserActivityLoading(false);
-        }
-    }, [isAdmin, getAdminAuthHeaders]);
-
-    const loadUserActivitySummary = useCallback(async ({ userId, days }: { userId?: unknown; days?: unknown } = {}) => {
-        if (!isAdmin) return;
-        const uid = String(userId || '').trim();
-        if (!uid) return;
-        const d = Math.min(90, Math.max(1, Number(days) || 7));
-        setUserActivitySummaryLoading(true);
-        try {
-            const qs = new URLSearchParams({ user_id: uid, days: String(d) });
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/summary?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) { setUserActivitySummary(null); return; }
-            setUserActivitySummary(json);
-        } catch {
-            setUserActivitySummary(null);
-        } finally {
-            setUserActivitySummaryLoading(false);
-        }
-    }, [isAdmin, getAdminAuthHeaders]);
-
-    const loadUserActivityEvents = useCallback(async ({ userId, before, reset = false }: { userId?: unknown; before?: unknown; reset?: boolean } = {}) => {
-        if (!isAdmin) return;
-        const uid = String(userId || '').trim();
-        if (!uid) return;
-        setUserActivityEventsLoading(true);
-        try {
-            const qs = new URLSearchParams({ user_id: uid, limit: '80' });
-            if (before) qs.set('before', String(before));
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/events?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) { if (reset) setUserActivityEvents([]); return; }
-            const list = Array.isArray(json?.events) ? json.events : [];
-            setUserActivityEventsBefore(json?.nextBefore ?? null);
-            setUserActivityEvents((prev) => (reset ? list : [...prev, ...list]));
-        } catch {
-            if (reset) setUserActivityEvents([]);
-        } finally {
-            setUserActivityEventsLoading(false);
-        }
-    }, [isAdmin, getAdminAuthHeaders]);
-
-    const loadUserActivityErrors = useCallback(async ({ userId }: { userId?: unknown } = {}) => {
-        if (!isAdmin) return;
-        const uid = String(userId || '').trim();
-        if (!uid) return;
-        setUserActivityErrorsLoading(true);
-        try {
-            const { data, error } = await supabase
-                .from('error_reports')
-                .select('id, created_at, message, pathname, url, status, app_version, source')
-                .eq('user_id', uid)
-                .order('created_at', { ascending: false })
-                .limit(10);
-            if (error) { setUserActivityErrors([]); return; }
-            setUserActivityErrors(Array.isArray(data) ? data : []);
-        } catch {
-            setUserActivityErrors([]);
-        } finally {
-            setUserActivityErrorsLoading(false);
-        }
-    }, [isAdmin, supabase]);
-
-    const openUserActivityUser = useCallback(async (u: UnknownRecord) => {
-        const id = String(u?.id || u?.userId || '').trim();
-        if (!id) return;
-        setUserActivitySelected(u as unknown as AdminUser);
-        setUserActivityEvents([]);
-        setUserActivityEventsBefore(null);
-        setUserActivitySummary(null);
-        setUserActivityErrors([]);
-        try { await loadUserActivitySummary({ userId: id, days: userActivityDays }); } catch { }
-        try { await loadUserActivityEvents({ userId: id, reset: true }); } catch { }
-        try { await loadUserActivityErrors({ userId: id }); } catch { }
-    }, [loadUserActivitySummary, loadUserActivityEvents, loadUserActivityErrors, userActivityDays]);
-
-    useEffect(() => {
-        if (!isAdmin) return;
-        if (tab !== 'system') return;
-        try { if (userActivityQueryDebounceRef.current) clearTimeout(userActivityQueryDebounceRef.current); } catch { }
-        userActivityQueryDebounceRef.current = setTimeout(() => {
-            loadUserActivityUsers({ q: userActivityQuery, role: userActivityRole });
-        }, 400);
-        return () => {
-            try { if (userActivityQueryDebounceRef.current) clearTimeout(userActivityQueryDebounceRef.current); } catch { }
-        };
-    }, [isAdmin, tab, userActivityQuery, userActivityRole, loadUserActivityUsers]);
 
     // ─── Utility helpers ───────────────────────────────────────────────────────
 
