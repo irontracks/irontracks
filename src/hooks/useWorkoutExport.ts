@@ -64,8 +64,39 @@ export function useWorkoutExport({
         if (!exportWorkout || !user) return
         try {
             const html = workoutPlanHtml(exportWorkout as Record<string, unknown>, user)
+            const title = String((exportWorkout as Record<string, unknown>)?.title || 'treino').trim() || 'treino'
+            const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`
+
+            // iOS WKWebView blocks window.open() and print().
+            // Web Share API: opens native share sheet → user taps "Print" → save as PDF.
+            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+            if (canShare) {
+                try {
+                    const blob = new Blob([html], { type: 'text/html' })
+                    const file = new File([blob], fileName, { type: 'text/html' })
+                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
+                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
+                    if (canShareFiles) {
+                        await navigator.share({ files: [file], title: `${title} • IronTracks` })
+                    } else {
+                        const url = URL.createObjectURL(blob)
+                        await navigator.share({ title: `${title} • IronTracks`, url })
+                        URL.revokeObjectURL(url)
+                    }
+                    setShowExportModal(false)
+                    return
+                } catch (shareErr) {
+                    const msg = shareErr instanceof Error ? shareErr.message : ''
+                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
+                }
+            }
+
+            // Desktop fallback: open new tab + print dialog (save as PDF)
             const win = window.open('', '_blank')
-            if (!win) return
+            if (!win) {
+                await alert('Não foi possível abrir a janela de impressão. Permita pop-ups e tente novamente.')
+                return
+            }
             win.document.open()
             win.document.write(html)
             win.document.close()
