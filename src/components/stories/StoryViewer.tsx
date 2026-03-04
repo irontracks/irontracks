@@ -264,7 +264,6 @@ export default function StoryViewer({
     }
     el.addEventListener('animationend', onEnd)
     return () => el.removeEventListener('animationend', onEnd)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyId, idx, durationMs, isVideo, needsVideoFallback, goNext])
 
   // ===== VIDEO PROGRESS: RAF loop reads paused from ref (no state deps = never restarts) =====
@@ -467,7 +466,14 @@ export default function StoryViewer({
 
   return (
     <div className="fixed inset-0 z-[2000] bg-black flex items-center justify-center pt-safe pb-safe">
-      <div className="absolute inset-0" onClick={deleting ? undefined : onClose} />
+      <div
+        className="absolute inset-0"
+        onClick={deleting ? undefined : onClose}
+        onKeyDown={(e) => { if (e.key === 'Escape' && !deleting) onClose() }}
+        role="button"
+        tabIndex={-1}
+        aria-label="Fechar viewer"
+      />
 
       <div
         className="relative w-full max-w-md h-[92vh] bg-neutral-950 border border-neutral-800 rounded-2xl overflow-hidden shadow-2xl"
@@ -548,6 +554,7 @@ export default function StoryViewer({
                         muted={muted}
                         autoPlay
                         preload="metadata"
+                        aria-label="Vídeo do story"
                         onLoadedMetadata={(e) => {
                           const d = Number((e.currentTarget as HTMLVideoElement)?.duration || 0)
                           const start = Math.max(0, Number(trimRange?.start ?? 0))
@@ -566,7 +573,9 @@ export default function StoryViewer({
                           }
                         }}
                         onError={() => setVideoError('Não foi possível reproduzir este vídeo.')}
-                      />
+                      >
+                        <track kind="captions" />
+                      </video>
                     ) : (
                       <div className="px-6 text-center">
                         <div className="text-white font-black text-lg">Story indisponível</div>
@@ -661,7 +670,7 @@ export default function StoryViewer({
 
               {commentsOpen && (
                 <div className="p-2 border-t border-neutral-800 flex gap-2">
-                  <input value={commentText} onChange={e => setCommentText(e.target.value)} className="flex-1 bg-black/40 border border-neutral-700 rounded-xl px-3 text-xs text-white" placeholder="Escreva..." />
+                  <input value={commentText} onChange={e => setCommentText(e.target.value)} className="flex-1 bg-black/40 border border-neutral-700 rounded-xl px-3 text-xs text-white" placeholder="Escreva..." aria-label="Escrever comentário" />
                   <button onClick={sendComment} className="px-3 py-2 bg-yellow-500 rounded-xl text-black text-xs font-black">Enviar</button>
                 </div>
               )}
