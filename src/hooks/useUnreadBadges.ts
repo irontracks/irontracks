@@ -51,10 +51,13 @@ export function useUnreadBadges({
 
     const loadInitial = async () => {
       try {
+        // Only count truly unread notifications — is_read is the canonical field
+        // (all API insert routes set is_read: false explicitly)
         const { data, error } = await supabase
           .from('notifications')
           .select('id')
           .eq('user_id', userId)
+          .eq('is_read', false)
           .limit(1)
 
         if (cancelled) return
@@ -80,6 +83,12 @@ export function useUnreadBadges({
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
         () => { if (!cancelled) setHasUnreadNotification(true) },
+      )
+      .on(
+        'postgres_changes',
+        // Re-check when a notification is updated (e.g., marked as read) or deleted
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        () => { if (!cancelled) loadInitial() },
       )
       .on(
         'postgres_changes',

@@ -165,9 +165,17 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
         let cancelled = false;
         const markRead = async () => {
             try {
-                await supabase.from('notifications').update({ read: true }).eq('user_id', safeUserId).eq('read', false);
+                // Update ALL unread notifications — covers legacy rows where
+                // one column may be true while the other is still false/null
+                await supabase
+                    .from('notifications')
+                    .update({ read: true, is_read: true })
+                    .eq('user_id', safeUserId)
+                    .or('read.eq.false,is_read.eq.false,is_read.is.null');
                 if (cancelled) return;
-                setSystemNotifications(prev => (Array.isArray(prev) ? prev : []).map(n => ({ ...n, read: true })));
+                setSystemNotifications(prev =>
+                    (Array.isArray(prev) ? prev : []).map(n => ({ ...n, read: true, is_read: true }))
+                );
             } catch { return; }
         };
         markRead();

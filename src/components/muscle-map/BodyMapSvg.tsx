@@ -90,22 +90,47 @@ const defaultOffsetsBack: ViewOffsets = {
 };
 
 export default function BodyMapSvg({ view, muscles, onSelect, selected, calibrationMode = false }: Props) {
-  const [frontOffsets, setFrontOffsets] = useState<ViewOffsets>(() => {
-    try {
-      if (typeof window === 'undefined') return defaultOffsetsFront
-      const saved = window.localStorage.getItem('calibration_front')
-      if (saved) return { ...defaultOffsetsFront, ...JSON.parse(saved) }
-    } catch { }
-    return defaultOffsetsFront
-  })
-  const [backOffsets, setBackOffsets] = useState<ViewOffsets>(() => {
-    try {
-      if (typeof window === 'undefined') return defaultOffsetsBack
-      const saved = window.localStorage.getItem('calibration_back')
-      if (saved) return { ...defaultOffsetsBack, ...JSON.parse(saved) }
-    } catch { }
-    return defaultOffsetsBack
-  })
+  const [frontOffsets, setFrontOffsets] = useState<ViewOffsets>(defaultOffsetsFront)
+  const [backOffsets, setBackOffsets] = useState<ViewOffsets>(defaultOffsetsBack)
+
+  // Load canonical calibration from the static JSON (deployed with the app).
+  // localStorage overrides are only used when calibrationMode is active (admin/dev).
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch('/muscle-map-calibration.json', { cache: 'no-store' })
+        if (!res.ok) return
+        const json = await res.json()
+        if (cancelled) return
+        if (json?.front && typeof json.front === 'object') {
+          setFrontOffsets((prev) => ({ ...prev, ...json.front }))
+        }
+        if (json?.back && typeof json.back === 'object') {
+          setBackOffsets((prev) => ({ ...prev, ...json.back }))
+        }
+      } catch { }
+    }
+
+    // In calibration mode, prefer localStorage overrides
+    if (calibrationMode) {
+      try {
+        const savedFront = window.localStorage.getItem('calibration_front')
+        const savedBack = window.localStorage.getItem('calibration_back')
+        if (savedFront) setFrontOffsets((prev) => ({ ...prev, ...JSON.parse(savedFront) }))
+        if (savedBack) setBackOffsets((prev) => ({ ...prev, ...JSON.parse(savedBack) }))
+      } catch { }
+    } else {
+      // Clear stale localStorage overrides so they never conflict with the canonical JSON
+      try {
+        window.localStorage.removeItem('calibration_front')
+        window.localStorage.removeItem('calibration_back')
+      } catch { }
+      load()
+    }
+    return () => { cancelled = true }
+  }, [calibrationMode])
+
   const [intensity, setIntensity] = useState<number>(() => {
     try {
       if (typeof window === 'undefined') return 0.9
@@ -120,14 +145,15 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected, calibrat
   const [showAll, setShowAll] = useState(true)
   const [editingMuscle, setEditingMuscle] = useState<string>('global')
 
-  // Persist to localStorage whenever calibration values change
+  // Persist to localStorage ONLY in calibration mode (admin/dev overlay)
   useEffect(() => {
+    if (!calibrationMode) return
     try {
       window.localStorage.setItem('calibration_front', JSON.stringify(frontOffsets))
       window.localStorage.setItem('calibration_back', JSON.stringify(backOffsets))
       window.localStorage.setItem('calibration_intensity', String(intensity))
     } catch { }
-  }, [frontOffsets, backOffsets, intensity])
+  }, [calibrationMode, frontOffsets, backOffsets, intensity])
 
   const offsets = view === 'front' ? frontOffsets : backOffsets;
   const setOffsets = view === 'front' ? setFrontOffsets : setBackOffsets;

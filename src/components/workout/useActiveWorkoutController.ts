@@ -69,6 +69,22 @@ import {
   AI_SUGGESTION_TIMEOUT_MS,
   DROPSET_STAGE_LIMIT
 } from './utils';
+import {
+  getPlanConfig,
+  getPlannedSet,
+  normalizeNaturalNote,
+  collectExerciseSetInputs,
+  collectExercisePlannedInputs,
+} from './helpers/setPlanningHelpers';
+import {
+  loadDeloadHistory,
+  saveDeloadHistory,
+  appendDeloadAudit,
+  analyzeDeloadHistory,
+  parseAiRecommendation,
+  estimate1RmFromSets,
+  getDeloadReason,
+} from './helpers/deloadHelpers';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
@@ -233,109 +249,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     getLog, updateLog,
   });
 
-  const getPlanConfig = (ex: WorkoutExercise, setIdx: number): UnknownRecord | null => {
-    const sdArr: unknown[] = Array.isArray(ex.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex.set_details) ? (ex.set_details as unknown[]) : [];
-    const sd = isObject(sdArr?.[setIdx]) ? (sdArr[setIdx] as UnknownRecord) : null;
-    const cfg = sd ? (sd.advanced_config ?? sd.advancedConfig ?? null) : null;
-    return isObject(cfg) ? cfg : null;
-  };
-
-  const normalizeNaturalNote = (v: unknown) => {
-    try {
-      return String(v ?? '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase()
-        .replace(/\s+/g, ' ')
-        .trim();
-    } catch {
-      return String(v ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
-    }
-  };
-
-  const inferDropSetStagesFromNote = (notes: unknown): number => {
-    const s = normalizeNaturalNote(notes);
-    if (!s) return 0;
-    if (!s.includes('drop')) return 0;
-    const isDouble = s.includes('duplo') || s.includes('dupla') || s.includes('2 drops') || s.includes('2drop');
-    const isTriple = s.includes('triplo') || s.includes('tripla') || s.includes('3 drops') || s.includes('3drop');
-    if (isTriple) return 4;
-    if (isDouble) return 3;
-    return 2;
-  };
-
-  const shouldInjectDropSetForSet = (ex: WorkoutExercise, setIdx: number, setsCount: number): number => {
-    const notes = String(ex?.notes ?? '').trim();
-    if (!notes) return 0;
-    const normalized = normalizeNaturalNote(notes);
-    if (!normalized.includes('drop')) return 0;
-    if (normalized.includes('em todas') || normalized.includes('todas as series') || normalized.includes('todas series')) {
-      return inferDropSetStagesFromNote(notes);
-    }
-    const wantsLast = normalized.includes('ultima') || normalized.includes('ultim');
-    if (!wantsLast) return 0;
-    if (setIdx !== Math.max(0, setsCount - 1)) return 0;
-    return inferDropSetStagesFromNote(notes);
-  };
-
-  const getPlannedSet = (ex: WorkoutExercise, setIdx: number): UnknownRecord | null => {
-    const sdArr: unknown[] = Array.isArray(ex.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex.set_details) ? (ex.set_details as unknown[]) : [];
-    const sd = isObject(sdArr?.[setIdx]) ? (sdArr[setIdx] as UnknownRecord) : null;
-    const rawCfg = sd ? (sd.advanced_config ?? sd.advancedConfig ?? null) : null;
-    if (Array.isArray(rawCfg) && rawCfg.length > 0) return sd;
-
-    const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
-    const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0) || 0;
-    const inferredStages = shouldInjectDropSetForSet(ex, setIdx, setsCount);
-    if (inferredStages > 0) {
-      const stages = Array.from({ length: inferredStages }).map(() => ({ weight: null as number | null, reps: null as number | null }));
-      return {
-        ...(sd || {}),
-        it_auto: { ...(isObject(sd?.it_auto) ? (sd?.it_auto as UnknownRecord) : {}), label: 'Drop' },
-        advanced_config: stages,
-      };
-    }
-
-    return sd;
-  };
-
-  const collectExerciseSetInputs = (ex: WorkoutExercise, exIdx: number) => {
-    const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
-    const sdArr: unknown[] = Array.isArray(ex.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex.set_details) ? (ex.set_details as unknown[]) : [];
-    const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
-    const sets: Array<{ weight: number | null; reps: number | null }> = [];
-    for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
-      const key = `${exIdx}-${setIdx}`;
-      const log = getLog(key);
-      const cfg = getPlanConfig(ex, setIdx);
-      const planned = getPlannedSet(ex, setIdx);
-      const logWeight = extractLogWeight(log);
-      const fallbackWeight = toNumber(cfg?.weight ?? planned?.weight ?? null);
-      const weight = logWeight != null ? logWeight : fallbackWeight;
-      const reps = toNumber(log.reps ?? planned?.reps ?? ex?.reps ?? null);
-      if (weight != null || reps != null) {
-        sets.push({ weight, reps });
-      }
-    }
-    return { setsCount, sets };
-  };
-
-  const collectExercisePlannedInputs = (ex: WorkoutExercise, exIdx: number) => {
-    const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
-    const sdArr: unknown[] = Array.isArray(ex.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex.set_details) ? (ex.set_details as unknown[]) : [];
-    const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
-    const sets: Array<{ weight: number | null; reps: number | null }> = [];
-    for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
-      const cfg = getPlanConfig(ex, setIdx);
-      const planned = getPlannedSet(ex, setIdx);
-      const weight = toNumber(cfg?.weight ?? planned?.weight ?? ex?.weight ?? null);
-      const reps = toNumber(planned?.reps ?? ex?.reps ?? null);
-      if (weight != null || reps != null) {
-        sets.push({ weight, reps });
-      }
-    }
-    return { setsCount, sets };
-  };
 
   const buildExerciseHistoryEntryFromSessionLogs = useCallback(
     (sessionObj: unknown, exIdx: number, meta: UnknownRecord): ReportHistoryItem | null => {
@@ -542,38 +455,11 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     } catch { }
   }, [ticker]);
 
-  const loadDeloadHistory = (): ReportHistory => {
-    try {
-      if (typeof window === 'undefined') return { version: 1, exercises: {} };
-      const raw = window.localStorage.getItem(DELOAD_HISTORY_KEY);
-      if (!raw) return { version: 1, exercises: {} };
-      const parsed = safeJsonParse(raw);
-      return normalizeReportHistory(parsed);
-    } catch {
-      return { version: 1, exercises: {} };
-    }
-  };
 
-  const saveDeloadHistory = (next: ReportHistory) => {
-    try {
-      if (typeof window === 'undefined') return;
-      window.localStorage.setItem(DELOAD_HISTORY_KEY, JSON.stringify(next));
-    } catch { }
-  };
 
-  const appendDeloadAudit = (entry: unknown) => {
-    try {
-      if (typeof window === 'undefined') return;
-      const raw = window.localStorage.getItem(DELOAD_AUDIT_KEY);
-      const parsed: unknown = raw ? safeJsonParse(raw) : null;
-      const list: unknown[] = Array.isArray(parsed) ? parsed : [];
-      const next = [entry, ...list].slice(0, 100);
-      window.localStorage.setItem(DELOAD_AUDIT_KEY, JSON.stringify(next));
-    } catch { }
-  };
 
   const buildExerciseHistoryEntry = (ex: WorkoutExercise, exIdx: number): ReportHistoryItem | null => {
-    const { sets } = collectExerciseSetInputs(ex, exIdx);
+    const { sets } = collectExerciseSetInputs(ex, exIdx, getLog);
     if (!sets.length) return null;
     const weightList = sets.map((s) => s.weight).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
     const repsList = sets.map((s) => s.reps).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
@@ -618,65 +504,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     } catch { }
   };
 
-  const analyzeDeloadHistory = (items: ReportHistoryItem[]): DeloadAnalysis => {
-    const ordered = Array.isArray(items) ? items.slice(-DELOAD_HISTORY_SIZE) : [];
-    const recent = ordered.slice(-DELOAD_RECENT_WINDOW);
-    const older = ordered.slice(0, Math.max(0, ordered.length - recent.length));
-    const avgRecentVolume = averageNumbers(recent.map((i) => i.totalVolume).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
-    const avgOlderVolume = averageNumbers(older.map((i) => i.totalVolume).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
-    const avgRecentWeight = averageNumbers(recent.map((i) => i.avgWeight).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
-    const avgOlderWeight = averageNumbers(older.map((i) => i.avgWeight).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
 
-    const volumeDelta = avgOlderVolume && avgRecentVolume ? (avgRecentVolume - avgOlderVolume) / avgOlderVolume : null;
-    const weightDelta = avgOlderWeight && avgRecentWeight ? (avgRecentWeight - avgOlderWeight) / avgOlderWeight : null;
 
-    const hasRegression =
-      (volumeDelta != null && volumeDelta <= -DELOAD_REGRESSION_PCT) ||
-      (weightDelta != null && weightDelta <= -DELOAD_REGRESSION_PCT);
-    const hasStagnation =
-      (!hasRegression && volumeDelta != null && Math.abs(volumeDelta) <= DELOAD_STAGNATION_PCT) ||
-      (!hasRegression && weightDelta != null && Math.abs(weightDelta) <= DELOAD_STAGNATION_PCT);
-
-    const status: DeloadAnalysis['status'] = hasRegression ? 'overtraining' : hasStagnation ? 'stagnation' : 'stable';
-    return { status, volumeDelta, weightDelta };
-  };
-
-  const parseAiRecommendation = (text: unknown): AiRecommendation => {
-    try {
-      const raw = String(text || '').trim();
-      if (!raw) return { weight: null, reps: null, rpe: null };
-      const weightMatch = raw.match(/(\d+(?:[.,]\d+)?)\s*kg/i);
-      const repsMatch = raw.match(/(\d+(?:[.,]\d+)?)\s*reps?/i);
-      const rpeMatch = raw.match(/rpe\s*([0-9]+(?:[.,]\d+)?)/i);
-      const weight = toNumber(weightMatch ? weightMatch[1] : null);
-      const reps = toNumber(repsMatch ? repsMatch[1] : null);
-      const rpe = toNumber(rpeMatch ? rpeMatch[1] : null);
-      return { weight: weight && weight > 0 ? weight : null, reps: reps && reps > 0 ? reps : null, rpe: rpe && rpe > 0 ? rpe : null };
-    } catch {
-      return { weight: null, reps: null, rpe: null };
-    }
-  };
-
-  const estimate1RmFromSets = (
-    sets: Array<{ weight: number | null; reps: number | null }>,
-    historyItems: ReportHistoryItem[],
-  ): number | null => {
-    const candidates: number[] = [];
-    const list = Array.isArray(sets) ? sets : [];
-    list.forEach((s) => {
-      const w = Number(s.weight ?? 0);
-      const r = Number(s.reps ?? 0);
-      const est = estimate1Rm(w, r);
-      if (est) candidates.push(est);
-    });
-    const hist = Array.isArray(historyItems) ? historyItems : [];
-    hist.forEach((h) => {
-      const est = estimate1Rm(h.topWeight ?? null, h.avgReps ?? null);
-      if (est) candidates.push(est);
-    });
-    if (!candidates.length) return null;
-    return Math.max(...candidates);
-  };
 
   const buildDeloadSuggestion = (ex: WorkoutExercise, exIdx: number, aiSuggestion: AiRecommendation | null = null): DeloadSuggestion => {
     const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
@@ -685,7 +514,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     const items = history.exercises[key]?.items ?? [];
     const reportItems = reportHistory.exercises[key]?.items ?? [];
     const preferredItems: ReportHistoryItem[] = reportItems.length ? reportItems : items;
-    const currentInputs = collectExerciseSetInputs(ex, exIdx);
+    const currentInputs = collectExerciseSetInputs(ex, exIdx, getLog);
     const currentSets = currentInputs.sets;
     const historyCount = preferredItems.length ? preferredItems.length : currentSets.length ? 1 : 0;
     const plannedInputs = collectExercisePlannedInputs(ex, exIdx);
@@ -726,17 +555,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     return result;
   };
 
-  const getDeloadReason = (analysis: DeloadAnalysis, reductionPct: number, historyCount: number) => {
-    const pct = Math.round((Number(reductionPct) || 0) * 1000) / 10;
-    const label =
-      analysis?.status === 'overtraining'
-        ? 'regressão'
-        : analysis?.status === 'stagnation'
-          ? 'estagnação'
-          : 'progressão estável';
-    const historyLabel = historyCount >= DELOAD_HISTORY_MIN ? `${historyCount} treinos` : `histórico curto (${historyCount || 0} treinos)`;
-    return `Redução de ${pct}% devido à ${label} nos últimos ${historyLabel}.`;
-  };
 
   const resolveAiSuggestionForExercise = async (exerciseName: unknown): Promise<AiRecommendation | null> => {
     try {
@@ -792,7 +610,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const suggestedWeight = baseSuggestion.ok ? baseSuggestion.suggestedWeight : baseWeight ?? null;
       const minWeight = baseSuggestion.ok ? baseSuggestion.minWeight : 0;
       const ratio = baseWeight && suggestedWeight ? suggestedWeight / baseWeight : 1;
-      const { setsCount } = collectExerciseSetInputs(ex, exIdx);
+      const { setsCount } = collectExerciseSetInputs(ex, exIdx, getLog);
       const entries: DeloadSetEntries = {};
       for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
         const setKey = `${exIdx}-${setIdx}`;
@@ -851,7 +669,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
             return;
           }
           const name = String(safeEx?.name || '').trim() || `Exercício ${safeIdx + 1}`;
-          const { setsCount } = collectExerciseSetInputs(safeEx, safeIdx);
+          const { setsCount } = collectExerciseSetInputs(safeEx, safeIdx, getLog);
           if (!setsCount || setsCount <= 0) {
             try {
               await alert('Deload indisponível: exercício sem séries configuradas.');
@@ -1004,7 +822,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     const ex = exercises?.[exIdx];
     if (!ex || typeof ex !== 'object') return;
     try {
-      const { setsCount } = collectExerciseSetInputs(ex, exIdx);
+      const { setsCount } = collectExerciseSetInputs(ex, exIdx, getLog);
       const baseWeight = Number(deloadModal.baseWeight || 0);
       const targetWeight = Number(deloadModal.suggestedWeight || 0);
       if (!Number.isFinite(baseWeight) || !Number.isFinite(targetWeight) || baseWeight <= 0 || targetWeight <= 0) {
