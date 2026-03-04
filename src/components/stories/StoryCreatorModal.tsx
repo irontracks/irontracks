@@ -449,6 +449,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                             onChange={handleFileSelect}
                             className="hidden"
                             accept="image/*,video/*"
+                            aria-label="Upload de mídia"
                         />
                     </div>
                 ) : (
@@ -469,10 +470,13 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                     autoPlay
                                     muted={true}
                                     preload="metadata"
+                                    aria-label="Preview do vídeo"
                                     onLoadedMetadata={handleVideoLoad}
                                     onTimeUpdate={handleTimeUpdate}
                                     onClick={togglePlay}
-                                />
+                                >
+                                    <track kind="captions" />
+                                </video>
                             )}
                         </div>
 
@@ -518,6 +522,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                         value={textInput}
                                         onChange={e => setTextInput(e.target.value)}
                                         placeholder="Digite algo..."
+                                        aria-label="Texto do story"
                                         className="w-full bg-transparent text-white text-xl font-bold placeholder-white/50 outline-none text-center mb-4"
                                         onKeyDown={e => e.key === 'Enter' && addText()}
                                     />
@@ -527,6 +532,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                                 key={c}
                                                 onClick={() => setTextColor(c)}
                                                 className={`w-8 h-8 rounded-full border-2 ${textColor === c ? 'border-white scale-110' : 'border-transparent'} ${COLOR_CLASS_MAP[c] || 'bg-white'}`}
+                                                aria-label={`Cor ${c}`}
                                             />
                                         ))}
                                     </div>
@@ -598,6 +604,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                                 max={videoDuration}
                                                 step={0.1}
                                                 value={trimRange.start}
+                                                aria-label="Início do corte"
                                                 onChange={e => {
                                                     const val = Math.max(0, Number(e.target.value || 0));
                                                     const end = Math.max(val + MIN_TRIM_SECONDS, Math.min(trimRange.end, val + MAX_VIDEO_SECONDS, videoDuration));
@@ -617,6 +624,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                                 max={videoDuration}
                                                 step={0.1}
                                                 value={trimRange.end}
+                                                aria-label="Fim do corte"
                                                 onChange={e => {
                                                     const val = Math.max(0, Number(e.target.value || 0));
                                                     const start = Math.min(trimRange.start, Math.max(0, val - MAX_VIDEO_SECONDS));
@@ -651,6 +659,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                             max={videoDuration}
                                             step={0.1}
                                             value={trimRange.start}
+                                            aria-label="Arraste início"
                                             onChange={e => {
                                                 const val = Number(e.target.value);
                                                 if (val < trimRange.end - MIN_TRIM_SECONDS) {
@@ -673,6 +682,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                                             max={videoDuration}
                                             step={0.1}
                                             value={trimRange.end}
+                                            aria-label="Arraste fim"
                                             onChange={e => {
                                                 const val = Number(e.target.value);
                                                 if (val > trimRange.start + MIN_TRIM_SECONDS) {
