@@ -10,8 +10,8 @@ interface UseAdminUserActivityParams {
     isAdmin: boolean;
     tab: string;
     getAdminAuthHeaders: GetAdminAuthHeaders;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    supabase: SupabaseClient<any>;
+    // Supabase client — no generated DB types in this project; using base client type
+    supabase: SupabaseClient;
 }
 
 /**
