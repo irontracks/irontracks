@@ -62,14 +62,30 @@ struct RestTimerLiveActivity: Widget {
                                     .foregroundColor(.white.opacity(0.6))
                             }
                         } else {
-                            HStack {
-                                Text("Tempo de Descanso")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white.opacity(0.7))
+                            HStack(spacing: 10) {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(context.state.title)
+                                        .font(.system(size: 11, weight: .black, design: .rounded))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                    Text("Próximo exercício")
+                                        .font(.system(size: 9, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.45))
+                                }
                                 Spacer()
-                                Text("Recupere e volte")
-                                    .font(.system(size: 10, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.4))
+                                Link(destination: URL(string: "irontracks://action/start-rest")!) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 10, weight: .black))
+                                        Text("START")
+                                            .font(.system(size: 11, weight: .black, design: .rounded))
+                                    }
+                                    .foregroundColor(.black)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .background(Color(red: 0.93, green: 0.79, blue: 0.15))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                }
                             }
                         }
                     }
@@ -150,10 +166,11 @@ struct RestTimerLiveActivity: Widget {
                 logotypeView()
                     .padding(.bottom, 2)
 
-                Text("TEMPO DE DESCANSO")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.7))
-                    .tracking(1.5)
+                Text(context.state.title.uppercased())
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundColor(.white)
+                    .tracking(1.0)
+                    .lineLimit(1)
 
                 Text(timerInterval: context.attributes.startTime...context.state.endTime, countsDown: true)
                     .font(.system(size: 32, weight: .heavy, design: .rounded))
@@ -167,12 +184,18 @@ struct RestTimerLiveActivity: Widget {
 
             Spacer()
 
-            TimelineView(.periodic(from: .now, by: 0.8)) { timeline in
-                let pulse = Int(timeline.date.timeIntervalSince1970 * 10) % 8 < 4
-                Circle()
-                    .fill(brandYellow)
-                    .frame(width: 10, height: 10)
-                    .opacity(pulse ? 1.0 : 0.25)
+            // START button — deeplink abre o app e encerra o descanso
+            Link(destination: URL(string: "irontracks://action/start-rest")!) {
+                VStack(spacing: 3) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 16, weight: .black))
+                    Text("START")
+                        .font(.system(size: 9, weight: .black, design: .rounded))
+                }
+                .foregroundColor(.black)
+                .frame(width: 52, height: 52)
+                .background(Color(red: 0.93, green: 0.79, blue: 0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
             .padding(.trailing, 4)
         }
