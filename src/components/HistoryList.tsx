@@ -1010,20 +1010,21 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             const dateLabel = new Date().toISOString().slice(0, 10);
             const kind = current.type === 'week' ? 'Semanal' : current.type === 'month' ? 'Mensal' : 'Periodo';
             const fileName = `Relatorio_${kind}_${dateLabel}`;
-            // Client-side PDF: open HTML in new window and trigger print dialog
+            // Client-side PDF: open HTML via Blob URL and trigger print dialog
             try {
-                const printWindow = window.open('', '_blank');
+                const blobPrint = new Blob([html], { type: 'text/html' });
+                const blobPrintUrl = URL.createObjectURL(blobPrint);
+                const printWindow = window.open(blobPrintUrl, '_blank');
                 if (printWindow) {
-                    printWindow.document.open();
-                    printWindow.document.write(html);
-                    printWindow.document.close();
                     setTimeout(() => {
                         try {
                             printWindow.focus();
                             printWindow.print();
                         } catch { }
+                        setTimeout(() => URL.revokeObjectURL(blobPrintUrl), 60_000);
                     }, 500);
                 } else {
+                    URL.revokeObjectURL(blobPrintUrl);
                     // Fallback: download as HTML
                     const blob = new Blob([html], { type: 'text/html' });
                     const url = URL.createObjectURL(blob);
