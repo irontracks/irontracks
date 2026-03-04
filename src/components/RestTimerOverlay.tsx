@@ -153,7 +153,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     const byDuration = Math.ceil(maxSeconds / notifyEverySeconds);
                     const notifyCount = repeatAlarm ? Math.max(0, Math.min(maxCount, byDuration)) : 0;
                     scheduleRestNotification(id, seconds, '⏰ Tempo Esgotado!', 'Hora de voltar para o treino!', notifyCount, notifyEverySeconds);
-                }).catch(() => {});
+                }).catch(() => { });
             }
             startRestLiveActivity(id, seconds, 'Descanso');
             setIdleTimerDisabled(true);
@@ -207,7 +207,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     if (isFinished) {
         return (
             <div
-                className="fixed inset-0 z-[2200] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast cursor-pointer pt-safe pb-safe"
+                className="fixed inset-0 z-[2200] bg-black/70 backdrop-blur-sm flex flex-col items-end justify-end pb-safe cursor-pointer"
                 onClick={() => {
                     try {
                         if (typeof onFinish === 'function') onFinish(context);
@@ -218,16 +218,26 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     }
                 }}
             >
-                <Timer size={120} className="text-black mb-8 animate-bounce" />
-                <h1 className="text-6xl font-black text-black uppercase tracking-tighter">BORA!</h1>
-                <p className="text-black font-bold mt-4 text-xl">TOQUE PARA VOLTAR</p>
+                {/* Elegant toast instead of full-screen flash */}
+                <div className="w-full px-4 pb-6 animate-slide-up">
+                    <div className="flex items-center gap-4 bg-emerald-950 border border-emerald-500/40 shadow-[0_0_40px_-4px_rgba(52,211,153,0.3)] rounded-2xl p-5">
+                        <div className="relative flex-shrink-0">
+                            <div className="absolute inset-0 bg-emerald-400 blur-xl opacity-30 animate-pulse rounded-full" />
+                            <Timer size={36} className="text-emerald-400 relative z-10" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-emerald-300 font-black text-base uppercase tracking-wider">Descanso Finalizado!</p>
+                            <p className="text-emerald-400/70 text-sm font-bold mt-0.5">Toque em qualquer lugar para continuar 💪</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-[2100] animate-slide-up pb-safe">
-            <div className="flex items-center justify-between max-w-md mx-auto">
+        <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-5 shadow-2xl z-[2100] animate-slide-up pb-safe">
+            <div className="flex items-center justify-between max-w-md mx-auto gap-4">
                 <div className="flex items-center gap-4">
                     <div className="relative">
                         <div className="absolute inset-0 bg-yellow-500 blur-lg opacity-20 animate-pulse"></div>
@@ -238,16 +248,26 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                         <p className="text-4xl font-mono font-black text-white tabular-nums leading-none">{formatDuration(timeLeft)}</p>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-shrink-0">
+                    <button
+                        onClick={() => {
+                            try {
+                                if (typeof onFinish === 'function') onFinish(context);
+                            } catch { }
+                        }}
+                        className="min-h-[52px] px-6 bg-yellow-500 rounded-xl text-black font-black border border-yellow-400 hover:bg-yellow-400 inline-flex items-center gap-2 active:scale-95 transition-transform"
+                    >
+                        <span className="text-sm font-black">START</span>
+                    </button>
                     <button
                         onClick={() => {
                             try {
                                 if (typeof onClose === 'function') onClose();
                             } catch { }
                         }}
-                        className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2"
+                        className="min-h-[52px] px-3 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2 active:scale-95 transition-transform"
                     >
-                        <ArrowLeft size={16} /> <span className="text-xs font-bold">Voltar</span>
+                        <ArrowLeft size={16} /> <span className="text-xs font-bold">Ocultar</span>
                     </button>
                 </div>
             </div>
