@@ -5,7 +5,7 @@ import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
 import { CalendarDays, Crown, RefreshCw, Sparkles, TrendingUp } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import { getErrorMessage } from '@/utils/errorMessage'
+import { getErrorMessage, getFriendlyApiError } from '@/utils/errorMessage'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -117,7 +117,7 @@ export default function VipPeriodizationPanel({
       if (!json?.ok) {
         setProgram(null)
         setSchedule([])
-        if (json && 'error' in json && typeof json.error === 'string') setError(json.error)
+        if (json && 'error' in json && typeof json.error === 'string') setError(getFriendlyApiError(json.error, 'Falha ao carregar periodização.'))
         return
       }
       setProgram(json.program || null)
@@ -136,7 +136,7 @@ export default function VipPeriodizationPanel({
       const json = (await res.json().catch((): null => null)) as StatsResponse | null
       if (!json?.ok) return
       setStats(Array.isArray(json.weekly) ? json.weekly : [])
-    } catch {}
+    } catch { }
   }, [isLocked])
 
   useEffect(() => {
@@ -265,7 +265,7 @@ export default function VipPeriodizationPanel({
         const { data } = await supabase.from('workouts').select('id, name').eq('id', id).maybeSingle()
         if (!data?.id) return
         onOpenWorkoutEditor({ id: data.id, name: data.name })
-      } catch {}
+      } catch { }
     },
     [onOpenWorkoutEditor, supabase],
   )
