@@ -1040,14 +1040,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onCreateWorkout={handleCreateWorkout}
                                     onQuickView={(w) => setQuickViewWorkout(w)}
                                     onStartSession={(w) => handleStartSession(w)}
-                                    onRestoreWorkout={(w: any) => handleRestoreWorkout(w)}
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    onShareWorkout={(w: any) => handleShareWorkout(w)}
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    onEditWorkout={(w: any) => handleEditWorkout(w)}
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    onDeleteWorkout={(id: any, title: any) => {
-                                        if (id) handleDeleteWorkout(id, String(title || ''))
+                                    onRestoreWorkout={(w: unknown) => handleRestoreWorkout(w)}
+                                    onShareWorkout={(w: unknown) => handleShareWorkout(w)}
+                                    onEditWorkout={(w: unknown) => handleEditWorkout(w)}
+                                    onDeleteWorkout={(id: unknown, title: unknown) => {
+                                        if (id) handleDeleteWorkout(String(id), String(title || ''))
                                     }}
                                     onBulkEditWorkouts={handleBulkEditWorkouts}
                                     currentUserId={String(user?.id || initialUserObj?.id || '')}
