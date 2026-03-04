@@ -122,7 +122,7 @@ const writeCache = (key: string, data: ApiPayload) => {
   try {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(key, JSON.stringify({ cachedAt: Date.now(), data }))
-  } catch {}
+  } catch { }
 }
 
 export default function MuscleMapCard(props: Props) {
@@ -164,12 +164,12 @@ export default function MuscleMapCard(props: Props) {
         const res =
           period === 'day'
             ? await getMuscleMapDay({
-                date: selectedDate,
-                tzOffsetMinutes: new Date().getTimezoneOffset(),
-                refreshAi: !!opts?.refreshAi,
-                maxAi: 400,
-                batchLimit: 40,
-              })
+              date: selectedDate,
+              tzOffsetMinutes: new Date().getTimezoneOffset(),
+              refreshAi: !!opts?.refreshAi,
+              maxAi: 400,
+              batchLimit: 40,
+            })
             : await getMuscleMapWeek({ refreshCache: !!opts?.refreshCache, refreshAi: !!opts?.refreshAi })
         if (!res?.ok) {
           const msg = String(res?.error || 'Falha ao carregar mapa muscular')
@@ -316,19 +316,19 @@ export default function MuscleMapCard(props: Props) {
     if (!res?.ok) {
       const msg = String(res?.error || 'Falha ao reprocessar histórico')
       setBackfill({ status: 'error', error: msg })
-      try { window.alert(msg) } catch {}
+      try { window.alert(msg) } catch { }
       return
     }
     setBackfill({ status: 'idle', error: '' })
     try {
       window.alert(
         `Reprocessamento concluído.\n` +
-          `Exercícios únicos: ${Number(res?.uniqueExercises || 0).toLocaleString('pt-BR')}\n` +
-          `Mapeados (heurística): ${Number(res?.heuristicMapped || 0).toLocaleString('pt-BR')}\n` +
-          `Mapeados (IA): ${Number(res?.aiMapped || 0).toLocaleString('pt-BR')}\n` +
-          `Ainda sem mapa: ${Number((Array.isArray(res?.remainingUnmapped) ? res.remainingUnmapped.length : 0) || 0).toLocaleString('pt-BR')}`
+        `Exercícios únicos: ${Number(res?.uniqueExercises || 0).toLocaleString('pt-BR')}\n` +
+        `Mapeados (heurística): ${Number(res?.heuristicMapped || 0).toLocaleString('pt-BR')}\n` +
+        `Mapeados (IA): ${Number(res?.aiMapped || 0).toLocaleString('pt-BR')}\n` +
+        `Ainda sem mapa: ${Number((Array.isArray(res?.remainingUnmapped) ? res.remainingUnmapped.length : 0) || 0).toLocaleString('pt-BR')}`
       )
-    } catch {}
+    } catch { }
     await load({ refreshCache: true, refreshAi: false, source: 'manual' })
   }, [backfill.status, load])
 
@@ -523,190 +523,194 @@ export default function MuscleMapCard(props: Props) {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <motion.div
-          key={`map-${dataUpdatedAt}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.25 }}
-          className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3"
-        >
-          <BodyMapSvg
-            view={view}
-            muscles={musclesForView}
-            selected={selected}
-            onSelect={(id) => {
-              setSelected((prev) => (prev === id ? null : id))
-            }}
-          />
-          <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-black uppercase tracking-widest">
-            <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
-              <div className="text-neutral-500">Baixo</div>
-              <div className="h-2 rounded-full mt-1 bg-[#1f2937]" />
-            </div>
-            <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
-              <div className="text-neutral-500">Na meta</div>
-              <div className="h-2 rounded-full mt-1 bg-[#f59e0b]" />
-            </div>
-            <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
-              <div className="text-neutral-500">Alto</div>
-              <div className="h-2 rounded-full mt-1 bg-[#ef4444]" />
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div key={`details-${dataUpdatedAt}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="lg:col-span-2 space-y-3">
-          <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Detalhes</div>
-              <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">
-                {state.status === 'loading' ? 'Carregando…' : state.data ? aiLabel : '—'}
-              </div>
-            </div>
-
-            {selectedInfo ? (
-              <div className="mt-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-white font-black">{String(selectedInfo.label ?? "")}</div>
-                  <div className="text-xs font-black text-neutral-300">{selectedInfo.sets.toLocaleString('pt-BR')} sets</div>
+              <motion.div
+                key={`map-${dataUpdatedAt}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.25 }}
+                className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3"
+              >
+                <BodyMapSvg
+                  view={view}
+                  muscles={musclesForView}
+                  selected={selected}
+                  onSelect={(id) => {
+                    setSelected((prev) => (prev === id ? null : id))
+                  }}
+                />
+                <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] font-black uppercase tracking-widest">
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
+                    <div className="text-neutral-500">Baixo</div>
+                    <div className="h-2 rounded-full mt-1 bg-[#1d4ed8]" />
+                  </div>
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
+                    <div className="text-neutral-500">Na meta</div>
+                    <div className="h-2 rounded-full mt-1 bg-[#f59e0b]" />
+                  </div>
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
+                    <div className="text-neutral-500">Alto</div>
+                    <div className="h-2 rounded-full mt-1 bg-[#f97316]" />
+                  </div>
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
+                    <div className="text-neutral-500">Acima</div>
+                    <div className="h-2 rounded-full mt-1 bg-[#ef4444]" />
+                  </div>
                 </div>
-                <div className="mt-2 h-2">
-                  <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
-                    <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
-                    <rect
-                      x="0"
-                      y="0"
-                      width={Math.min(100, Math.max(0, selectedInfo.ratio * 100))}
-                      height="8"
-                      rx="4"
-                      fill={selectedInfo.color}
-                    />
-                  </svg>
-                </div>
-                <div className="mt-2 text-xs text-neutral-400">
-                  Meta sugerida: {String(selectedInfo.minSets ?? "")}–{String(selectedInfo.maxSets ?? "")} sets/semana
+              </motion.div>
+
+              <motion.div key={`details-${dataUpdatedAt}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="lg:col-span-2 space-y-3">
+                <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Detalhes</div>
+                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">
+                      {state.status === 'loading' ? 'Carregando…' : state.data ? aiLabel : '—'}
+                    </div>
+                  </div>
+
+                  {selectedInfo ? (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-white font-black">{String(selectedInfo.label ?? "")}</div>
+                        <div className="text-xs font-black text-neutral-300">{selectedInfo.sets.toLocaleString('pt-BR')} sets</div>
+                      </div>
+                      <div className="mt-2 h-2">
+                        <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
+                          <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
+                          <rect
+                            x="0"
+                            y="0"
+                            width={Math.min(100, Math.max(0, selectedInfo.ratio * 100))}
+                            height="8"
+                            rx="4"
+                            fill={selectedInfo.color}
+                          />
+                        </svg>
+                      </div>
+                      <div className="mt-2 text-xs text-neutral-400">
+                        Meta sugerida: {String(selectedInfo.minSets ?? "")}–{String(selectedInfo.maxSets ?? "")} sets/semana
+                      </div>
+
+                      {isWeekPayload(state.data) && state.data.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="text-xs font-black uppercase tracking-widest text-neutral-500">Top exercícios</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {state.data.topExercisesByMuscle[selectedInfo.id].slice(0, 4).map((x, idx) => (
+                              <div key={`${x.name}-${idx}`} className="rounded-xl border border-neutral-800 bg-black px-3 py-2">
+                                <div className="text-xs font-bold text-neutral-200 truncate">{x.name}</div>
+                                <div className="text-[11px] text-neutral-500">{Number(x.setsEq || 0).toLocaleString('pt-BR')} sets eq.</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="mt-3 text-sm text-neutral-300">Toque em um músculo para ver detalhes.</div>
+                  )}
                 </div>
 
-                {isWeekPayload(state.data) && state.data.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
-                  <div className="mt-3 space-y-2">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-500">Top exercícios</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {state.data.topExercisesByMuscle[selectedInfo.id].slice(0, 4).map((x, idx) => (
-                        <div key={`${x.name}-${idx}`} className="rounded-xl border border-neutral-800 bg-black px-3 py-2">
-                          <div className="text-xs font-bold text-neutral-200 truncate">{x.name}</div>
-                          <div className="text-[11px] text-neutral-500">{Number(x.setsEq || 0).toLocaleString('pt-BR')} sets eq.</div>
+                <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
+                      <Sparkles size={14} /> Insights da IA
+                    </div>
+                    {state.status === 'loading' ? <Loader2 size={16} className="animate-spin text-neutral-400" /> : null}
+                  </div>
+
+                  {isWeekPayload(state.data) && state.data.insights?.summary?.length ? (
+                    <ul className="mt-3 space-y-2">
+                      {state.data.insights.summary.map((item, idx) => (
+                        <li key={idx} className="text-sm text-neutral-100">
+                          • {String(item || '')}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="mt-3 text-sm text-neutral-400">Sem insights suficientes para essa semana.</div>
+                  )}
+
+                  {isWeekPayload(state.data) && state.data.insights?.imbalanceAlerts?.length ? (
+                    <div className="mt-4 space-y-2">
+                      {state.data.insights.imbalanceAlerts.slice(0, 4).map((a, idx) => (
+                        <div key={idx} className="rounded-xl border border-neutral-800 bg-black p-3">
+                          <div className="text-xs font-black uppercase tracking-widest text-neutral-300">{String(a.type || 'Alerta')}</div>
+                          <div className="mt-1 text-sm text-neutral-100">{String(a.suggestion || '').trim()}</div>
+                          {String(a.evidence || '').trim() ? <div className="mt-1 text-xs text-neutral-500">{String(a.evidence || '').trim()}</div> : null}
                         </div>
                       ))}
                     </div>
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="mt-3 text-sm text-neutral-300">Toque em um músculo para ver detalhes.</div>
-            )}
-          </div>
+                  ) : null}
 
-          <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 flex items-center gap-2">
-                <Sparkles size={14} /> Insights da IA
-              </div>
-              {state.status === 'loading' ? <Loader2 size={16} className="animate-spin text-neutral-400" /> : null}
+                  {state.data?.unknownExercises?.length ? (
+                    <div className="mt-4 text-xs text-neutral-500">
+                      Exercícios sem mapeamento completo: {state.data.unknownExercises.slice(0, 6).join(', ')}
+                    </div>
+                  ) : null}
+
+                  {Number(state.data?.diagnostics?.estimatedSetsUsed || 0) > 0 ? (
+                    <div className="mt-2 text-xs text-neutral-600">
+                      Estimativa aplicada: {Number(state.data?.diagnostics?.estimatedSetsUsed || 0).toLocaleString('pt-BR')} set(s) (sem logs completos).
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
+                  <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top músculos</div>
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {(isWeekPayload(state.data) ? state.data.topMuscles : [])
+                      .filter((x) => x && x.id && (state.data?.muscles?.[x.id]?.view || '') === view)
+                      .slice(0, 6)
+                      .map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => setSelected(m.id as Parameters<typeof setSelected>[0])}
+                          className="rounded-xl border border-neutral-800 bg-black p-3 text-left hover:bg-neutral-950 transition-colors"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-sm font-black text-neutral-100">{m.label}</div>
+                            <div className="text-xs font-black text-neutral-400">{Number(m.sets || 0).toLocaleString('pt-BR')}</div>
+                          </div>
+                          <div className="mt-2 h-2">
+                            <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
+                              <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
+                              <rect
+                                x="0"
+                                y="0"
+                                width={Math.min(100, Math.max(0, Number(state.data?.muscles?.[m.id]?.ratio || 0) * 100))}
+                                height="8"
+                                rx="4"
+                                fill={state.data?.muscles?.[m.id]?.color || '#1f2937'}
+                              />
+                            </svg>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              </motion.div>
             </div>
 
-            {isWeekPayload(state.data) && state.data.insights?.summary?.length ? (
-              <ul className="mt-3 space-y-2">
-                {state.data.insights.summary.map((item, idx) => (
-                  <li key={idx} className="text-sm text-neutral-100">
-                    • {String(item || '')}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="mt-3 text-sm text-neutral-400">Sem insights suficientes para essa semana.</div>
-            )}
-
-            {isWeekPayload(state.data) && state.data.insights?.imbalanceAlerts?.length ? (
-              <div className="mt-4 space-y-2">
-                {state.data.insights.imbalanceAlerts.slice(0, 4).map((a, idx) => (
-                  <div key={idx} className="rounded-xl border border-neutral-800 bg-black p-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-300">{String(a.type || 'Alerta')}</div>
-                    <div className="mt-1 text-sm text-neutral-100">{String(a.suggestion || '').trim()}</div>
-                    {String(a.evidence || '').trim() ? <div className="mt-1 text-xs text-neutral-500">{String(a.evidence || '').trim()}</div> : null}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {state.data?.unknownExercises?.length ? (
-              <div className="mt-4 text-xs text-neutral-500">
-                Exercícios sem mapeamento completo: {state.data.unknownExercises.slice(0, 6).join(', ')}
-              </div>
-            ) : null}
-
-            {Number(state.data?.diagnostics?.estimatedSetsUsed || 0) > 0 ? (
-              <div className="mt-2 text-xs text-neutral-600">
-                Estimativa aplicada: {Number(state.data?.diagnostics?.estimatedSetsUsed || 0).toLocaleString('pt-BR')} set(s) (sem logs completos).
-              </div>
-            ) : null}
-          </div>
-
-          <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
-            <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top músculos</div>
-            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {(isWeekPayload(state.data) ? state.data.topMuscles : [])
-                .filter((x) => x && x.id && (state.data?.muscles?.[x.id]?.view || '') === view)
-                .slice(0, 6)
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {MUSCLE_GROUPS.filter((m) => m.view === view)
+                .slice(0, 8)
                 .map((m) => (
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setSelected(m.id as Parameters<typeof setSelected>[0])}
-                    className="rounded-xl border border-neutral-800 bg-black p-3 text-left hover:bg-neutral-950 transition-colors"
+                    onClick={() => setSelected(m.id)}
+                    className="rounded-xl border border-neutral-800 bg-black px-3 py-2 text-left hover:bg-neutral-950 transition-colors"
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-black text-neutral-100">{m.label}</div>
-                      <div className="text-xs font-black text-neutral-400">{Number(m.sets || 0).toLocaleString('pt-BR')}</div>
-                    </div>
-                    <div className="mt-2 h-2">
-                      <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
-                        <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
-                        <rect
-                          x="0"
-                          y="0"
-                          width={Math.min(100, Math.max(0, Number(state.data?.muscles?.[m.id]?.ratio || 0) * 100))}
-                          height="8"
-                          rx="4"
-                          fill={state.data?.muscles?.[m.id]?.color || '#1f2937'}
-                        />
+                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400">{m.label}</div>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <div className="text-sm font-black text-neutral-100">{Number(state.data?.muscles?.[m.id]?.sets || 0).toLocaleString('pt-BR')}</div>
+                      <svg className="w-3 h-3" viewBox="0 0 12 12">
+                        <circle cx="6" cy="6" r="6" fill={state.data?.muscles?.[m.id]?.color || '#111827'} />
                       </svg>
                     </div>
                   </button>
                 ))}
             </div>
-          </div>
-        </motion.div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {MUSCLE_GROUPS.filter((m) => m.view === view)
-          .slice(0, 8)
-          .map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => setSelected(m.id)}
-              className="rounded-xl border border-neutral-800 bg-black px-3 py-2 text-left hover:bg-neutral-950 transition-colors"
-            >
-              <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400">{m.label}</div>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <div className="text-sm font-black text-neutral-100">{Number(state.data?.muscles?.[m.id]?.sets || 0).toLocaleString('pt-BR')}</div>
-                <svg className="w-3 h-3" viewBox="0 0 12 12">
-                  <circle cx="6" cy="6" r="6" fill={state.data?.muscles?.[m.id]?.color || '#111827'} />
-                </svg>
-              </div>
-            </button>
-          ))}
-      </div>
           </motion.div>
         )}
       </AnimatePresence>
