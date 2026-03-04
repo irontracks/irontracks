@@ -50,24 +50,29 @@ export async function POST(req: Request) {
     const { data: comments } = await admin.from('social_story_comments').select('*').eq('story_id', storyId).limit(2000)
     const { data: views } = await admin.from('social_story_views').select('*').eq('story_id', storyId).limit(2000)
 
-    await admin.from('soft_delete_bin').insert({
-      deleted_by: auth.user.id,
-      delete_reason: 'user_manual_delete',
-      entity_type: 'social_story',
-      entity_id: storyId,
-      payload: { story, likes: likes || [], comments: comments || [], views: views || [] },
-      media_paths: mediaPath ? [mediaPath] : [],
-    })
+    // Soft-delete backup & audit — best-effort, must never block actual deletion
+    try {
+      await admin.from('soft_delete_bin').insert({
+        deleted_by: auth.user.id,
+        delete_reason: 'user_manual_delete',
+        entity_type: 'social_story',
+        entity_id: storyId,
+        payload: { story, likes: likes || [], comments: comments || [], views: views || [] },
+        media_paths: mediaPath ? [mediaPath] : [],
+      })
+    } catch { }
 
-    await admin.from('audit_events').insert({
-      actor_id: auth.user.id,
-      actor_email: String(auth.user.email || '').trim() || null,
-      actor_role: 'user',
-      action: 'social_story_delete',
-      entity_type: 'social_story',
-      entity_id: storyId,
-      metadata: { mediaPath: mediaPath || null },
-    })
+    try {
+      await admin.from('audit_events').insert({
+        actor_id: auth.user.id,
+        actor_email: String(auth.user.email || '').trim() || null,
+        actor_role: 'user',
+        action: 'social_story_delete',
+        entity_type: 'social_story',
+        entity_id: storyId,
+        metadata: { mediaPath: mediaPath || null },
+      })
+    } catch { }
 
     if (mediaPath) {
       try {
