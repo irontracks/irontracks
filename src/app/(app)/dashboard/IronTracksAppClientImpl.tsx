@@ -225,6 +225,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     }, [handleCloseTimer, setActiveSession])
 
+    // Handler para ações vindas da Live Activity via deeplink (irontracks://action/*)
+    useEffect(() => {
+        const onLiveActivityAction = (e: Event) => {
+            try {
+                const action = String((e as CustomEvent)?.detail?.action || '').trim()
+                if (!action) return
+                if (action === 'START_REST' || action === 'SKIP_REST') {
+                    handleCloseTimer()
+                }
+            } catch { }
+        }
+        window.addEventListener('irontracks:action', onLiveActivityAction)
+        return () => window.removeEventListener('irontracks:action', onLiveActivityAction)
+    }, [handleCloseTimer])
+
     const [settingsOpen, setSettingsOpen] = useState(false)
     const [isCoach, setIsCoach] = useState(false);
     const initialRole = String(initialProfileObj?.role || '').toLowerCase()
