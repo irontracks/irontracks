@@ -251,7 +251,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
             </div>
           ) : null}
         </div>
-        <div className="mt-1 grid grid-cols-4 gap-2 text-neutral-400 sm:flex sm:items-center sm:justify-end">
+        <div className="mt-1 flex flex-row flex-nowrap items-center justify-end gap-1.5 text-neutral-400">
           {videoUrl ? (
             <button
               type="button"
@@ -274,12 +274,11 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
                   } catch { }
                 }
               }}
-              className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
               title="Ver vídeo"
               aria-label="Ver vídeo"
             >
               <Play size={16} />
-              <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">Vídeo</span>
             </button>
           ) : null}
           <ExecutionVideoCapture
@@ -298,10 +297,11 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
               setCurrentExerciseIdx(exIdx);
               await openDeloadModal(ex, exIdx);
             }}
-            className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+            title="Sugestão de Deload"
+            aria-label="Sugestão de Deload"
           >
-            {isReportLoading ? <Loader2 size={16} className="animate-spin mb-1" /> : <ArrowDown size={16} className="mb-1" />}
-            <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">Deload</span>
+            {isReportLoading ? <Loader2 size={16} className="animate-spin" /> : <ArrowDown size={16} />}
           </button>
           <button
             type="button"
@@ -312,7 +312,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
               } catch { }
               toggleLinkWeights(exIdx);
             }}
-            className={`h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl border transition-colors active:scale-95 ${linkedWeightExercises?.has(exIdx)
+            className={`h-9 w-9 inline-flex items-center justify-center rounded-xl border transition-colors active:scale-95 flex-shrink-0 ${linkedWeightExercises?.has(exIdx)
               ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500'
               : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:bg-neutral-800'
               }`}
@@ -320,8 +320,6 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
             aria-label="Sincronizar pesos em todas as séries"
           >
             <Link size={14} className={linkedWeightExercises?.has(exIdx) ? '' : 'opacity-60'} />
-            <span className={`mt-0.5 text-[10px] leading-none ${linkedWeightExercises?.has(exIdx) ? 'text-yellow-500' : 'text-neutral-400 opacity-60'
-              }`}>Link</span>
           </button>
           <button
             type="button"
@@ -333,12 +331,11 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
               setCurrentExerciseIdx(exIdx);
               await openEditExercise(exIdx);
             }}
-            className="h-9 w-9 inline-flex flex-col items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
             title="Editar exercício"
             aria-label="Editar exercício"
           >
             <Pencil size={14} />
-            <span className="mt-0.5 text-[10px] leading-none text-neutral-400 opacity-60">Editar</span>
           </button>
         </div>
       </div>
