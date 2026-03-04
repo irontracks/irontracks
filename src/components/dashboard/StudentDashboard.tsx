@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Plus, Dumbbell, Play, Share2, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, GripVertical, Save, Undo2, Crown } from 'lucide-react'
+import { Plus, Dumbbell, Play, Share2, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, Save, Undo2, Crown } from 'lucide-react'
 import { Reorder, useDragControls } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { z } from 'zod'
@@ -18,6 +18,8 @@ import { DashboardTabs } from './DashboardTabs'
 import { CheckinsModal } from './CheckinsModal'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { SortableWorkoutItem } from './SortableWorkoutItem'
+import { WorkoutToolsPanel } from './WorkoutToolsPanel'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -101,44 +103,7 @@ const WorkoutFullRowSchema = z
   })
   .passthrough()
 
-function SortableWorkoutItem({
-  item,
-  index,
-  onChangeTitle,
-  saving,
-}: {
-  item: { id: string; title: string; sort_order: number }
-  index: number
-  onChangeTitle: (id: string, val: string) => void
-  saving: boolean
-}) {
-  const controls = useDragControls()
 
-  return (
-    <Reorder.Item
-      value={item}
-      dragListener={false}
-      dragControls={controls}
-      className="flex items-center gap-3 rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative touch-none select-none"
-    >
-      <div
-        className={`text-neutral-500 p-2 -m-2 touch-none ${saving ? 'opacity-50 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
-        onPointerDown={(e) => !saving && controls.start(e)}
-      >
-        <GripVertical size={18} />
-      </div>
-      <div className="w-10 text-xs font-mono text-neutral-500">#{index + 1}</div>
-      <input
-        value={item.title}
-        onChange={(e) => onChangeTitle(item.id, e.target.value)}
-        disabled={saving}
-        className="flex-1 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 disabled:opacity-50"
-        placeholder="Título"
-        onPointerDown={(e) => e.stopPropagation()}
-      />
-    </Reorder.Item>
-  )
-}
 
 export type DashboardWorkout = {
   id?: string
@@ -849,222 +814,23 @@ export default function StudentDashboard(props: Props) {
                   Ferramentas
                 </button>
                 {toolsOpen && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setToolsOpen(false)} />
-
-                    {/* ── Premium Tools Panel ─────────────────────────────── */}
-                    <div className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                      <div className="rounded-3xl border border-white/10 bg-neutral-950/97 backdrop-blur-xl shadow-2xl shadow-black/70 overflow-hidden">
-
-                        {/* Gold top shimmer */}
-                        <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/80 to-transparent" />
-
-                        {/* Header */}
-                        <div className="px-4 pt-3.5 pb-2.5 flex items-center gap-2.5 border-b border-white/5">
-                          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-600/10 border border-yellow-500/30 flex items-center justify-center">
-                            <Sparkles size={13} className="text-yellow-400" />
-                          </div>
-                          <div>
-                            <p className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Ferramentas</p>
-                            <p className="text-[10px] text-neutral-600 font-medium leading-none mt-0.5">Ações avançadas do seu treino</p>
-                          </div>
-                        </div>
-
-                        <div className="p-2 space-y-0.5">
-
-                          {/* ── GROUP: Criar ──────────────────────────────── */}
-                          <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Criar</p>
-
-                          {/* Criar automaticamente */}
-                          <button
-                            onClick={() => { setToolsOpen(false); props.onCreateWorkout() }}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-600/10 border border-yellow-500/25 flex items-center justify-center flex-shrink-0">
-                              <Sparkles size={14} className="text-yellow-400" />
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-white group-hover:text-yellow-100 leading-tight">Criar automaticamente</p>
-                              <p className="text-[10px] text-neutral-600">Wizard com IA</p>
-                            </div>
-                          </button>
-
-                          {/* Scanner de Treino */}
-                          <button
-                            onClick={() => { setToolsOpen(false); props.onOpenIronScanner() }}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-orange-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-600/10 border border-orange-500/25 flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm leading-none">📷</span>
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-white group-hover:text-orange-100 leading-tight">Scanner de Treino</p>
-                              <p className="text-[10px] text-neutral-600">Importar por imagem</p>
-                            </div>
-                          </button>
-
-                          {/* Divisor */}
-                          <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
-
-                          {/* ── GROUP: Analisar ───────────────────────────── */}
-                          <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Analisar</p>
-
-                          {/* Calendário */}
-                          <button
-                            onClick={() => { setToolsOpen(false); setCalendarOpen(true) }}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-blue-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/20 to-blue-700/10 border border-blue-500/25 flex items-center justify-center flex-shrink-0">
-                              <CalendarDays size={14} className="text-blue-400" />
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-white group-hover:text-blue-100 leading-tight">Calendário</p>
-                              <p className="text-[10px] text-neutral-600">Histórico por data</p>
-                            </div>
-                          </button>
-
-                          {/* Check-ins */}
-                          <button
-                            onClick={() => { setToolsOpen(false); setCheckinsOpen(true) }}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-green-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-700/10 border border-green-500/25 flex items-center justify-center flex-shrink-0">
-                              <Activity size={14} className="text-green-400" />
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-white group-hover:text-green-100 leading-tight">Check-ins</p>
-                              <p className="text-[10px] text-neutral-600">Humor e energia</p>
-                            </div>
-                          </button>
-
-                          {/* Divisor */}
-                          <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
-
-                          {/* ── GROUP: Dados ──────────────────────────────── */}
-                          <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Dados</p>
-
-                          {/* Importar JSON */}
-                          <button
-                            onClick={() => { setToolsOpen(false); props.onOpenJsonImport() }}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-700/10 border border-purple-500/25 flex items-center justify-center flex-shrink-0">
-                              <span className="text-sm font-black text-purple-400 leading-none">↵</span>
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-white group-hover:text-purple-100 leading-tight">Importar JSON</p>
-                              <p className="text-[10px] text-neutral-600">Carregar treinos salvos</p>
-                            </div>
-                          </button>
-
-                          {/* Exportar JSON */}
-                          <button
-                            onClick={() => { setToolsOpen(false); props.onExportAll() }}
-                            disabled={!!props.exportingAll}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-neutral-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-neutral-600/30 to-neutral-700/10 border border-neutral-600/25 flex items-center justify-center flex-shrink-0">
-                              {props.exportingAll
-                                ? <Loader2 size={14} className="text-neutral-400 animate-spin" />
-                                : <span className="text-sm font-black text-neutral-400 leading-none">↓</span>
-                              }
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
-                                {props.exportingAll ? 'Exportando...' : 'Exportar JSON'}
-                              </p>
-                              <p className="text-[10px] text-neutral-600">Backup dos seus treinos</p>
-                            </div>
-                          </button>
-
-                          {/* Divisor */}
-                          <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
-
-                          {/* ── GROUP: Manutenção ─────────────────────────── */}
-                          <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Manutenção</p>
-
-                          {/* Padronizar nomes IA */}
-                          <button
-                            onClick={async () => {
-                              setToolsOpen(false)
-                              if (typeof props.onNormalizeAiWorkoutTitles !== 'function') return
-                              try { setNormalizingAiTitles(true); await props.onNormalizeAiWorkoutTitles() }
-                              finally { setNormalizingAiTitles(false) }
-                            }}
-                            disabled={normalizingAiTitles}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/15 to-amber-700/10 border border-yellow-600/20 flex items-center justify-center flex-shrink-0">
-                              {normalizingAiTitles
-                                ? <Loader2 size={14} className="text-yellow-400 animate-spin" />
-                                : <Sparkles size={14} className="text-yellow-500" />
-                              }
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
-                                {normalizingAiTitles ? 'Padronizando...' : 'Padronizar nomes IA'}
-                              </p>
-                              <p className="text-[10px] text-neutral-600">Uniformizar com IA</p>
-                            </div>
-                          </button>
-
-                          {/* Normalizar exercícios */}
-                          <button
-                            onClick={async () => {
-                              setToolsOpen(false)
-                              if (typeof props.onNormalizeExercises !== 'function') return
-                              try { setNormalizingExercises(true); await props.onNormalizeExercises() }
-                              finally { setNormalizingExercises(false) }
-                            }}
-                            disabled={normalizingExercises}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/15 to-amber-700/10 border border-yellow-600/20 flex items-center justify-center flex-shrink-0">
-                              {normalizingExercises
-                                ? <Loader2 size={14} className="text-yellow-400 animate-spin" />
-                                : <span className="text-sm text-yellow-500 leading-none font-black">✦</span>
-                              }
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
-                                {normalizingExercises ? 'Normalizando...' : 'Normalizar exercícios'}
-                              </p>
-                              <p className="text-[10px] text-neutral-600">Corrigir nomes duplicados</p>
-                            </div>
-                          </button>
-
-                          {/* Padronizar títulos A/B/C */}
-                          <button
-                            onClick={async () => {
-                              setToolsOpen(false)
-                              if (typeof props.onApplyTitleRule !== 'function') return
-                              try { setApplyingTitleRule(true); await props.onApplyTitleRule() }
-                              finally { setApplyingTitleRule(false) }
-                            }}
-                            disabled={applyingTitleRule}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98] disabled:opacity-50"
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/15 to-amber-700/10 border border-yellow-600/20 flex items-center justify-center flex-shrink-0">
-                              {applyingTitleRule
-                                ? <Loader2 size={14} className="text-yellow-400 animate-spin" />
-                                : <span className="text-sm text-yellow-500 font-black leading-none">A</span>
-                              }
-                            </div>
-                            <div className="flex-1 text-left">
-                              <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
-                                {applyingTitleRule ? 'Aplicando...' : 'Padronizar títulos'}
-                              </p>
-                              <p className="text-[10px] text-neutral-600">Renomear A/B/C automaticamente</p>
-                            </div>
-                          </button>
-
-                        </div>
-
-                        {/* Gold bottom shimmer */}
-                        <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
-                      </div>
-                    </div>
-                  </>
+                  <WorkoutToolsPanel
+                    onClose={() => setToolsOpen(false)}
+                    onCreateWorkout={props.onCreateWorkout}
+                    onOpenIronScanner={props.onOpenIronScanner}
+                    onOpenJsonImport={props.onOpenJsonImport}
+                    onExportAll={props.onExportAll}
+                    exportingAll={props.exportingAll}
+                    onNormalizeAiWorkoutTitles={props.onNormalizeAiWorkoutTitles}
+                    onNormalizeExercises={props.onNormalizeExercises}
+                    onApplyTitleRule={props.onApplyTitleRule}
+                    normalizingAiTitles={normalizingAiTitles}
+                    normalizingExercises={normalizingExercises}
+                    applyingTitleRule={applyingTitleRule}
+                    setNormalizingAiTitles={setNormalizingAiTitles}
+                    setNormalizingExercises={setNormalizingExercises}
+                    setApplyingTitleRule={setApplyingTitleRule}
+                  />
                 )}
 
               </div>

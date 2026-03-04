@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { memo, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Crown, X } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -17,7 +17,7 @@ type Props = {
   showBadges?: boolean
 }
 
-export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, currentUserId, showIronRank = true, showBadges = true }: Props) {
+const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, totalVolumeKg, currentUserId, showIronRank = true, showBadges = true }: Props) {
   const safeBadges = Array.isArray(badges) ? badges : []
 
   // Calculate Level based on Volume (Gamification)
@@ -333,4 +333,6 @@ export default function BadgesGallery({ badges, currentStreak, totalVolumeKg, cu
       )}
     </div>
   )
-}
+});
+
+export default BadgesGallery;

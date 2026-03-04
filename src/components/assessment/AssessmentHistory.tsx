@@ -49,235 +49,28 @@ const BASE_ACTIVITY_FACTOR = 1.2;
 const TEF_FACTOR = 0.1;
 const MAX_SESSION_SECONDS = 4 * 60 * 60;
 
-interface AssessmentRow {
-  id?: string
-  weight?: number | string | null
-  bf?: number | string | null
-  waist?: number | string | null
-  arm?: number | string | null
-  sum7?: number | string | null
-  date?: string | null
-  notes?: string | null
-  [key: string]: unknown
-}
+import {
+  AssessmentRow,
+  isRecord,
+  toPositiveNumberOrNull,
+  getWeightKg,
+  getBodyFatPercent,
+  getFatMassKg,
+  getLeanMassKg,
+  getBmrKcal,
+  getMeasurementCm,
+  getSkinfoldMm,
+  getSum7Mm,
+  safeJsonParse,
+  safeDateMs,
+  safeDateMsStartOfDay,
+  safeDateMsEndOfDay,
+  countSessionSets,
+  estimateStrengthTrainingMet,
+  uniqueStrings,
+} from './assessmentUtils';
+import { AssessmentHistoryModal } from './AssessmentHistoryModal';
 
-const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
-
-const toPositiveNumberOrNull = (value: unknown): number | null => {
-  const num = typeof value === 'string' ? Number(value.replace(',', '.')) : Number(value);
-  return Number.isFinite(num) && num > 0 ? num : null;
-};
-
-const getWeightKg = (assessment: AssessmentRow): number | null => {
-  return toPositiveNumberOrNull(assessment?.weight);
-};
-
-const getBodyFatPercent = (assessment: AssessmentRow): number | null => {
-  return toPositiveNumberOrNull(assessment?.body_fat_percentage ?? assessment?.bf);
-};
-
-const getFatMassKg = (assessment: AssessmentRow): number | null => {
-  const stored = toPositiveNumberOrNull(assessment?.fat_mass);
-  if (stored) return stored;
-  const weight = getWeightKg(assessment);
-  const bf = getBodyFatPercent(assessment);
-  if (!weight || !bf) return null;
-  const computed = (weight * bf) / 100;
-  return Number.isFinite(computed) && computed > 0 ? computed : null;
-};
-
-const getLeanMassKg = (assessment: AssessmentRow): number | null => {
-  const weight = getWeightKg(assessment);
-  const bf = getBodyFatPercent(assessment);
-  const fatMass = getFatMassKg(assessment);
-  const stored = toPositiveNumberOrNull(assessment?.lean_mass);
-
-  if (stored) {
-    if (!weight) return stored;
-    const epsilon = 0.05;
-    const isEqualToWeight = Math.abs(stored - weight) <= epsilon;
-    const hasCompositionInputs = !!bf || !!fatMass;
-    if (!isEqualToWeight || hasCompositionInputs) {
-      return stored > 0 && stored < weight ? stored : null;
-    }
-  }
-
-  if (!weight || !bf) return null;
-  const computed = weight * (1 - bf / 100);
-  return Number.isFinite(computed) && computed > 0 && computed < weight ? computed : null;
-};
-
-const getBmrKcal = (assessment: AssessmentRow): number | null => {
-  return toPositiveNumberOrNull(assessment?.bmr);
-};
-
-const getMeasurementCm = (assessment: AssessmentRow, key: string): number | null => {
-  // Tenta buscar no objeto aninhado antigo
-  const measurements = isRecord(assessment?.measurements) ? (assessment.measurements as Record<string, unknown>) : null
-  const nested = toPositiveNumberOrNull(measurements?.[key]);
-  if (nested) return nested;
-
-  // Tenta mapear para as colunas planas novas
-  const keyMap: Record<string, string> = {
-    'arm': 'arm_circ',
-    'chest': 'chest_circ',
-    'waist': 'waist_circ',
-    'hip': 'hip_circ',
-    'thigh': 'thigh_circ',
-    'calf': 'calf_circ'
-  };
-
-  const flatKey = keyMap[key];
-  if (flatKey) {
-    return toPositiveNumberOrNull(assessment?.[flatKey]);
-  }
-
-  return null;
-};
-
-const getSkinfoldMm = (assessment: AssessmentRow, key: string): number | null => {
-  // Tenta buscar no objeto aninhado antigo
-  const skinfolds = isRecord(assessment?.skinfolds) ? (assessment.skinfolds as Record<string, unknown>) : null
-  const nested = toPositiveNumberOrNull(skinfolds?.[key]);
-  if (nested) return nested;
-
-  // Tenta mapear para as colunas planas novas
-  const keyMap: Record<string, string> = {
-    'triceps': 'triceps_skinfold',
-    'biceps': 'biceps_skinfold',
-    'subscapular': 'subscapular_skinfold',
-    'suprailiac': 'suprailiac_skinfold',
-    'abdominal': 'abdominal_skinfold',
-    'thigh': 'thigh_skinfold',
-    'calf': 'calf_skinfold'
-  };
-
-  const flatKey = keyMap[key];
-  if (flatKey) {
-    return toPositiveNumberOrNull(assessment?.[flatKey]);
-  }
-
-  return null;
-};
-
-const getSum7Mm = (assessment: AssessmentRow): number | null => {
-  // Tenta buscar valor pronto antigo
-  const measurements = isRecord(assessment?.measurements) ? (assessment.measurements as Record<string, unknown>) : null
-  const stored = toPositiveNumberOrNull(assessment?.sum7 ?? measurements?.sum7);
-  if (stored) return stored;
-
-  // Calcula somatório das colunas planas
-  const t = Number(assessment?.triceps_skinfold) || 0;
-  const b = Number(assessment?.biceps_skinfold) || 0;
-  const s = Number(assessment?.subscapular_skinfold) || 0;
-  const si = Number(assessment?.suprailiac_skinfold) || 0;
-  const a = Number(assessment?.abdominal_skinfold) || 0;
-  const th = Number(assessment?.thigh_skinfold) || 0;
-  const c = Number(assessment?.calf_skinfold) || 0;
-
-  const sum = t + b + s + si + a + th + c;
-  return sum > 0 ? sum : null;
-};
-
-const safeJsonParse = (raw: unknown): Record<string, unknown> | null => {
-  try {
-    if (!raw) return null;
-    if (isRecord(raw)) return raw;
-    if (typeof raw !== 'string') return null;
-    const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()));
-    return isRecord(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-const safeDateMs = (raw: unknown): number | null => {
-  if (!raw) return null;
-  const obj = isRecord(raw) ? raw : null
-  const toDate = obj && typeof obj.toDate === 'function' ? (obj.toDate as () => unknown) : null
-  const d = toDate ? toDate() : new Date(typeof raw === 'string' || typeof raw === 'number' || raw instanceof Date ? raw : String(raw))
-  if (!(d instanceof Date)) return null
-  const t = d.getTime();
-  return Number.isFinite(t) ? t : null;
-};
-
-const safeDateMsStartOfDay = (raw: unknown): number | null => {
-  if (!raw) return null;
-  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
-    const d = new Date(`${raw.trim()}T00:00:00.000`);
-    const t = d.getTime();
-    return Number.isFinite(t) ? t : null;
-  }
-  return safeDateMs(raw);
-};
-
-const safeDateMsEndOfDay = (raw: unknown): number | null => {
-  if (!raw) return null;
-  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim())) {
-    const d = new Date(`${raw.trim()}T23:59:59.999`);
-    const t = d.getTime();
-    return Number.isFinite(t) ? t : null;
-  }
-  return safeDateMs(raw);
-};
-
-const countSessionSets = (session: Record<string, unknown>): number => {
-  const logs = session?.logs
-  if (logs && typeof logs === 'object') {
-    try {
-      const values: unknown[] = Object.values(logs as Record<string, unknown>);
-      if (Array.isArray(values)) {
-        const doneCount = values.reduce<number>((acc: number, v: unknown) => {
-          if (isRecord(v) && v.done === true) return acc + 1;
-          return acc;
-        }, 0);
-        if (doneCount > 0) return doneCount;
-        return values.length;
-      }
-    } catch {
-      return 0;
-    }
-  }
-
-  const exercises = Array.isArray(session?.exercises) ? session.exercises : [];
-  let total = 0;
-  for (const exRaw of exercises) {
-    const ex = isRecord(exRaw) ? exRaw : {}
-    const setsArr = Array.isArray(ex?.sets) ? (ex.sets as unknown[]) : null;
-    if (setsArr) {
-      total += setsArr.length;
-      continue;
-    }
-    const count = typeof ex?.sets === 'number' ? ex.sets : Number(ex?.sets);
-    if (Number.isFinite(count) && count > 0) total += Math.floor(count);
-  }
-  return total;
-};
-
-const estimateStrengthTrainingMet = (seconds: number, setsCount: number): number => {
-  const minutes = seconds > 0 ? seconds / 60 : 0;
-  if (!Number.isFinite(minutes) || minutes <= 0) return 4.8;
-  const setsPerMin = setsCount > 0 ? setsCount / minutes : 0;
-  if (!Number.isFinite(setsPerMin) || setsPerMin <= 0) return 4.8;
-
-  if (setsPerMin < 0.25) return 3.8;
-  if (setsPerMin < 0.35) return 4.6;
-  if (setsPerMin < 0.5) return 5.3;
-  return 5.9;
-};
-
-const uniqueStrings = (values: unknown[]): string[] => {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const v of values) {
-    if (typeof v !== 'string') continue;
-    const s = v.trim();
-    if (!s || seen.has(s)) continue;
-    seen.add(s);
-    out.push(s);
-  }
-  return out;
-};
 
 interface AssessmentHistoryProps {
   studentId?: string;
@@ -1613,110 +1406,19 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
         </div>
       )}
 
-      {/* Modal de Histórico */}
+
       {showHistory && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowHistory(false)}>
-          <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-              <h3 className="font-bold text-white">Histórico de Avaliações</h3>
-              <button onClick={() => setShowHistory(false)} className="p-2 hover:bg-neutral-800 rounded-full"><X className="w-5 h-5 text-neutral-400"/></button>
-            </div>
-            <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
-              {sortedAssessments.map((a, idx) => {
-                const assessmentId = String(a?.id ?? idx)
-                return (
-                <div key={assessmentId} className="bg-neutral-800 p-3 rounded-xl border border-neutral-700">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                    <div>
-                      <div className="font-black text-white">{formatDateCompact(a.date || a.assessment_date)}</div>
-                      <div className="text-xs text-neutral-500">{(() => {
-                        const w = getWeightKg(a);
-                        const bf = getBodyFatPercent(a);
-                        const weightLabel = w ? `${w.toFixed(1)} kg` : '-';
-                        const bfLabel = bf ? `${bf.toFixed(1)}%` : '-';
-                        return `Peso ${weightLabel} • % Gordura ${bfLabel}`;
-                      })()}</div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
-                        className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
-                        type="button"
-                      >
-                        Detalhes
-                      </button>
-                      <AssessmentPDFGenerator
-                        formData={{
-                          assessment_date: String(a.assessment_date || ''),
-                          weight: String(a.weight || ''),
-                          height: String(a.height || ''),
-                          age: String(a.age || ''),
-                          gender: safeGender(a.gender),
-                          arm_circ: String(getMeasurementCm(a, 'arm') || ''),
-                          chest_circ: String(getMeasurementCm(a, 'chest') || ''),
-                          waist_circ: String(getMeasurementCm(a, 'waist') || ''),
-                          hip_circ: String(getMeasurementCm(a, 'hip') || ''),
-                          thigh_circ: String(getMeasurementCm(a, 'thigh') || ''),
-                          calf_circ: String(getMeasurementCm(a, 'calf') || ''),
-                          triceps_skinfold: String(getSkinfoldMm(a, 'triceps') || ''),
-                          biceps_skinfold: String(getSkinfoldMm(a, 'biceps') || ''),
-                          subscapular_skinfold: String(getSkinfoldMm(a, 'subscapular') || ''),
-                          suprailiac_skinfold: String(getSkinfoldMm(a, 'suprailiac') || ''),
-                          abdominal_skinfold: String(getSkinfoldMm(a, 'abdominal') || ''),
-                          thigh_skinfold: String(getSkinfoldMm(a, 'thigh') || ''),
-                          calf_skinfold: String(getSkinfoldMm(a, 'calf') || ''),
-                          observations: ''
-                        }}
-                        studentName={studentName}
-                        trainerName={String(a.trainer_name ?? '')}
-                        assessmentDate={new Date(
-                          typeof a.assessment_date === 'string' || typeof a.assessment_date === 'number' || a.assessment_date instanceof Date
-                            ? a.assessment_date
-                            : String(a.assessment_date ?? Date.now()),
-                        )}
-                      />
-                    </div>
-                  </div>
-                  {selectedAssessment === assessmentId && (
-                    <div className="mt-3 pt-3 border-t border-neutral-700">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <h4 className="font-bold text-white mb-2">Dobras Cutâneas (mm)</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                          {skinfoldFields.map(({ key, label }) => {
-                            const value = getSkinfoldMm(a, key);
-                            return (
-                              <div key={key} className="flex justify-between">
-                                <span className="text-neutral-400">{label}:</span>
-                                <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
-                              </div>
-                            );
-                          })}
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white mb-2">Circunferências (cm)</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                          {measurementFields.map(({ key, label }) => {
-                            const value = getMeasurementCm(a, key);
-                            return (
-                              <div key={key} className="flex justify-between">
-                                <span className="text-neutral-400">{label}:</span>
-                                <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
-                              </div>
-                            );
-                          })}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+        <AssessmentHistoryModal
+          assessments={sortedAssessments}
+          selectedAssessment={selectedAssessment}
+          setSelectedAssessment={setSelectedAssessment}
+          measurementFields={measurementFields}
+          skinfoldFields={skinfoldFields}
+          studentName={studentName}
+          formatDateCompact={formatDateCompact}
+          safeGender={safeGender}
+          onClose={() => setShowHistory(false)}
+        />
       )}
     </div>
     </DialogProvider>
