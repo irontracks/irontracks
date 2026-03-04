@@ -57,6 +57,7 @@ type ApiPayload = ApiPayloadWeek | ApiPayloadDay
 type Props = {
   onOpenWizard?: () => void
   defaultViewMode?: 'day' | 'week'
+  userRole?: string | null
 }
 
 const localIsoDate = () => {
@@ -537,6 +538,7 @@ export default function MuscleMapCard(props: Props) {
                   onSelect={(id) => {
                     setSelected((prev) => (prev === id ? null : id))
                   }}
+                  calibrationMode={String(props.userRole || '').toLowerCase() === 'admin'}
                 />
                 <div className="mt-3 grid grid-cols-4 gap-2 text-[11px] font-black uppercase tracking-widest">
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2">
