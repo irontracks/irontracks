@@ -10,7 +10,7 @@ import { HELP_TERMS } from '@/utils/help/terms';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { WorkoutHeader } from './ExerciseEditor/WorkoutHeader'
+import { WorkoutHeader } from './ExerciseEditor/EditorHeader'
 import { CardioFields, CARDIO_OPTIONS } from './ExerciseEditor/CardioFields'
 import { SetDetailsSection } from './ExerciseEditor/SetDetailsSection'
 import type { AdvancedConfig, SetDetail, Exercise, Workout } from './ExerciseEditor/types'
@@ -1052,159 +1052,159 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                             </div>
                                         )}
 
-                                                <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</label>
-                                                        <div className="flex items-center gap-1">
-                                                            <input
-                                                                type="number"
-                                                                value={setsCount || ''}
-                                                                onChange={e => updateExercise(index, 'sets', e.target.value)}
-                                                                className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                            />
-                                                            <button
-                                                                onClick={() => updateExercise(index, 'duplicate', true)}
-                                                                className="h-8 w-8 bg-neutral-700 hover:bg-white hover:text-black text-neutral-400 rounded-lg flex items-center justify-center transition-colors"
-                                                                title="Duplicar Série"
-                                                            >
-                                                                <Plus size={14} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</label>
-                                                        <input
-                                                            type="text"
-                                                            value={exercise.reps ? String(exercise.reps) : ''}
-                                                            onChange={e => updateExercise(index, 'reps', e.target.value)}
-                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                            RPE
-                                                            <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            value={exercise.rpe ? String(exercise.rpe) : ''}
-                                                            onChange={e => updateExercise(index, 'rpe', e.target.value)}
-                                                            className="w-full bg-neutral-900 border border-yellow-500/20 rounded-lg p-2 text-center text-sm font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
-                                                            placeholder="8"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</label>
-                                                        <input
-                                                            type="number"
-                                                            value={(exercise.restTime ?? '')}
-                                                            onChange={e => updateExercise(index, 'restTime', e.target.value)}
-                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                            Cad
-                                                            <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={exercise.cadence || ''}
-                                                            onChange={e => updateExercise(index, 'cadence', e.target.value)}
-                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
-                                                            Método
-                                                            {(() => {
-                                                                const m = String(safeMethod || 'Normal');
-                                                                const term =
-                                                                    m === 'Drop-set'
-                                                                        ? HELP_TERMS.dropSet
-                                                                        : m === 'Rest-Pause'
-                                                                            ? HELP_TERMS.restPause
-                                                                            : m === 'Cluster'
-                                                                                ? HELP_TERMS.cluster
-                                                                                : m === 'Bi-Set'
-                                                                                    ? HELP_TERMS.biSet
-                                                                                    : null;
-                                                                return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
-                                                            })()}
-                                                        </label>
-                                                        <select
-                                                            value={safeMethod || 'Normal'}
-                                                            onChange={e => updateExercise(index, 'method', e.target.value)}
-                                                            className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
-                                                        >
-                                                            <option value="Normal">Normal</option>
-                                                            <option value="Drop-set">Drop</option>
-                                                            <option value="Rest-Pause">Rest-P</option>
-                                                            <option value="Bi-Set">Bi-Set</option>
-                                                            <option value="Cluster">Cluster</option>
-                                                        </select>
-                                                    </div>
+                                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</label>
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        value={setsCount || ''}
+                                                        onChange={e => updateExercise(index, 'sets', e.target.value)}
+                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    />
+                                                    <button
+                                                        onClick={() => updateExercise(index, 'duplicate', true)}
+                                                        className="h-8 w-8 bg-neutral-700 hover:bg-white hover:text-black text-neutral-400 rounded-lg flex items-center justify-center transition-colors"
+                                                        title="Duplicar Série"
+                                                    >
+                                                        <Plus size={14} />
+                                                    </button>
                                                 </div>
-                                                {exerciseType === 'cardio' ? (
-                                                    <CardioFields
-                                                        exercise={exercise}
-                                                        setDetails={setDetails}
-                                                        onUpdateExercise={(field, value) => updateExercise(index, field, value)}
-                                                        onUpdateSetDetail={(setIdx, patch) => updateSetDetail(index, setIdx, patch)}
-                                                    />
-                                                ) : (
-                                                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</label>
+                                                <input
+                                                    type="text"
+                                                    value={exercise.reps ? String(exercise.reps) : ''}
+                                                    onChange={e => updateExercise(index, 'reps', e.target.value)}
+                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                    RPE
+                                                    <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    value={exercise.rpe ? String(exercise.rpe) : ''}
+                                                    onChange={e => updateExercise(index, 'rpe', e.target.value)}
+                                                    className="w-full bg-neutral-900 border border-yellow-500/20 rounded-lg p-2 text-center text-sm font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
+                                                    placeholder="8"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</label>
+                                                <input
+                                                    type="number"
+                                                    value={(exercise.restTime ?? '')}
+                                                    onChange={e => updateExercise(index, 'restTime', e.target.value)}
+                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                    Cad
+                                                    <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={exercise.cadence || ''}
+                                                    onChange={e => updateExercise(index, 'cadence', e.target.value)}
+                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                    Método
+                                                    {(() => {
+                                                        const m = String(safeMethod || 'Normal');
+                                                        const term =
+                                                            m === 'Drop-set'
+                                                                ? HELP_TERMS.dropSet
+                                                                : m === 'Rest-Pause'
+                                                                    ? HELP_TERMS.restPause
+                                                                    : m === 'Cluster'
+                                                                        ? HELP_TERMS.cluster
+                                                                        : m === 'Bi-Set'
+                                                                            ? HELP_TERMS.biSet
+                                                                            : null;
+                                                        return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
+                                                    })()}
+                                                </label>
+                                                <select
+                                                    value={safeMethod || 'Normal'}
+                                                    onChange={e => updateExercise(index, 'method', e.target.value)}
+                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
+                                                >
+                                                    <option value="Normal">Normal</option>
+                                                    <option value="Drop-set">Drop</option>
+                                                    <option value="Rest-Pause">Rest-P</option>
+                                                    <option value="Bi-Set">Bi-Set</option>
+                                                    <option value="Cluster">Cluster</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        {exerciseType === 'cardio' ? (
+                                            <CardioFields
+                                                exercise={exercise}
+                                                setDetails={setDetails}
+                                                onUpdateExercise={(field, value) => updateExercise(index, field, value)}
+                                                onUpdateSetDetail={(setIdx, patch) => updateSetDetail(index, setIdx, patch)}
+                                            />
+                                        ) : (
+                                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
 
-                                                        <div>
-                                                            <div className="flex items-center justify-between gap-3 mb-1">
-                                                                <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
-                                                                {String(exercise.videoUrl || '').trim() ? (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={(e) => {
-                                                                            try {
-                                                                                e.preventDefault();
-                                                                                e.stopPropagation();
-                                                                            } catch { }
-                                                                            try {
-                                                                                window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
-                                                                            } catch { }
-                                                                        }}
-                                                                        className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
-                                                                        title="Ver vídeo"
-                                                                    >
-                                                                        <Play size={14} />
-                                                                        Ver vídeo
-                                                                    </button>
-                                                                ) : null}
-                                                            </div>
-                                                            <input
-                                                                value={exercise.videoUrl || ''}
-                                                                onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
-                                                                className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
-                                                                placeholder="https://youtube.com/..."
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
-                                                            <textarea
-                                                                value={exercise.notes || ''}
-                                                                onChange={e => updateExercise(index, 'notes', e.target.value)}
-                                                                className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"
-                                                                placeholder="Dicas de execução..."
-                                                            />
-                                                        </div>
+                                                <div>
+                                                    <div className="flex items-center justify-between gap-3 mb-1">
+                                                        <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
+                                                        {String(exercise.videoUrl || '').trim() ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    try {
+                                                                        e.preventDefault();
+                                                                        e.stopPropagation();
+                                                                    } catch { }
+                                                                    try {
+                                                                        window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
+                                                                    } catch { }
+                                                                }}
+                                                                className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
+                                                                title="Ver vídeo"
+                                                            >
+                                                                <Play size={14} />
+                                                                Ver vídeo
+                                                            </button>
+                                                        ) : null}
                                                     </div>
-                                                )}
-
-                                                {setsCount > 0 && exerciseType !== 'cardio' && (
-                                                    <SetDetailsSection
-                                                        setDetails={setDetails}
-                                                        safeMethod={safeMethod}
-                                                        exerciseIndex={index}
-                                                        onUpdateSetDetail={updateSetDetail}
+                                                    <input
+                                                        value={exercise.videoUrl || ''}
+                                                        onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
+                                                        className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
+                                                        placeholder="https://youtube.com/..."
                                                     />
-                                                )}
+                                                </div>
+                                                <div>
+                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
+                                                    <textarea
+                                                        value={exercise.notes || ''}
+                                                        onChange={e => updateExercise(index, 'notes', e.target.value)}
+                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"
+                                                        placeholder="Dicas de execução..."
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {setsCount > 0 && exerciseType !== 'cardio' && (
+                                            <SetDetailsSection
+                                                setDetails={setDetails}
+                                                safeMethod={safeMethod}
+                                                exerciseIndex={index}
+                                                onUpdateSetDetail={updateSetDetail}
+                                            />
+                                        )}
                                     </div>
 
                                     {isBiSet && hasNext && (

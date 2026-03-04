@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server'
-
-/**
- * Extrai mensagem de erro de qualquer valor
- */
-export const getErrorMessage = (e: unknown): string =>
-  e instanceof Error ? e.message : String(e)
+import { getErrorMessage } from '@/utils/errorMessage'
 
 /**
  * Resposta padrão de erro interno
