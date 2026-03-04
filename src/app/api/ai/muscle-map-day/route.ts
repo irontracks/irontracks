@@ -108,12 +108,13 @@ const parseEffortFactor = (log: unknown) => {
 
 const colorForRatio = (ratio: number) => {
   const r = Number.isFinite(ratio) ? ratio : 0
-  if (r <= 0.15) return '#0b1220'
-  if (r <= 0.35) return '#111827'
-  if (r <= 0.6) return '#1f2937'
-  if (r <= 0.9) return '#f59e0b'
-  if (r <= 1.2) return '#fb923c'
-  return '#ef4444'
+  if (r <= 0) return '#1a2744'       // sem treino: azul-marinho escuro
+  if (r <= 0.25) return '#1e3a5f'    // muito baixo: azul escuro
+  if (r <= 0.5) return '#1d4ed8'     // baixo: azul
+  if (r <= 0.75) return '#0ea5e9'    // abaixo da meta: azul-claro
+  if (r <= 1.0) return '#f59e0b'     // na meta: amarelo dourado
+  if (r <= 1.3) return '#f97316'     // levemente acima: laranja
+  return '#ef4444'                   // muito acima: vermelho
 }
 
 const normalizeAiExerciseMap = (obj: unknown) => {
@@ -157,9 +158,9 @@ const normalizeAiExerciseMap = (obj: unknown) => {
       const normalizedContrib =
         weightSum > 0
           ? contributions.map((c: unknown) => {
-              const contrib = c && typeof c === 'object' ? (c as Record<string, unknown>) : ({} as Record<string, unknown>)
-              return { ...contrib, weight: (Number(contrib.weight) || 0) / weightSum }
-            })
+            const contrib = c && typeof c === 'object' ? (c as Record<string, unknown>) : ({} as Record<string, unknown>)
+            return { ...contrib, weight: (Number(contrib.weight) || 0) / weightSum }
+          })
           : []
 
       const confidenceRaw = Number(item?.confidence)
@@ -324,10 +325,10 @@ export async function POST(req: Request) {
     const exerciseKeys = Array.from(exerciseKeyToCanonical.keys()).slice(0, 1200)
     const { data: maps } = exerciseKeys.length
       ? await admin
-          .from('exercise_muscle_maps')
-          .select('exercise_key, mapping')
-          .eq('user_id', userId)
-          .in('exercise_key', exerciseKeys)
+        .from('exercise_muscle_maps')
+        .select('exercise_key, mapping')
+        .eq('user_id', userId)
+        .in('exercise_key', exerciseKeys)
       : { data: [] as Array<Record<string, unknown>> }
 
     const mapByKey = new Map<string, unknown>()
