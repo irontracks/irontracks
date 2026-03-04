@@ -45,6 +45,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const vibrateIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const alarmActiveRef = useRef(false);
     const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+    // Capture total rest seconds on mount so the ring can compute % remaining
+    const totalSecondsRef = useRef<number>(0);
     const safeSettings = settings && typeof settings === 'object' ? settings : null;
     const soundsEnabled = safeSettings ? safeSettings.enableSounds !== false : true;
     const soundVolume = (() => {
@@ -216,6 +218,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             setIdleTimerDisabled(true);
         } catch { }
 
+        // Capture total duration on first tick
+        const totalSecs = Math.max(1, Math.ceil((targetTime - Date.now()) / 1000));
+        totalSecondsRef.current = totalSecs;
+
         const updateTimer = () => {
             const now = Date.now();
             const remaining = Math.ceil((targetTime - now) / 1000);
@@ -324,16 +330,30 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const baseSeconds = Math.max(0, timeLeft);
     const extraSeconds = Math.max(0, -timeLeft);
 
-    // SVG ring config — all computed from state, no impure calls
-    const RADIUS = 80;
-    const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-    const r = RADIUS * 0.7;
-    const circ = CIRCUMFERENCE * 0.7;
-    // Ring drains as baseSeconds goes towards 0; fills when extra time (overtime)
-    const ringColor = isFinished || extraSeconds > 0 ? '#22c55e' : '#eab308';
-    const ringGlow = isFinished || extraSeconds > 0 ? 'rgba(34,197,94,0.4)' : 'rgba(234,179,8,0.4)';
-    // stroke-dashoffset: 0 = full, circ = empty. We drain clock-style as time goes down.
-    const ringOffset = isFinished ? 0 : circ * (1 - Math.max(0, Math.min(1, 1 / Math.max(1, baseSeconds + 1))));
+    // ── SVG Ring ────────────────────────────────────────────────────────────
+    const r = 33;             // ring radius inside 96×96 viewBox (center 48,48)
+    const circ = 2 * Math.PI * r; // full circumference ≈ 207.3
+
+    // ── YELLOW — countdown phase ─────────────────────────────────────────────
+    // progress = remaining / total  →  1.0 at start, 0.0 when done
+    const total = totalSecondsRef.current || 1;
+    const countdownProgress = !isFinished
+        ? Math.max(0, Math.min(1, baseSeconds / total))
+        : 0;
+    // strokeDashoffset: 0 = full arc drawn, circ = nothing drawn
+    const yellowOffset = circ * (1 - countdownProgress);
+
+    // ── RED — overtime phase, resets every 60 s ──────────────────────────────
+    // Within each 60 s bucket: starts full (0 offset) → drains to empty (circ offset)
+    const extraProgress = isFinished
+        ? Math.max(0, Math.min(1, (extraSeconds % 60) / 60))
+        : 0;
+    const redOffset = circ * extraProgress;
+
+    const isOvertime = isFinished || extraSeconds > 0;
+    const ringColor = isOvertime ? '#ef4444' : '#eab308';  // red : yellow
+    const ringGlow = isOvertime ? 'rgba(239,68,68,0.5)' : 'rgba(234,179,8,0.4)';
+    const ringOffset = isOvertime ? redOffset : yellowOffset;
 
     return (
         <>
@@ -356,20 +376,22 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                 cx="48" cy="48" r={r}
                                 fill="none"
                                 stroke="rgba(255,255,255,0.08)"
-                                strokeWidth="6"
+                                strokeWidth="7"
                             />
-                            {/* Progress ring */}
+                            {/* Progress arc */}
                             <circle
                                 cx="48" cy="48" r={r}
                                 fill="none"
                                 stroke={ringColor}
-                                strokeWidth="6"
+                                strokeWidth="7"
                                 strokeLinecap="round"
                                 strokeDasharray={circ}
                                 strokeDashoffset={ringOffset}
                                 style={{
-                                    transition: 'stroke-dashoffset 1s linear, stroke 0.5s ease',
-                                    filter: `drop-shadow(0 0 6px ${ringGlow})`,
+                                    transition: isOvertime
+                                        ? 'stroke-dashoffset 1s linear, stroke 0.4s ease'
+                                        : 'stroke-dashoffset 1s linear, stroke 0.4s ease',
+                                    filter: `drop-shadow(0 0 7px ${ringGlow})`,
                                 }}
                             />
                         </svg>
@@ -377,14 +399,17 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span
                                 className="font-mono font-black leading-none tabular-nums"
-                                style={{ fontSize: extraSeconds > 0 ? 14 : 18, color: ringColor }}
+                                style={{ fontSize: isOvertime ? 13 : 18, color: ringColor }}
                             >
-                                {isFinished || extraSeconds > 0
+                                {isOvertime
                                     ? `+${formatDuration(extraSeconds)}`
                                     : formatDuration(baseSeconds)}
                             </span>
-                            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mt-0.5">
-                                {isFinished ? 'BORA!' : 'rest'}
+                            <span
+                                className="text-[9px] font-black uppercase tracking-widest mt-0.5"
+                                style={{ color: isOvertime ? '#ef4444' : '#737373' }}
+                            >
+                                {isOvertime ? 'extra' : 'rest'}
                             </span>
                         </div>
                     </div>
