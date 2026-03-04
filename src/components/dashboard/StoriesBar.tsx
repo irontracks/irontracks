@@ -104,10 +104,10 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       logError('error', 'Story upload error:', e)
       const low = msg.toLowerCase()
       if (low.includes('exceeded') && low.includes('maximum') && low.includes('size')) {
-        setError('Arquivo excede o limite de upload do Storage. Se o vídeo estiver <= 200MB, ajuste o “Global upload limit” no Supabase Storage.')
+        setError('O arquivo é muito grande para enviar. Reduza o tamanho do vídeo e tente novamente.')
         return
       }
-      setError(msg === 'unauthorized' ? 'Faça login novamente para publicar.' : `Erro: ${msg}`)
+      setError(msg === 'unauthorized' ? 'Faça login novamente para publicar.' : 'Não foi possível publicar o story. Tente novamente.')
     } finally {
       setUploading(false)
     }

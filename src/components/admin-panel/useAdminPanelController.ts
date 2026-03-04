@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { escapeHtml } from '@/utils/escapeHtml';
 import type { Exercise } from '@/types/app';
 
+import { useAdminActions } from './hooks/useAdminActions';
 type UnknownRecord = Record<string, unknown>;
 
 
@@ -229,146 +230,24 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     // Loading State (Global)
     const [loading, setLoading] = useState<boolean>(false);
 
-    // --- Actions ---
-    const handleRegisterStudent = async () => {
-        if (!newStudent.name || !newStudent.email) return await alert('Preencha nome e email.');
-        setRegistering(true);
-        try {
-            const { data, error } = await supabase
-                .from('students')
-                .insert({ name: newStudent.name, email: newStudent.email, teacher_id: user.id })
-                .select();
-            if (error) throw error;
-            setUsersList(prev => (data?.[0] ? [data[0], ...prev] : prev));
-            setShowRegisterModal(false);
-            setNewStudent({ name: '', email: '' });
-            await alert('Aluno cadastrado com sucesso!', 'Sucesso');
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao cadastrar: ' + msg);
-        } finally {
-            setRegistering(false);
-        }
-    };
-
-    const handleAddTeacher = async () => {
-        if (!newTeacher.name || !newTeacher.email) return await alert('Preencha nome e email.');
-        setAddingTeacher(true);
-        try {
-            const res = await addTeacher(newTeacher.name, newTeacher.email, newTeacher.phone, newTeacher.birth_date);
-            if (res.error) throw new Error(String(res.error));
-
-            await alert('Professor adicionado com sucesso!');
-            setShowTeacherModal(false);
-            setNewTeacher({ name: '', email: '', phone: '', birth_date: '' });
-            // Refresh logic should be handled by refetching or optimistic update
-            // For now, simple reload triggers via state change could be implemented or manual refetch
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao adicionar professor: ' + msg);
-        } finally {
-            setAddingTeacher(false);
-        }
-    };
-
-    const handleUpdateTeacher = async () => {
-        if (!editingTeacher || !editingTeacher.name || !editingTeacher.email) return await alert('Preencha nome e email.');
-        try {
-            const res = await updateTeacher(editingTeacher.id, {
-                name: editingTeacher.name,
-                email: editingTeacher.email,
-                phone: editingTeacher.phone,
-                birth_date: editingTeacher.birth_date
-            });
-            if (res.error) throw new Error(String(res.error));
-            await alert('Professor atualizado com sucesso!');
-            setEditingTeacher(null);
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao atualizar professor: ' + msg);
-        }
-    };
-
-    const handleSendBroadcast = async () => {
-        if (!broadcastTitle || !broadcastMsg) return await alert('Preencha título e mensagem.');
-        setSendingBroadcast(true);
-        try {
-            const res = await sendBroadcastMessage(broadcastTitle, broadcastMsg);
-            if (res.error) throw new Error(String(res.error));
-            await alert('Aviso enviado!', 'Sucesso');
-            setBroadcastTitle('');
-            setBroadcastMsg('');
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao enviar: ' + msg);
-        } finally {
-            setSendingBroadcast(false);
-        }
-    };
-
-    const handleUpdateStudentTeacher = async (studentId: string, teacherId: string | null) => {
-        try {
-            const { error } = await supabase
-                .from('students')
-                .update({ teacher_id: teacherId })
-                .eq('id', studentId);
-            if (error) throw error;
-
-            setUsersList((prev) =>
-                prev.map((u) => (u.id === studentId ? { ...u, teacher_id: teacherId } : u))
-            );
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao atualizar professor: ' + msg);
-        }
-    };
-
-    const handleUpdateStudentStatus = async (student: AdminUser, newStatus: string) => {
-        if (!newStatus || newStatus === student.status) return;
-        const statusLabels: Record<string, string> = {
-            pago: 'Pago ✅',
-            pendente: 'Pendente ⏳',
-            atrasado: 'Atrasado ⚠️',
-            cancelar: 'Cancelado ❌',
-        };
-        const label = statusLabels[newStatus] || newStatus;
-        if (!(await confirm(`Mudar status de "${student.name || student.email}" para ${label}?`))) return;
-        try {
-            const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch('/api/admin/students/status', {
-                method: 'POST',
-                headers: { ...authHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: student.id, status: newStatus }),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
-            setUsersList((prev) =>
-                prev.map((u) => (u.id === student.id ? { ...u, status: newStatus } : u))
-            );
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao atualizar status: ' + msg);
-        }
-    };
-
-    // Keep legacy alias for backward compat
-    const handleToggleStudentStatus = async (student: AdminUser) => {
-        const newStatus = student.status === 'pago' ? 'pendente' : 'pago';
-        return handleUpdateStudentStatus(student, newStatus);
-    };
-
-    const handleDeleteStudent = async (studentId: string) => {
-        if (!(await confirm('Tem certeza que deseja excluir este aluno? Essa ação é irreversível.'))) return;
-        try {
-            const { error } = await supabase.from('students').delete().eq('id', studentId);
-            if (error) throw error;
-            setUsersList((prev) => prev.filter((u) => u.id !== studentId));
-            await alert('Aluno excluído com sucesso!');
-        } catch (e: unknown) {
-            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao excluir: ' + msg);
-        }
-    };
+    // --- Actions (extracted to useAdminActions) ---
+    const {
+        handleRegisterStudent,
+        handleAddTeacher,
+        handleUpdateTeacher,
+        handleSendBroadcast,
+        handleUpdateStudentTeacher,
+        handleUpdateStudentStatus,
+        handleToggleStudentStatus,
+        handleDeleteStudent,
+    } = useAdminActions({
+        supabase, user, alert, confirm, getAdminAuthHeaders,
+        setUsersList,
+        newStudent, setNewStudent, setShowRegisterModal, setRegistering,
+        newTeacher, setNewTeacher, setShowTeacherModal, setAddingTeacher,
+        editingTeacher, setEditingTeacher,
+        broadcastTitle, broadcastMsg, setBroadcastTitle, setBroadcastMsg, setSendingBroadcast,
+    });
 
     // ─── Utility helpers ───────────────────────────────────────────────────────
 
@@ -582,7 +461,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     const handleAddTemplateToStudent = useCallback(async (template: UnknownRecord) => {
         if (!selectedStudent) return;
         const targetUserId = selectedStudent.user_id || '';
-        if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
+        if (!targetUserId) { await alert('Este aluno ainda não possui acesso ao app.'); return; }
         if (!(await confirm(`Adicionar treino "${template?.name || 'Treino'}" para ${selectedStudent.name || selectedStudent.email}?`))) return;
         try {
             const templateExercises: UnknownRecord[] = Array.isArray(template.exercises) ? (template.exercises as UnknownRecord[]) : [];
@@ -637,7 +516,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                 }
             }
             let refreshed: UnknownRecord[] = [];
-            if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
+            if (!targetUserId) { await alert('Este aluno ainda não possui acesso ao app.'); return; }
             const { data } = await supabase
                 .from('workouts')
                 .select('*, exercises(*, sets(*))')
@@ -720,7 +599,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                 const { data, error } = await supabase.from('workouts').select('*').limit(1);
                 if (error) {
                     logError('error', "ERRO CRÍTICO SUPABASE:", error);
-                    setDebugError("Erro Supabase: " + error.message + " | Detalhes: " + JSON.stringify(error));
+                    setDebugError("Falha na conexão com o servidor. Verifique sua internet e recarregue a página.");
                 } else {
                     void data; // connection OK
                 }

@@ -184,6 +184,21 @@ const LoginScreen = () => {
         return msg.includes('authorizationerror') || msg.includes('1000') || code === '1000';
     };
 
+    const friendlyAuthError = (raw: string): string => {
+        const m = raw.toLowerCase();
+        if (m.includes('authorizationerror') || m.includes('1000') || m.includes('authorization')) return 'Não foi possível continuar com a Apple. Tente novamente ou use e-mail e senha.';
+        if (m.includes('invalid login') || m.includes('invalid credentials')) return 'E-mail ou senha incorretos.';
+        if (m.includes('user already registered') || m.includes('already registered')) return 'Este e-mail já possui uma conta. Tente entrar ou recuperar a senha.';
+        if (m.includes('email rate limit')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+        if (m.includes('error sending recovery') || m.includes('smtp')) return 'Não foi possível enviar o e-mail. Tente novamente em instantes.';
+        if (m.includes('network') || m.includes('fetch') || m.includes('conexão')) return 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+        if (m.includes('token') || m.includes('session')) return 'Sua sessão expirou. Faça login novamente.';
+        if (m.includes('user not found') || m.includes('no account')) return 'Não encontramos uma conta com este e-mail.';
+        if (m.includes('weak password') || m.includes('password')) return 'A senha precisa ter pelo menos 6 caracteres.';
+        if (m.includes('timeout') || m.includes('timed out')) return 'A conexão demorou muito. Tente novamente.';
+        return raw.length > 120 ? 'Ocorreu um erro inesperado. Por favor, tente novamente.' : raw;
+    };
+
     const hashSha256 = async (value: string) => {
         try {
             if (typeof window === 'undefined' || !window.crypto?.subtle) return '';
@@ -306,8 +321,8 @@ const LoginScreen = () => {
         } catch (error: unknown) {
             logError('error', "Login Error:", error);
             setIsLoading(false);
-            const msg = error instanceof Error ? error.message : 'Falha ao fazer login.';
-            setErrorMsg(msg);
+            const raw = error instanceof Error ? error.message : 'Falha ao fazer login.';
+            setErrorMsg(friendlyAuthError(raw));
         }
     };
 
@@ -457,14 +472,8 @@ const LoginScreen = () => {
             }
         } catch (err: unknown) {
             logError('error', "Auth Error:", err);
-            let msg = err instanceof Error ? err.message : 'Erro na autenticação';
-            if (msg.includes('Invalid login')) msg = 'E-mail ou senha incorretos.';
-            if (msg.includes('User already registered')) msg = 'E-mail já cadastrado. Tente entrar ou recuperar senha.';
-            if (msg.toLowerCase().includes('email rate limit')) msg = 'Limite de e-mails excedido. Aguarde alguns minutos e tente novamente.';
-            if (msg.toLowerCase().includes('error sending recovery email')) {
-                msg = 'Falha ao enviar o e-mail de recuperação. Verifique o SMTP no Supabase (domínio verificado no Resend, sender no mesmo domínio e senha = API key re_...).';
-            }
-            setErrorMsg(msg);
+            const raw = err instanceof Error ? err.message : 'Erro na autenticação';
+            setErrorMsg(friendlyAuthError(raw));
         } finally {
             if (!holdLoading) setIsLoading(false);
         }

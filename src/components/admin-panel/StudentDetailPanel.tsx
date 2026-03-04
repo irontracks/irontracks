@@ -378,11 +378,11 @@ export const StudentDetailPanel: React.FC = () => {
                                                     } catch { }
                                                 }
                                                 if (!payloadId && !payloadEmail) {
-                                                    await alert('Aluno sem conta (user_id) e sem email; não é possível sincronizar.');
+                                                    await alert('Este aluno ainda não possui acesso ao app. Solicite que ele faça o cadastro primeiro.');
                                                     return;
                                                 }
                                                 if (!payloadId && payloadEmail) {
-                                                    await alert('Aluno sem conta (user_id). Não é possível sincronizar.');
+                                                    await alert('Este aluno ainda não possui acesso ao app. Solicite que ele faça o cadastro primeiro.');
                                                     return;
                                                 }
                                                 const normalize = (s: unknown) => String(s || '')
@@ -416,7 +416,7 @@ export const StudentDetailPanel: React.FC = () => {
                                                     const selectedUserId = String((selectedStudent as UnknownRecord | null)?.user_id || '').trim();
                                                     const resolvedTargetUserId = String(debugObj?.targetUserId || selectedUserId || '').trim();
                                                     if (!resolvedTargetUserId) {
-                                                        await alert('Não foi possível resolver o user_id do aluno para sincronizar.');
+                                                        await alert('Não foi possível identificar o aluno. Tente recarregar a página.');
                                                         return;
                                                     }
                                                     // Se rota retorna vazio, reforçar fetch direto por OR user_id/student_id
@@ -1033,7 +1033,7 @@ export const StudentDetailPanel: React.FC = () => {
                                     onSave={async (data: AdminWorkout) => {
                                         try {
                                             const targetUserId = selectedStudent?.user_id ? String(selectedStudent.user_id) : '';
-                                            if (!targetUserId) { await alert('Aluno sem conta (user_id).'); return; }
+                                            if (!targetUserId) { await alert('Este aluno ainda não possui acesso ao app.'); return; }
                                             if (editingStudentWorkout.id) {
                                                 await updateWorkout(String(editingStudentWorkout.id || ''), data);
                                             } else {
