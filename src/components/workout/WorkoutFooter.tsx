@@ -17,7 +17,24 @@ export default function WorkoutFooter() {
     finishWorkout,
     confirm,
     onFinish,
+    exercises,
+    logs,
   } = useWorkoutContext();
+
+  // Count done/total for mini-timer
+  const { doneSets, totalSets: allSets } = React.useMemo(() => {
+    let total = 0; let done = 0;
+    (exercises || []).forEach((ex, exIdx) => {
+      const count = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
+      total += count;
+      for (let i = 0; i < count; i++) {
+        const log = (logs as Record<string, Record<string, unknown>>)[`${exIdx}-${i}`];
+        if (log?.done) done++;
+      }
+    });
+    return { doneSets: done, totalSets: total };
+  }, [exercises, logs]);
+  const allDone = allSets > 0 && doneSets >= allSets;
 
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
   const toNum = (v: unknown) => {
@@ -60,7 +77,9 @@ export default function WorkoutFooter() {
               <div className="min-w-0">
                 <div className="text-[9px] uppercase tracking-widest text-neutral-500 font-bold">Timer</div>
                 <div className="text-xs font-black text-white truncate">{currentExercise?.name || 'Treino ativo'}</div>
-                <div className="text-[10px] text-neutral-500">Descanso (plan): {plannedRestSec > 0 ? `${Math.round(plannedRestSec)}s` : '—'}</div>
+                <div className="text-[10px] text-neutral-500">
+                  {allSets > 0 ? `${doneSets}/${allSets} séries` : `Descanso: ${plannedRestSec > 0 ? `${Math.round(plannedRestSec)}s` : '—'}`}
+                </div>
               </div>
               <button
                 type="button"
@@ -88,7 +107,7 @@ export default function WorkoutFooter() {
               if (!ok) return;
               try {
                 if (typeof onFinish === 'function') onFinish(null, false);
-              } catch {}
+              } catch { }
             }}
             className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
           >
@@ -100,14 +119,17 @@ export default function WorkoutFooter() {
             type="button"
             disabled={finishing}
             onClick={finishWorkout}
-            className={
+            className={[
+              'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-black text-sm transition-all duration-300',
               finishing
-                ? 'inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-yellow-500/70 text-black font-black cursor-wait'
-                : 'inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400'
-            }
+                ? 'bg-yellow-500/60 cursor-wait'
+                : allDone
+                  ? 'bg-gradient-to-r from-yellow-400 to-amber-400 shadow-lg shadow-yellow-500/40 animate-pulse'
+                  : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-md shadow-yellow-900/30 hover:shadow-yellow-500/40 hover:from-yellow-400 hover:to-amber-300',
+            ].join(' ')}
           >
             <Save size={16} />
-            <span className="text-sm">Finalizar</span>
+            <span>{finishing ? 'Salvando...' : allDone ? 'FINALIZAR ⚡' : 'Finalizar'}</span>
           </button>
         </div>
       </div>

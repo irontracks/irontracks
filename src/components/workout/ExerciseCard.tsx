@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import {
   NormalSet,
@@ -35,6 +35,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
     setCurrentExerciseIdx,
     reportHistoryStatus,
     reportHistoryLoadingRef,
+    reportHistory,
     openDeloadModal,
     openEditExercise,
     addExtraSetToExercise,
@@ -57,11 +58,40 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
   const videoUrl = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
   const isReportLoading = reportHistoryStatus?.status === 'loading' && reportHistoryLoadingRef.current;
 
-  // Compute whether all sets in this exercise are marked done
-  const allSetsDone = setsCount > 0 && Array.from({ length: setsCount }).every((_, setIdx) => {
+  // Compute how many sets in this exercise are marked done (for progress bar)
+  const doneSetsCount = Array.from({ length: setsCount }).filter((_, setIdx) => {
     const log = getLog(`${exIdx}-${setIdx}`);
     return !!log.done;
-  });
+  }).length;
+  const cardProgressPct = setsCount > 0 ? Math.round((doneSetsCount / setsCount) * 100) : 0;
+
+  // Compute whether all sets in this exercise are marked done
+  const allSetsDone = setsCount > 0 && doneSetsCount === setsCount;
+
+  // PR detection: compare current session max weight with reportHistory
+  const isPR = useMemo(() => {
+    if (!reportHistory || setsCount === 0) return false;
+    try {
+      const normalizedName = String(ex?.name || '').trim().toLowerCase().replace(/\s+/g, '_');
+      const exercises_map = (reportHistory as Record<string, unknown>)?.exercises as Record<string, { items?: Array<{ topWeight?: number | null }> }>;
+      if (!exercises_map) return false;
+      const histEntry = Object.entries(exercises_map).find(
+        ([k]) => k === normalizedName || k.includes(normalizedName) || normalizedName.includes(k)
+      );
+      const items = histEntry?.[1]?.items ?? [];
+      const histTopWeight = items.length
+        ? Math.max(...items.map(i => Number(i.topWeight ?? 0)).filter(v => v > 0))
+        : 0;
+      if (!histTopWeight) return false;
+      let sessionMax = 0;
+      for (let i = 0; i < setsCount; i++) {
+        const log = getLog(`${exIdx}-${i}`);
+        const w = Number(log.weight ?? log.total_weight ?? 0);
+        if (w > sessionMax) sessionMax = w;
+      }
+      return sessionMax > 0 && sessionMax > histTopWeight;
+    } catch { return false; }
+  }, [ex?.name, exIdx, getLog, reportHistory, setsCount]);
 
   // Parse SST config from exercise description (e.g. "SST na última: Falha > 10s > Falha > 10s > Falha")
   const parsedSSTConfig = (() => {
@@ -217,6 +247,12 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
               <Dumbbell size={16} className="text-yellow-500" />
             )}
             <h3 className={['font-black truncate flex-1', allSetsDone ? 'text-emerald-300' : 'text-white'].join(' ')}>{name}</h3>
+            {isPR && (
+              <span className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-yellow-500/15 border border-yellow-500/40 text-yellow-400 text-[10px] font-black">
+                <Trophy size={10} />
+                PR
+              </span>
+            )}
             {collapsedNow ? <ChevronDown size={18} className="text-neutral-400" /> : <ChevronUp size={18} className="text-neutral-400" />}
           </div>
           <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
@@ -250,6 +286,18 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
               <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>
             </div>
           ) : null}
+          {/* Per-card sets progress bar */}
+          {setsCount > 0 && (
+            <div className="mt-2 h-[3px] w-full bg-neutral-800/60 rounded-full overflow-hidden">
+              <div
+                className={[
+                  'h-full rounded-full transition-all duration-500 ease-out',
+                  allSetsDone ? 'bg-emerald-400' : 'bg-yellow-500'
+                ].join(' ')}
+                style={{ width: `${cardProgressPct}%` }}
+              />
+            </div>
+          )}
         </div>
         <div className="mt-1 flex flex-row flex-nowrap items-center justify-end gap-1.5 text-neutral-400">
           {videoUrl ? (

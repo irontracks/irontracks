@@ -303,7 +303,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     const handleStart = () => {
         try {
-            // End the Live Activity when user starts next set
             if (notifyIdRef.current) {
                 endRestLiveActivity(notifyIdRef.current);
             }
@@ -320,51 +319,99 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const baseSeconds = Math.max(0, timeLeft);
     const extraSeconds = Math.max(0, -timeLeft);
 
+    // SVG ring config — all computed from state, no impure calls
+    const RADIUS = 80;
+    const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+    const r = RADIUS * 0.7;
+    const circ = CIRCUMFERENCE * 0.7;
+    // Ring drains as baseSeconds goes towards 0; fills when extra time (overtime)
+    const ringColor = isFinished || extraSeconds > 0 ? '#22c55e' : '#eab308';
+    const ringGlow = isFinished || extraSeconds > 0 ? 'rgba(34,197,94,0.4)' : 'rgba(234,179,8,0.4)';
+    // stroke-dashoffset: 0 = full, circ = empty. We drain clock-style as time goes down.
+    const ringOffset = isFinished ? 0 : circ * (1 - Math.max(0, Math.min(1, 1 / Math.max(1, baseSeconds + 1))));
+
     return (
         <>
-            {isFinished ? (
-                <div className="fixed inset-0 z-[2000] bg-green-500 flex flex-col items-center justify-center animate-pulse-fast pointer-events-none">
-                    <Timer size={120} className="text-black mb-8 animate-bounce" />
-                    <h1 className="text-6xl font-black text-black uppercase tracking-tighter">BORA!</h1>
-                    <p className="text-black font-bold mt-4 text-xl">DESCANSO FINALIZADO</p>
+            {/* Finished flash */}
+            {isFinished && (
+                <div className="fixed inset-0 z-[2000] bg-green-600/90 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none">
+                    <div className="text-7xl mb-4">💪</div>
+                    <h1 className="text-5xl font-black text-white uppercase tracking-tighter">BORA!</h1>
+                    <p className="text-white/80 font-bold mt-2 text-lg">Descanso finalizado</p>
                 </div>
-            ) : null}
+            )}
 
-            <div className="fixed bottom-0 left-0 right-0 bg-neutral-900/95 backdrop-blur-xl border-t border-yellow-500/30 p-6 shadow-2xl z-[2100] animate-slide-up pb-safe">
-                <div className="flex items-center justify-between max-w-md mx-auto">
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-yellow-500 blur-lg opacity-20 animate-pulse"></div>
-                            <Timer className="text-yellow-500 relative z-10" size={36} />
-                        </div>
-                        <div>
-                            <p className="text-[10px] text-yellow-500 uppercase font-bold tracking-widest">Recuperação</p>
-                            <p className="text-4xl font-mono font-black text-white tabular-nums leading-none">
-                                {formatDuration(baseSeconds)}
-                                {extraSeconds > 0 ? (
-                                    <span className="ml-2 text-sm font-black text-green-400">{`(+${formatDuration(extraSeconds)})`}</span>
-                                ) : null}
-                            </p>
+            <div className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 p-6 shadow-2xl z-[2100] animate-slide-up pb-safe">
+                <div className="flex items-center gap-6 max-w-md mx-auto">
+                    {/* Circular SVG ring */}
+                    <div className="relative flex-shrink-0" style={{ width: 96, height: 96 }}>
+                        <svg width="96" height="96" viewBox="0 0 96 96" style={{ transform: 'rotate(-90deg)' }}>
+                            {/* Track */}
+                            <circle
+                                cx="48" cy="48" r={r}
+                                fill="none"
+                                stroke="rgba(255,255,255,0.08)"
+                                strokeWidth="6"
+                            />
+                            {/* Progress ring */}
+                            <circle
+                                cx="48" cy="48" r={r}
+                                fill="none"
+                                stroke={ringColor}
+                                strokeWidth="6"
+                                strokeLinecap="round"
+                                strokeDasharray={circ}
+                                strokeDashoffset={ringOffset}
+                                style={{
+                                    transition: 'stroke-dashoffset 1s linear, stroke 0.5s ease',
+                                    filter: `drop-shadow(0 0 6px ${ringGlow})`,
+                                }}
+                            />
+                        </svg>
+                        {/* Central timer text */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                            <span
+                                className="font-mono font-black leading-none tabular-nums"
+                                style={{ fontSize: extraSeconds > 0 ? 14 : 18, color: ringColor }}
+                            >
+                                {isFinished || extraSeconds > 0
+                                    ? `+${formatDuration(extraSeconds)}`
+                                    : formatDuration(baseSeconds)}
+                            </span>
+                            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500 mt-0.5">
+                                {isFinished ? 'BORA!' : 'rest'}
+                            </span>
                         </div>
                     </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handleStart}
-                            className="px-4 py-2 bg-yellow-500 rounded-xl text-black font-black border border-yellow-400 hover:bg-yellow-400 inline-flex items-center gap-2"
-                        >
-                            <span className="text-xs font-black">START</span>
-                        </button>
-                        <button
-                            onClick={() => {
-                                try {
-                                    stopAlarm(true);
-                                    if (typeof onClose === 'function') onClose();
-                                } catch { }
-                            }}
-                            className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-300 border border-neutral-700 hover:text-white hover:bg-neutral-700 inline-flex items-center gap-2"
-                        >
-                            <X size={16} /> <span className="text-xs font-bold">Ocultar</span>
-                        </button>
+
+                    {/* Right side: label + buttons */}
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-yellow-500 uppercase font-black tracking-widest mb-1">Recuperação</p>
+                        <p className="text-3xl font-mono font-black text-white tabular-nums leading-none">
+                            {formatDuration(baseSeconds)}
+                            {extraSeconds > 0 && (
+                                <span className="ml-1 text-base font-black text-green-400">{`(+${formatDuration(extraSeconds)})`}</span>
+                            )}
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                            <button
+                                onClick={handleStart}
+                                className="flex-1 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-400 rounded-xl text-black font-black text-sm shadow-lg shadow-yellow-900/30 hover:shadow-yellow-500/40 transition-shadow active:scale-95"
+                            >
+                                START ▶
+                            </button>
+                            <button
+                                onClick={() => {
+                                    try {
+                                        stopAlarm(true);
+                                        if (typeof onClose === 'function') onClose();
+                                    } catch { }
+                                }}
+                                className="px-3 py-2.5 bg-neutral-800 rounded-xl text-neutral-400 border border-neutral-700 hover:text-white hover:bg-neutral-700 text-xs font-bold active:scale-95"
+                            >
+                                Ocultar
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
