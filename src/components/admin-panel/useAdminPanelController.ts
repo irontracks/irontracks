@@ -1003,13 +1003,14 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                 email: escapeHtml(baseUser.email ?? '')
             };
             const html = workoutPlanHtml(safeWorkout, safeUser);
-            const win = window.open('', '_blank');
-            if (!win) return;
-            win.document.open();
-            win.document.write(html);
-            win.document.close();
-            win.focus();
-            setTimeout(() => { try { win.print(); } catch { } }, 300);
+            const blob = new Blob([html], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            const win = window.open(blobUrl, '_blank');
+            if (!win) { URL.revokeObjectURL(blobUrl); return; }
+            setTimeout(() => {
+                try { win.print(); } catch { }
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+            }, 400);
             setExportOpen(false);
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);

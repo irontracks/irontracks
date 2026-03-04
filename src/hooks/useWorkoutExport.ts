@@ -92,18 +92,18 @@ export function useWorkoutExport({
             }
 
             // Desktop fallback: open new tab + print dialog (save as PDF)
-            const win = window.open('', '_blank')
+            const blob = new Blob([html], { type: 'text/html' })
+            const url = URL.createObjectURL(blob)
+            const win = window.open(url, '_blank')
             if (!win) {
+                URL.revokeObjectURL(url)
                 await alert('Não foi possível abrir a janela de impressão. Permita pop-ups e tente novamente.')
                 return
             }
-            win.document.open()
-            win.document.write(html)
-            win.document.close()
-            win.focus()
             setTimeout(() => {
                 try { win.print() } catch (e) { logWarn('useWorkoutExport', 'silenced error', e) }
-            }, 300)
+                setTimeout(() => URL.revokeObjectURL(url), 60_000)
+            }, 400)
             setShowExportModal(false)
         } catch (e) {
             await alert('Erro ao gerar PDF: ' + getErrorMessage(e))

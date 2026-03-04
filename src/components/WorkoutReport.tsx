@@ -221,18 +221,19 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             }
 
             // Desktop fallback: open new tab + native print dialog (Save as PDF)
-            const printWindow = window.open('', '_blank');
+            const blobFallback = new Blob([html], { type: 'text/html' });
+            const blobFallbackUrl = URL.createObjectURL(blobFallback);
+            const printWindow = window.open(blobFallbackUrl, '_blank');
             if (printWindow) {
-                printWindow.document.open();
-                printWindow.document.write(html);
-                printWindow.document.close();
                 setTimeout(() => {
                     try {
                         printWindow.focus();
                         printWindow.print();
                     } catch { }
+                    setTimeout(() => URL.revokeObjectURL(blobFallbackUrl), 60_000);
                 }, 500);
             } else {
+                URL.revokeObjectURL(blobFallbackUrl);
                 // Last resort: downloadable HTML file
                 const blob = new Blob([html], { type: 'text/html' });
                 const url = URL.createObjectURL(blob);
@@ -327,20 +328,18 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 email: escapeHtml(part?.email || '')
             };
             const html = workoutPlanHtml(workout, partnerUser);
-            const win = window.open('', '_blank');
+            const blob = new Blob([html], { type: 'text/html' });
+            const blobUrl = URL.createObjectURL(blob);
+            const win = window.open(blobUrl, '_blank');
             if (!win) {
+                URL.revokeObjectURL(blobUrl);
                 alert('Não foi possível abrir o PDF do parceiro.\nAtive pop-ups para este site e tente novamente.');
                 return;
             }
-            win.document.open();
-            win.document.write(html);
-            win.document.close();
-            win.focus();
             setTimeout(() => {
-                try {
-                    win.print();
-                } catch { }
-            }, 300);
+                try { win.print(); } catch { }
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+            }, 400);
         } catch (e: unknown) {
             alert('Não foi possível gerar o PDF do parceiro: ' + (getErrorMessage(e)));
         }
