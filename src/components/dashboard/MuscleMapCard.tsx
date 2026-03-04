@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronDown, Crown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
 import { backfillExerciseMuscleMaps, getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
@@ -384,8 +384,22 @@ export default function MuscleMapCard(props: Props) {
         </div>
       </div>
 
-      {state.status === 'error' ? <div className="mt-3 text-sm font-semibold text-red-300">{state.error}</div> : null}
-      {autoSync.status === 'error' ? <div className="mt-2 text-xs font-semibold text-amber-300">{autoSync.error}</div> : null}
+      {state.status === 'error' ? (
+        state.error === 'vip_required' ? (
+          <div className="mx-4 mb-4 mt-2 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center shrink-0">
+              <Crown size={18} className="text-yellow-500" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-sm font-black text-yellow-400">Recurso VIP</div>
+              <div className="text-xs text-neutral-400 mt-0.5">O Mapa Muscular é exclusivo para membros VIP.</div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-4 pb-3 text-sm font-semibold text-red-300">{state.error}</div>
+        )
+      ) : null}
+      {autoSync.status === 'error' ? <div className="px-4 pb-1 text-xs font-semibold text-amber-300">{autoSync.error}</div> : null}
 
       <AnimatePresence initial={false}>
         {expanded && (
