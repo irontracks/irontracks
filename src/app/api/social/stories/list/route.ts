@@ -37,6 +37,7 @@ const asRecord = (v: unknown): Record<string, unknown> => (v && typeof v === 'ob
 const QuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(300).default(200),
   signedSeconds: z.coerce.number().int().min(60).max(3600).default(600),
+  nocache: z.coerce.number().int().min(0).max(1).default(0),
 })
 
 export async function GET(req: Request) {
@@ -53,13 +54,16 @@ export async function GET(req: Request) {
 
     const limit = q?.limit ?? 200
     const signedSeconds = q?.signedSeconds ?? 600
+    const skipCache = (q?.nocache ?? 0) === 1
 
     const userId = String(auth.user.id || '').trim()
     if (!userId) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
     const cacheKey = `social:stories:list:${userId}:${limit}:${signedSeconds}`
-    const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
-    if (cached) return NextResponse.json(cached)
+    if (!skipCache) {
+      const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
+      if (cached) return NextResponse.json(cached)
+    }
 
     const admin = createAdminClient()
 
@@ -201,10 +205,8 @@ export async function GET(req: Request) {
       })
 
     const payload = { ok: true, data: groups }
-    // 🔥 UPSTASH REDIS CACHE (Stories Aggressive Cache)
-    // Saltamos de 30s para 2 minutos de TTL. 
-    // Posts de Stories não precisam ser instântaneos em tempo real a todo ms.
-    await cacheSet(cacheKey, payload, 120)
+    // Short-lived cache: 10s max. Stories must feel instant for posting/deleting.
+    await cacheSet(cacheKey, payload, 10)
     return NextResponse.json(payload, { headers: { 'cache-control': 'private, no-store' } })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

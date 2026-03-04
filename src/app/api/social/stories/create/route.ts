@@ -8,6 +8,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { enqueueStoryJob, guessMediaType } from '@/lib/queue/storyQueue'
+import { cacheDeletePattern } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 const BodySchema = z.unknown()
@@ -86,6 +87,9 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (error || !data?.id) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'failed' }, { status: 400 })
+
+    // Invalidate stories list cache so the new story appears immediately
+    try { await cacheDeletePattern('social:stories:list:*') } catch { }
 
     // Fire-and-forget notifications — must not block the response
     const storyId = data.id
