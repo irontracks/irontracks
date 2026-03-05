@@ -113,6 +113,7 @@ interface TeamWorkoutContextValue {
     createJoinCode: (workout: Record<string, unknown>, ttlMinutes?: number) => Promise<unknown>
     dismissAcceptedInvite: () => void
     refetchInvites: () => Promise<void>
+    sendMultipleInvites: (targets: unknown[], workout: Record<string, unknown>) => Promise<Array<{ userId: string; ok: boolean; error?: string }>>
     // ─ Live progress sync ─────────────────────────────────────────────────────
     sharedLogs: SharedLogsMap
     broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
@@ -670,6 +671,29 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         } catch { }
     }, [user?.id])
 
+    const sendMultipleInvitesImpl = async (targets: unknown[], workout: Record<string, unknown>, _sendInvite: typeof sendInvite): Promise<Array<{ userId: string; ok: boolean; error?: string }>> => {
+        const targetList = Array.isArray(targets) ? targets : []
+        const slots = MAX_TEAM_PARTICIPANTS - (teamSession?.participants?.length ?? 0)
+        const toInvite = targetList.slice(0, Math.max(0, slots))
+        if (toInvite.length === 0) {
+            return [{ userId: '', ok: false, error: `Sessão cheia. Máximo de ${MAX_TEAM_PARTICIPANTS} participantes.` }]
+        }
+        let createdSessionId: string | null = teamSession?.id ?? null
+        const results: Array<{ userId: string; ok: boolean; error?: string }> = []
+        for (const target of toInvite) {
+            const tObj = target && typeof target === 'object' ? (target as { id?: string }) : null
+            const uid = String(tObj?.id || '').trim()
+            try {
+                await _sendInvite(target, workout, createdSessionId)
+                if (!createdSessionId && teamSession?.id) createdSessionId = teamSession.id
+                results.push({ userId: uid, ok: true })
+            } catch (e: unknown) {
+                results.push({ userId: uid, ok: false, error: e instanceof Error ? e.message : String(e || '') })
+            }
+        }
+        return results
+    }
+
     const sendChatMessage = useCallback((text: string) => {
         const ch = teamBroadcastChannelRef.current
         if (!ch || !user?.id) return
@@ -952,6 +976,10 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         }
     };
 
+    // sendMultipleInvites must be declared AFTER sendInvite to avoid forward-reference lint errors
+    const sendMultipleInvites = (targets: unknown[], workout: Record<string, unknown>) =>
+        sendMultipleInvitesImpl(targets, workout, sendInvite)
+
     const generateJoinCode = () => {
         const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
         let out = '';
@@ -1137,6 +1165,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             sessionPaused,
             pauseSession,
             resumeSession,
+            sendMultipleInvites,
         }}>
             {children}
         </TeamWorkoutContext.Provider>
