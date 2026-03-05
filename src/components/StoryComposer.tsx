@@ -861,17 +861,55 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
 
                     {showSafeGuide && (
                       <div className="absolute inset-0 pointer-events-none z-10">
+                        {/* Top safe-zone band line — mimics Instagram's upper guideline */}
                         <div
-                          className="absolute border border-yellow-500/20 rounded-3xl border-dashed"
-                          style={{
-                            left: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
-                            right: `${(SAFE_SIDE / CANVAS_W) * 100}%`,
-                            top: `${(SAFE_TOP / CANVAS_H) * 100}%`,
-                            bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%`,
-                          }}
+                          className="absolute left-0 right-0 h-px bg-yellow-400/40"
+                          style={{ top: `${(SAFE_TOP / CANVAS_H) * 100}%` }}
                         />
+                        {/* Bottom safe-zone band line */}
+                        <div
+                          className="absolute left-0 right-0 h-px bg-yellow-400/40"
+                          style={{ bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100}%` }}
+                        />
+                        {/* Side safe zone lines */}
+                        <div
+                          className="absolute top-0 bottom-0 w-px bg-yellow-400/20"
+                          style={{ left: `${(SAFE_SIDE / CANVAS_W) * 100}%` }}
+                        />
+                        <div
+                          className="absolute top-0 bottom-0 w-px bg-yellow-400/20"
+                          style={{ right: `${(SAFE_SIDE / CANVAS_W) * 100}%` }}
+                        />
+                        {/* Safe area shaded overlays (top/bottom unsafe zones) */}
+                        <div
+                          className="absolute left-0 right-0 top-0 bg-black/25"
+                          style={{ height: `${(SAFE_TOP / CANVAS_H) * 100}%` }}
+                        />
+                        <div
+                          className="absolute left-0 right-0 bottom-0 bg-black/25"
+                          style={{ height: `${(SAFE_BOTTOM / CANVAS_H) * 100}%` }}
+                        />
+                        {/* Label: top */}
+                        <div
+                          className="absolute left-0 right-0 flex items-center justify-center"
+                          style={{ top: `${(SAFE_TOP / CANVAS_H) * 100 - 5}%` }}
+                        >
+                          <span className="text-[7px] font-black uppercase tracking-widest text-yellow-400/60 bg-black/40 px-1.5 py-0.5 rounded-full">
+                            SAFE TOP
+                          </span>
+                        </div>
+                        {/* Label: bottom */}
+                        <div
+                          className="absolute left-0 right-0 flex items-center justify-center"
+                          style={{ bottom: `${(SAFE_BOTTOM / CANVAS_H) * 100 - 5}%` }}
+                        >
+                          <span className="text-[7px] font-black uppercase tracking-widest text-yellow-400/60 bg-black/40 px-1.5 py-0.5 rounded-full">
+                            SAFE BOTTOM
+                          </span>
+                        </div>
                       </div>
                     )}
+
 
                     {layout === 'live' && (
                       <div className="absolute inset-0 pointer-events-none z-20">
