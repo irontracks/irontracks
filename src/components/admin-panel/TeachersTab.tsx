@@ -79,7 +79,7 @@ const TeacherCard = ({
                         <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Alunos</span>
                     </div>
                     <div className="text-lg font-black text-white leading-none">
-                        {studentCount ?? <span className="text-neutral-600 text-sm">—</span>}
+                        {studentCount !== undefined ? studentCount : <span className="text-neutral-600 text-sm">—</span>}
                     </div>
                 </div>
                 <div className="bg-neutral-800/50 rounded-2xl px-3 py-2.5 border border-neutral-700/40">
@@ -98,7 +98,7 @@ const TeacherCard = ({
             {teacher.cref && (
                 <div className="mt-3 flex items-center gap-2 text-[11px] text-neutral-500">
                     <Trophy size={11} className="text-yellow-500/60" />
-                    <span className="font-bold">CREF:</span> {teacher.cref}
+                    <span className="font-bold">CREF:</span> {String(teacher.cref)}
                 </div>
             )}
 
@@ -106,7 +106,7 @@ const TeacherCard = ({
             {teacher.phone && (
                 <div className="mt-1 flex items-center gap-2 text-[11px] text-neutral-500">
                     <Phone size={11} className="text-neutral-600" />
-                    {teacher.phone}
+                    {String(teacher.phone)}
                 </div>
             )}
 
@@ -132,8 +132,8 @@ const DetailTabPill = ({ label, icon: Icon, active, onClick, badge }: {
         type="button"
         onClick={onClick}
         className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest whitespace-nowrap transition-all duration-200 active:scale-95 ${active
-                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/25'
-                : 'bg-neutral-800/60 text-neutral-400 border border-neutral-700/60 hover:bg-neutral-800 hover:text-white'
+            ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/25'
+            : 'bg-neutral-800/60 text-neutral-400 border border-neutral-700/60 hover:bg-neutral-800 hover:text-white'
             }`}
     >
         <Icon size={12} />
@@ -160,8 +160,8 @@ const StudentRow = ({ student }: { student: AdminUser }) => {
                 <div className="text-[11px] text-neutral-500 truncate">{student.email}</div>
             </div>
             <div className={`flex-shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase ${String(student.status || '').toLowerCase() === 'pago'
-                    ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-                    : 'bg-neutral-700/50 text-neutral-500 border border-neutral-600/30'
+                ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                : 'bg-neutral-700/50 text-neutral-500 border border-neutral-600/30'
                 }`}>
                 {student.status || '—'}
             </div>
@@ -181,7 +181,7 @@ const WorkoutRow = ({ workout }: { workout: Record<string, unknown> }) => (
                 {Array.isArray(workout.exercises) ? `${workout.exercises.length} exercícios` : '—'}
             </div>
         </div>
-        {workout.created_at && (
+        {workout.created_at != null && (
             <div className="flex-shrink-0 text-[10px] text-neutral-600 flex items-center gap-1">
                 <CalendarDays size={10} />
                 {new Date(String(workout.created_at)).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
@@ -303,19 +303,19 @@ export const TeachersTab: React.FC = () => {
                                 {t.phone && (
                                     <div className="flex items-center gap-1 px-2.5 py-1 bg-neutral-800/60 border border-neutral-700/50 rounded-full text-[11px] text-neutral-400">
                                         <Phone size={10} />
-                                        {t.phone}
+                                        {String(t.phone)}
                                     </div>
                                 )}
                                 {t.cref && (
                                     <div className="flex items-center gap-1 px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded-full text-[11px] text-yellow-400 font-bold">
                                         <Trophy size={10} />
-                                        CREF: {t.cref}
+                                        CREF: {String(t.cref)}
                                     </div>
                                 )}
                                 {t.birth_date && (
                                     <div className="flex items-center gap-1 px-2.5 py-1 bg-neutral-800/60 border border-neutral-700/50 rounded-full text-[11px] text-neutral-400">
                                         <CalendarDays size={10} />
-                                        {new Date(t.birth_date).toLocaleDateString('pt-BR')}
+                                        {new Date(String(t.birth_date)).toLocaleDateString('pt-BR')}
                                     </div>
                                 )}
                                 <div className="flex items-center gap-1 px-2.5 py-1 bg-green-500/10 border border-green-500/20 rounded-full text-[11px] text-green-400 font-bold">
@@ -336,9 +336,9 @@ export const TeachersTab: React.FC = () => {
                         ].map(({ label, value, icon: Icon, color }) => (
                             <div key={label} className="text-center">
                                 <div className={`text-xl font-black ${color === 'yellow' ? 'text-yellow-400'
-                                        : color === 'blue' ? 'text-blue-400'
-                                            : color === 'violet' ? 'text-violet-400'
-                                                : 'text-red-400'
+                                    : color === 'blue' ? 'text-blue-400'
+                                        : color === 'violet' ? 'text-violet-400'
+                                            : 'text-red-400'
                                     }`}>{value}</div>
                                 <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{label}</div>
                             </div>
