@@ -19,6 +19,7 @@ interface NotificationCenterProps {
     user?: { id: string | number } | null;
     initialOpen?: boolean;
     embedded?: boolean;
+    open?: boolean; // When embedded, used to trigger markRead and control visibility awareness
 }
 
 // ─── Notification type config ─────────────────────────────────────────────────
@@ -116,9 +117,11 @@ function IconBubble({ children, bg, border }: { children: React.ReactNode; bg: s
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: NotificationCenterProps) => {
+const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open: externalOpen }: NotificationCenterProps) => {
     const { alert, confirm } = useDialog();
     const [isOpen, setIsOpen] = useState(() => !!initialOpen);
+    // In embedded mode, use the externally-controlled `open` prop (showNotifCenter from parent)
+    const effectiveOpen = embedded ? !!externalOpen : isOpen;
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
     const [systemNotifications, setSystemNotifications] = useState<NotificationItem[]>([]);
     const safeUserId = user?.id ? String(user.id) : '';
@@ -161,7 +164,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
 
     // ─── Mark all read on open ────────────────────────────────────────────────
     useEffect(() => {
-        if (!isOpen || !safeUserId || !supabase) return;
+        if (!effectiveOpen || !safeUserId || !supabase) return;
         let cancelled = false;
         const markRead = async () => {
             try {
@@ -180,7 +183,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded }: Not
         };
         markRead();
         return () => { cancelled = true; };
-    }, [isOpen, supabase, safeUserId]);
+    }, [effectiveOpen, supabase, safeUserId]);
 
     // ─── Actions ─────────────────────────────────────────────────────────────
     const handleDelete = async (id: string | null, e?: React.MouseEvent) => {
