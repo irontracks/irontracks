@@ -32,6 +32,7 @@ export interface AdminTeacher extends AdminUser {
   bio?: string;
   instagram?: string;
   students_count?: number;
+  cref?: string;
 }
 
 export interface AdminStudent extends AdminUser {
