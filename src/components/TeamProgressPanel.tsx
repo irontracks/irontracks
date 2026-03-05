@@ -41,7 +41,7 @@ export function TeamProgressPanel({ exercises, participants }: TeamProgressPanel
     if (!teamSession?.id || partnerIds.length === 0) return null
 
     return (
-        <div className="fixed bottom-4 right-4 z-50 w-72 max-w-[90vw] rounded-2xl border border-yellow-500/40 bg-neutral-900/95 backdrop-blur-md shadow-2xl shadow-yellow-900/30 overflow-hidden">
+        <div className="fixed bottom-20 left-4 z-[55] w-72 max-w-[90vw] rounded-2xl border border-yellow-500/40 bg-neutral-900/95 backdrop-blur-md shadow-2xl shadow-yellow-900/30 overflow-hidden pb-safe">
             {/* Header */}
             <button
                 onClick={() => setCollapsed(c => !c)}
