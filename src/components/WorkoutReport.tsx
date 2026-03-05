@@ -84,9 +84,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         postCheckin: rawPostCheckin,
         aiState, setAiState,
         applyState, setApplyState,
-        sessionLogs, currentVolume, volumeDelta, calories, outdoorBike,
+        sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
         reportMeta, reportTotals, reportRest, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
+        detectedPrs, prCount,
         muscleTrend, muscleTrend4w, exerciseTrend,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
@@ -100,7 +101,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
 
     // Use shared formatters
     const formatDate = sharedFormatDate;
-        const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {};
 
@@ -633,6 +634,58 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         <div className="absolute left-0 top-0 h-px w-28 bg-yellow-500" />
                     </div>
                 </div>
+
+                {/* ─── HITEK Highlights Panel ───────────────────────────────────────── */}
+                {(prCount > 0 || (volumeDeltaAbs !== 0 && currentVolume > 0)) && (
+                    <div className="mb-8 p-4 rounded-2xl border border-yellow-500/25 bg-gradient-to-br from-yellow-500/10 via-amber-500/5 to-neutral-900/80">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-3">⚡ Destaques da sessão</div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            {prCount > 0 && (
+                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 flex flex-col gap-1">
+                                    <div className="text-2xl font-black text-yellow-400">{prCount}</div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-yellow-300">
+                                        {prCount === 1 ? 'PR alcançado' : 'PRs alcançados'}
+                                    </div>
+                                    {detectedPrs[0] && (
+                                        <div className="text-[10px] text-yellow-200 opacity-80 truncate">
+                                            {detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {volumeDeltaAbs !== 0 && currentVolume > 0 && (
+                                <div className={`border rounded-xl p-3 flex flex-col gap-1 ${volumeDeltaAbs > 0
+                                        ? 'bg-green-500/10 border-green-500/30'
+                                        : 'bg-red-500/10 border-red-500/30'
+                                    }`}>
+                                    <div className={`text-2xl font-black ${volumeDeltaAbs > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {volumeDeltaAbs > 0 ? '+' : ''}{volumeDeltaAbs.toLocaleString('pt-BR')} kg
+                                    </div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume vs anterior</div>
+                                    {Math.abs(volumeDelta) > 0 && (
+                                        <div className={`text-[10px] font-mono ${volumeDelta > 0 ? 'text-green-300' : 'text-red-300'}`}>
+                                            {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {currentVolume > 0 && (
+                                <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col gap-1">
+                                    <div className="text-2xl font-black text-white">{currentVolume.toLocaleString('pt-BR')} kg</div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume total</div>
+                                </div>
+                            )}
+                            {Number(reportTotals?.densityKgPerMinExec) > 0 && (
+                                <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col gap-1">
+                                    <div className="text-2xl font-black text-blue-300">
+                                        {Number(reportTotals?.densityKgPerMinExec).toFixed(1)}
+                                    </div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">kg/min densidade</div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {reportMeta && (
                     <ReportMetricsPanel

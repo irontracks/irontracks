@@ -250,8 +250,12 @@ export interface UseReportDataReturn {
     sessionLogs: Record<string, unknown>
     currentVolume: number
     volumeDelta: number
+    volumeDeltaAbs: number
     calories: number
     outdoorBike: AnyObj | null
+    // PR detection (Epley 1RM vs previous session)
+    detectedPrs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number }>
+    prCount: number
     // Report meta
     reportMeta: AnyObj | null
     reportTotals: AnyObj | null
@@ -616,7 +620,30 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
         const bikeKcal = Number(outdoorBike?.caloriesKcal)
         if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-        return Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
+        // MET-based estimate — more physiologically accurate than linear volume formula
+        // MET scale for weight training: 3.5 (light), 5.0 (moderate), 6.0 (vigorous)
+        // Intensity proxy: avg weight per rep relative to typical loads
+        if (durationInMinutes > 0) {
+            const logEntries = Object.values(sessionLogs)
+            const avgWeightPerRep = (() => {
+                let totalW = 0, totalR = 0
+                logEntries.forEach((v) => {
+                    if (!v || typeof v !== 'object') return
+                    const obj = v as AnyObj
+                    const w = Number(String(obj?.weight ?? '').replace(',', '.'))
+                    const r = Number(String(obj?.reps ?? '').replace(',', '.'))
+                    if (w > 0 && r > 0) { totalW += w * r; totalR += r }
+                })
+                return totalR > 0 ? totalW / totalR : 0
+            })()
+            // Determine MET: <20 kg avg = light (3.5), <50 = moderate (5.0), >= 50 = vigorous (6.0)
+            const met = avgWeightPerRep < 20 ? 3.5 : avgWeightPerRep < 50 ? 5.0 : 6.0
+            // Assume 75 kg if body weight unavailable (common athlete estimate)
+            const bodyWeightKg = 75
+            const kcalMet = met * bodyWeightKg * (durationInMinutes / 60)
+            if (Number.isFinite(kcalMet) && kcalMet > 0) return Math.round(kcalMet)
+        }
+        return 0
     })()
 
     const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
@@ -667,6 +694,62 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         return {}
     })()
 
+    // ── Detect PRs (Epley 1RM per exercise, compared to previous session) ──────
+    // Used by the highlights header to show "N PRs achieved in this workout"
+    const { detectedPrs, prCount } = useMemo(() => {
+        try {
+            const exercises = Array.isArray(safeSession?.exercises) ? safeSession.exercises as unknown[] : []
+            const prs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number }> = []
+
+            exercises.forEach((ex, exIdx) => {
+                const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
+                const exName = String(exObj?.name || '').trim()
+                if (!exName) return
+
+                let bestCurE1rm = 0
+                let bestPrevE1rm = 0
+
+                const setsCount = Number(exObj?.sets ?? 0) || 0
+                const prevExLogs = (() => {
+                    const key = exName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+                    const fromMap = (prevByExercise?.logsByExercise as Record<string, unknown>)?.[key]
+                    return Array.isArray(fromMap) ? fromMap : []
+                })()
+
+                for (let sIdx = 0; sIdx < setsCount; sIdx++) {
+                    const key = `${exIdx}-${sIdx}`
+                    const log = sessionLogs[key]
+                    if (!log || typeof log !== 'object') continue
+                    const logObj = log as AnyObj
+                    const cw = Number(String(logObj?.weight ?? '').replace(',', '.'))
+                    const cr = Number(String(logObj?.reps ?? '').replace(',', '.'))
+                    const curE1rm = (cw > 0 && cr > 0) ? cw * (1 + cr / 30) : 0
+                    if (curE1rm > bestCurE1rm) bestCurE1rm = curE1rm
+
+                    const prevLog = prevExLogs[sIdx]
+                    if (prevLog && typeof prevLog === 'object') {
+                        const pObj = prevLog as AnyObj
+                        const pw = Number(String(pObj?.weight ?? '').replace(',', '.'))
+                        const pr = Number(String(pObj?.reps ?? '').replace(',', '.'))
+                        const prevE1rm = (pw > 0 && pr > 0) ? pw * (1 + pr / 30) : 0
+                        if (prevE1rm > bestPrevE1rm) bestPrevE1rm = prevE1rm
+                    }
+                }
+
+                if (bestCurE1rm > 0 && bestCurE1rm > bestPrevE1rm) {
+                    prs.push({ exerciseName: exName, e1rm: bestCurE1rm, prevE1rm: bestPrevE1rm })
+                }
+            })
+
+            return { detectedPrs: prs, prCount: prs.length }
+        } catch {
+            return { detectedPrs: [], prCount: 0 }
+        }
+    }, [safeSession?.exercises, sessionLogs, prevByExercise?.logsByExercise])
+
+    // Absolute volume delta vs previous session (kg)
+    const volumeDeltaAbs = prevVolume > 0 ? Math.round(currentVolume - prevVolume) : 0
+
     return {
         supabase,
         effectivePreviousSession,
@@ -676,9 +759,10 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         postCheckin: checkinsByKind.post,
         aiState, setAiState,
         applyState, setApplyState,
-        sessionLogs, currentVolume, volumeDelta, calories, outdoorBike,
+        sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
         reportMeta, reportTotals, reportRest, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
+        detectedPrs, prCount,
         muscleTrend, muscleTrend4w, exerciseTrend,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
