@@ -59,6 +59,18 @@ interface AcceptedInviteNotice {
 
 type PresenceStatus = 'online' | 'away' | 'offline'
 
+// Per-participant shared log entry
+export interface SharedLogEntry {
+    exIdx: number
+    sIdx: number
+    weight: string
+    reps: string
+    ts: number
+}
+
+// sharedLogs: userId -> logKey ("exIdx-sIdx") -> SharedLogEntry
+export type SharedLogsMap = Record<string, Record<string, SharedLogEntry>>
+
 interface JoinResult {
     ok: boolean
     teamSessionId?: string
@@ -88,6 +100,9 @@ interface TeamWorkoutContextValue {
     createJoinCode: (workout: Record<string, unknown>, ttlMinutes?: number) => Promise<unknown>
     dismissAcceptedInvite: () => void
     refetchInvites: () => Promise<void>
+    // ─ Live progress sync ─────────────────────────────────────────────────────
+    sharedLogs: SharedLogsMap
+    broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
 }
 
 interface TeamWorkoutProviderProps {
@@ -114,6 +129,9 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     const [loading, setLoading] = useState(false);
     const [presence, setPresence] = useState<Record<string, { status: PresenceStatus }>>({});
     const [presenceStatus, setPresenceStatus] = useState<PresenceStatus>('online');
+    // Live progress sync
+    const [sharedLogs, setSharedLogs] = useState<SharedLogsMap>({})
+    const teamBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
     const supabase = useMemo(() => createClient(), []);
     const seenAcceptedInviteIdsRef = useRef(new Set());
     const { notify } = useInAppNotifications();
@@ -521,6 +539,73 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         };
     }, [supabase, teamSession?.id, teamworkV2Enabled, user?.id]);
 
+    // ── Broadcast channel for real-time log sharing between teammates ─────────
+    useEffect(() => {
+        if (!teamSession?.id || !user?.id) {
+            setSharedLogs({})
+            if (teamBroadcastChannelRef.current) {
+                try { supabase.removeChannel(teamBroadcastChannelRef.current) } catch { }
+                teamBroadcastChannelRef.current = null
+            }
+            return
+        }
+        if (teamBroadcastChannelRef.current) {
+            try { supabase.removeChannel(teamBroadcastChannelRef.current) } catch { }
+        }
+        const ch = supabase
+            .channel(`team_logs:${teamSession.id}`, { config: { broadcast: { self: false } } })
+            .on('broadcast', { event: 'log_update' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.userId || '').trim()
+                const exIdx = Number(payload.exIdx)
+                const sIdx = Number(payload.sIdx)
+                const weight = String(payload.weight ?? '')
+                const reps = String(payload.reps ?? '')
+                const ts = Number(payload.ts || Date.now())
+                if (!fromUid || !Number.isFinite(exIdx) || !Number.isFinite(sIdx)) return
+                if (fromUid === String(user.id || '').trim()) return
+                const key = `${exIdx}-${sIdx}`
+                setSharedLogs(prev => ({
+                    ...prev,
+                    [fromUid]: { ...(prev[fromUid] ?? {}), [key]: { exIdx, sIdx, weight, reps, ts } }
+                }))
+            })
+            .on('broadcast', { event: 'leave' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.userId || '').trim()
+                if (!fromUid) return
+                try {
+                    const name = String(payload.displayName || 'Seu parceiro').trim()
+                    notify({
+                        id: `leave:${fromUid}:${Date.now()}`,
+                        type: 'team_leave',
+                        senderName: name,
+                        displayName: name,
+                        photoURL: null,
+                        text: `${name} saiu do treino em equipe.`,
+                    })
+                } catch { }
+                setSharedLogs(prev => { const next = { ...prev }; delete next[fromUid]; return next })
+                setPresence(prev => { const next = { ...prev }; delete next[fromUid]; return next })
+            })
+            .subscribe()
+        teamBroadcastChannelRef.current = ch
+        return () => {
+            try { supabase.removeChannel(ch) } catch { }
+            teamBroadcastChannelRef.current = null
+        }
+    }, [supabase, teamSession?.id, user?.id, notify])
+
+    const broadcastMyLog = useCallback((exIdx: number, sIdx: number, weight: string, reps: string) => {
+        const ch = teamBroadcastChannelRef.current
+        if (!ch || !user?.id) return
+        try {
+            ch.send({ type: 'broadcast', event: 'log_update', payload: { userId: user.id, exIdx, sIdx, weight, reps, ts: Date.now() } })
+        } catch { }
+    }, [user?.id])
+
     useEffect(() => {
         if (!teamworkV2Enabled) return;
         if (!teamSession?.id) return;
@@ -882,8 +967,21 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     const leaveSession = async () => {
         try {
             const sid = teamSession?.id ? String(teamSession.id) : '';
+            const u = user as unknown as { displayName?: string }
+            // Broadcast leave event to partners instantly
+            const ch = teamBroadcastChannelRef.current
+            if (ch && user?.id) {
+                try {
+                    ch.send({
+                        type: 'broadcast',
+                        event: 'leave',
+                        payload: { userId: user.id, displayName: u?.displayName || 'Usuário', ts: Date.now() },
+                    })
+                } catch { }
+            }
             if (!sid) {
                 setTeamSession(null);
+                setSharedLogs({});
                 return;
             }
             if (teamworkV2Enabled) {
@@ -893,8 +991,10 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 }
             }
             setTeamSession(null);
+            setSharedLogs({});
         } catch {
             setTeamSession(null);
+            setSharedLogs({});
         }
     };
 
@@ -919,6 +1019,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             loading,
             presenceStatus,
             refetchInvites,
+            sharedLogs,
+            broadcastMyLog,
         }}>
             {children}
         </TeamWorkoutContext.Provider>

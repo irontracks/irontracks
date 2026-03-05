@@ -102,8 +102,16 @@ const parseStartedAtMs = (raw: unknown): number => {
 
 export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const { alert, confirm } = useDialog();
-  const teamWorkout = useTeamWorkout() as unknown as { sendInvite: (targetUser: unknown, workout: UnknownRecord) => Promise<unknown> };
+  const teamWorkout = useTeamWorkout() as unknown as {
+    sendInvite: (targetUser: unknown, workout: UnknownRecord) => Promise<unknown>
+    broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
+    teamSession: { id: string; isHost: boolean; participants: unknown[] } | null
+    sharedLogs: Record<string, Record<string, { exIdx: number; sIdx: number; weight: string; reps: string; ts: number }>>
+  };
   const sendInvite = teamWorkout.sendInvite;
+  const broadcastMyLog = teamWorkout.broadcastMyLog
+  const teamSession = teamWorkout.teamSession
+  const sharedLogs = teamWorkout.sharedLogs
   const session = props.session;
   const workout = session?.workout ?? null;
   const exercises = useMemo<WorkoutExercise[]>(() => (Array.isArray(workout?.exercises) ? workout.exercises : []), [workout?.exercises]);
@@ -200,8 +208,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       if (typeof props?.onUpdateLog !== 'function') return;
 
       const patchObj: UnknownRecord = isObject(patch) ? patch : {};
-      const [exIdxStr] = key.split('-');
+      const [exIdxStr, sIdxStr] = key.split('-');
       const exIdx = parseInt(exIdxStr, 10);
+      const sIdx = parseInt(sIdxStr, 10);
 
       // If weight changes and this exercise has linked weights enable, update all sets
       if (linkedWeightExercises.has(exIdx) && 'weight' in patchObj) {
@@ -216,12 +225,27 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
             const prev = getLog(linkedKey);
             props.onUpdateLog(linkedKey, { ...prev, ...patchObj });
           }
+          // Broadcast linked weight update for first set only
+          try {
+            const w = String(patchObj.weight ?? '')
+            if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
+          } catch { }
           return;
         }
       }
 
       const prev = getLog(key);
       props.onUpdateLog(key, { ...prev, ...patchObj });
+
+      // Broadcast log update to team partners
+      try {
+        if (broadcastMyLog && Number.isFinite(exIdx) && Number.isFinite(sIdx)) {
+          const merged = { ...prev, ...patchObj }
+          const w = String(merged.weight ?? '')
+          const r = String(merged.reps ?? '')
+          if (w || r) broadcastMyLog(exIdx, sIdx, w, r)
+        }
+      } catch { }
     } catch { }
   };
 
