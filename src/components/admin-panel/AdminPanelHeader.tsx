@@ -38,7 +38,8 @@ const buildMenuGroups = (tabKeys: string[]): MenuGroup[] => {
     priorities: { key: 'priorities', icon: <AlertCircle size={ICON_SIZE} />, subtitle: 'Triagem inteligente do coach' },
     templates: { key: 'templates', icon: <Dumbbell size={ICON_SIZE} />, subtitle: 'Biblioteca de treinos-base' },
     videos: { key: 'videos', icon: <Play size={ICON_SIZE} />, subtitle: 'Vídeos demonstrativos' },
-    vip_reports: { key: 'vip_reports', icon: <BarChart3 size={ICON_SIZE} />, subtitle: 'Relatórios avançados' },
+    vip_reports: { key: 'vip_reports', icon: <BarChart3 size={ICON_SIZE} />, subtitle: 'Relatórios de uso VIP' },
+    vip: { key: 'vip', icon: <Crown size={ICON_SIZE} />, subtitle: 'Gestão de assinantes VIP' },
     errors: { key: 'errors', icon: <MessageSquare size={ICON_SIZE} />, subtitle: 'Feedbacks reportados' },
     system: { key: 'system', icon: <Settings size={ICON_SIZE} />, subtitle: 'Mensagens em massa e manutenção' },
   }
@@ -51,7 +52,7 @@ const buildMenuGroups = (tabKeys: string[]): MenuGroup[] => {
   if (gestao.length > 0) groups.push({ label: 'Gestão', items: gestao.map(k => allItems[k]) })
 
   // Group 2: Conteúdo
-  const conteudo = ['templates', 'videos', 'vip_reports'].filter(k => available.has(k))
+  const conteudo = ['templates', 'videos', 'vip', 'vip_reports'].filter(k => available.has(k))
   if (conteudo.length > 0) groups.push({ label: 'Conteúdo', items: conteudo.map(k => allItems[k]) })
 
   // Group 3: Ferramentas
@@ -239,14 +240,14 @@ export const AdminPanelHeader = ({
                               }}
                               style={{ animationDelay: `${(groupIdx * 5 + itemIdx) * 30}ms` }}
                               className={`w-full min-h-[58px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-200 active:scale-[0.98] animate-in fade-in slide-in-from-left-2 ${isActive
-                                  ? 'bg-gradient-to-r from-yellow-500/15 to-amber-500/5 text-yellow-300 border-yellow-500/25 shadow-[0_4px_20px_rgba(234,179,8,0.12)]'
-                                  : 'bg-white/[0.03] text-neutral-200 border-white/[0.06] hover:bg-white/[0.07] hover:border-white/[0.12]'
+                                ? 'bg-gradient-to-r from-yellow-500/15 to-amber-500/5 text-yellow-300 border-yellow-500/25 shadow-[0_4px_20px_rgba(234,179,8,0.12)]'
+                                : 'bg-white/[0.03] text-neutral-200 border-white/[0.06] hover:bg-white/[0.07] hover:border-white/[0.12]'
                                 }`}
                             >
                               <div className="flex items-center gap-3.5 min-w-0">
                                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${isActive
-                                    ? 'bg-yellow-500/20 border border-yellow-400/30'
-                                    : 'bg-white/[0.04] border border-white/[0.08]'
+                                  ? 'bg-yellow-500/20 border border-yellow-400/30'
+                                  : 'bg-white/[0.04] border border-white/[0.08]'
                                   }`}>
                                   <span className={`transition-colors ${isActive ? 'text-yellow-400' : 'text-neutral-400'}`}>
                                     {item.icon}

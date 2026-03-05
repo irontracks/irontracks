@@ -28,6 +28,7 @@ import { StudentDetailPanel } from '@/components/admin-panel/StudentDetailPanel'
 import { Modals } from '@/components/admin-panel/Modals';
 import AdminVipReports from '@/components/admin/AdminVipReports';
 import RequestsTab from '@/components/admin/RequestsTab';
+import { VipTab } from '@/components/admin-panel/VipTab';
 import type { AdminUser } from '@/types/admin';
 
 export type AdminPanelV2Props = {
@@ -49,7 +50,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
 
     let TAB_LABELS: Record<string, string> = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip_reports: 'VIP', system: 'FERRAMENTAS' };
+        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP GESTÃO', vip_reports: 'VIP REPORTS', system: 'FERRAMENTAS' };
     }
     if (isTeacher && !isAdmin) {
         TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
@@ -84,6 +85,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     {tab === 'requests' && !selectedStudent && isAdmin && <RequestsTab />}
                     {tab === 'videos' && !selectedStudent && isAdmin && <VideosTab />}
                     {tab === 'errors' && !selectedStudent && isAdmin && <ErrorsTab />}
+                    {tab === 'vip' && !selectedStudent && isAdmin && <VipTab />}
                     {tab === 'vip_reports' && !selectedStudent && <AdminVipReports supabase={supabase} />}
                     {tab === 'system' && !selectedStudent && <SystemTab />}
                     {tab === 'teachers' && isAdmin && !selectedStudent && <TeachersTab />}

@@ -1,7 +1,8 @@
-import React from 'react';
-import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList, Crown } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
+import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
 
 const STATUS_OPTIONS = [
     { value: 'pago', label: 'Pago', color: 'text-green-400' },
@@ -55,110 +56,135 @@ export const StudentsTab: React.FC = () => {
         }, {});
     }, [usersList]);
 
-    const renderStudentRow = (s: AdminUser) => (
-        <div
-            key={s.id}
-            className="group flex flex-col gap-3 p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-yellow-500/40 transition-all cursor-pointer"
-            onClick={() => setSelectedStudent(s)}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStudent(s); }}
-            aria-label={`Ver detalhes de ${s.name || s.email || 'Aluno'}`}
-        >
-            {/* Top row: avatar + info */}
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 flex-shrink-0 rounded-full bg-neutral-800 flex items-center justify-center font-black text-neutral-400 border border-neutral-700">
-                    {(s.name || s.email || '?').charAt(0).toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                    <div className="font-bold text-white group-hover:text-yellow-500 transition-colors truncate">
-                        {s.name || s.email || 'Sem Nome'}
-                    </div>
-                    <div className="text-xs text-neutral-500 truncate">{s.email}</div>
-                </div>
-                {/* Status badge (read-only display) */}
-                <span className={`ml-auto flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${statusBadgeClass(s.status || 'pendente')}`}>
-                    {s.status || 'pendente'}
-                </span>
-            </div>
+    // VIP batch lookup
+    const allStudentIds = useMemo(() => {
+        const ids = [
+            ...(Array.isArray(studentsWithTeacherFiltered) ? studentsWithTeacherFiltered : []),
+            ...(Array.isArray(studentsWithoutTeacherFiltered) ? studentsWithoutTeacherFiltered : []),
+        ].map(s => s.id).filter(Boolean);
+        return [...new Set(ids)];
+    }, [studentsWithTeacherFiltered, studentsWithoutTeacherFiltered]);
+    const { vipMap } = useAdminVipMap(allStudentIds);
 
-            {/* Controls row — stop propagation so selects/buttons don't trigger card click */}
+    const renderStudentRow = (s: AdminUser) => {
+        const vip = vipMap[s.id];
+        const vipLabel = vip ? getVipLabel(vip.tier) : null;
+        const vipColor = vip ? getVipColors(vip.tier) : null;
+        return (
             <div
-                className="flex flex-wrap items-center gap-2"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
-                role="none"
+                key={s.id}
+                className="group flex flex-col gap-3 p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl hover:border-yellow-500/40 transition-all cursor-pointer"
+                onClick={() => setSelectedStudent(s)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSelectedStudent(s); }}
+                aria-label={`Ver detalhes de ${s.name || s.email || 'Aluno'}`}
             >
-                {/* Status select — ALL transitions */}
-                {isAdmin && (
-                    <select
-                        className="flex-1 min-w-[120px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
-                        value={s.status || 'pendente'}
-                        onChange={(e) => {
-                            e.stopPropagation();
-                            handleUpdateStudentStatus(s, e.target.value as StatusValue);
-                        }}
-                        title="Alterar status de pagamento"
-                        aria-label="Status de pagamento"
-                    >
-                        {STATUS_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                        ))}
-                    </select>
-                )}
-
-                {/* Teacher select — value uses t.user_id (profiles.id) to match students.teacher_id FK */}
-                {isAdmin && (
-                    <select
-                        className="flex-1 min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
-                        value={s.teacher_id || ''}
-                        onChange={(e) => {
-                            e.stopPropagation();
-                            // Pass user_id (profiles.id), not t.id (teachers table PK)
-                            handleUpdateStudentTeacher(s.id, e.target.value || null);
-                        }}
-                        title="Atribuir professor"
-                        aria-label="Professor responsável"
-                    >
-                        <option value="">Sem professor</option>
-                        {teachersList.map((t) => (
-                            <option
-                                key={t.id}
-                                value={String(t.user_id || '')}
-                                disabled={!t.user_id}
-                            >
-                                {t.name || t.email || String(t.id).slice(0, 8)}
-                                {!t.user_id ? ' (sem conta)' : ''}
-                            </option>
-                        ))}
-                    </select>
-                )}
-
-                {/* Icon actions */}
-                <div className="flex items-center gap-1 ml-auto">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setHistoryOpen(true); }}
-                        className="p-2 text-neutral-400 hover:text-yellow-500 hover:bg-yellow-500/10 rounded-lg transition-colors"
-                        title="Ver Histórico"
-                        aria-label="Ver Histórico"
-                    >
-                        <Activity size={16} />
-                    </button>
-
-                    {isAdmin && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }}
-                            className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                            title="Excluir Aluno"
-                            aria-label="Excluir Aluno"
+                {/* Top row: avatar + info */}
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 flex-shrink-0 rounded-full bg-neutral-800 flex items-center justify-center font-black text-neutral-400 border border-neutral-700">
+                        {(s.name || s.email || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                        <div className="font-bold text-white group-hover:text-yellow-500 transition-colors truncate">
+                            {s.name || s.email || 'Sem Nome'}
+                        </div>
+                        <div className="text-xs text-neutral-500 truncate">{s.email}</div>
+                    </div>
+                    {/* VIP badge */}
+                    {vipLabel && vipColor && (
+                        <span
+                            className={`ml-auto flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${vipColor.bg} ${vipColor.text} ${vipColor.border}`}
+                            title={vip?.valid_until ? `Expira: ${new Date(vip.valid_until).toLocaleDateString('pt-BR')}` : 'VIP'}
                         >
-                            <Trash2 size={16} />
-                        </button>
+                            <Crown size={9} />
+                            {vipLabel}
+                        </span>
                     )}
+                    {/* Status badge (read-only display) */}
+                    <span className={`${vipLabel ? '' : 'ml-auto'} flex-shrink-0 px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${statusBadgeClass(String(s.status || 'pendente'))}`}>
+                        {String(s.status || 'pendente')}
+                    </span>
+                </div>
+
+                {/* Controls row — stop propagation so selects/buttons don't trigger card click */}
+                <div
+                    className="flex flex-wrap items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    role="none"
+                >
+                    {/* Status select — ALL transitions */}
+                    {isAdmin && (
+                        <select
+                            className="flex-1 min-w-[120px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
+                            value={s.status || 'pendente'}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                handleUpdateStudentStatus(s, e.target.value as StatusValue);
+                            }}
+                            title="Alterar status de pagamento"
+                            aria-label="Status de pagamento"
+                        >
+                            {STATUS_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                        </select>
+                    )}
+
+                    {/* Teacher select — value uses t.user_id (profiles.id) to match students.teacher_id FK */}
+                    {isAdmin && (
+                        <select
+                            className="flex-1 min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
+                            value={s.teacher_id || ''}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                // Pass user_id (profiles.id), not t.id (teachers table PK)
+                                handleUpdateStudentTeacher(s.id, e.target.value || null);
+                            }}
+                            title="Atribuir professor"
+                            aria-label="Professor responsável"
+                        >
+                            <option value="">Sem professor</option>
+                            {teachersList.map((t) => (
+                                <option
+                                    key={t.id}
+                                    value={String(t.user_id || '')}
+                                    disabled={!t.user_id}
+                                >
+                                    {t.name || t.email || String(t.id).slice(0, 8)}
+                                    {!t.user_id ? ' (sem conta)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    {/* Icon actions */}
+                    <div className="flex items-center gap-1 ml-auto">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setHistoryOpen(true); }}
+                            className="p-2 text-neutral-400 hover:text-yellow-500 hover:bg-yellow-500/10 rounded-lg transition-colors"
+                            title="Ver Histórico"
+                            aria-label="Ver Histórico"
+                        >
+                            <Activity size={16} />
+                        </button>
+
+                        {isAdmin && (
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s.id); }}
+                                className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Excluir Aluno"
+                                aria-label="Excluir Aluno"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
