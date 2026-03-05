@@ -831,7 +831,7 @@ export async function getReportPreviousData(params: ReportPreviousParams): Promi
       if (typeof candidateMs !== 'number' || !Number.isFinite(candidateMs)) continue
       if (typeof currentMs === 'number' && Number.isFinite(currentMs) && candidateMs >= currentMs) continue
 
-      // G1: Find best previous session (same workout)
+      // G1: Find best previous session (same workout) — must have real log data
       if (!bestPreviousSession) {
         const candOrigin = parsed?.originWorkoutId ?? parsed?.workoutId ?? null
         const candTitle = String(parsed?.workoutTitle ?? parsed?.name ?? '').trim().toLowerCase()
@@ -839,8 +839,20 @@ export async function getReportPreviousData(params: ReportPreviousParams): Promi
         const titleMatch = !!(currentTitleKey && candTitle && currentTitleKey === candTitle)
         if (originMatch || titleMatch) {
           if (candidateMs > bestPreviousMs) {
-            bestPreviousMs = candidateMs
-            bestPreviousSession = { ...parsed, id: parsed?.id ?? (r as Record<string, unknown>)?.id ?? null }
+            // ✅ Only accept if the session actually has logged data (weight or reps > 0)
+            // Prevents using a "ghost" session where the user opened but didn't log
+            const candLogs = parsed?.logs && typeof parsed.logs === 'object' ? (parsed.logs as Record<string, unknown>) : {}
+            const hasRealLogs = Object.values(candLogs).some((v) => {
+              if (!v || typeof v !== 'object') return false
+              const obj = v as Record<string, unknown>
+              const w = Number(String(obj?.weight ?? '').replace(',', '.'))
+              const r = Number(String(obj?.reps ?? '').replace(',', '.'))
+              return (Number.isFinite(w) && w > 0) || (Number.isFinite(r) && r > 0)
+            })
+            if (hasRealLogs) {
+              bestPreviousMs = candidateMs
+              bestPreviousSession = { ...parsed, id: parsed?.id ?? (r as Record<string, unknown>)?.id ?? null }
+            }
           }
         }
       }
