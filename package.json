@@ -22,11 +22,14 @@
     "postversion": "git push && git push --tags",
     "postinstall": "node scripts/patch-ios.mjs",
     "cap:sync": "npx cap sync && node scripts/patch-ios.mjs",
+    "cap:sync:android": "npx cap sync android",
     "cap:open": "npx cap open ios",
+    "cap:open:android": "npx cap open android",
     "analyze": "ANALYZE=true npm run build"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
+    "@capacitor/android": "^8.1.0",
     "@capacitor/app": "^8.0.0",
     "@capacitor/cli": "^8.0.2",
     "@capacitor/core": "^8.0.2",
