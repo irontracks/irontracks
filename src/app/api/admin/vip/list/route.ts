@@ -13,7 +13,6 @@ export async function GET(req: Request) {
         }
 
         const admin = createAdminClient()
-        const nowIso = new Date().toISOString()
 
         // All active entitlements with profile info
         const { data: rows, error } = await admin
@@ -31,8 +30,6 @@ export async function GET(req: Request) {
         created_at
       `)
             .in('status', ['active', 'trialing', 'past_due'])
-            .lte('valid_from', nowIso)
-            .or(`valid_until.is.null,valid_until.gte.${nowIso}`)
             .order('created_at', { ascending: false })
             .limit(500)
 
