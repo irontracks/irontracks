@@ -68,19 +68,25 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
-    // Fetch request details
+    // Fetch request details — use maybeSingle to avoid throwing on 0 rows
     const { data: request, error: fetchError } = await admin
       .from('access_requests')
       .select('id, user_id, email, status, phone, full_name, role_requested, cref, created_at')
       .eq('id', requestId)
-      .single()
+      .maybeSingle()
 
-    if (fetchError || !request) {
-      return NextResponse.json({ ok: false, error: 'Solicitação não encontrada.' }, { status: 404 })
+    if (fetchError) {
+      logError('access-requests/action', `Fetch error for requestId ${requestId}: ${fetchError.message}`)
+      return NextResponse.json({ ok: false, error: 'Não foi possível localizar a solicitação. Atualize a lista e tente novamente.' }, { status: 404 })
+    }
+
+    if (!request) {
+      logWarn('access-requests/action', 'Request not found — may have been processed by another admin. requestId:', requestId)
+      return NextResponse.json({ ok: false, error: 'Essa solicitação já foi processada ou removida. Atualize a lista.' }, { status: 404 })
     }
 
     if (request.status !== 'pending') {
-      return NextResponse.json({ ok: false, error: `Solicitação já processada (${request.status}).` }, { status: 400 })
+      return NextResponse.json({ ok: false, error: `Essa solicitação já foi ${request.status === 'accepted' || request.status === 'approved' ? 'aprovada' : 'recusada'} anteriormente.` }, { status: 400 })
     }
 
     if (action === 'reject') {
