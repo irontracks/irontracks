@@ -10,7 +10,7 @@ import type { AdminUser, AdminTeacher } from '@/types/admin';
 // ─── Avatar helper ────────────────────────────────────────────────
 const TeacherAvatar = ({ teacher, size = 'md' }: { teacher: AdminTeacher; size?: 'sm' | 'md' | 'lg' }) => {
     const sizes = { sm: 'w-9 h-9 text-sm', md: 'w-12 h-12 text-base', lg: 'w-16 h-16 text-xl' };
-    const char = (teacher.name || teacher.email || '?').charAt(0).toUpperCase();
+    const char = String(teacher.name || teacher.email || '?').charAt(0).toUpperCase();
     if (teacher.photo_url) {
         return (
             <img
@@ -37,8 +37,8 @@ const TeacherCard = ({
     onClick: () => void;
     onEdit: (e: React.MouseEvent) => void;
 }) => {
-    const name = teacher.name || teacher.email || 'Sem Nome';
-    const studentCount = (teacher as unknown as Record<string, unknown>).student_count as number | undefined;
+    const name = String(teacher.name || teacher.email || 'Sem Nome');
+    const studentCount = typeof teacher.students_count === 'number' ? teacher.students_count : undefined;
 
     return (
         <div
@@ -58,7 +58,7 @@ const TeacherCard = ({
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
                             <Mail size={11} className="text-neutral-500 flex-shrink-0" />
-                            <span className="text-[11px] text-neutral-500 truncate">{teacher.email}</span>
+                            <span className="text-[11px] text-neutral-500 truncate">{String(teacher.email || '')}</span>
                         </div>
                     </div>
                 </div>
@@ -79,7 +79,7 @@ const TeacherCard = ({
                         <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Alunos</span>
                     </div>
                     <div className="text-lg font-black text-white leading-none">
-                        {studentCount !== undefined ? studentCount : <span className="text-neutral-600 text-sm">—</span>}
+                        {studentCount !== undefined ? String(studentCount) : <span className="text-neutral-600 text-sm">—</span>}
                     </div>
                 </div>
                 <div className="bg-neutral-800/50 rounded-2xl px-3 py-2.5 border border-neutral-700/40">
@@ -148,7 +148,7 @@ const DetailTabPill = ({ label, icon: Icon, active, onClick, badge }: {
 
 // ─── Student Row ─────────────────────────────────────────────────
 const StudentRow = ({ student }: { student: AdminUser }) => {
-    const name = student.name || student.email || 'Sem Nome';
+    const name = String(student.name || student.email || 'Sem Nome');
     const char = name.charAt(0).toUpperCase();
     return (
         <div className="flex items-center gap-3 p-3.5 bg-neutral-800/30 border border-neutral-700/40 rounded-2xl hover:border-yellow-500/20 hover:bg-neutral-800/50 transition-all">
@@ -157,13 +157,13 @@ const StudentRow = ({ student }: { student: AdminUser }) => {
             </div>
             <div className="min-w-0 flex-1">
                 <div className="font-bold text-white text-sm truncate">{name}</div>
-                <div className="text-[11px] text-neutral-500 truncate">{student.email}</div>
+                <div className="text-[11px] text-neutral-500 truncate">{String(student.email || '')}</div>
             </div>
             <div className={`flex-shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase ${String(student.status || '').toLowerCase() === 'pago'
                 ? 'bg-green-500/15 text-green-400 border border-green-500/20'
                 : 'bg-neutral-700/50 text-neutral-500 border border-neutral-600/30'
                 }`}>
-                {student.status || '—'}
+                {String(student.status || '—')}
             </div>
         </div>
     );
@@ -192,7 +192,7 @@ const WorkoutRow = ({ workout }: { workout: Record<string, unknown> }) => (
 
 // ─── Inbox Row ───────────────────────────────────────────────────
 const InboxRow = ({ student }: { student: AdminUser }) => {
-    const name = student.name || student.email || 'Sem Nome';
+    const name = String(student.name || student.email || 'Sem Nome');
     const days = (student as unknown as Record<string, unknown>).daysSinceLastWorkout as number | undefined;
     return (
         <div className="flex items-center gap-3 p-3.5 bg-neutral-800/30 border border-red-500/10 rounded-2xl">
@@ -247,7 +247,7 @@ export const TeachersTab: React.FC = () => {
     // ─── Detail View ──────────────────────────────────────────────
     if (selectedTeacher) {
         const t = selectedTeacher;
-        const name = t.name || t.email || 'Sem Nome';
+        const name = String(t.name || t.email || 'Sem Nome');
         const char = name.charAt(0).toUpperCase();
 
         const detailTabs = [
@@ -286,7 +286,7 @@ export const TeachersTab: React.FC = () => {
                                     <h2 className="text-xl font-black text-white leading-snug">{name}</h2>
                                     <div className="flex items-center gap-1.5 mt-1">
                                         <Mail size={12} className="text-neutral-500" />
-                                        <span className="text-xs text-neutral-500 truncate">{t.email}</span>
+                                        <span className="text-xs text-neutral-500 truncate">{String(t.email || '')}</span>
                                     </div>
                                 </div>
                                 <button
