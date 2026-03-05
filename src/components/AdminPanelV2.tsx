@@ -49,7 +49,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
 
     let TAB_LABELS: Record<string, string> = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'ERROS', vip_reports: 'RELATÓRIOS VIP', system: 'SISTEMA' };
+        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip_reports: 'VIP', system: 'FERRAMENTAS' };
     }
     if (isTeacher && !isAdmin) {
         TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };

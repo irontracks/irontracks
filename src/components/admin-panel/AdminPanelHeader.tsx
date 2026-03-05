@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, AlertTriangle, ChevronDown, Crown, Dumbbell, Play, ShieldAlert, UserCog, UserPlus, X } from 'lucide-react'
+import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Crown, Dumbbell, FileText, MessageSquare, Play, Settings, UserCog, UserPlus, Users, X } from 'lucide-react'
 
 type AdminPanelHeaderProps = {
   debugError: string | null
@@ -13,6 +13,52 @@ type AdminPanelHeaderProps = {
   setTab: (value: string) => void
   setSelectedStudent: (value: unknown) => void
   onClose?: () => void
+}
+
+// ─── Menu Item Config ──────────────────────────────────────────────────────
+type MenuItem = {
+  key: string
+  icon: React.ReactNode
+  subtitle: string
+}
+
+type MenuGroup = {
+  label: string
+  items: MenuItem[]
+}
+
+const ICON_SIZE = 16
+
+const buildMenuGroups = (tabKeys: string[]): MenuGroup[] => {
+  const allItems: Record<string, MenuItem> = {
+    dashboard: { key: 'dashboard', icon: <Crown size={ICON_SIZE} />, subtitle: 'Resumo e métricas do seu negócio' },
+    students: { key: 'students', icon: <Users size={ICON_SIZE} />, subtitle: 'Gestão completa dos alunos' },
+    requests: { key: 'requests', icon: <UserPlus size={ICON_SIZE} />, subtitle: 'Pedidos de acesso pendentes' },
+    teachers: { key: 'teachers', icon: <UserCog size={ICON_SIZE} />, subtitle: 'Professores e convites' },
+    priorities: { key: 'priorities', icon: <AlertCircle size={ICON_SIZE} />, subtitle: 'Triagem inteligente do coach' },
+    templates: { key: 'templates', icon: <Dumbbell size={ICON_SIZE} />, subtitle: 'Biblioteca de treinos-base' },
+    videos: { key: 'videos', icon: <Play size={ICON_SIZE} />, subtitle: 'Vídeos demonstrativos' },
+    vip_reports: { key: 'vip_reports', icon: <BarChart3 size={ICON_SIZE} />, subtitle: 'Relatórios avançados' },
+    errors: { key: 'errors', icon: <MessageSquare size={ICON_SIZE} />, subtitle: 'Feedbacks reportados' },
+    system: { key: 'system', icon: <Settings size={ICON_SIZE} />, subtitle: 'Mensagens em massa e manutenção' },
+  }
+
+  const groups: MenuGroup[] = []
+  const available = new Set(tabKeys)
+
+  // Group 1: Gestão
+  const gestao = ['dashboard', 'students', 'requests', 'teachers', 'priorities'].filter(k => available.has(k))
+  if (gestao.length > 0) groups.push({ label: 'Gestão', items: gestao.map(k => allItems[k]) })
+
+  // Group 2: Conteúdo
+  const conteudo = ['templates', 'videos', 'vip_reports'].filter(k => available.has(k))
+  if (conteudo.length > 0) groups.push({ label: 'Conteúdo', items: conteudo.map(k => allItems[k]) })
+
+  // Group 3: Ferramentas
+  const ferramentas = ['errors', 'system'].filter(k => available.has(k))
+  if (ferramentas.length > 0) groups.push({ label: 'Ferramentas', items: ferramentas.map(k => allItems[k]) })
+
+  return groups
 }
 
 export const AdminPanelHeader = ({
@@ -78,11 +124,10 @@ export const AdminPanelHeader = ({
                         setSelectedStudent(null)
                         setMoreTabsOpen(false)
                       }}
-                      className={`min-h-[40px] px-3.5 md:px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-300 border active:scale-95 ${
-                        tab === key
+                      className={`min-h-[40px] px-3.5 md:px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-300 border active:scale-95 ${tab === key
                           ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
                           : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
-                      }`}
+                        }`}
                     >
                       {label}
                     </button>
@@ -122,10 +167,13 @@ export const AdminPanelHeader = ({
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
           <div className="absolute inset-x-0 bottom-0 pb-safe" onClick={(e) => e.stopPropagation()}>
             <div className="mx-auto w-full max-w-md rounded-t-3xl bg-neutral-950 border border-neutral-800 shadow-[0_-20px_60px_rgba(0,0,0,0.65)] overflow-hidden">
-              <div className="px-4 pt-3 pb-2 border-b border-neutral-800 flex items-center justify-between gap-3">
+              {/* Handle bar */}
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full bg-neutral-700" />
+              </div>
+              <div className="px-4 pt-1 pb-3 border-b border-neutral-800 flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Mais</div>
-                  <div className="text-base font-black text-white">Navegação</div>
+                  <div className="text-base font-black text-white">Menu</div>
                 </div>
                 <button
                   type="button"
@@ -136,67 +184,56 @@ export const AdminPanelHeader = ({
                   <X size={18} />
                 </button>
               </div>
-              <div className="p-3 grid gap-2">
-                {(Array.isArray(tabKeys) ? tabKeys : []).map((key) => {
-                  const isActive = tab === key
-                  const label = tabLabels[key] || key
-                  let subtitle = ''
-                  if (key === 'dashboard') subtitle = 'Visão geral do negócio'
-                  else if (key === 'students') subtitle = 'Gestão de alunos e status'
-                  else if (key === 'templates') subtitle = 'Biblioteca de treinos-base'
-                  else if (key === 'teachers') subtitle = 'Gestão de professores e convites'
-                  else if (key === 'videos') subtitle = 'Fila de vídeos por exercício'
-                  else if (key === 'priorities') subtitle = 'Triagem inteligente do coach'
-                  else if (key === 'errors') subtitle = 'Erros reportados pelos usuários'
-                  else if (key === 'system') subtitle = 'Backup, broadcasts e operações críticas'
 
-                  let iconColor = isActive ? 'text-yellow-400' : 'text-neutral-400'
-                  let badgeClass = isActive ? 'bg-yellow-500/15 border-yellow-500/40' : 'bg-neutral-900 border-neutral-800'
+              {/* Grouped menu items */}
+              <div className="p-3 max-h-[65vh] overflow-y-auto custom-scrollbar space-y-5">
+                {buildMenuGroups(tabKeys).map((group) => (
+                  <div key={group.label}>
+                    {/* Section header */}
+                    <div className="px-2 mb-2 flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">{group.label}</span>
+                      <div className="flex-1 h-px bg-neutral-800" />
+                    </div>
 
-                  if (key === 'system') {
-                    iconColor = isActive ? 'text-red-400' : 'text-red-300'
-                    badgeClass = isActive ? 'bg-red-900/60 border-red-500/60' : 'bg-red-950/70 border-red-700/70'
-                  }
+                    {/* Section items */}
+                    <div className="grid gap-1.5">
+                      {group.items.map((item) => {
+                        const isActive = tab === item.key
+                        const label = tabLabels[item.key] || item.key
 
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => {
-                        setTab(key)
-                        setSelectedStudent(null)
-                        setMoreTabsOpen(false)
-                      }}
-                      className={`w-full min-h-[56px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 active:scale-[0.99] ${
-                        isActive
-                          ? key === 'system'
-                            ? 'bg-red-900/20 text-red-300 border-red-500/40 shadow-lg shadow-red-500/20'
-                            : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
-                          : key === 'system'
-                            ? 'bg-neutral-900/80 text-red-300 border-red-800 hover:bg-neutral-900'
-                            : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 border ${badgeClass}`}>
-                          {key === 'dashboard' && <Crown size={16} className={iconColor} />}
-                          {key === 'students' && <UserPlus size={16} className={iconColor} />}
-                          {key === 'templates' && <Dumbbell size={16} className={iconColor} />}
-                          {key === 'teachers' && <UserCog size={16} className={iconColor} />}
-                          {key === 'videos' && <Play size={16} className={iconColor} />}
-                          {key === 'priorities' && <AlertCircle size={16} className={iconColor} />}
-                          {key === 'errors' && <AlertTriangle size={16} className={iconColor} />}
-                          {key === 'system' && <ShieldAlert size={16} className={iconColor} />}
-                        </div>
-                        <div className="min-w-0 text-left">
-                          <div className="font-black text-[12px] uppercase tracking-widest truncate">{label}</div>
-                          {subtitle && <div className="text-[11px] text-neutral-400 truncate">{subtitle}</div>}
-                        </div>
-                      </div>
-                      <ChevronDown size={16} className={`transition-transform text-neutral-500 ${isActive ? 'rotate-90' : '-rotate-90'}`} />
-                    </button>
-                  )
-                })}
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => {
+                              setTab(item.key)
+                              setSelectedStudent(null)
+                              setMoreTabsOpen(false)
+                            }}
+                            className={`w-full min-h-[56px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 active:scale-[0.99] ${isActive
+                                ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
+                                : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                              }`}
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 border ${isActive ? 'bg-yellow-500/15 border-yellow-500/40' : 'bg-neutral-900 border-neutral-800'
+                                }`}>
+                                <span className={isActive ? 'text-yellow-400' : 'text-neutral-400'}>
+                                  {item.icon}
+                                </span>
+                              </div>
+                              <div className="min-w-0 text-left">
+                                <div className="font-black text-[12px] uppercase tracking-widest truncate">{label}</div>
+                                <div className="text-[11px] text-neutral-500 truncate">{item.subtitle}</div>
+                              </div>
+                            </div>
+                            <ChevronRight size={14} className={`flex-shrink-0 transition-colors ${isActive ? 'text-yellow-500' : 'text-neutral-600'}`} />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
