@@ -276,12 +276,14 @@ export default function HeaderActionsMenu({
                     gold
                     onClick={() => { onOpenSchedule?.(); close() }}
                   />
-                  <MenuItem
-                    icon={<CreditCard size={14} className="text-yellow-400" />}
-                    label="Carteira"
-                    gold
-                    onClick={() => { onOpenWallet?.(); close() }}
-                  />
+                  {!hideVipCtas && (
+                    <MenuItem
+                      icon={<CreditCard size={14} className="text-yellow-400" />}
+                      label="Carteira"
+                      gold
+                      onClick={() => { onOpenWallet?.(); close() }}
+                    />
+                  )}
                   <Divider />
                 </>
               )}
