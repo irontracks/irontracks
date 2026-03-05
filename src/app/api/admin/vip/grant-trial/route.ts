@@ -72,7 +72,7 @@ export async function POST(req: Request) {
         const existingValidUntil = existing?.valid_until ? new Date(String(existing.valid_until)).getTime() : 0
         const nextValidUntilMs = Math.max(existingValidUntil, new Date(validUntil).getTime())
 
-        if (existing?.id && String(existing.provider || '') === 'admin_grant' && String(existing.plan_id || '') === g.plan_id) {
+        if (existing?.id && (String(existing.provider || '') === 'admin_grant' || String(existing.provider || '') === 'admin') && String(existing.plan_id || '') === g.plan_id) {
           const { error: upErr } = await admin
             .from('user_entitlements')
             .update({
@@ -97,8 +97,8 @@ export async function POST(req: Request) {
           } catch (e) { logWarn('admin/vip/grant-trial', 'Failed to write audit_events (extended)', e) }
           updated += 1
           await Promise.all([
-            cacheDelete(`vip:access:${userId}`).catch(() => {}),
-            cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => {}),
+            cacheDelete(`vip:access:${userId}`).catch(() => { }),
+            cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => { }),
           ])
           results.push({ ok: true, action: 'extended', user_id: userId, email: email || null, plan_id: g.plan_id, days: g.days, valid_until: new Date(nextValidUntilMs).toISOString() })
           continue
@@ -110,7 +110,7 @@ export async function POST(req: Request) {
             user_id: userId,
             plan_id: g.plan_id,
             status: 'active',
-            provider: 'admin_grant',
+            provider: 'admin',
             provider_subscription_id: null,
             current_period_start: validFrom,
             current_period_end: validUntil,
@@ -135,8 +135,8 @@ export async function POST(req: Request) {
         } catch (e) { logWarn('admin/vip/grant-trial', 'Failed to write audit_events (created)', e) }
         created += 1
         await Promise.all([
-          cacheDelete(`vip:access:${userId}`).catch(() => {}),
-          cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => {}),
+          cacheDelete(`vip:access:${userId}`).catch(() => { }),
+          cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => { }),
         ])
         results.push({ ok: true, action: 'created', user_id: userId, email: email || null, plan_id: g.plan_id, days: g.days, valid_until: validUntil })
       } catch (e: unknown) {

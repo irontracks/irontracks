@@ -233,12 +233,12 @@ const EmptyState = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; 
 
 // ─── Teacher Students List (with VIP badges) ─────────────────────
 const TeacherStudentsList = ({ students }: { students: AdminUser[] }) => {
-    const ids = useMemo(() => students.map(s => s.id).filter(Boolean), [students]);
+    const ids = useMemo(() => students.map(s => String(s.user_id || s.id || '')).filter(Boolean), [students]);
     const { vipMap } = useAdminVipMap(ids);
     return (
         <>
             {students.map((s) => (
-                <StudentRow key={s.id} student={s} vipTier={vipMap[s.id]?.tier} />
+                <StudentRow key={s.id} student={s} vipTier={vipMap[String(s.user_id || s.id || '')]?.tier} />
             ))}
         </>
     );
