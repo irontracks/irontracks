@@ -233,7 +233,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       setError(null);
       const { data, error } = await supabase
         .from('assessments')
-        .select('id, student_id, teacher_id, date, weight, body_fat, notes, measurements, created_at')
+        .select('*')
         .eq('id', id)
         .single();
 
@@ -258,7 +258,7 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       const { data, error } = await supabase
         .from('assessments')
-        .select('id, student_id, teacher_id, date, weight, body_fat, notes, measurements, created_at')
+        .select('*')
         .or(`student_id.eq.${resolvedId},user_id.eq.${resolvedId}`)
         .order('assessment_date', { ascending: false });
 
