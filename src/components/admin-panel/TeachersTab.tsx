@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     Search, UserPlus, Mail, ChevronLeft, Edit3, Users,
     Dumbbell, Clock, AlertCircle, Loader2, BookOpen,
-    CheckCircle2, CalendarDays, Phone, ShieldCheck, Trophy
+    CheckCircle2, CalendarDays, Phone, ShieldCheck, Trophy, Crown
 } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import type { AdminUser, AdminTeacher } from '@/types/admin';
+import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
 
 // ─── Avatar helper ────────────────────────────────────────────────
 const TeacherAvatar = ({ teacher, size = 'md' }: { teacher: AdminTeacher; size?: 'sm' | 'md' | 'lg' }) => {
@@ -147,9 +148,11 @@ const DetailTabPill = ({ label, icon: Icon, active, onClick, badge }: {
 );
 
 // ─── Student Row ─────────────────────────────────────────────────
-const StudentRow = ({ student }: { student: AdminUser }) => {
+const StudentRow = ({ student, vipTier }: { student: AdminUser; vipTier?: string }) => {
     const name = String(student.name || student.email || 'Sem Nome');
     const char = name.charAt(0).toUpperCase();
+    const vipLabel = vipTier ? getVipLabel(vipTier) : null;
+    const vipColor = vipTier ? getVipColors(vipTier) : null;
     return (
         <div className="flex items-center gap-3 p-3.5 bg-neutral-800/30 border border-neutral-700/40 rounded-2xl hover:border-yellow-500/20 hover:bg-neutral-800/50 transition-all">
             <div className="w-9 h-9 rounded-xl bg-neutral-700/60 flex items-center justify-center font-black text-yellow-500 text-sm flex-shrink-0 border border-neutral-600/40">
@@ -159,6 +162,12 @@ const StudentRow = ({ student }: { student: AdminUser }) => {
                 <div className="font-bold text-white text-sm truncate">{name}</div>
                 <div className="text-[11px] text-neutral-500 truncate">{String(student.email || '')}</div>
             </div>
+            {vipLabel && vipColor && (
+                <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${vipColor.bg} ${vipColor.text} ${vipColor.border}`}>
+                    <Crown size={9} />
+                    {vipLabel}
+                </span>
+            )}
             <div className={`flex-shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase ${String(student.status || '').toLowerCase() === 'pago'
                 ? 'bg-green-500/15 text-green-400 border border-green-500/20'
                 : 'bg-neutral-700/50 text-neutral-500 border border-neutral-600/30'
@@ -221,6 +230,19 @@ const EmptyState = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; 
         </div>
     </div>
 );
+
+// ─── Teacher Students List (with VIP badges) ─────────────────────
+const TeacherStudentsList = ({ students }: { students: AdminUser[] }) => {
+    const ids = useMemo(() => students.map(s => s.id).filter(Boolean), [students]);
+    const { vipMap } = useAdminVipMap(ids);
+    return (
+        <>
+            {students.map((s) => (
+                <StudentRow key={s.id} student={s} vipTier={vipMap[s.id]?.tier} />
+            ))}
+        </>
+    );
+};
 
 // ─── Main Component ───────────────────────────────────────────────
 export const TeachersTab: React.FC = () => {
@@ -373,7 +395,7 @@ export const TeachersTab: React.FC = () => {
                             ) : teacherStudents.length === 0 ? (
                                 <EmptyState icon={Users} title="Sem alunos" subtitle="Este professor ainda não tem alunos vinculados." />
                             ) : (
-                                teacherStudents.map((s) => <StudentRow key={s.id} student={s} />)
+                                <TeacherStudentsList students={teacherStudents} />
                             )}
                         </>
                     )}
