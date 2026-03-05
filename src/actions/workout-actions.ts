@@ -655,6 +655,22 @@ export async function generatePeriodReportInsights(input: unknown) {
     const topVolumeName = safeString(topByVolume?.[0]?.name)
     const topFreqName = safeString(topByFreq?.[0]?.name)
 
+    // ✅ Attempt real AI endpoint first (graceful fallback if unavailable)
+    try {
+      const aiRes = await fetch('/api/ai/period-insights', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type, stats }),
+      })
+      if (aiRes.ok) {
+        const aiJson = await aiRes.json().catch((): null => null)
+        if (aiJson?.ok && aiJson?.ai && typeof aiJson.ai === 'object') {
+          return { ok: true, ai: aiJson.ai }
+        }
+      }
+    } catch { /* silenced — fall through to deterministic */ }
+
+    // Deterministic fallback (always works, offline-friendly)
     const ai = {
       title: `Resumo ${label}`,
       summary: [
@@ -691,6 +707,7 @@ export async function generatePeriodReportInsights(input: unknown) {
     return { ok: false, error: message }
   }
 }
+
 
 export async function generateAssessmentPlanAi(input: unknown) {
   const payload = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
@@ -885,6 +902,77 @@ export async function getReportPreviousData(params: ReportPreviousParams): Promi
       prevLogsByExercise: resolvedLogs,
       prevBaseMsByExercise: resolvedBaseMs,
     }
+  } catch {
+    return empty
+  }
+}
+
+// ─── Historical best e1RM per exercise (all-time) ────────────────────────────
+// Used to detect TRUE PRs (vs just the previous session).
+// Returns: { [normalizedExerciseName]: bestE1rm (kg) }
+
+export async function getHistoricalBestE1rm(params: {
+  userId: string
+  currentSessionId: string | null
+  exerciseNames: string[]
+}): Promise<Record<string, number>> {
+  const empty: Record<string, number> = {}
+  try {
+    const { userId, currentSessionId, exerciseNames } = params
+    if (!userId || !exerciseNames.length) return empty
+    const supabase = createClient()
+
+    // Fetch up to 100 historical sessions (excluding current)
+    let query = supabase
+      .from('workouts')
+      .select('id, notes')
+      .eq('user_id', userId)
+      .eq('is_template', false)
+      .order('date', { ascending: false })
+      .limit(100)
+    if (currentSessionId) query = query.neq('id', currentSessionId)
+    const { data: rows, error } = await query
+    if (error || !Array.isArray(rows)) return empty
+
+    // Build normalized key set for wanted exercises
+    const normalize = (name: string) =>
+      name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+
+    const wantedKeys = new Set(exerciseNames.map((n) => normalize(String(n || '').trim())).filter(Boolean))
+    const bestE1rm: Record<string, number> = {}
+
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue
+      const parsed = parseNotesField((row as Record<string, unknown>).notes)
+      if (!parsed) continue
+      const exercises = Array.isArray(parsed?.exercises) ? (parsed.exercises as unknown[]) : []
+      const logs = parsed?.logs && typeof parsed.logs === 'object' ? (parsed.logs as Record<string, unknown>) : {}
+
+      exercises.forEach((ex, exIdx) => {
+        if (!ex || typeof ex !== 'object') return
+        const exName = String((ex as Record<string, unknown>)?.name || '').trim()
+        if (!exName) return
+        const key = normalize(exName)
+        if (!wantedKeys.has(key)) return
+
+        // Find best e1RM for this exercise in this session
+        Object.entries(logs).forEach(([k, v]) => {
+          const parts = k.split('-')
+          const eIdx = Number(parts[0])
+          if (!Number.isFinite(eIdx) || eIdx !== exIdx) return
+          if (!v || typeof v !== 'object') return
+          const obj = v as Record<string, unknown>
+          const w = Number(String(obj?.weight ?? '').replace(',', '.'))
+          const r = Number(String(obj?.reps ?? '').replace(',', '.'))
+          if (w <= 0 || r <= 0 || !Number.isFinite(w) || !Number.isFinite(r)) return
+          const e1rm = w * (1 + r / 30)
+          if (!Number.isFinite(e1rm)) return
+          if (!bestE1rm[key] || e1rm > bestE1rm[key]) bestE1rm[key] = e1rm
+        })
+      })
+    }
+
+    return bestE1rm
   } catch {
     return empty
   }
