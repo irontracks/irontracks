@@ -163,57 +163,79 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
 
   return (
     <div className="space-y-3 mb-5">
-      {/* Level Card */}
+      {/* ─── Iron Rank Card ─────────────────────────────────── */}
       {showIronRank ? (
         <button
           type="button"
           onClick={() => setRankOpen(true)}
-          className="w-full text-left cursor-pointer bg-gradient-to-br from-neutral-900 to-neutral-950 border border-neutral-700/80 rounded-2xl p-4 relative overflow-hidden hover:border-yellow-500/50 transition-all active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-yellow-500/40 shadow-lg"
+          className="w-full text-left cursor-pointer bg-gradient-to-br from-neutral-900 via-neutral-900 to-neutral-950 border border-neutral-700/60 rounded-2xl p-4 relative overflow-hidden hover:border-yellow-500/50 transition-all active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-yellow-500/30 shadow-lg group"
           aria-label="Abrir ranking Iron Rank"
         >
-          {/* Gold glow background for high levels */}
+          {/* Ambient glow for high levels */}
           {level >= 5 && (
-            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 via-amber-500/3 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/8 via-amber-500/3 to-transparent pointer-events-none" />
           )}
-          <div className="absolute top-0 right-0 p-4 opacity-8">
-            <Crown size={52} className={level >= 5 ? 'text-yellow-500' : 'text-neutral-600'} />
+          {/* Decorative crown watermark */}
+          <div className="absolute -top-2 -right-2 opacity-[0.06] pointer-events-none">
+            <Crown size={80} className={level >= 5 ? 'text-yellow-400' : 'text-neutral-400'} />
           </div>
 
-          <div className="flex items-center gap-3 mb-3 relative z-10">
-            <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-black text-xs px-2.5 py-1 rounded-lg shadow-sm shadow-yellow-500/20">
+          {/* ── Row 1: Level + Title + Streak ─────────────────── */}
+          <div className="flex items-center gap-2.5 relative z-10">
+            {/* NIV badge */}
+            <div className="shrink-0 bg-gradient-to-br from-yellow-400 to-amber-600 text-black font-black text-[11px] px-2.5 py-1.5 rounded-xl shadow-md shadow-yellow-500/25 leading-none">
               NIV {level}
             </div>
-            <div>
-              <div className="text-yellow-500 text-[11px] font-black uppercase tracking-widest">Iron Rank</div>
-              <div className="text-white font-black text-sm leading-tight">{levelName}</div>
+
+            {/* Title block */}
+            <div className="min-w-0 flex-1">
+              <div className="text-yellow-500 text-[9px] font-black uppercase tracking-[0.2em] leading-none mb-0.5">Iron Rank</div>
+              <div className="text-white font-black text-[15px] leading-tight truncate">{levelName}</div>
             </div>
+
+            {/* Streak badge */}
             {currentStreak > 0 && (
-              <div className="ml-auto flex items-center gap-1 bg-orange-500/10 border border-orange-500/20 rounded-lg px-2 py-1">
-                <span className="text-base leading-none">🔥</span>
-                <span className="text-orange-400 font-black text-xs">{currentStreak}d</span>
+              <div className="shrink-0 flex items-center gap-1.5 bg-orange-500/12 border border-orange-500/25 rounded-xl px-2.5 py-1.5">
+                <span className="text-sm leading-none">🔥</span>
+                <span className="text-orange-400 font-black text-xs leading-none">{currentStreak}d</span>
               </div>
             )}
           </div>
 
-          <div className="relative z-10">
-            <div className="flex justify-between text-[10px] text-neutral-500 mb-1.5">
-              <span>{totalVolumeKg.toLocaleString('pt-BR')}kg levantados</span>
-              <span className="text-yellow-500/70 font-bold">{Math.round(progressPercent)}%</span>
+          {/* ── Row 2: Progress section ────────────────────────── */}
+          <div className="relative z-10 mt-3">
+            {/* Labels above bar */}
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="text-[11px] text-neutral-400 font-semibold">
+                {totalVolumeKg.toLocaleString('pt-BR')}kg levantados
+              </span>
+              <span className="text-[12px] text-yellow-400 font-black tabular-nums">
+                {Math.round(progressPercent)}%
+              </span>
             </div>
-            {/* Taller progress bar with shimmer */}
-            <div className="h-3 bg-neutral-800 rounded-full overflow-hidden">
+
+            {/* Progress bar */}
+            <div className="h-2.5 bg-neutral-800/80 rounded-full overflow-hidden ring-1 ring-neutral-700/40">
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                className="h-full bg-gradient-to-r from-yellow-600 via-amber-400 to-yellow-300 rounded-full relative"
+                transition={{ duration: 1.2, ease: 'easeOut' }}
+                className="h-full rounded-full relative"
+                style={{ background: 'linear-gradient(90deg, #b45309 0%, #f59e0b 50%, #fde68a 100%)' }}
               >
-                {/* Shimmer overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2s_ease-in-out_infinite]" />
+                {/* Shimmer */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2.5s_ease-in-out_infinite] rounded-full" />
+                {/* Glow cap at end */}
+                <div className="absolute right-0 top-0 bottom-0 w-3 bg-gradient-to-r from-transparent to-yellow-200/40 rounded-full" />
               </motion.div>
             </div>
-            <div className="text-[10px] text-neutral-600 mt-1 text-right">
-              Próximo nível: {nextLevelVol.toLocaleString('pt-BR')}kg
+
+            {/* Next level label */}
+            <div className="flex justify-between items-center mt-1.5">
+              <span className="text-[10px] text-neutral-600">Toque para ver o ranking</span>
+              <span className="text-[10px] text-neutral-600">
+                próx. {nextLevelVol.toLocaleString('pt-BR')}kg
+              </span>
             </div>
           </div>
         </button>
