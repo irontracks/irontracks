@@ -56,18 +56,19 @@ export const StudentsTab: React.FC = () => {
         }, {});
     }, [usersList]);
 
-    // VIP batch lookup
+    // VIP batch lookup — use user_id (profiles.id), NOT id (students table PK)
     const allStudentIds = useMemo(() => {
         const ids = [
             ...(Array.isArray(studentsWithTeacherFiltered) ? studentsWithTeacherFiltered : []),
             ...(Array.isArray(studentsWithoutTeacherFiltered) ? studentsWithoutTeacherFiltered : []),
-        ].map(s => s.id).filter(Boolean);
+        ].map(s => String(s.user_id || s.id || '')).filter(Boolean);
         return [...new Set(ids)];
     }, [studentsWithTeacherFiltered, studentsWithoutTeacherFiltered]);
     const { vipMap } = useAdminVipMap(allStudentIds);
 
     const renderStudentRow = (s: AdminUser) => {
-        const vip = vipMap[s.id];
+        const uid = String(s.user_id || s.id || '');
+        const vip = vipMap[uid];
         const vipLabel = vip ? getVipLabel(vip.tier) : null;
         const vipColor = vip ? getVipColors(vip.tier) : null;
         return (
