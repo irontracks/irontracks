@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, ChevronLeft, Clock, Edit3, History, Plus, Trash2, CheckCircle2, Circle, Lock } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, Dumbbell, Edit3, FileText, Flame, History, Plus, Trash2, TrendingUp, Trophy, CheckCircle2, Circle, Lock } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import { createClient } from '@/utils/supabase/client';
 import ExerciseEditor from '@/components/ExerciseEditor';
@@ -249,7 +249,14 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
         const count = visibleHistory.length;
         const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
-        return { count, totalMinutes, avgMinutes };
+        // Volume total across all visible sessions
+        let totalVolume = 0;
+        visibleHistory.forEach((s) => {
+            const raw = parseRawSession(s?.rawSession ?? s?.notes);
+            if (raw?.logs) totalVolume += calculateTotalVolumeFromLogs(raw.logs);
+        });
+        const volumeLabel = totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}t` : `${Math.round(totalVolume)}kg`;
+        return { count, totalMinutes, avgMinutes, totalVolume, volumeLabel };
     }, [visibleHistory]);
 
     const calculateTotalVolumeFromLogs = (logs: unknown) => {
@@ -969,11 +976,19 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
         await alert('Compartilhamento nativo indisponível. Copie o texto manualmente abaixo.', 'Compartilhamento indisponível');
     };
 
+    // ─── Extracted exercise + volume info from rawSession ───
+    const getSessionMeta = (s: WorkoutSummary) => {
+        const raw = parseRawSession(s?.rawSession ?? s?.notes);
+        const exCount = Array.isArray(raw?.exercises) ? raw.exercises.length : 0;
+        const vol = raw?.logs ? calculateTotalVolumeFromLogs(raw.logs) : 0;
+        return { exCount, vol };
+    };
+
     return (
         <>
             <div className={embedded ? "w-full text-white" : "min-h-screen bg-neutral-900 text-white p-4 pb-safe-extra"}>
                 {!embedded && (
-                    <div className="mb-4 flex items-center gap-2 sm:gap-3">
+                    <div className="mb-5 flex items-center gap-2 sm:gap-3">
                         <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
                         <div className="flex-1 min-w-0">
                             <div className="min-w-0">
@@ -982,15 +997,6 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                             </div>
                         </div>
                         <div className="flex items-center gap-2 justify-end shrink-0">
-                            {weeklyReportCtaEnabled && !loading && historyItems.length > 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={() => openPeriodReport('week')}
-                                    className="h-9 px-3 rounded-xl font-black text-[11px] uppercase tracking-wider transition-all duration-300 active:scale-95 bg-neutral-800 border border-neutral-700 text-neutral-100 hover:bg-neutral-700"
-                                >
-                                    Semanal
-                                </button>
-                            ) : null}
                             {!isReadOnly && historyItems.length > 0 && (
                                 <button
                                     type="button"
@@ -1039,26 +1045,29 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                 )}
 
                 <div className="space-y-4">
-                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/10 via-transparent to-transparent pointer-events-none" />
-                        <div className="relative">
+                    {/* ═══ PREMIUM SUMMARY CARD ═══ */}
+                    <div className="rounded-2xl border border-yellow-500/20 shadow-lg shadow-yellow-500/5 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 via-yellow-600/5 to-transparent pointer-events-none" />
+                        <div className="absolute top-0 right-0 w-40 h-40 bg-yellow-500/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/4" />
+                        <div className="relative p-4">
+                            {/* Header row: title + period filter pills */}
                             <div className="flex items-start justify-between gap-3 flex-wrap">
                                 <div>
-                                    <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Resumo</div>
-                                    <div className="text-base font-black tracking-tight text-white">{rangeLabel}</div>
+                                    <div className="text-[10px] uppercase tracking-[0.2em] text-yellow-500/70 font-black">Resumo</div>
+                                    <div className="text-lg font-black tracking-tight text-white">{rangeLabel}</div>
                                 </div>
-                                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
                                     {[
-                                        { key: '7', label: '7 dias' },
-                                        { key: '30', label: '30 dias' },
-                                        { key: '90', label: '90 dias' },
+                                        { key: '7', label: '7d' },
+                                        { key: '30', label: '30d' },
+                                        { key: '90', label: '90d' },
                                         { key: 'all', label: 'Tudo' },
                                     ].map((opt) => (
                                         <button
                                             key={opt.key}
                                             type="button"
                                             onClick={() => setRange(opt.key)}
-                                            className={`min-h-[40px] px-3 rounded-full text-xs font-black uppercase tracking-wide transition-all duration-300 active:scale-95 whitespace-nowrap ${range === opt.key ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'bg-neutral-950 border border-neutral-800 text-neutral-300 hover:bg-neutral-900'}`}
+                                            className={`min-h-[36px] px-3 rounded-full text-[11px] font-black uppercase tracking-wider transition-all duration-300 active:scale-95 whitespace-nowrap ${range === opt.key ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/30' : 'bg-neutral-900/80 border border-neutral-800 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800'}`}
                                         >
                                             {opt.label}
                                         </button>
@@ -1066,74 +1075,101 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4">
-                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Treinos</div>
-                                    <div className="text-xl font-black tracking-tight text-white">{summary.count}</div>
+                            {/* Metrics grid */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4">
+                                {/* Treinos (primary gold card) */}
+                                <div className="bg-gradient-to-br from-yellow-500/15 to-yellow-600/5 border border-yellow-500/30 rounded-xl p-3 relative overflow-hidden">
+                                    <div className="absolute top-2 right-2 opacity-10">
+                                        <Flame size={28} className="text-yellow-500" />
+                                    </div>
+                                    <div className="relative">
+                                        <div className="text-[10px] uppercase tracking-wider text-yellow-500/80 font-bold">Treinos</div>
+                                        <div className="text-2xl font-black tracking-tight text-white mt-0.5">{summary.count}</div>
+                                    </div>
                                 </div>
-                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo total</div>
-                                    <div className="text-xl font-black tracking-tight text-white">{summary.totalMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                                {/* Tempo total */}
+                                <div className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <Clock size={12} className="text-yellow-500/60" />
+                                        <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Tempo</div>
+                                    </div>
+                                    <div className="text-xl font-black tracking-tight text-white">{summary.totalMinutes}<span className="text-xs text-neutral-500 font-black ml-1">min</span></div>
                                 </div>
-                                <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 col-span-2 sm:col-span-1">
-                                    <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
-                                    <div className="text-xl font-black tracking-tight text-white">{summary.avgMinutes}<span className="text-sm text-neutral-400 font-black ml-1">min</span></div>
+                                {/* Média */}
+                                <div className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <TrendingUp size={12} className="text-yellow-500/60" />
+                                        <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Média</div>
+                                    </div>
+                                    <div className="text-xl font-black tracking-tight text-white">{summary.avgMinutes}<span className="text-xs text-neutral-500 font-black ml-1">min</span></div>
+                                </div>
+                                {/* Volume total */}
+                                <div className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-3">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <Dumbbell size={12} className="text-yellow-500/60" />
+                                        <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">Volume</div>
+                                    </div>
+                                    <div className="text-xl font-black tracking-tight text-white">{summary.volumeLabel}</div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    {!loading && historyItems.length > 0 && (
-                        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg shadow-black/30">
-                            <div className="flex items-start sm:items-center justify-between gap-3 flex-wrap">
-                                <div>
-                                    <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatórios rápidos</div>
-                                    <div className="text-base font-black tracking-tight text-white">Compartilhe sua evolução</div>
-                                </div>
-                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                            {/* Integrated report buttons */}
+                            {!loading && historyItems.length > 0 && (
+                                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-neutral-800/70">
+                                    <FileText size={14} className="text-neutral-500 flex-shrink-0" />
+                                    <span className="text-[11px] text-neutral-500 font-bold uppercase tracking-wider flex-shrink-0">Relatórios</span>
+                                    <div className="flex-1" />
                                     <button
                                         type="button"
                                         onClick={() => openPeriodReport('week')}
-                                        className="min-h-[44px] px-4 rounded-xl bg-yellow-500 text-black text-xs font-black uppercase tracking-wide shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95 w-full sm:w-auto"
+                                        className="h-8 px-3 rounded-lg bg-yellow-500/10 text-yellow-500 text-[11px] font-black uppercase tracking-wider hover:bg-yellow-500/20 transition-all duration-300 active:scale-95 border border-yellow-500/20"
                                     >
-                                        Relatório semanal
+                                        Semanal
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => openPeriodReport('month')}
-                                        className="min-h-[44px] px-4 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 text-xs font-black uppercase tracking-wide hover:bg-neutral-900 transition-all duration-300 active:scale-95 w-full sm:w-auto"
+                                        className="h-8 px-3 rounded-lg bg-neutral-800/80 text-neutral-300 text-[11px] font-black uppercase tracking-wider hover:bg-neutral-800 transition-all duration-300 active:scale-95 border border-neutral-700/50"
                                     >
-                                        Relatório mensal
+                                        Mensal
                                     </button>
                                 </div>
-                            </div>
+                            )}
                         </div>
-                    )}
+                    </div>
 
+                    {/* ═══ EMPTY / PERIOD STATES ═══ */}
                     <div aria-live="polite" aria-atomic="true">
                         {loading && <SkeletonList count={4} />}
 
                         {!loading && historyItems.length === 0 && (
-                            <div className="text-center py-10 border border-neutral-800 bg-neutral-900 rounded-2xl">
-                                <div className="text-neutral-400 font-bold">Nenhum treino finalizado ainda.</div>
-                                {!isReadOnly && (
-                                    <div className="mt-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowManual(true)}
-                                            className="min-h-[44px] px-5 py-2.5 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95"
-                                        >
-                                            Adicionar primeiro treino
-                                        </button>
+                            <div className="text-center py-12 border border-neutral-800 bg-neutral-900 rounded-2xl relative overflow-hidden">
+                                <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 via-transparent to-transparent pointer-events-none" />
+                                <div className="relative">
+                                    <div className="w-16 h-16 mx-auto bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border border-yellow-500/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-yellow-500/10">
+                                        <Trophy className="text-yellow-500" size={28} />
                                     </div>
-                                )}
+                                    <div className="text-white font-black text-lg">Comece sua jornada</div>
+                                    <div className="text-neutral-500 text-sm mt-1 max-w-xs mx-auto">Registre seu primeiro treino e acompanhe sua evolução ao longo do tempo.</div>
+                                    {!isReadOnly && (
+                                        <div className="mt-5">
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowManual(true)}
+                                                className="min-h-[44px] px-6 py-2.5 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95 text-sm"
+                                            >
+                                                Adicionar primeiro treino
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 
                         {!loading && historyItems.length > 0 && filteredHistory.length === 0 && (
-                            <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-4">
+                            <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-5">
                                 <div className="text-white font-black">Sem treinos nesse período</div>
-                                <div className="text-sm text-neutral-400 mt-1">Tente aumentar o período para ver mais resultados.</div>
+                                <div className="text-sm text-neutral-500 mt-1">Aumente o período para visualizar mais resultados.</div>
                                 <div className="mt-4 flex gap-2 flex-wrap">
                                     <button type="button" onClick={() => setRange('all')} className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95">Ver tudo</button>
                                     <button type="button" onClick={() => setRange('90')} className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 font-black transition-all duration-300 active:scale-95">Últimos 90 dias</button>
@@ -1143,6 +1179,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
 
                     </div>{/* end aria-live */}
 
+                    {/* ═══ VIRTUALIZED SESSION LIST ═══ */}
                     {!loading && (visibleHistory.length > 0 || blockedCount > 0) && (
                         <div ref={parentRef} className="pb-24">
                             <div
@@ -1153,6 +1190,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                                     const session = visibleHistory[row.index]
                                     const minutes = Math.floor((Number(session?.totalTime) || 0) / 60)
                                     const isSelected = selectedIds.has(session.id)
+                                    const meta = getSessionMeta(session)
 
                                     // Week group header — show when week changes from previous item
                                     const getWeekStart = (dateVal: unknown): string | null => {
@@ -1190,66 +1228,96 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                                                 paddingBottom: '12px',
                                             }}
                                         >
-                                            {/* Week group separator */}
+                                            {/* ── Premium Week Header ── */}
                                             {showWeekHeader && (
-                                                <div className="flex items-center gap-2 mb-2 pt-1">
-                                                    <div className="h-px flex-1 bg-neutral-800" />
-                                                    <span className="text-[10px] font-black uppercase tracking-widest text-neutral-500 px-2">
+                                                <div className="flex items-center gap-2 mb-3 pt-1">
+                                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
+                                                    <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-yellow-500/70 bg-yellow-500/5 border border-yellow-500/15 px-3 py-1 rounded-full">
+                                                        <CalendarDays size={10} />
                                                         {weekHeaderLabel}
                                                     </span>
-                                                    <div className="h-px flex-1 bg-neutral-800" />
+                                                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
                                                 </div>
                                             )}
+
+                                            {/* ── Premium Session Card ── */}
                                             <div
                                                 onClick={() => (isSelectionMode ? toggleItemSelection(session.id) : openSession(session))}
-                                                className={`bg-neutral-900 border rounded-2xl p-4 cursor-pointer transition-all duration-300 ${isSelectionMode ? (isSelected ? 'border-yellow-500/70 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700') : 'border-neutral-800 hover:border-yellow-500/40 hover:shadow-lg hover:shadow-black/30'}`}
+                                                className={`relative rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden ${isSelectionMode ? (isSelected ? 'shadow-lg shadow-yellow-500/10' : '') : 'hover:shadow-lg hover:shadow-black/30 group'}`}
                                             >
-                                                <div className="flex items-start gap-3">
-                                                    {isSelectionMode && (
-                                                        <div className="mt-0.5">
-                                                            {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
-                                                        </div>
-                                                    )}
+                                                {/* Gold accent bar */}
+                                                <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl transition-colors duration-300 ${isSelected ? 'bg-yellow-500' : 'bg-yellow-500/30 group-hover:bg-yellow-500/60'}`} />
 
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="min-w-0">
-                                                                <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
-                                                                <div className="mt-1 flex items-center gap-3 text-xs text-neutral-400 flex-wrap">
-                                                                    <span className="inline-flex items-center gap-1.5">
-                                                                        <CalendarDays size={14} className="text-yellow-500/70" />
-                                                                        {formatCompletedAt(session?.date)}
-                                                                    </span>
-                                                                    <span className="inline-flex items-center gap-1.5">
-                                                                        <Clock size={14} className="text-yellow-500/70" />
-                                                                        {minutes} min
-                                                                    </span>
+                                                <div className={`bg-neutral-900 border rounded-2xl p-4 pl-5 ${isSelectionMode ? (isSelected ? 'border-yellow-500/50' : 'border-neutral-800') : 'border-neutral-800 group-hover:border-yellow-500/30'}`}>
+                                                    <div className="flex items-start gap-3">
+                                                        {isSelectionMode && (
+                                                            <div className="mt-0.5">
+                                                                {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
+                                                                    <div className="mt-1.5 flex items-center gap-2.5 text-xs text-neutral-400 flex-wrap">
+                                                                        <span className="inline-flex items-center gap-1">
+                                                                            <CalendarDays size={12} className="text-yellow-500/60" />
+                                                                            {formatCompletedAt(session?.date)}
+                                                                        </span>
+                                                                        <span className="inline-flex items-center gap-1">
+                                                                            <Clock size={12} className="text-yellow-500/60" />
+                                                                            {minutes} min
+                                                                        </span>
+                                                                    </div>
+                                                                    {/* Exercise & Volume chips */}
+                                                                    {(meta.exCount > 0 || meta.vol > 0) && (
+                                                                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                                                            {meta.exCount > 0 && (
+                                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-neutral-400 bg-neutral-800/80 border border-neutral-700/50 px-2 py-0.5 rounded-full">
+                                                                                    <Dumbbell size={10} className="text-yellow-500/60" />
+                                                                                    {meta.exCount} exercício{meta.exCount !== 1 ? 's' : ''}
+                                                                                </span>
+                                                                            )}
+                                                                            {meta.vol > 0 && (
+                                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-yellow-500/80 bg-yellow-500/5 border border-yellow-500/15 px-2 py-0.5 rounded-full">
+                                                                                    <TrendingUp size={10} />
+                                                                                    {meta.vol >= 1000 ? `${(meta.vol / 1000).toFixed(1)}t` : `${Math.round(meta.vol)}kg`}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                                    {!isReadOnly && !isSelectionMode && (
+                                                                        <>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => handleDeleteClick(e, session)}
+                                                                                className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                                                aria-label="Excluir"
+                                                                            >
+                                                                                <Trash2 size={16} className="pointer-events-none" />
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    openEdit(session);
+                                                                                }}
+                                                                                className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                                                aria-label="Editar"
+                                                                            >
+                                                                                <Edit3 size={16} className="pointer-events-none" />
+                                                                            </button>
+                                                                        </>
+                                                                    )}
+                                                                    {!isSelectionMode && (
+                                                                        <ChevronRight size={16} className="text-neutral-600 group-hover:text-yellow-500/60 transition-colors ml-0.5" />
+                                                                    )}
                                                                 </div>
                                                             </div>
-
-                                                            {!isReadOnly && !isSelectionMode && (
-                                                                <div className="flex items-center gap-2 shrink-0">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={(e) => handleDeleteClick(e, session)}
-                                                                        className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
-                                                                        aria-label="Excluir"
-                                                                    >
-                                                                        <Trash2 size={18} className="pointer-events-none" />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            openEdit(session);
-                                                                        }}
-                                                                        className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
-                                                                        aria-label="Editar"
-                                                                    >
-                                                                        <Edit3 size={18} className="pointer-events-none" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1259,6 +1327,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                                 })}
                             </div>
 
+                            {/* ── VIP Locked Sessions ── */}
                             {blockedCount > 0 && (
                                 <div className="bg-neutral-950/50 border border-yellow-500/20 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden group cursor-pointer" onClick={onUpgrade}>
                                     <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent pointer-events-none" />
