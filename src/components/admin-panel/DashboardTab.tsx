@@ -61,55 +61,71 @@ export const DashboardTab: React.FC = () => {
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
+                <button
+                    type="button"
+                    onClick={() => setTab('students')}
+                    className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm text-left transition-all duration-200 hover:border-yellow-500/50 hover:bg-neutral-800/60 active:scale-95 cursor-pointer group"
+                >
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-yellow-500/10 rounded-lg">
+                        <div className="p-2 bg-yellow-500/10 rounded-lg group-hover:bg-yellow-500/20 transition-colors">
                             <Users size={18} className="text-yellow-500" />
                         </div>
-                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Total Alunos</span>
+                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider group-hover:text-yellow-500 transition-colors">Total Alunos</span>
                     </div>
-                    <div className="text-2xl font-black text-white ml-1">
+                    <div className="text-2xl font-black text-white ml-1 group-hover:text-yellow-400 transition-colors">
                         {dashboardCharts.totalStudents}
                     </div>
-                </div>
+                </button>
 
                 {isAdmin && (
-                    <div className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
+                    <button
+                        type="button"
+                        onClick={() => setTab('teachers')}
+                        className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm text-left transition-all duration-200 hover:border-neutral-600 hover:bg-neutral-800/60 active:scale-95 cursor-pointer group"
+                    >
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 bg-neutral-800 rounded-lg">
-                                <UserCheck size={18} className="text-neutral-400" />
+                            <div className="p-2 bg-neutral-800 rounded-lg group-hover:bg-neutral-700 transition-colors">
+                                <UserCheck size={18} className="text-neutral-400 group-hover:text-white transition-colors" />
                             </div>
-                            <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Professores</span>
+                            <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider group-hover:text-white transition-colors">Professores</span>
                         </div>
                         <div className="text-2xl font-black text-white ml-1">
                             {teachersList.length}
                         </div>
-                    </div>
+                    </button>
                 )}
 
-                <div className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
+                <button
+                    type="button"
+                    onClick={() => setTab('students')}
+                    className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm text-left transition-all duration-200 hover:border-green-500/50 hover:bg-neutral-800/60 active:scale-95 cursor-pointer group"
+                >
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-green-500/10 rounded-lg">
+                        <div className="p-2 bg-green-500/10 rounded-lg group-hover:bg-green-500/20 transition-colors">
                             <UserCheck size={18} className="text-green-500" />
                         </div>
-                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Ativos</span>
+                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider group-hover:text-green-400 transition-colors">Ativos</span>
                     </div>
-                    <div className="text-2xl font-black text-white ml-1">
+                    <div className="text-2xl font-black text-white ml-1 group-hover:text-green-400 transition-colors">
                         {usersList.filter(u => String(u?.status || '').toLowerCase() === 'pago').length}
                     </div>
-                </div>
+                </button>
 
-                <div className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm">
+                <button
+                    type="button"
+                    onClick={() => setTab(isAdmin ? 'requests' : 'students')}
+                    className="bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 shadow-sm backdrop-blur-sm text-left transition-all duration-200 hover:border-red-500/50 hover:bg-neutral-800/60 active:scale-95 cursor-pointer group"
+                >
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-red-500/10 rounded-lg">
+                        <div className="p-2 bg-red-500/10 rounded-lg group-hover:bg-red-500/20 transition-colors">
                             <UserX size={18} className="text-red-500" />
                         </div>
-                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Pendentes</span>
+                        <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider group-hover:text-red-400 transition-colors">Pendentes</span>
                     </div>
-                    <div className="text-2xl font-black text-white ml-1">
+                    <div className="text-2xl font-black text-white ml-1 group-hover:text-red-400 transition-colors">
                         {usersList.filter(u => String(u?.status || '').toLowerCase() === 'pendente').length}
                     </div>
-                </div>
+                </button>
             </div>
 
             {/* Inbox do Coach */}

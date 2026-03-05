@@ -60,13 +60,16 @@ export const STORY_LAYOUTS: LayoutOption[] = [
     { id: 'live', label: 'LIVE' },
 ];
 
+// Safe-area-aware defaults for LIVE layout
+// Top boundary: SAFE_TOP/CANVAS_H = 168/1280 ≈ 0.131
+// Bottom boundary for card bottom: (CANVAS_H - SAFE_BOTTOM - cardH) / CANVAS_H = (1280 - 200 - 130) / 1280 ≈ 0.742
 export const DEFAULT_LIVE_POSITIONS: LivePositions = {
-    brand: { x: 0.083, y: 0.14 },
-    title: { x: 0.083, y: 0.245 },
-    subtitle: { x: 0.083, y: 0.365 },
-    cardVolume: { x: 0.083, y: 0.66 },
-    cardTempo: { x: 0.37, y: 0.66 },
-    cardKcal: { x: 0.657, y: 0.66 },
+    brand: { x: 0.078, y: 0.135 },  // just below safe top
+    title: { x: 0.078, y: 0.225 },
+    subtitle: { x: 0.078, y: 0.340 },
+    cardVolume: { x: 0.078, y: 0.720 },  // cards end at ≈0.822, safely above safe bottom
+    cardTempo: { x: 0.366, y: 0.720 },
+    cardKcal: { x: 0.654, y: 0.720 },
 };
 
 // ─── Helper Utilities ─────────────────────────────────────────────────────────
@@ -421,36 +424,55 @@ export const drawStory = ({
     const gap = 18;
     const cardH = 130;
 
-    // Helper to draw card
+    // ── Premium card renderer ─────────────────────────────────────────────────
     const drawCard = (
         box: { x: number; y: number; w: number; h: number },
         card: { label: string; value: string },
     ) => {
-        drawRoundedRect(ctx, box.x, box.y, box.w, box.h, 24);
-        ctx.fillStyle = 'rgba(0,0,0,0.62)';
+        const r = 28;
+
+        // 1. Dark glass fill
+        drawRoundedRect(ctx, box.x, box.y, box.w, box.h, r);
+        ctx.fillStyle = 'rgba(0,0,0,0.72)';
         ctx.fill();
+
+        // 2. Subtle border
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
         ctx.stroke();
 
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
-        ctx.font = '800 22px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        // 3. Gold bottom accent line
+        const accentH = 3;
+        const accentY = box.y + box.h - accentH;
+        const accentInset = 14;
+        drawRoundedRect(ctx, box.x + accentInset, accentY, box.w - accentInset * 2, accentH, accentH / 2);
+        ctx.fillStyle = 'rgba(250,204,21,0.70)';
+        ctx.fill();
+
+        // 4. Gold label
         ctx.textBaseline = 'top';
+        ctx.font = '800 20px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        ctx.fillStyle = 'rgba(250,204,21,0.85)';
+        ctx.letterSpacing = '2px';
         const labelW = ctx.measureText(card.label).width;
         const labelX = box.x + (box.w - labelW) / 2;
-        ctx.fillText(card.label, labelX, box.y + 24);
+        ctx.fillText(card.label, labelX, box.y + 20);
+        ctx.letterSpacing = '0px';
 
+        // 5. White value — auto-shrink to fit
         ctx.fillStyle = '#ffffff';
-        let valFont = 48;
-        ctx.font = `800 ${valFont}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        let valFont = 52;
+        ctx.font = `900 ${valFont}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
         let valW = ctx.measureText(card.value).width;
-        while (valW > box.w - 20 && valFont > 24) {
+        while (valW > box.w - 24 && valFont > 26) {
             valFont -= 2;
-            ctx.font = `800 ${valFont}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+            ctx.font = `900 ${valFont}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
             valW = ctx.measureText(card.value).width;
         }
         const valX = box.x + (box.w - valW) / 2;
-        ctx.fillText(card.value, valX, box.y + 64);
+        // centre value vertically in the card (accounting for label height ~40px)
+        const valY = box.y + 20 + 32 + Math.max(0, (box.h - 20 - 32 - valFont - accentH - 8) / 2);
+        ctx.fillText(card.value, valX, valY);
     };
 
     const layoutId = STORY_LAYOUTS.some((l) => l.id === layout) ? layout : 'bottom-row';
@@ -513,21 +535,41 @@ export const drawStory = ({
         return;
     }
 
-    // Standard Layouts
+    // ── Standard Layouts ──────────────────────────────────────────────────────
     ctx.textBaseline = 'top';
 
-    const brandY = SAFE_TOP + 24;
-    ctx.font = 'italic 900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+    // Safe usable area
+    const safeH = canvasH - SAFE_TOP - SAFE_BOTTOM; // usable vertical pixels
+    void safeH; // referenced below per layout
+
+    // ── Brand logo (IRON·TRACKS) — strictly below SAFE_TOP ───────────────────
+    const brandY = SAFE_TOP + 18;
+    const brandFontSize = 54;
+    ctx.font = `italic 900 ${brandFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.textBaseline = 'top';
+
+    // Shadow for legibility on any background
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 12;
     ctx.fillStyle = '#ffffff';
     ctx.fillText('IRON', left, brandY);
     const ironW = ctx.measureText('IRON').width;
+    // separator dot
+    ctx.fillStyle = 'rgba(250,204,21,0.55)';
+    ctx.font = `italic 900 ${Math.round(brandFontSize * 0.55)}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    const dotW = ctx.measureText(' · ').width;
+    ctx.fillText(' · ', left + ironW, brandY + brandFontSize * 0.22);
+    ctx.font = `italic 900 ${brandFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
     ctx.fillStyle = '#facc15';
-    ctx.fillText('TRACKS', left + ironW, brandY);
+    ctx.fillText('TRACKS', left + ironW + dotW, brandY);
+    ctx.restore();
 
+    // ── Workout title — wrapping text ─────────────────────────────────────────
+    const titleFontSize = 36;
+    const titleLineH = titleFontSize + 8;
     const title = safeString(metrics?.title).toUpperCase();
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
-
+    ctx.font = `800 ${titleFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
     const lines: string[] = [];
     const words = title.split(/\s+/).filter(Boolean);
     let line = '';
@@ -542,65 +584,100 @@ export const drawStory = ({
     }
     if (line && lines.length < 2) lines.push(line);
 
+    // ── Card data ─────────────────────────────────────────────────────────────
     const cards = [
-        {
-            label: 'VOLUME',
-            value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg`,
-        },
+        { label: 'VOLUME', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` },
         { label: 'TEMPO', value: formatDuration(metrics?.totalTime) },
         { label: 'KCAL', value: String(metrics?.kcal || 0) },
     ];
+
+    // ── Subtitle pill helper ───────────────────────────────────────────────────
+    const drawSubtitlePill = (x: number, y: number) => {
+        const dateText = metrics?.date ? ` · ${metrics.date}` : '';
+        const subText = `RELATÓRIO${dateText}`;
+        ctx.font = '700 24px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        const tw = ctx.measureText(subText).width;
+        const padX = 18; const padY = 10;
+        const pillW = tw + padX * 2;
+        const pillH = 24 + padY * 2;
+        drawRoundedRect(ctx, x, y, pillW, pillH, pillH / 2);
+        ctx.fillStyle = 'rgba(0,0,0,0.52)';
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(250,204,21,0.30)';
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.80)';
+        ctx.fillText(subText, x + padX, y + padY);
+    };
+
+    // ── Layout coordinates (strict safe-area clamping) ────────────────────────
+    const cardW3 = Math.floor((right - left - gap * 2) / 3);
+    // Max card bottom Y = safeBottomY (= canvasH - SAFE_BOTTOM)
+    // So max card top Y = safeBottomY - cardH
+    const maxCardTopY = safeBottomY - cardH;
 
     let titleY = 0;
     let subtitleY = 0;
     let cardsBoxes: { x: number; y: number; w: number; h: number }[] = [];
 
     if (layoutId === 'top-row') {
-        titleY = Math.max(brandY + 92, SAFE_TOP + 130);
-        subtitleY = titleY + lines.length * 40 + 12;
-        const cardY = subtitleY + 56;
-        const cardW = Math.floor((right - left - gap * 2) / 3);
+        // Brand → title → subtitle → cards, all top-aligned
+        titleY = Math.max(brandY + brandFontSize + 16, SAFE_TOP + brandFontSize + 28);
+        subtitleY = titleY + lines.length * titleLineH + 14;
+        const cardTopY = subtitleY + 50;
+        // Clamp cards so they don't exceed safeBottomY
+        const clampedCardY = Math.min(cardTopY, maxCardTopY);
         cardsBoxes = cards.map((_, idx) => ({
-            x: left + idx * (cardW + gap),
-            y: cardY,
-            w: cardW,
+            x: left + idx * (cardW3 + gap),
+            y: clampedCardY,
+            w: cardW3,
             h: cardH,
         }));
     } else if (layoutId === 'right-stack' || layoutId === 'left-stack') {
-        const stackW = 360;
+        const stackW = Math.round((right - left) * 0.52); // ~52% of usable width
         const x = layoutId === 'right-stack' ? right - stackW : left;
-        const totalH = cardH * 3 + gap * 2;
-        const cardY0 = safeBottomY - 24 - totalH;
+        const totalStackH = cardH * 3 + gap * 2;
+        // Anchor bottom of last card to safe bottom edge
+        const lastCardBottom = Math.min(safeBottomY - 16, canvasH - SAFE_BOTTOM - 16);
+        const cardY0 = Math.max(SAFE_TOP, lastCardBottom - totalStackH);
         cardsBoxes = cards.map((_, idx) => ({
             x,
             y: cardY0 + idx * (cardH + gap),
             w: stackW,
             h: cardH,
         }));
-        subtitleY = cardsBoxes[0].y - 56;
-        titleY = Math.max(brandY + 92, subtitleY - 24 - lines.length * 40);
+        subtitleY = Math.max(SAFE_TOP, cardsBoxes[0].y - 52);
+        titleY = Math.max(brandY + brandFontSize + 16, subtitleY - 16 - lines.length * titleLineH);
     } else {
-        // bottom-row
-        const cardY = safeBottomY - 24 - cardH;
-        subtitleY = cardY - 56;
-        titleY = Math.max(brandY + 92, subtitleY - 24 - lines.length * 40);
-        const cardW = Math.floor((right - left - gap * 2) / 3);
+        // bottom-row (default)
+        // Cards sit just above safe bottom edge
+        const cardTopY = safeBottomY - 16 - cardH;
+        subtitleY = cardTopY - 52;
+        titleY = Math.max(brandY + brandFontSize + 16, subtitleY - 16 - lines.length * titleLineH);
         cardsBoxes = cards.map((_, idx) => ({
-            x: left + idx * (cardW + gap),
-            y: cardY,
-            w: cardW,
+            x: left + idx * (cardW3 + gap),
+            y: cardTopY,
+            w: cardW3,
             h: cardH,
         }));
     }
 
+    // ── Draw workout title ────────────────────────────────────────────────────
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `800 ${titleFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.textBaseline = 'top';
     lines.forEach((l, idx) => {
-        ctx.fillText(l, left, titleY + idx * 40);
+        ctx.fillText(l, left, titleY + idx * titleLineH);
     });
+    ctx.restore();
 
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
-    const dateText = metrics?.date ? `• ${metrics.date}` : '';
-    ctx.fillText(`RELATÓRIO DO TREINO ${dateText}`.trim(), left, subtitleY);
+    // ── Draw subtitle pill ────────────────────────────────────────────────────
+    ctx.textBaseline = 'top';
+    drawSubtitlePill(left, subtitleY);
 
+    // ── Draw cards ────────────────────────────────────────────────────────────
     cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
 };

@@ -125,8 +125,8 @@ export const AdminPanelHeader = ({
                         setMoreTabsOpen(false)
                       }}
                       className={`min-h-[40px] px-3.5 md:px-4 py-2 rounded-full font-black text-[11px] uppercase tracking-wide whitespace-nowrap transition-all duration-300 border active:scale-95 ${tab === key
-                          ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
-                          : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
+                        ? 'bg-yellow-500 text-black border-yellow-400 shadow-lg shadow-yellow-500/20'
+                        : 'bg-neutral-900/70 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
                         }`}
                     >
                       {label}
@@ -159,82 +159,124 @@ export const AdminPanelHeader = ({
 
       {moreTabsOpen && (
         <div
-          className="md:hidden fixed inset-0 z-[60]"
+          className="md:hidden fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]"
           role="dialog"
           aria-modal="true"
           onClick={() => setMoreTabsOpen(false)}
         >
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div className="absolute inset-x-0 bottom-0 pb-safe" onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto w-full max-w-md rounded-t-3xl bg-neutral-950 border border-neutral-800 shadow-[0_-20px_60px_rgba(0,0,0,0.65)] overflow-hidden">
-              {/* Handle bar */}
-              <div className="flex justify-center pt-3 pb-1">
-                <div className="w-10 h-1 rounded-full bg-neutral-700" />
-              </div>
-              <div className="px-4 pt-1 pb-3 border-b border-neutral-800 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-base font-black text-white">Menu</div>
+          {/* Premium blurred backdrop */}
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+
+          {/* Modal card */}
+          <div
+            className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] border border-white/[0.06] animate-in fade-in slide-in-from-top-4 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Glassmorphism background layers */}
+            <div className="absolute inset-0 bg-neutral-950/95 backdrop-blur-2xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/[0.04] via-transparent to-transparent" />
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent" />
+
+            {/* Content */}
+            <div className="relative">
+              {/* Header */}
+              <div className="px-5 pt-5 pb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-500/25">
+                    <Crown size={16} className="text-black" />
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.25em] text-yellow-500/70">IronTracks</div>
+                    <div className="text-sm font-black text-white leading-none">Painel de Controle</div>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMoreTabsOpen(false)}
-                  className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                  className="w-9 h-9 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-all duration-200 active:scale-95"
                   aria-label="Fechar"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
 
+              {/* Divider */}
+              <div className="mx-5 h-px bg-gradient-to-r from-transparent via-neutral-700/60 to-transparent mb-1" />
+
               {/* Grouped menu items */}
-              <div className="p-3 max-h-[65vh] overflow-y-auto custom-scrollbar space-y-5">
-                {buildMenuGroups(tabKeys).map((group) => (
-                  <div key={group.label}>
-                    {/* Section header */}
-                    <div className="px-2 mb-2 flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500">{group.label}</span>
-                      <div className="flex-1 h-px bg-neutral-800" />
-                    </div>
+              <div className="p-3 max-h-[60vh] overflow-y-auto space-y-4">
+                {buildMenuGroups(tabKeys).map((group, groupIdx) => {
+                  const groupAccents: Record<string, { text: string; dot: string }> = {
+                    'Gestão': { text: 'text-yellow-400/70', dot: 'bg-yellow-500' },
+                    'Conteúdo': { text: 'text-blue-400/70', dot: 'bg-blue-500' },
+                    'Ferramentas': { text: 'text-violet-400/70', dot: 'bg-violet-500' },
+                  }
+                  const accent = groupAccents[group.label] ?? { text: 'text-neutral-500', dot: 'bg-neutral-500' }
 
-                    {/* Section items */}
-                    <div className="grid gap-1.5">
-                      {group.items.map((item) => {
-                        const isActive = tab === item.key
-                        const label = tabLabels[item.key] || item.key
+                  return (
+                    <div key={group.label}>
+                      {/* Section header */}
+                      <div className="px-2 mb-2 flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full ${accent.dot}`} />
+                        <span className={`text-[10px] font-black uppercase tracking-[0.22em] ${accent.text}`}>{group.label}</span>
+                        <div className="flex-1 h-px bg-white/[0.06]" />
+                      </div>
 
-                        return (
-                          <button
-                            key={item.key}
-                            type="button"
-                            onClick={() => {
-                              setTab(item.key)
-                              setSelectedStudent(null)
-                              setMoreTabsOpen(false)
-                            }}
-                            className={`w-full min-h-[56px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-300 active:scale-[0.99] ${isActive
-                                ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30 shadow-lg shadow-yellow-500/10'
-                                : 'bg-neutral-900/60 text-neutral-200 border-neutral-800 hover:bg-neutral-900'
-                              }`}
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 border ${isActive ? 'bg-yellow-500/15 border-yellow-500/40' : 'bg-neutral-900 border-neutral-800'
-                                }`}>
-                                <span className={isActive ? 'text-yellow-400' : 'text-neutral-400'}>
-                                  {item.icon}
-                                </span>
+                      {/* Section items */}
+                      <div className="grid gap-1">
+                        {group.items.map((item, itemIdx) => {
+                          const isActive = tab === item.key
+                          const label = tabLabels[item.key] || item.key
+
+                          return (
+                            <button
+                              key={item.key}
+                              type="button"
+                              onClick={() => {
+                                setTab(item.key)
+                                setSelectedStudent(null)
+                                setMoreTabsOpen(false)
+                              }}
+                              style={{ animationDelay: `${(groupIdx * 5 + itemIdx) * 30}ms` }}
+                              className={`w-full min-h-[58px] px-4 rounded-2xl border flex items-center justify-between gap-3 transition-all duration-200 active:scale-[0.98] animate-in fade-in slide-in-from-left-2 ${isActive
+                                  ? 'bg-gradient-to-r from-yellow-500/15 to-amber-500/5 text-yellow-300 border-yellow-500/25 shadow-[0_4px_20px_rgba(234,179,8,0.12)]'
+                                  : 'bg-white/[0.03] text-neutral-200 border-white/[0.06] hover:bg-white/[0.07] hover:border-white/[0.12]'
+                                }`}
+                            >
+                              <div className="flex items-center gap-3.5 min-w-0">
+                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${isActive
+                                    ? 'bg-yellow-500/20 border border-yellow-400/30'
+                                    : 'bg-white/[0.04] border border-white/[0.08]'
+                                  }`}>
+                                  <span className={`transition-colors ${isActive ? 'text-yellow-400' : 'text-neutral-400'}`}>
+                                    {item.icon}
+                                  </span>
+                                </div>
+                                <div className="min-w-0 text-left">
+                                  <div className={`font-black text-[11.5px] uppercase tracking-widest truncate leading-none mb-0.5 ${isActive ? 'text-yellow-300' : 'text-white'}`}>
+                                    {label}
+                                  </div>
+                                  <div className="text-[10.5px] text-neutral-500 truncate leading-none">{item.subtitle}</div>
+                                </div>
                               </div>
-                              <div className="min-w-0 text-left">
-                                <div className="font-black text-[12px] uppercase tracking-widest truncate">{label}</div>
-                                <div className="text-[11px] text-neutral-500 truncate">{item.subtitle}</div>
+                              <div className={`flex-shrink-0 transition-all ${isActive ? 'opacity-100' : 'opacity-30'}`}>
+                                {isActive ? (
+                                  <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_6px_rgba(234,179,8,0.8)]" />
+                                ) : (
+                                  <ChevronRight size={13} className="text-neutral-500" />
+                                )}
                               </div>
-                            </div>
-                            <ChevronRight size={14} className={`flex-shrink-0 transition-colors ${isActive ? 'text-yellow-500' : 'text-neutral-600'}`} />
-                          </button>
-                        )
-                      })}
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
+
+              {/* Bottom padding */}
+              <div className="h-3" />
             </div>
           </div>
         </div>
