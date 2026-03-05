@@ -46,13 +46,20 @@ export async function POST(req: Request) {
         }
 
         // 2. Get active entitlements
-        const nowIso = new Date().toISOString()
         const { data: entitlements } = await admin
             .from('user_entitlements')
             .select('user_id, plan_id, status, provider, valid_until')
             .in('user_id', user_ids)
             .in('status', ['active', 'trialing', 'past_due'])
             .order('valid_until', { ascending: false, nullsFirst: true })
+
+        // 3. Get app_subscriptions (legacy fallback)
+        const { data: appSubs } = await admin
+            .from('app_subscriptions')
+            .select('user_id, plan_id, status')
+            .in('user_id', user_ids)
+            .in('status', ['active', 'past_due', 'trialing'])
+            .order('created_at', { ascending: false })
 
         // Build entitlement map (first match per user = best)
         const entMap = new Map<string, { plan_id: string; valid_until: string | null; status: string; provider: string }>()
@@ -67,30 +74,58 @@ export async function POST(req: Request) {
             }
         }
 
-        // 3. Build result
+        // Build app_subscriptions map (fallback)
+        const subMap = new Map<string, { plan_id: string; status: string }>()
+        for (const s of appSubs || []) {
+            if (!subMap.has(s.user_id)) {
+                subMap.set(s.user_id, {
+                    plan_id: s.plan_id || '',
+                    status: s.status || '',
+                })
+            }
+        }
+
+        const normalizeTier = (planId: string) => {
+            const raw = planId.toLowerCase().replace(/\s+/g, '_')
+            const match = raw.match(/^vip_(start|pro|elite)/)
+            return match ? `vip_${match[1]}` : raw || 'free'
+        }
+
+        // 4. Build result
         const result: VipBatchResult = {}
         for (const uid of user_ids) {
             const role = roleMap.get(uid)
+            // Admin/Teacher = VIP Elite by role
             if (role === 'admin' || role === 'teacher') {
                 result[uid] = { tier: 'vip_elite', plan_id: null, valid_until: null, source: 'role', status: null }
                 continue
             }
+            // Check user_entitlements
             const ent = entMap.get(uid)
             if (ent) {
-                // Normalize tier
-                const raw = String(ent.plan_id || '').toLowerCase().replace(/\s+/g, '_')
-                const match = raw.match(/^vip_(start|pro|elite)/)
-                const tier = match ? `vip_${match[1]}` : raw || 'free'
                 result[uid] = {
-                    tier,
+                    tier: normalizeTier(ent.plan_id),
                     plan_id: ent.plan_id,
                     valid_until: ent.valid_until,
                     source: ent.provider || 'entitlement_table',
                     status: ent.status,
                 }
-            } else {
-                result[uid] = { tier: 'free', plan_id: null, valid_until: null, source: 'none', status: null }
+                continue
             }
+            // Check app_subscriptions (legacy)
+            const sub = subMap.get(uid)
+            if (sub) {
+                result[uid] = {
+                    tier: normalizeTier(sub.plan_id),
+                    plan_id: sub.plan_id,
+                    valid_until: null,
+                    source: 'app_subscription',
+                    status: sub.status,
+                }
+                continue
+            }
+            // Free
+            result[uid] = { tier: 'free', plan_id: null, valid_until: null, source: 'none', status: null }
         }
 
         return NextResponse.json({ ok: true, vip: result })
