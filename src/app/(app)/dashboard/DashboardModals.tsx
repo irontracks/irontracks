@@ -299,9 +299,14 @@ export default function DashboardModals(props: DashboardModalsProps) {
                 </div>
             )}
 
-            {/* Notification Center */}
-            {showNotifCenter && (
-                <div className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setShowNotifCenter(false)}>
+            {/* Notification Center — always mounted to avoid fetch race condition (ghost notifications).
+                The wrapper is hidden via `display:none` so the component stays alive and pre-loaded. */}
+            {user && (
+                <div
+                    style={{ display: showNotifCenter ? undefined : 'none' }}
+                    className="fixed inset-0 z-[75] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+                    onClick={() => setShowNotifCenter(false)}
+                >
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 flex justify-between items-center border-b border-neutral-800">
                             <h3 className="font-bold text-white">Notificações</h3>
@@ -309,7 +314,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         </div>
                         <div className="p-4 relative">
                             <SectionErrorBoundary section="Notificações" onReset={() => setShowNotifCenter(false)}>
-                                <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen />
+                                <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen open={showNotifCenter} />
                             </SectionErrorBoundary>
                         </div>
                     </div>
