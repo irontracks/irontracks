@@ -244,21 +244,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
     })
     const virtualItems = rowVirtualizer.getVirtualItems()
 
-    const summary = useMemo(() => {
-        const totalSeconds = visibleHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
-        const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
-        const count = visibleHistory.length;
-        const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
-        // Volume total across all visible sessions
-        let totalVolume = 0;
-        visibleHistory.forEach((s) => {
-            const raw = parseRawSession(s?.rawSession ?? s?.notes);
-            if (raw?.logs) totalVolume += calculateTotalVolumeFromLogs(raw.logs);
-        });
-        const volumeLabel = totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}t` : `${Math.round(totalVolume)}kg`;
-        return { count, totalMinutes, avgMinutes, totalVolume, volumeLabel };
-    }, [visibleHistory]);
-
+    // Must be defined BEFORE summary useMemo (avoids Temporal Dead Zone on first render)
     const calculateTotalVolumeFromLogs = (logs: unknown) => {
         try {
             const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {};
@@ -276,6 +262,22 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
             return 0;
         }
     };
+
+    const summary = useMemo(() => {
+        const totalSeconds = visibleHistory.reduce((acc, s) => acc + (Number(s?.totalTime) || 0), 0);
+        const totalMinutes = Math.max(0, Math.round(totalSeconds / 60));
+        const count = visibleHistory.length;
+        const avgMinutes = count > 0 ? Math.max(0, Math.round(totalMinutes / count)) : 0;
+        // Volume total across all visible sessions
+        let totalVolume = 0;
+        visibleHistory.forEach((s) => {
+            const raw = parseRawSession(s?.rawSession ?? s?.notes);
+            if (raw?.logs) totalVolume += calculateTotalVolumeFromLogs(raw.logs);
+        });
+        const volumeLabel = totalVolume >= 1000 ? `${(totalVolume / 1000).toFixed(1)}t` : `${Math.round(totalVolume)}kg`;
+        return { count, totalMinutes, avgMinutes, totalVolume, volumeLabel };
+    }, [visibleHistory]);
+
 
     const buildPeriodStats = (days: unknown): PeriodStats | null => {
         try {
