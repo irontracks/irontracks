@@ -66,18 +66,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Dados inválidos.' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
+    let admin: ReturnType<typeof createAdminClient>
+    try {
+      admin = createAdminClient()
+    } catch (adminErr) {
+      const msg = adminErr instanceof Error ? adminErr.message : String(adminErr)
+      logError('access-requests/action', 'Admin client creation failed:', msg)
+      return NextResponse.json({ ok: false, error: `Erro interno: ${msg}` }, { status: 500 })
+    }
 
-    // Fetch request details — use maybeSingle to avoid throwing on 0 rows
+    // Fetch request details — use select('*') to avoid column-not-found errors
     const { data: request, error: fetchError } = await admin
       .from('access_requests')
-      .select('id, user_id, email, status, phone, full_name, role_requested, cref, created_at')
+      .select('*')
       .eq('id', requestId)
       .maybeSingle()
 
     if (fetchError) {
       logError('access-requests/action', `Fetch error for requestId ${requestId}: ${fetchError.message}`)
-      return NextResponse.json({ ok: false, error: 'Não foi possível localizar a solicitação. Atualize a lista e tente novamente.' }, { status: 404 })
+      // Expose real error to help diagnose
+      return NextResponse.json({ ok: false, error: `Erro ao buscar solicitação: ${fetchError.message}` }, { status: 500 })
     }
 
     if (!request) {
