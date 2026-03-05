@@ -71,6 +71,19 @@ export interface SharedLogEntry {
 // sharedLogs: userId -> logKey ("exIdx-sIdx") -> SharedLogEntry
 export type SharedLogsMap = Record<string, Record<string, SharedLogEntry>>
 
+// Chat message broadcasted via team_logs channel
+export interface ChatMessage {
+    id: string
+    userId: string
+    displayName: string
+    photoURL: string | null
+    text: string
+    ts: number
+}
+
+const MAX_TEAM_PARTICIPANTS = 5
+const MAX_CHAT_MESSAGES = 60
+
 interface JoinResult {
     ok: boolean
     teamSessionId?: string
@@ -103,6 +116,13 @@ interface TeamWorkoutContextValue {
     // ─ Live progress sync ─────────────────────────────────────────────────────
     sharedLogs: SharedLogsMap
     broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
+    // ─ Chat ────────────────────────────────────────────────────────────────
+    chatMessages: ChatMessage[]
+    sendChatMessage: (text: string) => void
+    // ─ Pause/Resume ────────────────────────────────────────────────────────
+    sessionPaused: boolean
+    pauseSession: () => void
+    resumeSession: () => void
 }
 
 interface TeamWorkoutProviderProps {
@@ -132,6 +152,12 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     // Live progress sync
     const [sharedLogs, setSharedLogs] = useState<SharedLogsMap>({})
     const teamBroadcastChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+    // Chat
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+    // Pause state
+    const [sessionPaused, setSessionPaused] = useState(false)
+    const myDisplayNameRef = useRef<string>('')
+    const myPhotoUrlRef = useRef<string | null>(null)
     const supabase = useMemo(() => createClient(), []);
     const seenAcceptedInviteIdsRef = useRef(new Set());
     const { notify } = useInAppNotifications();
@@ -590,6 +616,44 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 setSharedLogs(prev => { const next = { ...prev }; delete next[fromUid]; return next })
                 setPresence(prev => { const next = { ...prev }; delete next[fromUid]; return next })
             })
+            .on('broadcast', { event: 'chat' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.userId || '').trim()
+                // Show messages from others only (own messages are added optimistically)
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const newMsg: ChatMessage = {
+                    id: String(payload.id || `${fromUid}:${Date.now()}`),
+                    userId: fromUid,
+                    displayName: String(payload.displayName || 'Parceiro'),
+                    photoURL: payload.photoURL ? String(payload.photoURL) : null,
+                    text: String(payload.text || '').slice(0, 200),
+                    ts: Number(payload.ts || Date.now()),
+                }
+                setChatMessages(prev => [...prev, newMsg].slice(-MAX_CHAT_MESSAGES))
+            })
+            .on('broadcast', { event: 'pause' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.userId || '').trim()
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const name = String(payload.displayName || 'Seu parceiro').trim()
+                setSessionPaused(true)
+                try {
+                    notify({ id: `pause:${fromUid}:${Date.now()}`, type: 'team_pause', senderName: name, displayName: name, photoURL: null, text: `${name} pausou o treino.` })
+                } catch { }
+            })
+            .on('broadcast', { event: 'resume' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.userId || '').trim()
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const name = String(payload.displayName || 'Seu parceiro').trim()
+                setSessionPaused(false)
+                try {
+                    notify({ id: `resume:${fromUid}:${Date.now()}`, type: 'team_resume', senderName: name, displayName: name, photoURL: null, text: `${name} retomou o treino! 💪` })
+                } catch { }
+            })
             .subscribe()
         teamBroadcastChannelRef.current = ch
         return () => {
@@ -603,6 +667,47 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         if (!ch || !user?.id) return
         try {
             ch.send({ type: 'broadcast', event: 'log_update', payload: { userId: user.id, exIdx, sIdx, weight, reps, ts: Date.now() } })
+        } catch { }
+    }, [user?.id])
+
+    const sendChatMessage = useCallback((text: string) => {
+        const ch = teamBroadcastChannelRef.current
+        if (!ch || !user?.id) return
+        const trimmed = String(text || '').trim().slice(0, 200)
+        if (!trimmed) return
+        const id = `${user.id}:${Date.now()}`
+        const newMsg: ChatMessage = {
+            id,
+            userId: user.id,
+            displayName: String(myDisplayNameRef.current || 'Eu'),
+            photoURL: myPhotoUrlRef.current,
+            text: trimmed,
+            ts: Date.now(),
+        }
+        // Optimistic add for sender
+        setChatMessages(prev => [...prev, newMsg].slice(-MAX_CHAT_MESSAGES))
+        try {
+            ch.send({ type: 'broadcast', event: 'chat', payload: { ...newMsg } })
+        } catch { }
+    }, [user?.id])
+
+    const pauseSession = useCallback(() => {
+        const ch = teamBroadcastChannelRef.current
+        if (!user?.id) return
+        setSessionPaused(true)
+        if (!ch) return
+        try {
+            ch.send({ type: 'broadcast', event: 'pause', payload: { userId: user.id, displayName: myDisplayNameRef.current || 'Eu', ts: Date.now() } })
+        } catch { }
+    }, [user?.id])
+
+    const resumeSession = useCallback(() => {
+        const ch = teamBroadcastChannelRef.current
+        if (!user?.id) return
+        setSessionPaused(false)
+        if (!ch) return
+        try {
+            ch.send({ type: 'broadcast', event: 'resume', payload: { userId: user.id, displayName: myDisplayNameRef.current || 'Eu', ts: Date.now() } })
         } catch { }
     }, [user?.id])
 
@@ -790,6 +895,12 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
 
             let sessionId = currentTeamSessionId;
             const u = user as unknown as { displayName?: string; photoURL?: string | null };
+
+            // Enforce max participants (5)
+            const currentParticipants = teamSession?.participants ?? [];
+            if (currentParticipants.length >= MAX_TEAM_PARTICIPANTS) {
+                throw new Error(`Sessão cheia. Máximo de ${MAX_TEAM_PARTICIPANTS} participantes.`);
+            }
 
             if (!sessionId) {
                 const { data: session, error } = await supabase
@@ -1021,6 +1132,11 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             refetchInvites,
             sharedLogs,
             broadcastMyLog,
+            chatMessages,
+            sendChatMessage,
+            sessionPaused,
+            pauseSession,
+            resumeSession,
         }}>
             {children}
         </TeamWorkoutContext.Provider>
