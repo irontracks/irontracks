@@ -25,6 +25,7 @@ const MuscleTrend4wPanel = dynamic(() => import('@/components/workout-report/Mus
 const ExerciseTrendPanel = dynamic(() => import('@/components/workout-report/ExerciseTrendPanel').then(m => ({ default: m.ExerciseTrendPanel })), { ssr: false })
 const ReportCheckinPanel = dynamic(() => import('@/components/workout-report/ReportCheckinPanel').then(m => ({ default: m.ReportCheckinPanel })), { ssr: false })
 const ReportAiSection = dynamic(() => import('@/components/workout-report/ReportAiSection').then(m => ({ default: m.ReportAiSection })), { ssr: false })
+const ReportMusclePieChart = dynamic(() => import('@/components/workout-report/ReportMusclePieChart').then(m => ({ default: m.ReportMusclePieChart })), { ssr: false })
 import {
     useReportData,
     remapPrevLogsByCanonical,
@@ -85,9 +86,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         aiState, setAiState,
         applyState, setApplyState,
         sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
+        setsCompleted, setsPlanned, setCompletionPct,
         reportMeta, reportTotals, reportRest, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
-        detectedPrs, prCount,
+        detectedPrs, prCount, allTimePrCount, historicalBestE1rm,
         muscleTrend, muscleTrend4w, exerciseTrend,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
@@ -636,7 +638,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 </div>
 
                 {/* ─── HITEK Highlights Panel ───────────────────────────────────────── */}
-                {(prCount > 0 || (volumeDeltaAbs !== 0 && currentVolume > 0)) && (
+                {(prCount > 0 || (volumeDeltaAbs !== 0 && currentVolume > 0) || setCompletionPct > 0) && (
                     <div className="mb-8 p-4 rounded-2xl border border-yellow-500/25 bg-gradient-to-br from-yellow-500/10 via-amber-500/5 to-neutral-900/80">
                         <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-3">⚡ Destaques da sessão</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -646,17 +648,20 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                     <div className="text-[10px] font-black uppercase tracking-widest text-yellow-300">
                                         {prCount === 1 ? 'PR alcançado' : 'PRs alcançados'}
                                     </div>
+                                    {allTimePrCount > 0 && (
+                                        <div className="text-[10px] text-amber-300 font-black">★ {allTimePrCount} recorde{allTimePrCount > 1 ? 's' : ''} histórico{allTimePrCount > 1 ? 's' : ''}!</div>
+                                    )}
                                     {detectedPrs[0] && (
                                         <div className="text-[10px] text-yellow-200 opacity-80 truncate">
-                                            {detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
+                                            {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
                                         </div>
                                     )}
                                 </div>
                             )}
                             {volumeDeltaAbs !== 0 && currentVolume > 0 && (
                                 <div className={`border rounded-xl p-3 flex flex-col gap-1 ${volumeDeltaAbs > 0
-                                        ? 'bg-green-500/10 border-green-500/30'
-                                        : 'bg-red-500/10 border-red-500/30'
+                                    ? 'bg-green-500/10 border-green-500/30'
+                                    : 'bg-red-500/10 border-red-500/30'
                                     }`}>
                                     <div className={`text-2xl font-black ${volumeDeltaAbs > 0 ? 'text-green-400' : 'text-red-400'}`}>
                                         {volumeDeltaAbs > 0 ? '+' : ''}{volumeDeltaAbs.toLocaleString('pt-BR')} kg
@@ -675,12 +680,16 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                     <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume total</div>
                                 </div>
                             )}
-                            {Number(reportTotals?.densityKgPerMinExec) > 0 && (
-                                <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col gap-1">
-                                    <div className="text-2xl font-black text-blue-300">
-                                        {Number(reportTotals?.densityKgPerMinExec).toFixed(1)}
-                                    </div>
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">kg/min densidade</div>
+                            {setCompletionPct > 0 && (
+                                <div className={`border rounded-xl p-3 flex flex-col gap-1 ${setCompletionPct >= 90 ? 'bg-green-500/10 border-green-500/30' :
+                                    setCompletionPct >= 70 ? 'bg-yellow-500/10 border-yellow-500/30' :
+                                        'bg-red-500/10 border-red-500/30'
+                                    }`}>
+                                    <div className={`text-2xl font-black ${setCompletionPct >= 90 ? 'text-green-400' :
+                                        setCompletionPct >= 70 ? 'text-yellow-400' : 'text-red-400'
+                                        }`}>{setCompletionPct}%</div>
+                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Séries completas</div>
+                                    <div className="text-[10px] text-neutral-500 font-mono">{setsCompleted}/{setsPlanned}</div>
                                 </div>
                             )}
                         </div>
@@ -712,6 +721,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     <ExerciseTrendPanel data={exerciseTrend.data} buildSparklinePoints={buildSparklinePoints} />
                 )}
 
+                {/* ─── Muscle Volume Pie Chart ─────────────────────────────────── */}
+                {muscleTrend.status === 'ready' && muscleTrend.data && (
+                    <ReportMusclePieChart data={muscleTrend.data as Record<string, unknown>} />
+                )}
+
                 {reportMeta && Array.isArray(reportMeta.exercises) && reportMeta.exercises.length > 0 && (
                     <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -737,6 +751,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                         <th className="px-3 py-2 text-right">Δ Volume</th>
                                         <th className="px-3 py-2 text-right">Δ Reps</th>
                                         <th className="px-3 py-2 text-right">Δ Peso</th>
+                                        <th className="px-3 py-2 text-right">Δ 1RM</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-neutral-800">
@@ -775,6 +790,23 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                                                 <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
                                                 <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
                                                 <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-blue-300 text-xs">
+                                                    {(() => {
+                                                        // Compute Δ1RM from historicalBestE1rm if available
+                                                        const key = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
+                                                        const hist = historicalBestE1rm[key]
+                                                        if (!hist || hist <= 0) return '—'
+                                                        // avg weight × (1 + avg reps/30) as rough e1RM for overall exercise
+                                                        const avgW = Number(ex.avgWeightKg || 0)
+                                                        const avgR = Number(ex.repsDone || 0) / Math.max(1, Number(ex.setsDone || 1))
+                                                        const curE1rm = avgW > 0 && avgR > 0 ? avgW * (1 + avgR / 30) : 0
+                                                        if (curE1rm <= 0) return '—'
+                                                        const delta = curE1rm - hist
+                                                        if (!Number.isFinite(delta)) return '—'
+                                                        const cls = delta > 0 ? 'text-green-300' : delta < 0 ? 'text-red-300' : 'text-neutral-500'
+                                                        return <span className={cls}>{delta > 0 ? '+' : ''}{delta.toFixed(1)} kg</span>
+                                                    })()}
+                                                </td>
                                             </tr>
                                         )
                                     })}

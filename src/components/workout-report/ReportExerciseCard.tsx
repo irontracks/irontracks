@@ -175,6 +175,21 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
         return n
     })()
 
+    // Index of best set (highest e1RM) — marked with 💎
+    const bestSetIdx = (() => {
+        let bestIdx = -1
+        let bestVal = 0
+        for (let sIdx = 0; sIdx < setsCount; sIdx++) {
+            const key = `${exIdx}-${sIdx}`
+            const log = sessionLogs[key]
+            if (!log || typeof log !== 'object') continue
+            const { w, r } = parseWR(log as AnyObj)
+            const e1rm = epley1RM(w, r)
+            if (e1rm != null && e1rm > bestVal) { bestVal = e1rm; bestIdx = sIdx }
+        }
+        return bestIdx
+    })()
+
     return (
         <div className="break-inside-avoid">
             <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-800 pb-2">
@@ -229,8 +244,16 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                             <React.Fragment key={`${exIdx}-${sIdx}`}>
                                 <tr className={`border-b border-neutral-800 ${isPr ? 'bg-yellow-500/5' : ''}`}>
                                     <td className="py-2 font-mono text-neutral-400 text-xs">
-                                        #{sIdx + 1}
-                                        {isPr && <span className="ml-1 text-yellow-400">★</span>}
+                                        <div className="flex items-center gap-1">
+                                            #{sIdx + 1}
+                                            {isPr && <span className="text-yellow-400">★</span>}
+                                            {sIdx === bestSetIdx && !isPr && (
+                                                <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1 rounded font-black">Melhor</span>
+                                            )}
+                                            {sIdx === bestSetIdx && isPr && (
+                                                <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1 rounded font-black">Melhor</span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="py-2 text-center font-semibold text-sm">
                                         {logObj.weight != null && String(logObj.weight) !== '' ? `${String(logObj.weight)} kg` : '—'}

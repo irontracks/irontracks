@@ -2,7 +2,7 @@
 import { logWarn } from '@/lib/logger'
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { getMuscleMapWeek, getReportPreviousData } from '@/actions/workout-actions'
+import { getMuscleMapWeek, getReportPreviousData, getHistoricalBestE1rm } from '@/actions/workout-actions'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -253,9 +253,16 @@ export interface UseReportDataReturn {
     volumeDeltaAbs: number
     calories: number
     outdoorBike: AnyObj | null
-    // PR detection (Epley 1RM vs previous session)
-    detectedPrs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number }>
+    // Set completion
+    setsCompleted: number
+    setsPlanned: number
+    setCompletionPct: number
+    // PR detection — vs last session AND vs all-time
+    detectedPrs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number; isAllTimePr: boolean }>
     prCount: number
+    allTimePrCount: number
+    // Historical best e1RM per exercise (all-time)
+    historicalBestE1rm: Record<string, number>
     // Report meta
     reportMeta: AnyObj | null
     reportTotals: AnyObj | null
@@ -301,6 +308,10 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     // ── Per-exercise previous data ─────────────────────────────────────────
     const prevDataFetchRef = useRef(false)
     const [prevByExercise, setPrevByExercise] = useState<{ logsByExercise: Record<string, unknown>; baseMsByExercise: Record<string, unknown> }>({ logsByExercise: {}, baseMsByExercise: {} })
+
+    // ── Historical best e1RM (all-time) ────────────────────────────────────
+    const [historicalBestE1rm, setHistoricalBestE1rm] = useState<Record<string, number>>({})
+    const historicalFetchRef = useRef(false)
 
     // ── Check-ins ──────────────────────────────────────────────────────────
     const [checkinsByKind, setCheckinsByKind] = useState<{ pre: AnyObj | null; post: AnyObj | null }>({ pre: null, post: null })
@@ -444,6 +455,32 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         })()
         return () => { cancelled = true }
     }, [session, previousSession, targetUserId])
+
+    // ── Effect: Historical best e1RM fetch ────────────────────────────────
+    useEffect(() => {
+        let cancelled = false
+        if (!targetUserId || !session || historicalFetchRef.current) return
+        const exercisesArr = Array.isArray(session?.exercises) ? session.exercises as unknown[] : []
+        const exerciseNames = exercisesArr
+            .map((ex: unknown) => String((ex as AnyObj)?.name || '').trim())
+            .filter(Boolean)
+        if (!exerciseNames.length) return
+        historicalFetchRef.current = true;
+        (async () => {
+            try {
+                const result = await getHistoricalBestE1rm({
+                    userId: targetUserId,
+                    currentSessionId: typeof session?.id === 'string' && session.id ? session.id : null,
+                    exerciseNames,
+                })
+                if (cancelled) return
+                setHistoricalBestE1rm(result)
+            } catch { /* silenced */ } finally {
+                historicalFetchRef.current = false
+            }
+        })()
+        return () => { cancelled = true }
+    }, [session, targetUserId])
 
     // ── Effect: Kcal estimate ──────────────────────────────────────────────
     useEffect(() => {
@@ -694,12 +731,42 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         return {}
     })()
 
-    // ── Detect PRs (Epley 1RM per exercise, compared to previous session) ──────
-    // Used by the highlights header to show "N PRs achieved in this workout"
-    const { detectedPrs, prCount } = useMemo(() => {
+    // ── Set completion rate ────────────────────────────────────────────────
+    const { setsCompleted, setsPlanned, setCompletionPct } = useMemo(() => {
         try {
             const exercises = Array.isArray(safeSession?.exercises) ? safeSession.exercises as unknown[] : []
-            const prs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number }> = []
+            let planned = 0
+            let completed = 0
+            exercises.forEach((ex, exIdx) => {
+                const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
+                const setCount = Number(exObj?.sets ?? 0) || 0
+                planned += setCount
+                for (let sIdx = 0; sIdx < setCount; sIdx++) {
+                    const key = `${exIdx}-${sIdx}`
+                    const log = sessionLogs[key]
+                    if (!log || typeof log !== 'object') continue
+                    const obj = log as AnyObj
+                    const w = Number(String(obj?.weight ?? '').replace(',', '.'))
+                    const r = Number(String(obj?.reps ?? '').replace(',', '.'))
+                    if ((w > 0 || r > 0)) completed++
+                }
+            })
+            return {
+                setsCompleted: completed,
+                setsPlanned: planned,
+                setCompletionPct: planned > 0 ? Math.round((completed / planned) * 100) : 0,
+            }
+        } catch {
+            return { setsCompleted: 0, setsPlanned: 0, setCompletionPct: 0 }
+        }
+    }, [safeSession?.exercises, sessionLogs])
+
+    // ── Detect PRs (Epley 1RM per exercise, compared to previous session AND all-time) ──────
+    // Used by the highlights header to show "N PRs achieved in this workout"
+    const { detectedPrs, prCount, allTimePrCount } = useMemo(() => {
+        try {
+            const exercises = Array.isArray(safeSession?.exercises) ? safeSession.exercises as unknown[] : []
+            const prs: Array<{ exerciseName: string; e1rm: number; prevE1rm: number; isAllTimePr: boolean }> = []
 
             exercises.forEach((ex, exIdx) => {
                 const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
@@ -710,9 +777,9 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
                 let bestPrevE1rm = 0
 
                 const setsCount = Number(exObj?.sets ?? 0) || 0
+                const normalizedKey = exName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
                 const prevExLogs = (() => {
-                    const key = exName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
-                    const fromMap = (prevByExercise?.logsByExercise as Record<string, unknown>)?.[key]
+                    const fromMap = (prevByExercise?.logsByExercise as Record<string, unknown>)?.[normalizedKey]
                     return Array.isArray(fromMap) ? fromMap : []
                 })()
 
@@ -737,15 +804,22 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
                 }
 
                 if (bestCurE1rm > 0 && bestCurE1rm > bestPrevE1rm) {
-                    prs.push({ exerciseName: exName, e1rm: bestCurE1rm, prevE1rm: bestPrevE1rm })
+                    // Check if also an all-time PR
+                    const allTimeBest = historicalBestE1rm[normalizedKey] ?? 0
+                    const isAllTimePr = bestCurE1rm > allTimeBest
+                    prs.push({ exerciseName: exName, e1rm: bestCurE1rm, prevE1rm: bestPrevE1rm, isAllTimePr })
                 }
             })
 
-            return { detectedPrs: prs, prCount: prs.length }
+            return {
+                detectedPrs: prs,
+                prCount: prs.length,
+                allTimePrCount: prs.filter(p => p.isAllTimePr).length,
+            }
         } catch {
-            return { detectedPrs: [], prCount: 0 }
+            return { detectedPrs: [], prCount: 0, allTimePrCount: 0 }
         }
-    }, [safeSession?.exercises, sessionLogs, prevByExercise?.logsByExercise])
+    }, [safeSession?.exercises, sessionLogs, prevByExercise?.logsByExercise, historicalBestE1rm])
 
     // Absolute volume delta vs previous session (kg)
     const volumeDeltaAbs = prevVolume > 0 ? Math.round(currentVolume - prevVolume) : 0
@@ -760,9 +834,10 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
         aiState, setAiState,
         applyState, setApplyState,
         sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
+        setsCompleted, setsPlanned, setCompletionPct,
         reportMeta, reportTotals, reportRest, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
-        detectedPrs, prCount,
+        detectedPrs, prCount, allTimePrCount, historicalBestE1rm,
         muscleTrend, muscleTrend4w, exerciseTrend,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
