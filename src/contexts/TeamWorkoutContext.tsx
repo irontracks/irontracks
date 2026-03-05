@@ -124,6 +124,20 @@ interface TeamWorkoutContextValue {
     sessionPaused: boolean
     pauseSession: () => void
     resumeSession: () => void
+    // ─ Set Challenge ─────────────────────────────────────────────────────
+    pendingChallenge: SetChallengePayload | null
+    sendSetChallenge: (exName: string, weight: number, reps: number) => void
+    dismissChallenge: () => void
+}
+
+export interface SetChallengePayload {
+    id: string
+    fromUserId: string
+    fromName: string
+    exName: string
+    weight: number
+    reps: number
+    ts: number
 }
 
 interface TeamWorkoutProviderProps {
@@ -157,6 +171,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
     // Pause state
     const [sessionPaused, setSessionPaused] = useState(false)
+    // Set challenge
+    const [pendingChallenge, setPendingChallenge] = useState<SetChallengePayload | null>(null)
     const myDisplayNameRef = useRef<string>('')
     const myPhotoUrlRef = useRef<string | null>(null)
     const supabase = useMemo(() => createClient(), []);
@@ -655,6 +671,25 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     notify({ id: `resume:${fromUid}:${Date.now()}`, type: 'team_resume', senderName: name, displayName: name, photoURL: null, text: `${name} retomou o treino! 💪` })
                 } catch { }
             })
+            .on('broadcast', { event: 'set_challenge' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.fromUserId || '').trim()
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const challenge: SetChallengePayload = {
+                    id: String(payload.id || `${fromUid}:${Date.now()}`),
+                    fromUserId: fromUid,
+                    fromName: String(payload.fromName || 'Parceiro'),
+                    exName: String(payload.exName || ''),
+                    weight: Number(payload.weight ?? 0),
+                    reps: Number(payload.reps ?? 0),
+                    ts: Number(payload.ts || Date.now()),
+                }
+                setPendingChallenge(challenge)
+                try {
+                    notify({ id: `challenge:${fromUid}:${Date.now()}`, type: 'team_challenge', senderName: challenge.fromName, displayName: challenge.fromName, photoURL: null, text: `${challenge.fromName} te desafiou no ${challenge.exName || 'treino'}! 🔥` })
+                } catch { }
+            })
             .subscribe()
         teamBroadcastChannelRef.current = ch
         return () => {
@@ -670,6 +705,26 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             ch.send({ type: 'broadcast', event: 'log_update', payload: { userId: user.id, exIdx, sIdx, weight, reps, ts: Date.now() } })
         } catch { }
     }, [user?.id])
+
+    const sendSetChallenge = useCallback((exName: string, weight: number, reps: number) => {
+        const ch = teamBroadcastChannelRef.current
+        if (!ch || !user?.id) return
+        const id = `${user.id}:${Date.now()}`
+        const payload: SetChallengePayload = {
+            id,
+            fromUserId: user.id,
+            fromName: myDisplayNameRef.current || 'Parceiro',
+            exName,
+            weight,
+            reps,
+            ts: Date.now(),
+        }
+        try {
+            ch.send({ type: 'broadcast', event: 'set_challenge', payload })
+        } catch { }
+    }, [user?.id])
+
+    const dismissChallenge = useCallback(() => setPendingChallenge(null), [])
 
     const sendMultipleInvitesImpl = async (targets: unknown[], workout: Record<string, unknown>, _sendInvite: typeof sendInvite): Promise<Array<{ userId: string; ok: boolean; error?: string }>> => {
         const targetList = Array.isArray(targets) ? targets : []
@@ -1166,6 +1221,9 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             pauseSession,
             resumeSession,
             sendMultipleInvites,
+            pendingChallenge,
+            sendSetChallenge,
+            dismissChallenge,
         }}>
             {children}
         </TeamWorkoutContext.Provider>
