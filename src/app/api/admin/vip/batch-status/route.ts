@@ -52,8 +52,6 @@ export async function POST(req: Request) {
             .select('user_id, plan_id, status, provider, valid_until')
             .in('user_id', user_ids)
             .in('status', ['active', 'trialing', 'past_due'])
-            .lte('valid_from', nowIso)
-            .or(`valid_until.is.null,valid_until.gte.${nowIso}`)
             .order('valid_until', { ascending: false, nullsFirst: true })
 
         // Build entitlement map (first match per user = best)

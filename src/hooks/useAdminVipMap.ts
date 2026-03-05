@@ -1,9 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import type { VipBatchEntry, VipBatchResult } from '@/app/api/admin/vip/batch-status/route'
+import { useState, useEffect, useRef, useMemo } from 'react'
 
-export type { VipBatchEntry, VipBatchResult }
+export type VipBatchEntry = {
+    tier: string
+    plan_id: string | null
+    valid_until: string | null
+    source: string
+    status: string | null
+}
+
+export type VipBatchResult = Record<string, VipBatchEntry>
 
 const TIER_LABELS: Record<string, string> = {
     vip_start: 'START',
@@ -23,17 +30,20 @@ export const getVipColors = (tier: string) => TIER_COLORS[tier] || null
 export function useAdminVipMap(userIds: string[]) {
     const [vipMap, setVipMap] = useState<VipBatchResult>({})
     const [loading, setLoading] = useState(false)
-    const prevIdsRef = useRef('')
+    const prevKeyRef = useRef('')
+
+    // Stabilize array reference — only recalculate on actual content change
+    const stableKey = useMemo(() => {
+        const ids = userIds.filter(Boolean)
+        return ids.length > 0 ? [...ids].sort().join(',') : ''
+    }, [userIds])
 
     useEffect(() => {
-        const ids = userIds.filter(Boolean)
-        if (ids.length === 0) return
+        if (!stableKey) return
+        if (stableKey === prevKeyRef.current) return
+        prevKeyRef.current = stableKey
 
-        // Prevent re-fetching for same set of IDs
-        const key = ids.sort().join(',')
-        if (key === prevIdsRef.current) return
-        prevIdsRef.current = key
-
+        const ids = stableKey.split(',')
         let cancelled = false
         setLoading(true)
 
@@ -55,7 +65,7 @@ export function useAdminVipMap(userIds: string[]) {
             .finally(() => { if (!cancelled) setLoading(false) })
 
         return () => { cancelled = true }
-    }, [userIds])
+    }, [stableKey])
 
-    return { vipMap, loading, refresh: () => { prevIdsRef.current = ''; setVipMap({}) } }
+    return { vipMap, loading, refresh: () => { prevKeyRef.current = ''; setVipMap({}) } }
 }
