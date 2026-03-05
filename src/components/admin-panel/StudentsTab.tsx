@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, UserPlus, Trash2, Activity, User } from 'lucide-react';
+import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 
@@ -40,6 +40,9 @@ export const StudentsTab: React.FC = () => {
         setSelectedStudent,
         setHistoryOpen,
         user,
+        // Bug 1 fix: pending self-registered users
+        pendingProfiles,
+        approvePendingProfile,
     } = useAdminPanel();
 
     // Live counts for filter pills
@@ -104,13 +107,14 @@ export const StudentsTab: React.FC = () => {
                     </select>
                 )}
 
-                {/* Teacher select */}
+                {/* Teacher select — value uses t.user_id (profiles.id) to match students.teacher_id FK */}
                 {isAdmin && (
                     <select
                         className="flex-1 min-w-[140px] bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-xs text-neutral-300 focus:border-yellow-500 outline-none"
                         value={s.teacher_id || ''}
                         onChange={(e) => {
                             e.stopPropagation();
+                            // Pass user_id (profiles.id), not t.id (teachers table PK)
                             handleUpdateStudentTeacher(s.id, e.target.value || null);
                         }}
                         title="Atribuir professor"
@@ -118,7 +122,14 @@ export const StudentsTab: React.FC = () => {
                     >
                         <option value="">Sem professor</option>
                         {teachersList.map((t) => (
-                            <option key={t.id} value={t.id}>{t.name}</option>
+                            <option
+                                key={t.id}
+                                value={String(t.user_id || '')}
+                                disabled={!t.user_id}
+                            >
+                                {t.name || t.email || String(t.id).slice(0, 8)}
+                                {!t.user_id ? ' (sem conta)' : ''}
+                            </option>
                         ))}
                     </select>
                 )}
@@ -202,9 +213,51 @@ export const StudentsTab: React.FC = () => {
                 </div>
             </div>
 
+            {/* Solicitações de Cadastro — novos membros que se auto-cadastraram via app */}
+            {isAdmin && Array.isArray(pendingProfiles) && pendingProfiles.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                        <ClipboardList size={16} className="text-yellow-500" />
+                        <h3 className="text-sm font-black text-yellow-500 uppercase tracking-widest">
+                            Solicitações de Cadastro
+                        </h3>
+                        <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[10px] rounded-full font-black bg-yellow-500 text-black">
+                            {pendingProfiles.length}
+                        </span>
+                    </div>
+                    <div className="grid gap-3">
+                        {pendingProfiles.map((p) => {
+                            const uid = String(p.user_id || p.id || '');
+                            return (
+                                <div
+                                    key={uid}
+                                    className="flex items-center gap-3 p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl"
+                                >
+                                    <div className="w-10 h-10 flex-shrink-0 rounded-full bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center font-black text-yellow-500">
+                                        {(String(p.name || p.email || '?').charAt(0)).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="font-bold text-white truncate">{String(p.name || p.email || 'Novo membro')}</div>
+                                        <div className="text-xs text-neutral-400 truncate">{String(p.email || '')}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => approvePendingProfile(p)}
+                                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-2 bg-yellow-500 hover:bg-yellow-400 text-black rounded-lg text-xs font-black transition-all active:scale-95"
+                                        title="Aprovar membro"
+                                    >
+                                        <UserCheck size={14} />
+                                        Aprovar
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+
             {/* Lists */}
             <div className="space-y-8">
-                {/* Com Professor */}
                 {(isTeacher || (isAdmin && studentsWithTeacherFiltered.length > 0)) && (
                     <div className="space-y-4">
                         <h3 className="text-sm font-black text-neutral-500 uppercase tracking-widest px-1">

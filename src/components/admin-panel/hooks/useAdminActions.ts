@@ -122,15 +122,25 @@ export function useAdminActions({
         }
     };
 
-    const handleUpdateStudentTeacher = async (studentId: string, teacherId: string | null) => {
+    const handleUpdateStudentTeacher = async (studentId: string, teacherUserId: string | null) => {
         try {
-            const { error } = await supabase
-                .from('students')
-                .update({ teacher_id: teacherId })
-                .eq('id', studentId);
-            if (error) throw error;
+            // Route through the API which validates teacher_user_id against profiles before
+            // updating students.teacher_id, avoiding the students_teacher_id_fkey FK violation
+            // that occurred when passing teachers.id (PK) instead of teachers.user_id (profiles FK).
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch('/api/admin/students/assign-teacher', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
+                body: JSON.stringify({
+                    student_id: studentId,
+                    teacher_user_id: teacherUserId || null,
+                }),
+            });
+            const json = await res.json().catch(() => ({})) as Record<string, unknown>;
+            if (!json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
+            const nextTid = (json.teacher_user_id as string | null) ?? teacherUserId ?? null;
             setUsersList((prev) =>
-                prev.map((u) => (u.id === studentId ? { ...u, teacher_id: teacherId } : u))
+                prev.map((u) => (u.id === studentId ? { ...u, teacher_id: nextTid } : u))
             );
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);

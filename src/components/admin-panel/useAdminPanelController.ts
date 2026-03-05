@@ -111,6 +111,9 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     const [studentCheckinsRange, setStudentCheckinsRange] = useState<string>('7d');
     const [studentCheckinsFilter, setStudentCheckinsFilter] = useState<string>('all');
     const loadedStudentInfo = useRef<Set<string>>(new Set<string>());
+    // Bug 1 fix: state for self-registered users awaiting approval
+    const [pendingProfiles, setPendingProfiles] = useState<UnknownRecord[]>([]);
+
 
     // Execution Videos
     const [executionVideos, setExecutionVideos] = useState<ExecutionVideo[]>([]);
@@ -623,7 +626,14 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                 if (isAdmin) {
                     await getAdminAuthHeaders();
                     const json = await adminFetchJson(supabase, '/api/admin/students/list') as UnknownRecord;
-                    if (json?.ok) list = (json.students as UnknownRecord[]) || [];
+                    if (json?.ok) {
+                        list = (json.students as UnknownRecord[]) || [];
+                        // Bug 1 fix: populate pending self-registered users
+                        const pp = Array.isArray((json as UnknownRecord).pending_profiles)
+                            ? ((json as UnknownRecord).pending_profiles as UnknownRecord[])
+                            : [];
+                        setPendingProfiles(pp);
+                    }
 
                     const legacyJson = await adminFetchJson(supabase, '/api/admin/legacy-students') as UnknownRecord;
                     if (legacyJson?.ok && legacyJson.students) {
@@ -1320,6 +1330,38 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         if (selectedStudent) setSelectedTeacher(null);
     }, [selectedStudent, setSelectedTeacher]);
 
+    // Bug 1 fix: approve a self-registered user → insert into students table
+    const approvePendingProfile = useCallback(async (profile: UnknownRecord) => {
+        try {
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch('/api/admin/students/assign-teacher', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
+                body: JSON.stringify({
+                    student_id: String(profile.user_id || ''),
+                    email: String(profile.email || ''),
+                    teacher_user_id: null,
+                }),
+            });
+            const json = await res.json().catch(() => ({})) as Record<string, unknown>;
+            if (!json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
+            const newStudent: UnknownRecord = {
+                id: json.student_id || profile.user_id,
+                user_id: String(profile.user_id || ''),
+                name: profile.name || null,
+                email: profile.email || null,
+                teacher_id: null,
+                status: 'pendente',
+                workouts: [],
+            };
+            setUsersList(prev => [...prev, newStudent as unknown as AdminUser]);
+            setPendingProfiles(prev => prev.filter(p => p.user_id !== profile.user_id));
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
+            await alert('Erro ao aprovar membro: ' + msg);
+        }
+    }, [alert, getAdminAuthHeaders, setUsersList, setPendingProfiles]);
+
     return {
         user,
         isAdmin,
@@ -1471,8 +1513,6 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         templatesFiltered,
         dashboardCharts,
         coachInboxItems,
-
-        // Actions
         handleRegisterStudent,
         handleAddTeacher,
         handleUpdateTeacher,
@@ -1527,5 +1567,8 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         handleSaveTemplate,
         handleDangerAction,
         runDangerAction,
+        // Bug 1 fix: pending self-registered users
+        pendingProfiles, setPendingProfiles,
+        approvePendingProfile,
     };
 };

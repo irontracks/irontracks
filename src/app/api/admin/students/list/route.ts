@@ -78,7 +78,41 @@ export async function GET(req: Request) {
       return true
     })
 
-    const payload = { ok: true, students: filtered }
+    // Bug 1 fix: also find profiles that self-registered (have no linked student row)
+    // These show up as pending "Solicitações de Cadastro" in the admin panel.
+    const existingEmails = new Set(filtered.map(s => (s.email || '').toLowerCase()).filter(Boolean))
+    const existingUserIds = new Set(filtered.map(s => s.user_id).filter(Boolean))
+
+    const { data: allProfiles } = await admin
+      .from('profiles')
+      .select('id, display_name, email, photo_url, role')
+      .not('role', 'eq', 'teacher')
+      .order('display_name')
+
+    const pendingProfiles = (allProfiles || [])
+      .filter(p => {
+        if (!p.id) return false
+        // skip teachers
+        if (teacherEmails.has((p.email || '').toLowerCase())) return false
+        if (teacherIds.has(p.id)) return false
+        // skip those already linked to a student row
+        if (p.email && existingEmails.has(p.email.toLowerCase())) return false
+        if (existingUserIds.has(p.id)) return false
+        return true
+      })
+      .map(p => ({
+        id: `pending_${p.id}`,
+        user_id: p.id,
+        name: p.display_name || null,
+        email: p.email || null,
+        teacher_id: null as string | null,
+        status: 'pendente',
+        photo_url: p.photo_url || null,
+        is_pending: true,
+        workouts: [],
+      }))
+
+    const payload = { ok: true, students: filtered, pending_profiles: pendingProfiles }
     await cacheSet(cacheKey, payload, 30)
     return NextResponse.json(payload)
   } catch (e: unknown) {
@@ -86,3 +120,4 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
   }
 }
+
