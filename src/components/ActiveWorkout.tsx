@@ -11,15 +11,30 @@ import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import dynamic from 'next/dynamic';
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 
 const TeamProgressPanel = dynamic(
   () => import('@/components/TeamProgressPanel').then(m => ({ default: m.TeamProgressPanel })),
+  { ssr: false }
+);
+const TeamChatDrawer = dynamic(
+  () => import('@/components/TeamChatDrawer').then(m => ({ default: m.TeamChatDrawer })),
   { ssr: false }
 );
 
 export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
   const { session, workout, exercises } = controller;
+
+  // Team context for chat and pause banner
+  const teamCtx = useTeamWorkout() as unknown as {
+    teamSession: { id: string } | null
+    sessionPaused: boolean
+    pauseSession: () => void
+    resumeSession: () => void
+    chatMessages: unknown[]
+    sendChatMessage: (text: string) => void
+  }
 
   const finishPayload = React.useMemo(() => {
     if (!session || !workout) return null;
@@ -50,18 +65,40 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     );
   }
 
-  // exercises typed for TeamProgressPanel
   const panelExercises = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
+  const inTeamSession = !!teamCtx.teamSession?.id;
 
   return (
     <WorkoutProvider value={controller}>
       <div className="fixed inset-0 z-[50] overflow-y-auto bg-neutral-900 text-white flex flex-col">
         <WorkoutHeader />
+
+        {/* Pause banner — shown when a partner paused the session */}
+        {inTeamSession && teamCtx.sessionPaused && (
+          <div className="bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 flex items-center justify-between text-sm">
+            <span className="text-yellow-300 font-bold">⏸ Parceiro pausou o treino</span>
+            <button
+              onClick={() => teamCtx.resumeSession()}
+              className="text-[11px] font-black bg-yellow-500 text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors"
+            >
+              Retomar
+            </button>
+          </div>
+        )}
+
         <ExerciseList />
         <WorkoutFooter />
         <Modals />
-        {/* Live team progress panel — auto-renders when in a team session */}
+
+        {/* Team panels */}
         <TeamProgressPanel exercises={panelExercises} />
+        {inTeamSession && (
+          <TeamChatDrawer
+            myUserId={String(props.settings?.userId ?? props.session?.userId ?? '')}
+            myDisplayName={String(props.settings?.displayName ?? '')}
+            myPhotoURL={null}
+          />
+        )}
       </div>
     </WorkoutProvider>
   );
