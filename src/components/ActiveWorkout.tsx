@@ -10,10 +10,16 @@ import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
+import dynamic from 'next/dynamic';
+
+const TeamProgressPanel = dynamic(
+  () => import('@/components/TeamProgressPanel').then(m => ({ default: m.TeamProgressPanel })),
+  { ssr: false }
+);
 
 export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
-  const { session, workout } = controller;
+  const { session, workout, exercises } = controller;
 
   const finishPayload = React.useMemo(() => {
     if (!session || !workout) return null;
@@ -44,6 +50,9 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     );
   }
 
+  // exercises typed for TeamProgressPanel
+  const panelExercises = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
+
   return (
     <WorkoutProvider value={controller}>
       <div className="fixed inset-0 z-[50] overflow-y-auto bg-neutral-900 text-white flex flex-col">
@@ -51,6 +60,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
         <ExerciseList />
         <WorkoutFooter />
         <Modals />
+        {/* Live team progress panel — auto-renders when in a team session */}
+        <TeamProgressPanel exercises={panelExercises} />
       </div>
     </WorkoutProvider>
   );
