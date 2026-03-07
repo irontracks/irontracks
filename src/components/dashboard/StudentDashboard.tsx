@@ -1,0 +1,1052 @@
+'use client'
+
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+
+import { Plus, Dumbbell, Play, Share2, Pencil, Trash2, Loader2, Activity, CalendarDays, Sparkles, X, Save, Undo2, Crown } from 'lucide-react'
+import { Reorder, useDragControls } from 'framer-motion'
+import { createClient } from '@/utils/supabase/client'
+import { z } from 'zod'
+import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database'
+import { AdvancedConfig } from '@/types/app'
+import { StoriesBarSkeleton, MuscleMapSkeleton, SectionSkeleton } from '@/components/ui/SuspenseFallbacks'
+
+// Lazy-loaded dashboard sections for granular Suspense
+const BadgesGallery = React.lazy(() => import('./BadgesGallery'))
+const RecentAchievements = React.lazy(() => import('./RecentAchievements'))
+const StoriesBar = React.lazy(() => import('./StoriesBar'))
+const MuscleMapCard = React.lazy(() => import('./MuscleMapCard'))
+
+import WorkoutCalendarModal from './WorkoutCalendarModal'
+import { ProfileIncompleteBanner } from './ProfileIncompleteBanner'
+import { DashboardTabs } from './DashboardTabs'
+import { CheckinsModal } from './CheckinsModal'
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
+import { getErrorMessage } from '@/utils/errorMessage'
+import { SortableWorkoutItem } from './SortableWorkoutItem'
+import { WorkoutToolsPanel } from './WorkoutToolsPanel'
+
+type UnknownRecord = Record<string, unknown>
+
+const isPlainRecord = (v: unknown): v is UnknownRecord => v !== null && typeof v === 'object' && !Array.isArray(v)
+
+const toNumberOrNull = (v: unknown): number | null => {
+  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+const toIntOrZero = (v: unknown): number => {
+  const n = toNumberOrNull(v)
+  return n == null ? 0 : Math.max(0, Math.floor(n))
+}
+
+const PeriodizationActiveWorkoutSchema = z.object({
+  workout_id: z.string(),
+  exercise_count: z.number().nullable().optional(),
+})
+
+const PeriodizationActiveResponseSchema = z
+  .object({
+    ok: z.boolean().optional(),
+    error: z.unknown().optional(),
+    workouts: z.array(PeriodizationActiveWorkoutSchema).optional(),
+    program: z.object({ id: z.unknown().optional() }).optional(),
+  })
+  .passthrough()
+
+const WorkoutListRowSchema = z
+  .object({
+    id: WorkoutRowSchema.shape.id,
+    user_id: WorkoutRowSchema.shape.user_id,
+    created_by: z.string().uuid().nullable().optional(),
+    name: WorkoutRowSchema.shape.name,
+    notes: WorkoutRowSchema.shape.notes,
+    archived_at: z.string().nullable().optional(),
+    sort_order: z.number().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+  })
+  .passthrough()
+
+const WorkoutSetRowSchema = z
+  .object({
+    id: SetRowSchema.shape.id,
+    set_number: SetRowSchema.shape.set_number,
+    weight: SetRowSchema.shape.weight,
+    reps: SetRowSchema.shape.reps,
+    rpe: SetRowSchema.shape.rpe,
+    completed: SetRowSchema.shape.completed,
+    is_warmup: SetRowSchema.shape.is_warmup,
+    advanced_config: SetRowSchema.shape.advanced_config,
+  })
+  .passthrough()
+
+const WorkoutExerciseRowSchema = z
+  .object({
+    id: ExerciseRowSchema.shape.id,
+    name: ExerciseRowSchema.shape.name,
+    notes: ExerciseRowSchema.shape.notes,
+    video_url: ExerciseRowSchema.shape.video_url,
+    rest_time: ExerciseRowSchema.shape.rest_time,
+    cadence: ExerciseRowSchema.shape.cadence,
+    method: ExerciseRowSchema.shape.method,
+    order: ExerciseRowSchema.shape.order,
+    sets: z.array(WorkoutSetRowSchema).optional(),
+  })
+  .passthrough()
+
+const WorkoutFullRowSchema = z
+  .object({
+    id: WorkoutRowSchema.shape.id,
+    user_id: WorkoutRowSchema.shape.user_id,
+    created_by: z.string().uuid().nullable().optional(),
+    name: WorkoutRowSchema.shape.name,
+    notes: WorkoutRowSchema.shape.notes,
+    archived_at: z.string().nullable().optional(),
+    sort_order: z.number().nullable().optional(),
+    created_at: z.string().nullable().optional(),
+    exercises: z.array(WorkoutExerciseRowSchema).optional(),
+  })
+  .passthrough()
+
+
+
+export type DashboardWorkout = {
+  id?: string
+  user_id?: string | null
+  created_by?: string | null
+  name?: string
+  title?: string
+  notes?: string | null
+  exercises?: DashboardExercise[]
+  exercises_count?: number | null
+  archived_at?: string | null
+  sort_order?: number
+  created_at?: string | null
+}
+
+export type DashboardSetDetail = {
+  set_number: number
+  reps: string | null
+  rpe: number | null
+  weight: number | null
+  isWarmup: boolean
+  advancedConfig: AdvancedConfig | AdvancedConfig[] | null
+}
+
+export type DashboardExercise = {
+  id: string
+  name: string
+  notes: string | null
+  videoUrl: string | null
+  restTime: number | null
+  cadence: string | null
+  method: string | null
+  sets: number
+  reps: string
+  rpe: number
+  setDetails?: DashboardSetDetail[]
+}
+
+type WorkoutCheckinRow = {
+  id?: string
+  kind?: string
+  created_at?: string | null
+  energy?: number | string | null
+  mood?: number | string | null
+  soreness?: number | string | null
+  notes?: string | null
+  answers?: UnknownRecord | null
+  workout_id?: string | null
+  planned_workout_id?: string | null
+}
+
+type MaybePromise<T> = T | Promise<T>
+
+type Props = {
+  workouts: DashboardWorkout[]
+  profileIncomplete: boolean
+  onOpenCompleteProfile: () => void
+  view: 'dashboard' | 'assessments' | 'community' | 'vip'
+  onChangeView: (next: 'dashboard' | 'assessments' | 'community' | 'vip') => void
+  assessmentsContent?: React.ReactNode
+  communityContent?: React.ReactNode
+  vipContent?: React.ReactNode
+  vipLabel?: string
+  vipLocked?: boolean
+  vipEnabled?: boolean
+  settings?: {
+    dashboardDensity?: 'compact' | 'comfortable'
+    uiMode?: string
+    moduleSocial?: boolean
+    moduleCommunity?: boolean
+    moduleMarketplace?: boolean
+    showStoriesBar?: boolean
+    showNewRecordsCard?: boolean
+    showIronRank?: boolean
+    showBadges?: boolean
+  } | null
+  onCreateWorkout: () => MaybePromise<void>
+  onQuickView: (w: DashboardWorkout) => void
+  onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
+  onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
+  onShareWorkout: (w: DashboardWorkout) => MaybePromise<void>
+  onEditWorkout: (w: DashboardWorkout) => MaybePromise<void>
+  onDeleteWorkout: (id?: string, title?: string) => MaybePromise<void>
+  onBulkEditWorkouts?: (items: { id: string; title: string; sort_order: number }[]) => MaybePromise<void>
+  currentUserId?: string
+  newRecordsReloadKey?: number
+  exportingAll?: boolean
+  onExportAll: () => MaybePromise<void>
+  onOpenJsonImport: () => void
+  onNormalizeExercises?: () => MaybePromise<void>
+  onNormalizeAiWorkoutTitles?: () => MaybePromise<void>
+  onApplyTitleRule?: () => MaybePromise<void>
+  onOpenIronScanner: () => void
+  streakStats?: {
+    currentStreak: number
+    bestStreak: number
+    totalWorkouts: number
+    totalVolumeKg: number
+    badges: { id: string; label: string; kind: string }[]
+  } | null
+  streakLoading?: boolean
+}
+
+const isPeriodizedWorkout = (w: DashboardWorkout) =>
+  String(w?.title || w?.name || '').trim().startsWith('VIP •')
+
+export default function StudentDashboard(props: Props) {
+  const supabase = useMemo(() => createClient(), [])
+  const workouts = Array.isArray(props.workouts) ? props.workouts : []
+  const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [workoutsTab, setWorkoutsTab] = useState<'normal' | 'periodized'>('normal')
+  const [periodizedLoading, setPeriodizedLoading] = useState(false)
+  const [periodizedLoaded, setPeriodizedLoaded] = useState(false)
+  const [periodizedWorkouts, setPeriodizedWorkouts] = useState<DashboardWorkout[]>([])
+  const [periodizedError, setPeriodizedError] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [checkinsOpen, setCheckinsOpen] = useState(false)
+  const [checkinsLoading, setCheckinsLoading] = useState(false)
+  const [checkinsRows, setCheckinsRows] = useState<WorkoutCheckinRow[]>([])
+  const [checkinsFilter, setCheckinsFilter] = useState<'all' | 'pre' | 'post'>('all')
+  const [checkinsRange, setCheckinsRange] = useState<'7d' | '30d'>('7d')
+  const [creatingWorkout, setCreatingWorkout] = useState(false)
+  const [normalizingAiTitles, setNormalizingAiTitles] = useState(false)
+  const [normalizingExercises, setNormalizingExercises] = useState(false)
+  const [applyingTitleRule, setApplyingTitleRule] = useState(false)
+  const [editListOpen, setEditListOpen] = useState(false)
+  const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
+  const [savingListEdits, setSavingListEdits] = useState(false)
+  const [pendingAction, setPendingAction] = useState<
+    | {
+      workoutKey: string
+      type: 'open' | 'start' | 'restore' | 'share' | 'duplicate' | 'edit' | 'delete'
+    }
+    | null
+  >(null)
+  const TABS_BAR_MIN_HEIGHT_PX = 60
+  const CREATE_WORKOUT_LOADING_TIMEOUT_MS = 900
+  const isMountedRef = useRef(true)
+  const showNewRecordsCard = props.settings?.showNewRecordsCard !== false
+  const showIronRank = props.settings?.showIronRank !== false
+  const showBadges = props.settings?.showBadges !== false
+  const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
+  const workoutsForTab = useMemo(
+    () =>
+      workoutsTab === 'periodized'
+        ? (periodizedLoaded ? periodizedWorkouts : workouts.filter(isPeriodizedWorkout))
+        : workouts.filter((w) => !isPeriodizedWorkout(w)),
+    [workoutsTab, periodizedLoaded, periodizedWorkouts, workouts],
+  )
+  const archivedCount = useMemo(
+    () => workoutsForTab.reduce((acc, w) => (w?.archived_at ? acc + 1 : acc), 0),
+    [workoutsForTab],
+  )
+  const visibleWorkouts = useMemo(
+    () => (showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archived_at)),
+    [showArchived, workoutsForTab],
+  )
+
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (props.view !== 'dashboard') return
+    if (workoutsTab !== 'periodized') return
+    setPeriodizedLoaded(false)
+    setPeriodizedWorkouts([])
+    setPeriodizedError('')
+  }, [props.view, workoutsTab])
+
+  useEffect(() => {
+    if (workoutsTab !== 'periodized') return
+    if (periodizedLoaded) return
+    if (periodizedLoading) return
+    let cancelled = false
+    setPeriodizedLoading(true)
+    setPeriodizedError('')
+      ; (async () => {
+        try {
+          const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
+          const jsonUnknown: unknown = await res.json().catch(() => null)
+          const jsonParsed = PeriodizationActiveResponseSchema.safeParse(jsonUnknown)
+          const json = jsonParsed.success ? jsonParsed.data : null
+          if (cancelled) return
+          if (!json?.ok) {
+            const msg = json?.error != null ? String(json.error) : 'Falha ao carregar periodização.'
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError(msg)
+            return
+          }
+          const rows = Array.isArray(json?.workouts) ? json.workouts : []
+          const ids = rows.map((r) => String(r?.workout_id || '').trim()).filter(Boolean)
+          const countById = new Map<string, number>()
+          rows.forEach((r) => {
+            const id = String(r?.workout_id || '').trim()
+            const n = Number(r?.exercise_count)
+            if (!id) return
+            if (!Number.isFinite(n)) return
+            countById.set(id, Math.max(0, Math.floor(n)))
+          })
+          if (ids.length === 0) {
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError(json?.program?.id ? 'Programa encontrado, mas sem treinos vinculados.' : '')
+            return
+          }
+
+          const { data, error } = await supabase
+            .from('workouts')
+            .select(
+              `
+            id,
+            user_id,
+            created_by,
+            name,
+            notes,
+            archived_at,
+            sort_order,
+            created_at
+          `,
+            )
+            .in('id', ids)
+            .limit(ids.length)
+
+          if (cancelled) return
+          if (error) {
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError(String(getErrorMessage(error) || 'Falha ao carregar treinos periodizados.'))
+            return
+          }
+
+          const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
+          const mapped = (Array.isArray(data) ? data : [])
+            .filter((w) => isRecord(w))
+            .map((w): DashboardWorkout | null => {
+              const parsed = WorkoutListRowSchema.safeParse(w)
+              if (!parsed.success) return null
+              const workout = parsed.data
+              const wid = String(workout.id || '').trim()
+              return {
+                id: workout.id ?? undefined,
+                title: String(workout.name ?? ''),
+                notes: workout.notes,
+                exercises: [],
+                exercises_count: wid ? (countById.get(wid) ?? null) : null,
+                user_id: workout.user_id,
+                created_by: workout.created_by ?? null,
+                archived_at: workout.archived_at ?? null,
+                sort_order: workout.sort_order == null ? 0 : toIntOrZero(workout.sort_order),
+                created_at: workout.created_at ?? null,
+              } satisfies DashboardWorkout
+            })
+            .filter((w): w is DashboardWorkout => Boolean(w))
+
+          const byId = new Map<string, DashboardWorkout>()
+          mapped.forEach((w: DashboardWorkout) => {
+            const id = String(w?.id || '').trim()
+            if (id) byId.set(id, w)
+          })
+          const ordered = ids.map((id: string) => byId.get(id)).filter(Boolean) as DashboardWorkout[]
+          setPeriodizedWorkouts(ordered)
+          setPeriodizedLoaded(true)
+        } catch {
+          if (!cancelled) {
+            setPeriodizedWorkouts([])
+            setPeriodizedLoaded(true)
+            setPeriodizedError('Falha ao carregar treinos periodizados.')
+          }
+        } finally {
+          if (!cancelled) setPeriodizedLoading(false)
+        }
+      })()
+    return () => {
+      cancelled = true
+    }
+  }, [periodizedLoaded, periodizedLoading, supabase, workoutsTab])
+
+  const safeSetPendingAction = (next: typeof pendingAction) => {
+    if (!isMountedRef.current) return
+    setPendingAction(next)
+  }
+
+  const getWorkoutKey = (w: DashboardWorkout, idx: number) => String(w?.id ?? idx)
+  const isWorkoutBusy = (workoutKey: string) => pendingAction?.workoutKey === workoutKey
+  const isActionBusy = (workoutKey: string, type: NonNullable<typeof pendingAction>['type']) =>
+    pendingAction?.workoutKey === workoutKey && pendingAction?.type === type
+
+  const runWorkoutAction = async (workoutKey: string, type: NonNullable<typeof pendingAction>['type'], fn: () => unknown) => {
+    if (isWorkoutBusy(workoutKey)) return
+    safeSetPendingAction({ workoutKey, type })
+    try {
+      await Promise.resolve(fn())
+    } finally {
+      safeSetPendingAction(null)
+    }
+  }
+
+  const isPeriodizedWorkoutFullyLoaded = (w: DashboardWorkout) => {
+    const exs = Array.isArray(w?.exercises) ? w.exercises : []
+    if (exs.length === 0) return false
+    return exs.some((e) => Array.isArray(e?.setDetails))
+  }
+
+  const loadWorkoutFullById = async (workoutId: string): Promise<DashboardWorkout | null> => {
+    const id = String(workoutId || '').trim()
+    if (!id) return null
+    const { data, error } = await supabase
+      .from('workouts')
+      .select(
+        `
+        id,
+        user_id,
+        created_by,
+        name,
+        notes,
+        archived_at,
+        sort_order,
+        created_at,
+        exercises (
+          id,
+          name,
+          notes,
+          video_url,
+          rest_time,
+          cadence,
+          method,
+          "order",
+          sets ( id, set_number, weight, reps, rpe, completed, is_warmup, advanced_config )
+        )
+      `,
+      )
+      .eq('id', id)
+      .maybeSingle()
+
+    if (error || !data?.id) return null
+
+    const parsed = WorkoutFullRowSchema.safeParse(data)
+    if (!parsed.success) return null
+
+    const workout = parsed.data
+    const rawExercises = Array.isArray(workout?.exercises) ? workout.exercises : []
+    const exs: DashboardExercise[] = rawExercises
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+      .map((e) => {
+        const isCardio = String(e.method || '').toLowerCase() === 'cardio'
+        const dbSets = Array.isArray(e.sets) ? e.sets : []
+        const sortedSets = dbSets.slice().sort((aSet, bSet) => (aSet.set_number ?? 0) - (bSet.set_number ?? 0))
+        const setsCount = sortedSets.length || (isCardio ? 1 : 4)
+        const setDetails: DashboardSetDetail[] = sortedSets.map((s) => ({
+          set_number: s.set_number,
+          reps: s.reps,
+          rpe: s.rpe,
+          weight: s.weight,
+          isWarmup: !!s.is_warmup,
+          advancedConfig: (s.advanced_config as AdvancedConfig | AdvancedConfig[] | null) ?? null,
+        }))
+        const nonEmptyReps = setDetails.map((s) => s.reps).filter((r): r is string => typeof r === 'string' && r.trim() !== '')
+        const defaultReps = isCardio ? '20' : '10'
+        let repsHeader = defaultReps
+        if (nonEmptyReps.length > 0) {
+          const uniqueReps = Array.from(new Set(nonEmptyReps))
+          repsHeader = uniqueReps.length === 1 ? String(uniqueReps[0] ?? defaultReps) : String(nonEmptyReps[0] ?? defaultReps)
+        }
+        const rpeValues = setDetails.map((s) => s.rpe).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+        const defaultRpe = isCardio ? 5 : 8
+        const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe
+        return {
+          id: e.id,
+          name: e.name,
+          notes: e.notes,
+          videoUrl: e.video_url,
+          restTime: e.rest_time,
+          cadence: e.cadence,
+          method: e.method,
+          sets: setsCount,
+          reps: repsHeader,
+          rpe: rpeHeader,
+          setDetails,
+        } satisfies DashboardExercise
+      })
+
+    return {
+      id: workout.id,
+      title: String(workout.name ?? ''),
+      notes: workout.notes,
+      exercises: exs,
+      user_id: workout.user_id,
+      created_by: workout.created_by ?? null,
+      archived_at: workout.archived_at ?? null,
+      sort_order: workout.sort_order == null ? 0 : toIntOrZero(workout.sort_order),
+      created_at: workout.created_at ?? null,
+    } satisfies DashboardWorkout
+  }
+
+  useEffect(() => {
+    if (!toolsOpen) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      setToolsOpen(false)
+    }
+    try {
+      window.addEventListener('keydown', onKeyDown)
+    } catch { }
+    return () => {
+      try {
+        window.removeEventListener('keydown', onKeyDown)
+      } catch { }
+    }
+  }, [toolsOpen])
+
+  useEffect(() => {
+    if (!checkinsOpen) return
+    const uid = String(props.currentUserId || '').trim()
+    if (!uid) {
+      setCheckinsRows([])
+      return
+    }
+    const supabase = createClient()
+    let cancelled = false
+      ; (async () => {
+        try {
+          setCheckinsLoading(true)
+          const days = checkinsRange === '30d' ? 30 : 7
+          const startIso = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+          const { data, error } = await supabase
+            .from('workout_checkins')
+            .select('id, kind, created_at, energy, mood, soreness, notes, answers, workout_id, planned_workout_id')
+            .eq('user_id', uid)
+            .gte('created_at', startIso)
+            .order('created_at', { ascending: false })
+            .limit(400)
+          if (error) throw error
+          if (cancelled) return
+          const rows: WorkoutCheckinRow[] = (Array.isArray(data) ? data : [])
+            .filter((row) => isPlainRecord(row))
+            .map((row) => {
+              const toNumberOrStringOrNull = (v: unknown): number | string | null => {
+                if (v == null) return null
+                if (typeof v === 'number') return v
+                const s = String(v)
+                return s ? s : null
+              }
+              const answers = isPlainRecord(row.answers) ? row.answers : null
+              return {
+                id: row.id != null ? String(row.id) : undefined,
+                kind: row.kind != null ? String(row.kind) : undefined,
+                created_at: row.created_at != null ? String(row.created_at) : null,
+                energy: toNumberOrStringOrNull(row.energy),
+                mood: toNumberOrStringOrNull(row.mood),
+                soreness: toNumberOrStringOrNull(row.soreness),
+                notes: row.notes != null ? String(row.notes) : null,
+                answers,
+                workout_id: row.workout_id != null ? String(row.workout_id) : null,
+                planned_workout_id: row.planned_workout_id != null ? String(row.planned_workout_id) : null,
+              }
+            })
+          setCheckinsRows(rows)
+        } catch {
+          if (cancelled) return
+          setCheckinsRows([])
+        } finally {
+          if (!cancelled) setCheckinsLoading(false)
+        }
+      })()
+    return () => {
+      cancelled = true
+    }
+  }, [checkinsOpen, checkinsRange, props.currentUserId])
+
+  const showCommunityTab = !!props.communityContent
+  const showVipTab = props.vipEnabled !== false
+  const vipLocked = !!props.vipLocked
+  const vipLabel = String(props.vipLabel || 'VIP')
+
+  return (
+    <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
+      {props.profileIncomplete && <ProfileIncompleteBanner onComplete={props.onOpenCompleteProfile} />}
+
+      {props.view === 'dashboard' && showStoriesBar ? (
+        <Suspense fallback={<StoriesBarSkeleton />}>
+          <StoriesBar currentUserId={props.currentUserId} />
+        </Suspense>
+      ) : null}
+
+      <DashboardTabs
+        view={props.view}
+        onChangeView={props.onChangeView}
+        showCommunityTab={showCommunityTab}
+        showVipTab={showVipTab}
+        vipLabel={vipLabel}
+        vipLocked={vipLocked}
+      />
+
+      {props.view === 'assessments' ? <div className="pt-2">{props.assessmentsContent ?? null}</div> : null}
+      {props.view === 'community' ? <div className="pt-2">{props.communityContent ?? null}</div> : null}
+      {props.view === 'vip' ? <div className="pt-2">{props.vipContent ?? null}</div> : null}
+
+      {props.view === 'dashboard' && (
+        <>
+          <WorkoutCalendarModal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} userId={props.currentUserId} />
+
+          <CheckinsModal
+            isOpen={checkinsOpen}
+            onClose={() => setCheckinsOpen(false)}
+            checkinsRange={checkinsRange}
+            setCheckinsRange={setCheckinsRange}
+            checkinsFilter={checkinsFilter}
+            setCheckinsFilter={setCheckinsFilter}
+            checkinsRows={checkinsRows}
+            checkinsLoading={checkinsLoading}
+            toNumberOrNull={toNumberOrNull}
+            isPlainRecord={isPlainRecord}
+          />
+
+          {editListOpen && (
+            <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => !savingListEdits && setEditListOpen(false)}>
+              <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Treinos</div>
+                    <div className="text-white font-black text-lg truncate">Organizar</div>
+                    <div className="text-xs text-neutral-400">Arraste para reordenar e edite os títulos.</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditListOpen(false)}
+                    disabled={savingListEdits}
+                    className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center disabled:opacity-50"
+                    aria-label="Fechar"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                  {editListDraft.length === 0 ? (
+                    <div className="text-sm text-neutral-400">Nenhum treino para organizar.</div>
+                  ) : (
+                    <Reorder.Group axis="y" values={editListDraft} onReorder={setEditListDraft} className="space-y-2">
+                      {editListDraft.map((it, idx) => (
+                        <SortableWorkoutItem
+                          key={it.id}
+                          item={it}
+                          index={idx}
+                          saving={savingListEdits}
+                          onChangeTitle={(id, val) => {
+                            setEditListDraft((prev) => prev.map((x) => (x.id === id ? { ...x, title: val } : x)))
+                          }}
+                        />
+                      ))}
+                    </Reorder.Group>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setEditListOpen(false)}
+                    disabled={savingListEdits}
+                    className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingListEdits || typeof props.onBulkEditWorkouts !== 'function' || editListDraft.length === 0}
+                    onClick={async () => {
+                      if (typeof props.onBulkEditWorkouts !== 'function') return
+                      try {
+                        setSavingListEdits(true)
+                        await props.onBulkEditWorkouts(editListDraft)
+                        setEditListOpen(false)
+                      } finally {
+                        setSavingListEdits(false)
+                      }
+                    }}
+                    className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2 disabled:opacity-60"
+                  >
+                    <Save size={16} />
+                    Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showNewRecordsCard ? (
+            <Suspense fallback={<SectionSkeleton lines={2} />}>
+              <RecentAchievements userId={props.currentUserId} badges={props.streakStats?.badges ?? []} showBadges={showBadges} reloadKey={props.newRecordsReloadKey} />
+            </Suspense>
+          ) : null}
+
+          {(showIronRank || showBadges) && (
+            <Suspense fallback={<SectionSkeleton lines={2} />}>
+              <BadgesGallery
+                badges={props.streakStats?.badges ?? []}
+                currentStreak={props.streakStats?.currentStreak ?? 0}
+                totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
+                currentUserId={props.currentUserId}
+                showIronRank={showIronRank}
+                showBadges={!showNewRecordsCard && showBadges}
+              />
+            </Suspense>
+          )}
+
+          <Suspense fallback={<MuscleMapSkeleton />}>
+            <MuscleMapCard onOpenWizard={props.onCreateWorkout} />
+          </Suspense>
+
+          <button
+            onClick={() => {
+              setCreatingWorkout(true)
+              try {
+                try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
+                props.onCreateWorkout()
+              } catch {
+                setCreatingWorkout(false)
+              }
+              try {
+                window.setTimeout(() => setCreatingWorkout(false), CREATE_WORKOUT_LOADING_TIMEOUT_MS)
+              } catch { }
+            }}
+            disabled={creatingWorkout}
+            className="w-full min-h-[44px] bg-yellow-500 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 hover:bg-yellow-400 transition-transform active:scale-95 disabled:opacity-70"
+          >
+            {creatingWorkout ? <Loader2 size={20} className="animate-spin" /> : <Plus size={24} />}
+            {creatingWorkout ? 'Abrindo editor...' : 'Novo Treino'}
+          </button>
+
+          <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
+            {/* Linha 1: abas Meus Treinos / Periodizados */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 inline-flex items-center rounded-xl bg-neutral-900/40 border border-neutral-800 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowArchived(false)
+                    setWorkoutsTab('normal')
+                  }}
+                  className={
+                    workoutsTab === 'normal'
+                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black font-black text-[11px] uppercase tracking-wider text-center'
+                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 text-center'
+                  }
+                >
+                  Meus Treinos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowArchived(false)
+                    setPeriodizedLoaded(false)
+                    setPeriodizedWorkouts([])
+                    setPeriodizedError('')
+                    setWorkoutsTab('periodized')
+                  }}
+                  className={
+                    workoutsTab === 'periodized'
+                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black font-black text-[11px] uppercase tracking-wider text-center'
+                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 text-center'
+                  }
+                >
+                  <span className="inline-flex items-center justify-center gap-1">
+                    <Crown size={11} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
+                    Periodizados
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Linha 2: botões de ação — Arquivados, Organizar, Ferramentas */}
+            <div className="flex items-center gap-2">
+              {archivedCount > 0 ? (
+                <button
+                  onClick={() => setShowArchived((v) => !v)}
+                  className={
+                    showArchived
+                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black rounded-xl font-black text-[11px] uppercase tracking-wider'
+                      : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700'
+                  }
+                >
+                  {showArchived ? `Arquivados (${archivedCount})` : `Arquivados (${archivedCount})`}
+                </button>
+              ) : null}
+              <button
+                onClick={() => {
+                  try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch { }
+                  const items = visibleWorkouts
+                    .map((w, idx) => {
+                      const id = String(w?.id || '').trim()
+                      if (!id) return null
+                      return { id, title: String(w?.title || 'Treino'), sort_order: idx }
+                    })
+                    .filter(Boolean) as { id: string; title: string; sort_order: number }[]
+                  setEditListDraft(items)
+                  setEditListOpen(true)
+                  setToolsOpen(false)
+                }}
+                className="flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+              >
+                Organizar
+              </button>
+              <div className="relative flex-1">
+                <button
+                  onClick={() => setToolsOpen((v) => !v)}
+                  className="w-full min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+                  aria-expanded={toolsOpen}
+                >
+                  Ferramentas
+                </button>
+                {toolsOpen && (
+                  <WorkoutToolsPanel
+                    onClose={() => setToolsOpen(false)}
+                    onCreateWorkout={props.onCreateWorkout}
+                    onOpenIronScanner={props.onOpenIronScanner}
+                    onOpenJsonImport={props.onOpenJsonImport}
+                    onExportAll={props.onExportAll}
+                    exportingAll={props.exportingAll}
+                    onNormalizeAiWorkoutTitles={props.onNormalizeAiWorkoutTitles}
+                    onNormalizeExercises={props.onNormalizeExercises}
+                    onApplyTitleRule={props.onApplyTitleRule}
+                    normalizingAiTitles={normalizingAiTitles}
+                    normalizingExercises={normalizingExercises}
+                    applyingTitleRule={applyingTitleRule}
+                    setNormalizingAiTitles={setNormalizingAiTitles}
+                    setNormalizingExercises={setNormalizingExercises}
+                    setApplyingTitleRule={setApplyingTitleRule}
+                  />
+                )}
+
+              </div>
+            </div>
+
+            {visibleWorkouts.length === 0 && (
+              <div className="text-center py-10 text-neutral-600">
+                <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
+                  <Dumbbell size={32} />
+                </div>
+                <p>
+                  {workoutsTab === 'periodized'
+                    ? periodizedLoading
+                      ? 'Carregando treinos periodizados...'
+                      : 'Nenhum treino periodizado criado.'
+                    : 'Nenhum treino criado.'}
+                </p>
+                {workoutsTab === 'periodized' && periodizedError ? (
+                  <div className="mt-3 inline-flex items-center justify-center">
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
+                      {periodizedError}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPeriodizedLoaded(false)
+                        setPeriodizedWorkouts([])
+                        setPeriodizedError('')
+                      }}
+                      className="ml-2 min-h-[36px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                ) : workoutsTab === 'periodized' && !periodizedLoading ? (
+                  <p className="mt-2 text-xs text-neutral-500">
+                    Crie sua periodização na aba VIP para ela aparecer aqui.
+                  </p>
+                ) : null}
+              </div>
+            )}
+
+            {visibleWorkouts.map((w, idx) => {
+              // Dynamic accent color per workout (cycles through brand palette)
+              const accentColors = [
+                { border: 'border-yellow-500', gradient: 'from-yellow-500/5' },
+                { border: 'border-orange-500', gradient: 'from-orange-500/5' },
+                { border: 'border-amber-500', gradient: 'from-amber-500/5' },
+                { border: 'border-purple-500', gradient: 'from-purple-500/5' },
+              ]
+              const accent = accentColors[idx % accentColors.length]
+              // FUTURE: highlight the workout that has an ongoing session.
+              // Requires `activeSessionWorkoutId?: string` prop from the parent
+              // that connects to the active session state in useWorkoutCrud.
+              const isActive = false
+              return (
+                <div
+                  key={String(w?.id ?? idx)}
+                  className={[
+                    'rounded-xl p-4 border-l-4 transition-all group relative overflow-hidden cursor-pointer shadow-sm shadow-black/30',
+                    `bg-gradient-to-r ${accent.gradient} via-neutral-800/80 to-neutral-800`,
+                    accent.border,
+                    isActive ? 'ring-2 ring-green-500/60' : '',
+                    density === 'compact' ? 'p-3' : 'p-4',
+                  ].join(' ')}
+                  onClick={() => {
+                    const key = getWorkoutKey(w, idx)
+                    if (isWorkoutBusy(key)) return
+                    if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                      runWorkoutAction(key, 'open', async () => {
+                        const id = String(w?.id || '').trim()
+                        const full = await loadWorkoutFullById(id)
+                        if (!full) {
+                          setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                          return
+                        }
+                        if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                          setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                          return
+                        }
+                        setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                        props.onQuickView(full)
+                      })
+                      return
+                    }
+                    props.onQuickView(w)
+                  }}
+                >
+                  <div className="relative z-10">
+                    {isActive && (
+                      <div className="absolute -top-1 -left-1 w-3 h-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                      </div>
+                    )}
+                    <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight">{String(w?.title || 'Treino')}</h3>
+                    <p className="text-[11px] text-neutral-500 font-mono mb-3">
+                      {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} exercícios
+                    </p>
+                    {w?.archived_at ? (
+                      <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
+                        ARQUIVADO
+                      </div>
+                    ) : null}
+
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const key = getWorkoutKey(w, idx)
+                          if (w?.archived_at) {
+                            if (typeof props.onRestoreWorkout !== 'function') return
+                            await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
+                            return
+                          }
+                          await runWorkoutAction(key, 'start', async () => {
+                            if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                              const id = String(w?.id || '').trim()
+                              const full = await loadWorkoutFullById(id)
+                              if (!full) {
+                                setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                                return
+                              }
+                              if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                                setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                                return
+                              }
+                              setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                              await props.onStartSession(full)
+                              return
+                            }
+                            await props.onStartSession(w)
+                          })
+                        }}
+                        data-tour="workout-start"
+                        disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
+                        className="relative z-30 flex-1 bg-yellow-500/90 hover:bg-yellow-400 py-2.5 rounded-xl flex items-center justify-center gap-2 text-black font-black text-sm transition-all border border-yellow-400/50 active:scale-95 touch-manipulation disabled:opacity-60 shadow-sm shadow-yellow-500/20"
+                      >
+                        {w?.archived_at ? (
+                          isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
+                            <>
+                              <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
+                            </>
+                          ) : (
+                            <>
+                              <Undo2 size={16} /> RESTAURAR
+                            </>
+                          )
+                        ) : isActionBusy(getWorkoutKey(w, idx), 'start') ? (
+                          <>
+                            <Loader2 size={16} className="text-yellow-500 animate-spin" /> INICIANDO...
+                          </>
+                        ) : (
+                          <>
+                            <Play size={16} className="fill-white" /> INICIAR TREINO
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const key = getWorkoutKey(w, idx)
+                        await runWorkoutAction(key, 'share', () => props.onShareWorkout(w))
+                      }}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                    >
+                      {isActionBusy(getWorkoutKey(w, idx), 'share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const key = getWorkoutKey(w, idx)
+                        await runWorkoutAction(key, 'edit', () => props.onEditWorkout(w))
+                      }}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                    >
+                      {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const key = getWorkoutKey(w, idx)
+                        await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
+                      }}
+                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
+                    >
+                      {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
