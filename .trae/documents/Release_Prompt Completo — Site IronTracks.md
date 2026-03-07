@@ -1,0 +1,1 @@
+Copie o prompt abaixo no novo projeto do site e use como especificação. Depois, ajuste apenas links/dominios/CTA e identidade visual (logo/cores).
