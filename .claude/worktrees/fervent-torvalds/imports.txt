@@ -1,0 +1,15 @@
+import {
+    DirectChatState,
+    WorkoutStreak,
+    ActiveSession,
+    ActiveWorkoutSession,
+    PendingUpdate,
+    VipStatus,
+    TourState,
+    SyncState,
+    DuplicateGroup,
+    Workout,
+    Exercise,
+    UserRecord
+} from '@/types/app';
+const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)

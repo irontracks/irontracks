@@ -2,9 +2,8 @@ name: IronTracks CI
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  pull_request: {}   # runs on PRs targeting any branch — not just main
 
 jobs:
   quality-check:
@@ -12,12 +11,12 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
-    
+      uses: actions/checkout@v6
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '20.x'   # semver range — picks latest 20.x patch
         cache: 'npm'
 
     - name: Install dependencies
@@ -38,6 +37,22 @@ jobs:
         NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
 
+    - name: Coverage Report
+      run: npx vitest run --coverage --coverage.reporter=json-summary --coverage.reportOnFailure 2>/dev/null || true
+      env:
+        NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+
+    - name: Check Coverage Threshold
+      run: |
+        if [ -f coverage/coverage-summary.json ]; then
+          STMT=$(node -e "const c=require('./coverage/coverage-summary.json');console.log(c.total.statements.pct)")
+          echo "Statement coverage: ${STMT}%"
+          node -e "if(Number(process.argv[1])<40){console.error('Coverage below 40% threshold');process.exit(1)}" "$STMT"
+        else
+          echo "⚠️ No coverage report found — skipping threshold check"
+        fi
+
     - name: Smoke Tests
       run: npm run test:smoke
 
@@ -46,3 +61,26 @@ jobs:
       env:
         NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
         NEXT_PUBLIC_SUPABASE_ANON_KEY: "placeholder-key"
+
+    # ── Failure notification ─────────────────────────────────────────────────
+    # Posts a comment on the PR whenever CI fails, so the team knows immediately
+    # without having to watch GitHub notifications manually.
+    - name: Comment on PR (failure only)
+      if: failure() && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: [
+              '## ❌ CI failed',
+              '',
+              `One or more steps in the \`quality-check\` job did not pass.`,
+              `[View full log](${runUrl})`,
+              '',
+              '> Fix the issues above and push again to re-run CI.',
+            ].join('\n'),
+          })
