@@ -25,7 +25,10 @@
     "cap:sync:android": "npx cap sync android",
     "cap:open": "npx cap open ios",
     "cap:open:android": "npx cap open android",
-    "analyze": "ANALYZE=true npm run build"
+    "analyze": "ANALYZE=true npm run build",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "e2e:ci": "playwright test --reporter=github"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
@@ -64,6 +67,7 @@
   "devDependencies": {
     "@eslint-community/eslint-utils": "^4.9.1",
     "@next/bundle-analyzer": "^14.0.0",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
