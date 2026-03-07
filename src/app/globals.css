@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@source "../../src";
+@source "../../middleware.ts";
 
 @theme {
   --animate-fade-in: fadeIn 0.5s ease-out;
