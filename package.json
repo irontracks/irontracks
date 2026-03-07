@@ -6,9 +6,9 @@
     "node": ">=20 <23"
   },
   "scripts": {
-    "predev": "test -f scripts/ensure-next-compiled-commander.mjs && node scripts/ensure-next-compiled-commander.mjs || true",
-    "prebuild": "test -f scripts/ensure-next-compiled-commander.mjs && node scripts/ensure-next-compiled-commander.mjs || true",
-    "prestart": "test -f scripts/ensure-next-compiled-commander.mjs && node scripts/ensure-next-compiled-commander.mjs || true",
+    "predev": "node scripts/ensure-next-compiled-commander.mjs",
+    "prebuild": "node scripts/ensure-next-compiled-commander.mjs",
+    "prestart": "node scripts/ensure-next-compiled-commander.mjs",
     "dev": "next dev --webpack --hostname localhost --port 3000",
     "build": "next build --webpack",
     "start": "next start",
@@ -21,7 +21,7 @@
     "e2e:deload": "tsx scripts/e2e/deload.e2e.ts",
     "postversion": "git push && git push --tags",
     "postinstall": "test -f scripts/patch-ios.mjs && node scripts/patch-ios.mjs || true",
-    "cap:sync": "npx cap sync && test -f scripts/patch-ios.mjs && node scripts/patch-ios.mjs || true",
+    "cap:sync": "npx cap sync && node scripts/patch-ios.mjs",
     "cap:sync:android": "npx cap sync android",
     "cap:open": "npx cap open ios",
     "cap:open:android": "npx cap open android",
