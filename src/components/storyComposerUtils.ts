@@ -680,4 +680,58 @@ export const drawStory = ({
 
     // ── Draw cards ────────────────────────────────────────────────────────────
     cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
+
+    // ── Timestamp badge — bottom-left, above safe-bottom ─────────────────────
+    (() => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        if (!timeStr) return;
+
+        ctx.save();
+        const fontSize = 38;
+        const smallFontSize = 22;
+        ctx.font = `900 ${fontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        const timeW = ctx.measureText(timeStr).width;
+        ctx.font = `700 ${smallFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+
+        const padX = 22;
+        const padY = 14;
+        const pillW = timeW + padX * 2;
+        const pillH = fontSize + smallFontSize + padY * 2 + 4;
+        const pillX = left;
+        // Place above the bottom-most card
+        const pillY = (cardsBoxes.length > 0 ? cardsBoxes[0].y : safeBottomY) - pillH - 80;
+
+        // Glass background
+        drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 20);
+        ctx.fillStyle = 'rgba(0,0,0,0.52)';
+        ctx.fill();
+        // Gold border
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(250,204,21,0.45)';
+        ctx.stroke();
+        // Gold top accent line
+        drawRoundedRect(ctx, pillX + 10, pillY, pillW - 20, 3, 2);
+        ctx.fillStyle = 'rgba(250,204,21,0.75)';
+        ctx.fill();
+
+        // Time text (gold, large)
+        ctx.font = `900 ${fontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#facc15';
+        ctx.shadowColor = 'rgba(0,0,0,0.7)';
+        ctx.shadowBlur = 8;
+        ctx.fillText(timeStr, pillX + padX, pillY + padY);
+
+        // Date label (white/muted, small)
+        const today = new Date();
+        const dateLabel = today.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
+        ctx.font = `700 ${smallFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.shadowBlur = 0;
+        ctx.fillText(dateLabel, pillX + padX, pillY + padY + fontSize + 4);
+
+        ctx.restore();
+    })();
 };
+
