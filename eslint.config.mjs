@@ -24,8 +24,9 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
+      // All a11y rules elevated to "error" — accessibility violations now break the build
       ...Object.fromEntries(
-        Object.entries(jsxA11y.configs.recommended.rules).map(([key]) => [key, "warn"])
+        Object.entries(jsxA11y.configs.recommended.rules).map(([key]) => [key, "error"])
       ),
       // Accept htmlFor alone (without nesting) as valid label association
       "jsx-a11y/label-has-associated-control": ["warn", { assert: "either" }],
