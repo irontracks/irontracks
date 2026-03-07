@@ -22,6 +22,23 @@ const initials = (name: string) => {
   return n.slice(0, 1).toUpperCase()
 }
 
+const formatTime = (iso: string): string => {
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return ''
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+const formatDate = (iso: string): string => {
+  const d = new Date(iso)
+  if (!Number.isFinite(d.getTime())) return ''
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  const isYesterday = new Date(now.setDate(now.getDate() - 1)).toDateString() === d.toDateString()
+  if (isToday) return 'Hoje'
+  if (isYesterday) return 'Ontem'
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
+}
+
 const formatAgo = (iso: string) => {
   const ms = new Date(iso).getTime()
   if (!Number.isFinite(ms)) return ''
@@ -610,6 +627,33 @@ export default function StoryViewer({
               )}
             </motion.div>
           </AnimatePresence>
+
+          {/* Timestamp overlay — purely visual, no effect on saving system */}
+          {story?.createdAt && formatTime(story.createdAt) && (
+            <div
+              className="absolute bottom-20 left-3 z-10 pointer-events-none"
+            >
+              <div
+                className="flex flex-col items-start px-2.5 py-1.5 rounded-xl"
+                style={{
+                  background: 'rgba(0,0,0,0.45)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(234,179,8,0.3)',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(234,179,8,0.15)',
+                }}
+              >
+                <span
+                  className="text-base font-black tabular-nums leading-tight tracking-tight"
+                  style={{ color: '#facc15', textShadow: '0 1px 6px rgba(0,0,0,0.8)' }}
+                >
+                  {formatTime(story.createdAt)}
+                </span>
+                <span className="text-[10px] font-bold text-white/60 leading-none mt-0.5">
+                  {formatDate(story.createdAt)}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Áreas de Toque para Navegação */}
