@@ -347,7 +347,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             void import('@/components/ActiveWorkout')
             void import('@/components/IncomingInviteModal')
             void import('@/components/InviteAcceptedModal')
-        }, 3000)
+        }, 1000)
         return () => clearTimeout(t)
     }, [])
 
