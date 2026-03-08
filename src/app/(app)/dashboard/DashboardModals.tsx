@@ -436,7 +436,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         </div>
                         <div className="p-4 relative">
                             <SectionErrorBoundary section="Notificações" onReset={() => setShowNotifCenter(false)}>
-                                <NotificationCenter user={user as unknown as AdminUser} onStartSession={handleStartSession} embedded initialOpen open={showNotifCenter} />
+                                <NotificationCenter user={user as AdminUser} onStartSession={handleStartSession} embedded initialOpen open={showNotifCenter} />
                             </SectionErrorBoundary>
                         </div>
                     </div>
@@ -664,7 +664,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
             />
 
             {/* Welcome */}
-            <WelcomeFloatingWindow user={user as unknown as AdminUser} onClose={() => { }} />
+            <WelcomeFloatingWindow user={user as AdminUser} onClose={() => { }} />
         </>
     )
 }

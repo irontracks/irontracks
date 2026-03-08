@@ -45,7 +45,7 @@ export default function WorkoutFooter() {
   const activeExec = ui && isRecord(ui.activeExecution) ? (ui.activeExecution as Record<string, unknown>) : null
   const startedAtMs = activeExec ? Number(activeExec.startedAtMs) : 0
   const isExecuting = Number.isFinite(startedAtMs) && startedAtMs > 0
-  const timerTargetTime = toNum((session as unknown as Record<string, unknown>)?.timerTargetTime)
+  const timerTargetTime = toNum((session as Record<string, unknown>)?.timerTargetTime)
   const hasRecovery = Number.isFinite(timerTargetTime) && timerTargetTime > 0
   const recoveryRemaining = hasRecovery ? Math.ceil((timerTargetTime - ticker) / 1000) : 0
   const recoverySeconds = hasRecovery ? Math.max(0, recoveryRemaining) : 0
@@ -53,7 +53,7 @@ export default function WorkoutFooter() {
   const displaySeconds = hasRecovery ? recoverySeconds : isExecuting ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : elapsedSeconds
   const displayLabel = hasRecovery ? 'Recuperação' : isExecuting ? 'Exercício' : 'Treino'
   const plannedRestSec = toNum(
-    currentExercise?.restTime ?? (currentExercise as unknown as Record<string, unknown>)?.rest_time ?? (currentExercise as unknown as Record<string, unknown>)?.rest ?? currentExercise?.rest_time
+    currentExercise?.restTime ?? (currentExercise as Record<string, unknown>)?.rest_time ?? (currentExercise as Record<string, unknown>)?.rest ?? currentExercise?.rest_time
   )
   const displayTime = `${formatElapsed(displaySeconds)}${recoveryExtraSeconds > 0 ? ` (+${formatElapsed(recoveryExtraSeconds)})` : ''}`
 

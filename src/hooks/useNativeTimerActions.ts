@@ -50,14 +50,14 @@ export function useNativeTimerActions({
       if (actionId === 'ADD_30S') {
         setActiveSession((prev) => {
           if (!prev) return prev
-          const base = prev as unknown as Record<string, unknown>
+          const base = prev as Record<string, unknown>
           const ctx = isRecord(base.timerContext)
             ? (base.timerContext as Record<string, unknown>)
             : null
           const kind = String(ctx?.kind || '').trim()
           const t = Number(base.timerTargetTime)
           if (kind !== 'rest' || !Number.isFinite(t) || t <= 0) return prev
-          return { ...base, timerTargetTime: t + 30_000 } as unknown as ActiveWorkoutSession
+          return { ...base, timerTargetTime: t + 30_000 } as ActiveWorkoutSession
         })
       }
     })

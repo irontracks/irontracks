@@ -86,13 +86,13 @@ const normalizeText = (s: unknown): string =>
 const templateSignature = (tpl: WorkoutTemplate): string => {
   const nameParts: string[] = []
   const exs = sortByOrder(
-    safeArray<ExerciseRow>(tpl?.exercises ?? []) as unknown as Array<Record<string, unknown>>,
+    safeArray<ExerciseRow>(tpl?.exercises ?? []) as Array<Record<string, unknown>>,
   )
   for (const row of exs) {
     const e = row as unknown as ExerciseRow
     const en = normalizeText(e?.name || '')
     const sets = sortBySetNumber(
-      safeArray<SetRow>(e?.sets ?? []) as unknown as Array<Record<string, unknown>>,
+      safeArray<SetRow>(e?.sets ?? []) as Array<Record<string, unknown>>,
     )
     const method = normalizeText(e?.method || '')
     const fallbackSets = method === 'cardio' ? 1 : 4
@@ -228,10 +228,10 @@ const replaceExercisesAndSets = async ({
   const exercises = sortByOrder(
     safeArray<ExerciseRow>(template?.exercises ?? [])
       .filter((x) => x && typeof x === 'object')
-      .map((x) => x as unknown as Record<string, unknown>),
+      .map((x) => x as Record<string, unknown>),
   )
   for (const e of exercises) {
-    const ex = e as unknown as ExerciseRow
+    const ex = e as ExerciseRow
     const { data: newEx, error } = await admin
       .from('exercises')
       .insert({
@@ -252,12 +252,12 @@ const replaceExercisesAndSets = async ({
     const sets = sortBySetNumber(
       safeArray<SetRow>(ex?.sets ?? [])
         .filter((x) => x && typeof x === 'object')
-        .map((x) => x as unknown as Record<string, unknown>),
+        .map((x) => x as Record<string, unknown>),
     )
     if (sets.length === 0) continue
     await admin.from('sets').insert(
       sets.map((s) => {
-        const set = s as unknown as SetRow
+        const set = s as SetRow
         return {
         exercise_id: newEx.id,
         weight: set?.weight ?? null,

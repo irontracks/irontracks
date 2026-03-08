@@ -713,13 +713,13 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                                             .select('id, display_name, email')
                                             .eq('id', selectedStudent.teacher_id)
                                             .maybeSingle();
-                                        if (curProfile) enriched.unshift({ id: String(curProfile.id || ''), name: curProfile.display_name, email: curProfile.email, user_id: curProfile.id, status: 'active' } as unknown as UnknownRecord);
+                                        if (curProfile) enriched.unshift({ id: String(curProfile.id || ''), name: curProfile.display_name, email: curProfile.email, user_id: curProfile.id, status: 'active' } as UnknownRecord);
                                     }
-                                    setTeachersList(enriched as unknown as AdminTeacher[]);
+                                    setTeachersList(enriched as AdminTeacher[]);
                                 } else {
-                                    setTeachersList(base as unknown as AdminTeacher[]);
+                                    setTeachersList(base as AdminTeacher[]);
                                 }
-                            } catch { setTeachersList(base as unknown as AdminTeacher[]); }
+                            } catch { setTeachersList(base as AdminTeacher[]); }
                         }
                     }
                 } else {
@@ -740,7 +740,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                         });
                     } catch { }
                 }
-                setUsersList((list || []) as unknown as AdminUser[]);
+                setUsersList((list || []) as AdminUser[]);
             } finally { setLoading(false); }
         };
         fetchStudents();
@@ -1355,7 +1355,7 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
                 status: 'pendente',
                 workouts: [],
             };
-            setUsersList(prev => [...prev, newStudent as unknown as AdminUser]);
+            setUsersList(prev => [...prev, newStudent as AdminUser]);
             setPendingProfiles(prev => prev.filter(p => p.user_id !== profile.user_id));
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);

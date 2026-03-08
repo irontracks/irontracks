@@ -202,7 +202,7 @@ const WorkoutRow = ({ workout }: { workout: Record<string, unknown> }) => (
 // ─── Inbox Row ───────────────────────────────────────────────────
 const InboxRow = ({ student }: { student: AdminUser }) => {
     const name = String(student.name || student.email || 'Sem Nome');
-    const days = (student as unknown as Record<string, unknown>).daysSinceLastWorkout as number | undefined;
+    const days = (student as Record<string, unknown>).daysSinceLastWorkout as number | undefined;
     return (
         <div className="flex items-center gap-3 p-3.5 bg-neutral-800/30 border border-red-500/10 rounded-2xl">
             <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center flex-shrink-0">
@@ -442,7 +442,7 @@ export const TeachersTab: React.FC = () => {
                             ) : teacherTemplatesRows.length === 0 ? (
                                 <EmptyState icon={Dumbbell} title="Sem treinos" subtitle="Nenhum treino template encontrado para este professor." />
                             ) : (
-                                teacherTemplatesRows.map((w, i) => <WorkoutRow key={String(w.id || i)} workout={w as unknown as Record<string, unknown>} />)
+                                teacherTemplatesRows.map((w, i) => <WorkoutRow key={String(w.id || i)} workout={w as Record<string, unknown>} />)
                             )}
                         </>
                     )}
