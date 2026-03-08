@@ -36,6 +36,7 @@ export default function AssessmentsError({ error, reset }: { error: Error & { di
             <div className="flex gap-3">
                 <button
                     onClick={() => router.back()}
+                    aria-label="Voltar"
                     className="flex items-center gap-2 bg-neutral-800 text-white px-5 py-3 rounded-xl font-bold hover:bg-neutral-700 transition-all active:scale-95 border border-neutral-700"
                 >
                     <ArrowLeft size={18} />
@@ -43,6 +44,7 @@ export default function AssessmentsError({ error, reset }: { error: Error & { di
                 </button>
                 <button
                     onClick={() => reset()}
+                    aria-label="Tentar novamente"
                     className="flex items-center gap-2 bg-yellow-500 text-black px-5 py-3 rounded-xl font-bold hover:bg-yellow-400 transition-all active:scale-95"
                 >
                     <RefreshCw size={18} />

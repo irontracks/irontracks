@@ -37,6 +37,7 @@ export default function AppGroupError({ error, reset }: { error: Error & { diges
 
             <button
                 onClick={() => reset()}
+                aria-label="Tentar novamente"
                 className="flex items-center gap-2 bg-yellow-500 text-black px-6 py-3 rounded-xl font-bold hover:bg-yellow-400 transition-all active:scale-95"
             >
                 <RefreshCw size={20} />
