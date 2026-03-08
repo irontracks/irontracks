@@ -3,8 +3,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Crown, Sparkles, ArrowRight, Lock, MessageSquare, CalendarDays, TrendingUp, Trash2, Zap, BarChart3, ChefHat, FileText } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
-import VipPeriodizationPanel from '@/components/vip/VipPeriodizationPanel'
+import dynamic from 'next/dynamic'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
+
+const VipPeriodizationPanel = dynamic(() => import('@/components/vip/VipPeriodizationPanel'), { ssr: false })
 import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { useDialog } from '@/contexts/DialogContext'
