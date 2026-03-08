@@ -56,3 +56,6 @@ lint-out.txt
 deploy_full_log.txt
 *.debug.json
 push_bg.sh
+
+# Playwright auth state
+e2e/.auth/
