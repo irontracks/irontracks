@@ -6,7 +6,7 @@ import { requireRole } from '@/utils/auth/route'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { sendPushToUsers } from '@/lib/push/apns'
 
-type AdminResult = { success: true; [key: string]: unknown } | { success?: never; error: string; [key: string]: unknown }
+type AdminResult = { success: true;[key: string]: unknown } | { success?: never; error: string;[key: string]: unknown }
 
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -461,7 +461,7 @@ export async function getStudentWorkouts(studentId: string): Promise<AdminResult
             .order('name');
 
         if (error) throw error;
-        return { data };
+        return { success: true, data };
     } catch (e) {
         return { error: getErrorMessage(e) };
     }
