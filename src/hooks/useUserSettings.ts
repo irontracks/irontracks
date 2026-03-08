@@ -55,7 +55,7 @@ export function useUserSettings(userId: string | null | undefined) {
         const cachedRaw = window.localStorage.getItem(`${STORAGE_KEY}.${safeUserId}`) || ''
         const cached = cachedRaw ? safeJsonParse(cachedRaw) : null
         if (cached && typeof cached === 'object') {
-          setSettings((prev) => ({ ...prev, ...(cached as unknown as Partial<UserSettings>) }))
+          setSettings((prev) => ({ ...prev, ...(cached as Partial<UserSettings>) }))
         }
       }
     } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
@@ -71,7 +71,7 @@ export function useUserSettings(userId: string | null | undefined) {
 
         if (cancelled) return
         if (error) {
-          const e = error as unknown as { status?: unknown; code?: unknown; message?: unknown }
+          const e = error as { status?: unknown; code?: unknown; message?: unknown }
           const status = Number(e?.status)
           const code = e?.code ? String(e.code) : ''
           const msg = getErrorMessage(e) ? String(e.message) : ''
@@ -88,7 +88,7 @@ export function useUserSettings(userId: string | null | undefined) {
 
         const prefs = data?.preferences && typeof data.preferences === 'object' ? data.preferences : null
         if (prefs) {
-          setSettings((prev) => ({ ...prev, ...(prefs as unknown as Partial<UserSettings>) }))
+          setSettings((prev) => ({ ...prev, ...(prefs as Partial<UserSettings>) }))
         }
         lastSavedRef.current = data?.updated_at || null
       } catch {
@@ -141,7 +141,7 @@ export function useUserSettings(userId: string | null | undefined) {
         .upsert(payload, { onConflict: 'user_id' })
 
       if (error) {
-        const e = error as unknown as { status?: unknown; code?: unknown; message?: unknown }
+        const e = error as { status?: unknown; code?: unknown; message?: unknown }
         const status = Number(e?.status)
         const code = e?.code ? String(e.code) : ''
         const msg = getErrorMessage(e) ? String(e.message) : ''

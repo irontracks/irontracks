@@ -118,18 +118,18 @@ export function useAdminTeacherDetail(
         setTeacherHistoryRows([]);
         setTeacherHistoryCursor(null);
         setTeacherInboxItems([]);
-        loadTeacherStudents(selectedTeacher as unknown as UnknownRecord).catch(() => { });
+        loadTeacherStudents(selectedTeacher as UnknownRecord).catch(() => { });
     }, [isAdmin, loadTeacherStudents, selectedTeacher]);
 
     // Lazy load detail tabs
     useEffect(() => {
         if (!selectedTeacher || !isAdmin) return;
         if (teacherDetailTab === 'templates' && teacherTemplatesRows.length === 0)
-            loadTeacherTemplates(selectedTeacher as unknown as UnknownRecord, true).catch(() => { });
+            loadTeacherTemplates(selectedTeacher as UnknownRecord, true).catch(() => { });
         if (teacherDetailTab === 'history' && teacherHistoryRows.length === 0)
-            loadTeacherHistory(selectedTeacher as unknown as UnknownRecord, true).catch(() => { });
+            loadTeacherHistory(selectedTeacher as UnknownRecord, true).catch(() => { });
         if (teacherDetailTab === 'inbox' && teacherInboxItems.length === 0)
-            loadTeacherInbox(selectedTeacher as unknown as UnknownRecord).catch(() => { });
+            loadTeacherInbox(selectedTeacher as UnknownRecord).catch(() => { });
     }, [isAdmin, loadTeacherHistory, loadTeacherInbox, loadTeacherTemplates, selectedTeacher, teacherDetailTab, teacherHistoryRows.length, teacherInboxItems.length, teacherTemplatesRows.length]);
 
     return {
