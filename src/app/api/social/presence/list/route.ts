@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
+import { getErrorMessage } from '@/utils/errorMessage'
 import { getUpstashConfig } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +33,6 @@ export async function GET() {
 
         return NextResponse.json({ ok: true, online_users: result })
     } catch (e: unknown) {
-        return NextResponse.json({ ok: false, error: (e as Error)?.message || 'unknown_error' }, { status: 500 })
+        return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
     }
 }

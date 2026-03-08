@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+
+const BodySchema = z.object({
+    user_id: z.string().trim().min(1, 'user_id required'),
+    token: z.string().trim().min(1, 'token required'),
+})
 
 export const dynamic = 'force-dynamic'
 
@@ -12,12 +18,13 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(req: Request) {
     try {
-        const body = await req.json().catch(() => ({})) as Record<string, unknown>
-        const userId = String(body?.user_id || '').trim()
-        const token = String(body?.token || '').trim()
-
-        if (!userId) return NextResponse.json({ ok: false, error: 'user_id required' }, { status: 400 })
-        if (!token) return NextResponse.json({ ok: false, error: 'token required' }, { status: 400 })
+        const raw = await req.json().catch(() => ({}))
+        const parsed = BodySchema.safeParse(raw)
+        if (!parsed.success) {
+            const msg = parsed.error.issues.map(i => i.message).join(', ')
+            return NextResponse.json({ ok: false, error: msg }, { status: 400 })
+        }
+        const { user_id: userId, token } = parsed.data
 
         const admin = createAdminClient()
 
