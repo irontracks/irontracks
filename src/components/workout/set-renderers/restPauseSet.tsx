@@ -5,6 +5,7 @@ import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import { HelpHint } from '@/components/ui/HelpHint';
+import { HELP_TERMS } from '@/utils/help/terms';
 import {
   isObject,
   DELOAD_SUGGEST_MODE,

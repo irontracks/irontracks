@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageSquare, Check } from 'lucide-react';
 import { HelpHint } from '@/components/ui/HelpHint';
+import { HELP_TERMS } from '@/utils/help/terms';
 import { useActiveWorkout } from './ActiveWorkoutContext';
 import { isObject, toNumber } from './utils';
 import { UnknownRecord } from './types';
