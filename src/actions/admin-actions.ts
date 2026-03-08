@@ -9,19 +9,7 @@ import { sendPushToUsers } from '@/lib/push/apns'
 
 type AdminActionResult<T = Record<string, unknown>> = ActionResult<T> & { success?: boolean; error?: string; data?: unknown }
 
-function getErrorMessage(err: unknown) {
-    try {
-        if (err instanceof Error && typeof err.message === 'string' && err.message.trim()) return err.message
-        if (err && typeof err === 'object' && 'message' in err) {
-            const msg = err.message
-            if (typeof msg === 'string' && msg.trim()) return msg
-        }
-        const s = String(err ?? '').trim()
-        return s || 'Erro desconhecido'
-    } catch {
-        return 'Erro desconhecido'
-    }
-}
+import { getErrorMessage } from '@/utils/errorMessage'
 
 async function checkAdmin() {
     const auth = await requireRole(['admin'])
