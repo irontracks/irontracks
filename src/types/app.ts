@@ -1,4 +1,6 @@
 
+export type UnknownRecord = Record<string, unknown>;
+
 export interface AdvancedConfig {
   initial_reps?: number | null;
   mini_sets?: number | null;

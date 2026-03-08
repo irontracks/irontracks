@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 
 interface UseAdminVideoBackfillProps {
     tab: string;

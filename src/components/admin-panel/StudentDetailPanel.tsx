@@ -17,8 +17,8 @@ import { updateWorkout } from '@/actions/workout-actions';
 import type { AdminUser, AdminWorkoutTemplate } from '@/types/admin';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 
 export const StudentDetailPanel: React.FC = () => {
     const { alert, confirm } = useDialog();

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admin';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 type GetAdminAuthHeaders = () => Promise<Record<string, string>>;
 
 /**

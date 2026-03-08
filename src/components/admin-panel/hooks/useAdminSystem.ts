@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import type { AdminUser, AdminWorkoutTemplate } from '@/types/admin';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 
 interface UseAdminSystemProps {
     user: AdminUser;

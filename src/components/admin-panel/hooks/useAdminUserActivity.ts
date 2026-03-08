@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useState } from 'react';
 import type { AdminUser } from '@/types/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 type GetAdminAuthHeaders = () => Promise<Record<string, string>>;
 
 interface UseAdminUserActivityParams {

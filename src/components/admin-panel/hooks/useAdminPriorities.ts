@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 
 const COACH_INBOX_DEFAULTS = {
     churnDays: 7,

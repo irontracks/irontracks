@@ -10,7 +10,7 @@ import { PeriodStats } from '@/types/workout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type UnknownRecord = Record<string, unknown>;
+export type { UnknownRecord } from '@/types/app';
 
 export interface WorkoutLog {
     weight?: string | number | null;

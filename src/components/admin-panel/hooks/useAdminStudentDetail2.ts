@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import type { AdminUser, ExecutionVideo } from '@/types/admin';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 
 interface UseAdminStudentDetailProps {
     selectedStudent: AdminUser | null;

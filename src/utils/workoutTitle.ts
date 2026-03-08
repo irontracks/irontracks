@@ -1,4 +1,5 @@
-type UnknownRecord = Record<string, unknown>
+
+import type { UnknownRecord } from '@/types/app'
 
 const normalizeSpaces = (value: unknown): string => String(value || '').replace(/\s+/g, ' ').trim()
 
