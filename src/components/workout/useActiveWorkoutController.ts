@@ -172,6 +172,58 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;
 
 
+  const getLog = (key: string): UnknownRecord => {
+    const v = logs[key];
+    return isObject(v) ? v : {};
+  };
+
+  const updateLog = (key: string, patch: unknown) => {
+    try {
+      if (typeof props?.onUpdateLog !== 'function') return;
+
+      const patchObj: UnknownRecord = isObject(patch) ? patch : {};
+      const [exIdxStr, sIdxStr] = key.split('-');
+      const exIdx = parseInt(exIdxStr, 10);
+      const sIdx = parseInt(sIdxStr, 10);
+
+      // If weight changes and this exercise has linked weights enabled, update all sets
+      if (linkedWeightExercises.has(exIdx) && 'weight' in patchObj) {
+        const ex = exercises[exIdx];
+        if (ex) {
+          const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
+          const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
+          const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+
+          for (let setIdx = 0; setIdx < setsCount; setIdx++) {
+            const linkedKey = `${exIdx}-${setIdx}`;
+            const prev = getLog(linkedKey);
+            props.onUpdateLog(linkedKey, { ...prev, ...patchObj });
+          }
+          // Broadcast linked weight update for first set only
+          try {
+            const w = String(patchObj.weight ?? '')
+            if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
+          } catch { }
+          return;
+        }
+      }
+
+      const prev = getLog(key);
+      props.onUpdateLog(key, { ...prev, ...patchObj });
+
+      // Broadcast log update to team partners
+      try {
+        if (broadcastMyLog && Number.isFinite(exIdx) && Number.isFinite(sIdx)) {
+          const merged = { ...prev, ...patchObj }
+          const w = String(merged.weight ?? '')
+          const r = String(merged.reps ?? '')
+          if (w || r) broadcastMyLog(exIdx, sIdx, w, r)
+        }
+      } catch { }
+    } catch { }
+  };
+
+
   // ── Deload + report history (extracted to useWorkoutDeload) ──────────────
   const deload = useWorkoutDeload({
     session, workout, exercises, logs, getLog, updateLog,
@@ -264,6 +316,41 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     addExtraExerciseToWorkout,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
   } = exerciseCrud;
+
+  // ── Method savers (cluster, rest-pause, drop-set, etc) ──────────────────
+  const {
+    saveClusterModal,
+    saveRestPauseModal,
+    saveDropSetModal,
+    saveStrippingModal,
+    saveFst7Modal,
+    saveHeavyDutyModal,
+    savePontoZeroModal,
+    saveForcedRepsModal,
+    saveNegativeRepsModal,
+    savePartialRepsModal,
+    saveSistema21Modal,
+    saveWaveModal,
+    saveGroupMethodModal,
+  } = useWorkoutMethodSavers({
+    clusterModal, restPauseModal, dropSetModal, strippingModal,
+    fst7Modal, heavyDutyModal, pontoZeroModal, forcedRepsModal,
+    negativeRepsModal, partialRepsModal, sistema21Modal, waveModal, groupMethodModal,
+    setClusterModal, setRestPauseModal, setDropSetModal, setStrippingModal,
+    setFst7Modal, setHeavyDutyModal, setPontoZeroModal, setForcedRepsModal,
+    setNegativeRepsModal, setPartialRepsModal, setSistema21Modal, setWaveModal, setGroupMethodModal,
+    getLog, updateLog,
+  });
+
+  // ── Toggle exercise notes ──────────────────────────────────────────────
+  const toggleNotes = (key: string) => {
+    setOpenNotesKeys((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
 
   // ── Finish workout (extracted to useWorkoutFinish) ──────────────────────
