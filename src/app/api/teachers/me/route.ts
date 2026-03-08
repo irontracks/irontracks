@@ -55,7 +55,7 @@ export async function GET() {
     let data: Record<string, unknown> | null = null
     let byUser = await fetchByUserId(selectFull)
     if (byUser?.error && shouldFallback(byUser.error)) byUser = await fetchByUserId(selectFallback)
-    data = (byUser?.data as unknown as Record<string, unknown>) || null
+    data = (byUser?.data as Record<string, unknown>) || null
     if (data && normalizedEmail) {
       const rowEmail = String(data?.email || '').toLowerCase().trim()
       if (rowEmail && rowEmail !== normalizedEmail) {
@@ -66,7 +66,7 @@ export async function GET() {
     if (!data && normalizedEmail) {
       let byEmail = await fetchByEmail(selectFull)
       if (byEmail?.error && shouldFallback(byEmail.error)) byEmail = await fetchByEmail(selectFallback)
-      data = (byEmail?.data as unknown as Record<string, unknown>) || null
+      data = (byEmail?.data as Record<string, unknown>) || null
     }
 
     if (data?.id && !data?.user_id) {

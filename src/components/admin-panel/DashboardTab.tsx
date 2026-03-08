@@ -177,7 +177,7 @@ export const DashboardTab: React.FC = () => {
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => {
-                                                    setSelectedStudent(item as unknown as import('@/types/admin').AdminUser);
+                                                    setSelectedStudent(item as import('@/types/admin').AdminUser);
                                                     setTab('students');
                                                 }}
                                                 className="px-3 py-2 text-xs font-bold text-neutral-400 bg-neutral-800 hover:bg-neutral-700 hover:text-white rounded-lg transition-all"
@@ -186,7 +186,7 @@ export const DashboardTab: React.FC = () => {
                                             </button>
                                             <button
                                                 onClick={() => {
-                                                    setSelectedStudent(item as unknown as import('@/types/admin').AdminUser);
+                                                    setSelectedStudent(item as import('@/types/admin').AdminUser);
                                                     setHistoryOpen(true);
                                                 }}
                                                 className="px-3 py-2 text-xs font-bold text-black bg-yellow-500 hover:bg-yellow-400 rounded-lg transition-all"
