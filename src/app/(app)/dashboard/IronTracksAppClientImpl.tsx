@@ -866,7 +866,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         return null
                                     })()}
                                     <HeaderActionsMenu
-                                        user={user as unknown as AdminUser}
+                                        user={user as AdminUser}
                                         isCoach={isCoach}
                                         hasUnreadChat={hasUnreadChat}
                                         hasUnreadNotification={hasUnreadNotification}
@@ -942,7 +942,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     vipContent={
                                         hideVipOnIos ? null :
                                             <VipHub
-                                                user={user as unknown as AdminUser}
+                                                user={user as AdminUser}
                                                 locked={!vipAccess?.hasVip}
                                                 onOpenWorkoutEditor={(w: unknown) => handleEditWorkout(w)}
                                                 onOpenVipTab={() => openVipView()}
@@ -1080,7 +1080,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 <SectionErrorBoundary section="Treino Ativo" fullScreen onReset={() => setView('dashboard')}>
                                     <ActiveWorkout
                                         session={activeSession as Record<string, unknown>}
-                                        user={user as unknown as AdminUser}
+                                        user={user as AdminUser}
                                         settings={userSettingsApi?.settings ?? null}
                                         onUpdateLog={handleUpdateSessionLog}
                                         onFinish={handleFinishSession}
@@ -1128,7 +1128,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             {view === 'history' && (
                                 <SectionErrorBoundary section="Histórico" fullScreen onReset={() => setView('dashboard')}>
                                     <HistoryList
-                                        user={user as unknown as AdminUser}
+                                        user={user as AdminUser}
                                         settings={userSettingsApi?.settings ?? null}
                                         onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]); setView('report'); }}
                                         onBack={() => setView('dashboard')}
@@ -1150,7 +1150,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         <WorkoutReport
                                             session={reportData.current}
                                             previousSession={reportData.previous}
-                                            user={user as unknown as AdminUser}
+                                            user={user as AdminUser}
                                             isVip={vipAccess?.hasVip}
                                             settings={userSettingsApi?.settings ?? null}
                                             onUpgrade={() => openVipView()}
@@ -1216,7 +1216,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             {view === 'chat' && (
                                 <div className="absolute inset-0 z-50 bg-neutral-900">
                                     <SectionErrorBoundary section="Chat" fullScreen onReset={() => setView('dashboard')}>
-                                        <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                        <ChatScreen user={user as AdminUser} onClose={() => setView('dashboard')} />
                                     </SectionErrorBoundary>
                                 </div>
                             )}
@@ -1224,7 +1224,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             {view === 'globalChat' && (
                                 <div className="absolute inset-0 z-50 bg-neutral-900">
                                     <SectionErrorBoundary section="Chat Global" fullScreen onReset={() => setView('dashboard')}>
-                                        <ChatScreen user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                        <ChatScreen user={user as AdminUser} onClose={() => setView('dashboard')} />
                                     </SectionErrorBoundary>
                                 </div>
                             )}
@@ -1232,7 +1232,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             {view === 'chatList' && (
                                 <div className="absolute inset-0 z-50 bg-neutral-900">
                                     <ChatListScreen
-                                        user={user as unknown as AdminUser}
+                                        user={user as AdminUser}
                                         onClose={() => setView('dashboard')}
                                         onSelectUser={() => { }}
                                         onSelectChannel={(c: unknown) => {
@@ -1261,7 +1261,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 <div className="absolute inset-0 z-50 bg-neutral-900">
                                     <SectionErrorBoundary section="Chat Direto" fullScreen onReset={() => setView('chatList')}>
                                         <ChatDirectScreen
-                                            user={user as unknown as AdminUser}
+                                            user={user as AdminUser}
                                             targetUser={directChat}
                                             otherUserId={String(directChat.other_user_id ?? directChat.userId ?? '')}
                                             otherUserName={String(directChat.other_user_name ?? directChat.displayName ?? '')}
@@ -1275,7 +1275,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             {view === 'admin' && (
                                 <div className="fixed inset-0 z-[60]">
                                     <SectionErrorBoundary section="Painel Admin" fullScreen onReset={() => setView('dashboard')}>
-                                        <AdminPanelV2 user={user as unknown as AdminUser} onClose={() => setView('dashboard')} />
+                                        <AdminPanelV2 user={user as AdminUser} onClose={() => setView('dashboard')} />
                                     </SectionErrorBoundary>
                                 </div>
                             )}

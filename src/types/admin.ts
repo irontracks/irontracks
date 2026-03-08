@@ -1,11 +1,8 @@
 
-import type { Workout, Exercise } from '@/types/app'
+import type { Workout, Exercise, UserRecord } from '@/types/app'
 
-export interface AdminUser {
-  id: string;
-  email?: string;
+export interface AdminUser extends UserRecord {
   name?: string;
-  displayName?: string;
   role?: string;
   photo_url?: string;
   status?: string;

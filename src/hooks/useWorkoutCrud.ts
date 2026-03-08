@@ -179,7 +179,7 @@ export function useWorkoutCrud({
             playStartSound({ enabled, volume })
         }
 
-        const sessionWorkout = { ...workoutObj, exercises: resolvedExercises } as unknown as ActiveSession
+        const sessionWorkout = { ...workoutObj, exercises: resolvedExercises } as ActiveSession
         setActiveSession({
             workout: sessionWorkout,
             logs: {} as Record<string, unknown>,
@@ -193,7 +193,7 @@ export function useWorkoutCrud({
             startedAt: Date.now(),
             timerTargetTime: null,
             timerContext: null,
-        } as unknown as ActiveWorkoutSession)
+        } as ActiveWorkoutSession)
         setView('active')
 
         // Social workout-start ping
@@ -267,7 +267,7 @@ export function useWorkoutCrud({
                 .maybeSingle()
             if (error) throw error
             if (!data) {
-                setCurrentWorkout(w as unknown as ActiveSession)
+                setCurrentWorkout(w as ActiveSession)
                 setView('edit')
                 return
             }
@@ -285,10 +285,10 @@ export function useWorkoutCrud({
                 persistExerciseVideoUrls(resolved?.updates || [])
                 setCurrentWorkout({
                     ...mappedObj,
-                    exercises: exercises as unknown as Array<Record<string, unknown>>,
-                } as unknown as ActiveSession)
+                    exercises: exercises as Array<Record<string, unknown>>,
+                } as ActiveSession)
             } catch {
-                setCurrentWorkout(mapped as unknown as ActiveSession)
+                setCurrentWorkout(mapped as ActiveSession)
             }
             setView('edit')
         } catch (e) {
@@ -306,20 +306,20 @@ export function useWorkoutCrud({
                 const res = await updateWorkout(String(w.id), w)
                 setCurrentWorkout(
                     isRecord(wRaw)
-                        ? (wRaw as unknown as ActiveSession)
-                        : (w as unknown as ActiveSession)
+                        ? (wRaw as ActiveSession)
+                        : (w as ActiveSession)
                 )
                 return res
             } else {
                 const created = await createWorkout(w)
-                const id = created?.ok ? (created as unknown as { data: { id: string } }).data.id : null
+                const id = created?.ok ? (created as { ok: boolean; data?: { id: string } }).data?.id : null
                 const baseObj: Record<string, unknown> = isRecord(wRaw)
                     ? (wRaw as Record<string, unknown>)
                     : w
                 setCurrentWorkout({
                     ...baseObj,
                     id: id != null ? String(id) : undefined,
-                } as unknown as ActiveSession)
+                } as ActiveSession)
                 return created
             }
         } catch (e) {
@@ -348,8 +348,8 @@ export function useWorkoutCrud({
             return {
                 ok: true,
                 mode: 'create',
-                id: (created as unknown as { ok: boolean; data?: { id: string } })?.ok
-                    ? (created as unknown as { data: { id: string } }).data.id
+                id: (created as { ok: boolean; data?: { id: string } })?.ok
+                    ? (created as { ok: boolean; data?: { id: string } }).data?.id
                     : undefined,
             }
         } catch (e) {
@@ -421,7 +421,7 @@ export function useWorkoutCrud({
                 : baseUi
             return {
                 ...prev,
-                workout: normalized as unknown as ActiveSession,
+                workout: normalized as ActiveSession,
                 logs: nextLogs,
                 ui: nextUi,
             }

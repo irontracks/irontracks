@@ -25,7 +25,7 @@ const safeString = (v: unknown): string => {
 const safeIso = (v: unknown): string | null => {
   try {
     if (!v) return null
-    const d = v instanceof Date ? v : new Date(v as unknown as string | number | Date)
+    const d = v instanceof Date ? v : new Date(v as string | number)
     const t = d.getTime()
     return Number.isFinite(t) ? d.toISOString() : null
   } catch {
@@ -261,8 +261,8 @@ export async function generatePostWorkoutInsights(
       body: JSON.stringify(body),
     })
     const json = await res.json().catch((): null => null)
-    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as unknown as ActionResult<Record<string, unknown>>
-    return json as unknown as ActionResult<Record<string, unknown>>
+    if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as ActionResult<Record<string, unknown>>
+    return json as ActionResult<Record<string, unknown>>
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
@@ -281,7 +281,7 @@ export async function generateExerciseMuscleMap(
     })
     const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao mapear exercícios' }
-    return json as unknown as ActionResult<Record<string, unknown>>
+    return json as ActionResult<Record<string, unknown>>
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
@@ -300,7 +300,7 @@ export async function getMuscleMapWeek(
     })
     const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular' }
-    return json as unknown as ActionResult<Record<string, unknown>>
+    return json as ActionResult<Record<string, unknown>>
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
@@ -319,7 +319,7 @@ export async function getMuscleMapDay(
     })
     const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular do dia' }
-    return json as unknown as ActionResult<Record<string, unknown>>
+    return json as ActionResult<Record<string, unknown>>
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
@@ -338,7 +338,7 @@ export async function backfillExerciseMuscleMaps(
     })
     const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao reprocessar histórico' }
-    return json as unknown as ActionResult<Record<string, unknown>>
+    return json as ActionResult<Record<string, unknown>>
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
@@ -357,7 +357,7 @@ export async function applyProgressionToNextTemplate(
     })
     const json = await res.json().catch((): null => null)
     if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao aplicar progressão' }
-    return json as unknown as ActionResult<Record<string, unknown>>
+    return json as ActionResult<Record<string, unknown>>
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return { ok: false, error: message }
@@ -433,7 +433,7 @@ export async function getLatestWorkoutPrs(): Promise<ActionResult<Record<string,
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user?.id) return { ok: false, error: 'unauthorized', prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
+    if (!user?.id) return { ok: false, error: 'unauthorized', prs: [], workout: null } as ActionResult<Record<string, unknown>>
 
     const { data: latest, error: lErr } = await supabase
       .from('workouts')
@@ -444,8 +444,8 @@ export async function getLatestWorkoutPrs(): Promise<ActionResult<Record<string,
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    if (lErr) return { ok: false, error: lErr.message, prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
-    if (!latest?.id) return { ok: true, data: { prs: [], workout: { title: null, date: null } }, prs: [], workout: { title: null, date: null } } as unknown as ActionResult<Record<string, unknown>>
+    if (lErr) return { ok: false, error: lErr.message, prs: [], workout: null } as ActionResult<Record<string, unknown>>
+    if (!latest?.id) return { ok: true, data: { prs: [], workout: { title: null, date: null } }, prs: [], workout: { title: null, date: null } } as ActionResult<Record<string, unknown>>
 
     const session = safeJsonParse(latest.notes)
     const currentMap = extractLogsStatsByExercise(session)
@@ -504,10 +504,10 @@ export async function getLatestWorkoutPrs(): Promise<ActionResult<Record<string,
         title: latest?.name ?? null,
         date: safeIso(latest?.date) || safeIso(latest?.created_at),
       },
-    } as unknown as ActionResult<Record<string, unknown>>
+    } as ActionResult<Record<string, unknown>>
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
-    return { ok: false, error: message, prs: [], workout: null } as unknown as ActionResult<Record<string, unknown>>
+    return { ok: false, error: message, prs: [], workout: null } as ActionResult<Record<string, unknown>>
   }
 }
 
