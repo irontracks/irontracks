@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useWorkoutTicker } from './hooks/useWorkoutTicker';
 import { useWorkoutModals } from './hooks/useWorkoutModals';
 import { useWorkoutDeload } from './hooks/useWorkoutDeload';
@@ -8,7 +8,6 @@ import { useWorkoutFinish } from './hooks/useWorkoutFinish';
 import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers';
 import { useDialog } from '@/contexts/DialogContext';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
-import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import {
   ActiveWorkoutProps,
   UnknownRecord,
@@ -84,7 +83,6 @@ import {
   getDeloadReason,
 } from './helpers/deloadHelpers';
 import { HELP_TERMS } from '@/utils/help/terms';
-import { logError, logWarn, logInfo } from '@/lib/logger'
 
 const parseStartedAtMs = (raw: unknown): number => {
   const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
