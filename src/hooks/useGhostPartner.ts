@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { logError } from '@/lib/logger'
 
 /**
  * A single ghost set entry — mirroring a partner's past workout log.
@@ -104,7 +105,7 @@ export function useGhostPartner(myUserId: string, partnerUserId: string | null) 
             })
         } catch (e: unknown) {
             setError('Erro ao carregar dados do ghost.')
-            console.error(e)
+            logError('useGhostPartner', e)
         } finally {
             setLoading(false)
         }

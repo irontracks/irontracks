@@ -3,9 +3,10 @@
 import { useEffect } from 'react'
 import { AlertCircle, RefreshCw } from 'lucide-react'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 
 export default function MarketplaceError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
-  useEffect(() => { console.error('Marketplace error:', error) }, [error])
+  useEffect(() => { logError('MarketplaceError', error) }, [error])
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center">

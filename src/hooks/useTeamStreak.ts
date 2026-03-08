@@ -11,6 +11,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { logError } from '@/lib/logger'
 
 export interface TeamStreakData {
     partnerId: string
@@ -88,7 +89,7 @@ export function useTeamStreak(myUserId: string, partnerUserId?: string | null) {
             setStreaks(result)
         } catch (e: unknown) {
             setError('Erro ao carregar streak.')
-            console.error(e)
+            logError('useTeamStreak', e)
         } finally {
             setLoading(false)
         }
