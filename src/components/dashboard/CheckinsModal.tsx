@@ -1,8 +1,8 @@
 'use client'
 
 import { X } from 'lucide-react'
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>
 
 type CheckinsModalProps = {
   isOpen: boolean

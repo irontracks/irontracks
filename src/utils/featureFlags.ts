@@ -1,3 +1,5 @@
+
+import type { UnknownRecord } from '@/types/app'
 export const FEATURE_KEYS = {
   teamworkV2: 'featureTeamworkV2',
   storiesV2: 'featureStoriesV2',
@@ -12,7 +14,6 @@ export const FEATURE_META = {
   weeklyReportCTA: { key: FEATURE_KEYS.weeklyReportCTA, owner: 'core', review_at: '2026-03-31' },
 }
 
-type UnknownRecord = Record<string, unknown>
 
 const isObject = (v: unknown): v is UnknownRecord => Boolean(v && typeof v === 'object' && !Array.isArray(v))
 

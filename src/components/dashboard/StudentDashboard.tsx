@@ -24,8 +24,8 @@ import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { SortableWorkoutItem } from './SortableWorkoutItem'
 import { WorkoutToolsPanel } from './WorkoutToolsPanel'
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>
 
 const isPlainRecord = (v: unknown): v is UnknownRecord => v !== null && typeof v === 'object' && !Array.isArray(v)
 

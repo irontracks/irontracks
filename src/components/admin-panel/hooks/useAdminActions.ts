@@ -8,8 +8,8 @@
 import { AdminUser, AdminTeacher } from '@/types/admin';
 import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin-actions';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { UnknownRecord } from '@/types/app'
 
-type UnknownRecord = Record<string, unknown>;
 type AlertFn = (msg: string, title?: string) => Promise<unknown>;
 type ConfirmFn = (msg: string, title?: string) => Promise<boolean>;
 

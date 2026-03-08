@@ -1,4 +1,5 @@
-type UnknownRecord = Record<string, unknown>
+
+import type { UnknownRecord } from '@/types/app'
 
 type WorkoutLogEntry = {
   weight?: unknown

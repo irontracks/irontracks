@@ -1,7 +1,7 @@
 
-import type { Exercise, Workout, UserRecord, ActiveWorkoutSession } from '@/types/app';
+import type { Exercise, Workout, UserRecord, ActiveWorkoutSession, UnknownRecord } from '@/types/app';
 
-export type UnknownRecord = Record<string, unknown>;
+export type { UnknownRecord } from '@/types/app';
 
 export type UserProfile = Partial<UserRecord> & { id?: string };
 
@@ -78,17 +78,17 @@ export type DeloadAnalysis = { status: 'overtraining' | 'stagnation' | 'stable';
 
 export type DeloadSuggestion =
   | {
-      ok: true;
-      name: string;
-      exIdx: number;
-      baseWeight: number;
-      suggestedWeight: number;
-      appliedReduction: number;
-      targetReduction: number;
-      historyCount: number;
-      minWeight: number;
-      analysis: DeloadAnalysis;
-    }
+    ok: true;
+    name: string;
+    exIdx: number;
+    baseWeight: number;
+    suggestedWeight: number;
+    appliedReduction: number;
+    targetReduction: number;
+    historyCount: number;
+    minWeight: number;
+    analysis: DeloadAnalysis;
+  }
   | { ok: false; error: string };
 
 export type DeloadSetSuggestion =

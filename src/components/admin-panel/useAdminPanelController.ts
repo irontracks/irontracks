@@ -20,7 +20,7 @@ import { escapeHtml } from '@/utils/escapeHtml';
 import type { Exercise } from '@/types/app';
 
 import { useAdminActions } from './hooks/useAdminActions';
-type UnknownRecord = Record<string, unknown>;
+import type { UnknownRecord } from '@/types/app'
 
 
 export type AdminPanelProps = {

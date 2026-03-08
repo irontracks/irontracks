@@ -1,4 +1,5 @@
-type UnknownRecord = Record<string, unknown>
+
+import type { UnknownRecord } from '@/types/app'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
