@@ -98,54 +98,51 @@ const LoginScreen = () => {
 
     // Carregar e-mail salvo e tentar restaurar sessão de backup (iOS PWA Killed State)
     useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const savedEmail = localStorage.getItem('it_remembered_email');
-            if (savedEmail) {
-                setEmailData(prev => ({ ...prev, email: savedEmail }));
-                setRememberMe(true);
-            }
+        if (typeof window === 'undefined') return
 
-            // Tentar restaurar a sessão do localStorage (fallback para cookies dropados pela Apple)
-            try {
-                const backupRaw = localStorage.getItem('it.session.backup')
-                if (backupRaw) {
-                    const backup = JSON.parse(backupRaw)
-                    if (backup?.access_token && backup?.refresh_token) {
-                        setIsLoading(true)
-                        const supabase = createClient()
-                        supabase.auth.setSession({
-                            access_token: backup.access_token,
-                            refresh_token: backup.refresh_token
-                        }).then(({ error, data }) => {
-                            if (!error && data?.session) {
-                                // Restore na API de cookies Nextjs
-                                fetch('/api/auth/session', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
-                                }).then(() => {
-                                    try { localStorage.setItem('it.logged_in', '1') } catch { }
-                                    router.replace('/dashboard')
-                                    try { router.refresh() } catch { }
-                                }).catch(() => setIsLoading(false))
-                            } else {
-                                setIsLoading(false)
-                            }
-                        }).catch(() => setIsLoading(false))
-                        return // backup restore handles its own loading state
-                    }
-                }
-            } catch { }
-
-            // Safety net: if isLoading was set by cookie detection (no backup),
-            // the server redirect should complete quickly. If it doesn't after 3s,
-            // the cookie is likely expired — show the login form.
-            if (isLoading) {
-                const t = setTimeout(() => setIsLoading(false), 3000)
-                return () => clearTimeout(t)
-            }
+        const savedEmail = localStorage.getItem('it_remembered_email');
+        if (savedEmail) {
+            setEmailData(prev => ({ ...prev, email: savedEmail }));
+            setRememberMe(true);
         }
-    }, [router, isLoading]);
+
+        // If logged-in flag is set, redirect immediately without waiting for server
+        if (localStorage.getItem('it.logged_in') === '1') {
+            setIsLoading(true)
+            window.location.replace('/dashboard')
+            return
+        }
+
+        // Tentar restaurar a sessão do localStorage (fallback para cookies dropados pela Apple)
+        try {
+            const backupRaw = localStorage.getItem('it.session.backup')
+            if (backupRaw) {
+                const backup = JSON.parse(backupRaw)
+                if (backup?.access_token && backup?.refresh_token) {
+                    setIsLoading(true)
+                    const supabase = createClient()
+                    supabase.auth.setSession({
+                        access_token: backup.access_token,
+                        refresh_token: backup.refresh_token
+                    }).then(({ error, data }) => {
+                        if (!error && data?.session) {
+                            fetch('/api/auth/session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
+                            }).then(() => {
+                                try { localStorage.setItem('it.logged_in', '1') } catch { }
+                                window.location.replace('/dashboard')
+                            }).catch(() => setIsLoading(false))
+                        } else {
+                            setIsLoading(false)
+                        }
+                    }).catch(() => setIsLoading(false))
+                }
+            }
+        } catch { }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Request Access State
     const [showRequestModal, setShowRequestModal] = useState(false);
@@ -551,9 +548,13 @@ const LoginScreen = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // When loading, render ONLY the loading screen — no login form behind it
+    if (isLoading) {
+        return <LoadingScreen />
+    }
+
     return (
         <div className="relative flex flex-col items-center justify-center min-h-[100dvh] overflow-hidden bg-neutral-950 text-white p-6">
-            {isLoading && <LoadingScreen />}
             {/* Spotlight Gradient Background */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] opacity-60" />
