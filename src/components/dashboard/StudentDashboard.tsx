@@ -215,7 +215,6 @@ const isPeriodizedWorkout = (w: DashboardWorkout) =>
   String(w?.title || w?.name || '').trim().startsWith('VIP •')
 
 export default function StudentDashboard(props: Props) {
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const supabase = useMemo(() => createClient(), [])
   const workouts = Array.isArray(props.workouts) ? props.workouts : []
   const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'

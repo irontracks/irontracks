@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
  * unnecessary re-renders in the background.
  */
 export function useWorkoutTicker() {
-    const [ticker, setTicker] = useState<number>(() => Date.now());
+    const [ticker, setTicker] = useState<number>(Date.now());
     const [timerMinimized, setTimerMinimized] = useState<boolean>(true);
 
     useEffect(() => {

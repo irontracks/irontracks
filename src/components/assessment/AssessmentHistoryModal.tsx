@@ -140,7 +140,6 @@ export function AssessmentHistoryModal({
                                                     typeof a.assessment_date === 'number' ||
                                                     a.assessment_date instanceof Date
                                                     ? a.assessment_date
-                                                    // eslint-disable-next-line react-hooks/purity
                                                     : String(a.assessment_date ?? Date.now()),
                                             )}
                                         />

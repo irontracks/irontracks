@@ -31,7 +31,6 @@ function useCountUp(target: number, duration = 900) {
     return value
 }
 
-// eslint-disable-next-line react/display-name
 export const ReportSummaryCards = memo(({
     session,
     currentVolume,

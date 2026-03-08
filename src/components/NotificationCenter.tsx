@@ -222,7 +222,6 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     // ─── Data assembly ────────────────────────────────────────────────────────
     const formatTime = (isoString?: string) => {
         if (!isoString) return 'Agora';
-        // eslint-disable-next-line react-hooks/purity
         const diff = (Date.now() - new Date(isoString).getTime()) / 1000;
         if (diff < 60) return 'Agora';
         if (diff < 3600) return `${Math.floor(diff / 60)}m atrás`;
