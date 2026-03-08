@@ -1,11 +1,12 @@
+import dynamic from 'next/dynamic'
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import { Plus } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import StoryViewer from '@/components/stories/StoryViewer'
-import StoryCreatorModal from '@/components/stories/StoryCreatorModal'
+const StoryViewer = dynamic(() => import('@/components/stories/StoryViewer'), { ssr: false })
+const StoryCreatorModal = dynamic(() => import('@/components/stories/StoryCreatorModal'), { ssr: false })
 import { Story, StoryGroup } from '@/types/social'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
