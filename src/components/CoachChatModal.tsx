@@ -1,3 +1,4 @@
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
@@ -175,7 +176,7 @@ export default function CoachChatModal({
     const isChatExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
 
     return (
-        <div className="fixed inset-0 z-[1300] flex items-center justify-center p-4 pt-safe pb-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}>
+        <div className="fixed inset-0 z-[1300] flex items-center justify-center p-4 pt-safe pb-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="CoachChat">
             <div className="w-full max-w-lg rounded-2xl flex flex-col max-h-[80vh]" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
                 <div className="p-4 flex items-center justify-between rounded-t-2xl relative" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     <div className="flex items-center gap-3">

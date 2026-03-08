@@ -66,7 +66,7 @@ const GlobalDialog = () => {
 	})();
 
 	return (
-		<div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 pt-safe pb-safe animate-fade-in" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}>
+		<div role="dialog" aria-modal="true" aria-label="Confirmação" className="fixed inset-0 z-[5000] flex items-center justify-center p-4 pt-safe pb-safe animate-fade-in" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}>
 			<div className="rounded-2xl max-w-sm w-full overflow-hidden animate-slide-up" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 50px rgba(234,179,8,0.08), 0 30px 80px rgba(0,0,0,0.7)' }}>
 
 				{/* Premium header with big centered icon */}

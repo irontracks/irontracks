@@ -1,4 +1,6 @@
-'use client';
+'use client'
+// Focus trap for accessibility
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 import { useState, useRef, useEffect, type ChangeEvent } from 'react';
 import { X, Type, Smile, Scissors, Sparkles, Send, Loader2, Play, Pause, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
@@ -396,7 +398,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col pb-safe">
+        <div className="fixed inset-0 z-50 bg-black flex flex-col pb-safe" role="dialog" aria-modal="true" aria-label="StoryCreator">
             {/* Top Bar */}
             <div className="absolute top-0 left-0 right-0 z-50 p-4 pt-safe flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
                 <button onClick={onClose} className="p-2 bg-black/20 rounded-full backdrop-blur-md">

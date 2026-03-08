@@ -1,3 +1,4 @@
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, RefreshCw, Trash2, X, Bug, Clock } from 'lucide-react'
 import { bumpOfflineJob, clearOfflineJobs, flushOfflineQueue, getOfflineQueueSummary, isOnline } from '@/lib/offline/offlineSync'
@@ -57,7 +58,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[1600] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => onClose?.()}>
+    <div className="fixed inset-0 z-[1600] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-label="Sincronização Offline" onClick={() => onClose?.()}>
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="p-4 border-b border-neutral-800 flex items-start justify-between gap-3">
           <div className="min-w-0">
