@@ -28,17 +28,24 @@ const LoginScreen = () => {
     const router = useRouter();
     useNativeAppSetup(null)
     const appVersionLabel = useMemo(() => 'v1.0', []);
-    // Lazy initializer: verifica localStorage SINCRONAMENTE no primeiro render.
-    // Se houver backup de sessão (iOS cookie wipe), começa já com isLoading=true
-    // para exibir o LoadingScreen antes de qualquer frame de login — elimina o flash.
+    // Lazy initializer: verifica sessão existente SINCRONAMENTE no primeiro render.
+    // Se houver cookie de sessão Supabase OU backup no localStorage, começa com
+    // isLoading=true para exibir o LoadingScreen — elimina o flash da tela de login.
     const [isLoading, setIsLoading] = useState(() => {
         if (typeof window === 'undefined') return false
         try {
+            // 1. Check for session backup (iOS cookie wipe recovery)
             const raw = localStorage.getItem('it.session.backup')
             if (raw) {
                 const backup = JSON.parse(raw) as Record<string, unknown>
-                return !!(backup?.access_token && backup?.refresh_token)
+                if (backup?.access_token && backup?.refresh_token) return true
             }
+            // 2. Check for existing Supabase cookies (user already logged in)
+            const cookies = document.cookie || ''
+            if (cookies.split(';').some(c => {
+                const name = c.trim().split('=')[0] || ''
+                return name.startsWith('sb-') || name.includes('supabase')
+            })) return true
         } catch { }
         return false
     });
@@ -128,11 +135,20 @@ const LoginScreen = () => {
                                 setIsLoading(false)
                             }
                         }).catch(() => setIsLoading(false))
+                        return // backup restore handles its own loading state
                     }
                 }
             } catch { }
+
+            // Safety net: if isLoading was set by cookie detection (no backup),
+            // the server redirect should complete quickly. If it doesn't after 3s,
+            // the cookie is likely expired — show the login form.
+            if (isLoading) {
+                const t = setTimeout(() => setIsLoading(false), 3000)
+                return () => clearTimeout(t)
+            }
         }
-    }, [router]);
+    }, [router, isLoading]);
 
     // Request Access State
     const [showRequestModal, setShowRequestModal] = useState(false);
