@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { Users, Clock, TrendingUp, ChevronRight } from 'lucide-react'
 import Image from 'next/image'
 import { createClient } from '@/utils/supabase/client'
+import { logError } from '@/lib/logger'
 
 export interface TeamSessionRecord {
     id: string
@@ -91,7 +92,7 @@ export function TeamSessionHistory({ userId, onSelectSession, limit = 20 }: Team
             setSessions(parsed)
         } catch (e: unknown) {
             setError('Erro ao carregar histórico de sessões em equipe.')
-            console.error(e)
+            logError('TeamSessionHistory', e)
         } finally {
             setLoading(false)
         }

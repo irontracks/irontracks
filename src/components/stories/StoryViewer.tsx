@@ -8,6 +8,7 @@ import { useDialog } from '@/contexts/DialogContext'
 import { Story, StoryGroup } from '@/types/social'
 import { mediaKindFromUrl } from '@/utils/mediaUtils'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 
 const MAX_VIDEO_SECONDS = 60
 const PHOTO_SECONDS = 15
@@ -473,11 +474,11 @@ export default function StoryViewer({
         onClose()
       } else {
         const errMsg = json?.error || `Status ${res.status}`
-        console.error('[StoryViewer] delete failed:', res.status, json)
+        logError('StoryViewer.delete', `Delete failed: ${res.status}`, json)
         await alert(`Erro ao deletar: ${errMsg}`)
       }
     } catch (e) {
-      console.error('[StoryViewer] delete exception:', e)
+      logError('StoryViewer.delete', e)
       await alert('Erro ao deletar story. Verifique sua conexão.')
     } finally {
       setDeleting(false)
