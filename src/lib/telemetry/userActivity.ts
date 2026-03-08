@@ -77,7 +77,7 @@ const scheduleFlush = () => {
   flushTimer = window.setTimeout(() => {
     flushTimer = null
     flush({ preferBeacon: false })
-  }, 2000) as unknown as ReturnType<typeof setTimeout>
+  }, 2000) as ReturnType<typeof setTimeout>
 }
 
 const shouldDrop = (key: string, ms: number) => {
