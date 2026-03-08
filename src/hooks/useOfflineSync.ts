@@ -105,7 +105,6 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
   // intentional: listeners registered exactly once (mount-only). refreshRef and flushRef
   // are stable mutable refs updated on every render (lines above), so the callbacks
   // always call the latest version without causing listener churn.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-flush every 15s if there are pending items

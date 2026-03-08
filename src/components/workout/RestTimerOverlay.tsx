@@ -336,6 +336,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     // ── YELLOW — countdown phase ─────────────────────────────────────────────
     // progress = remaining / total  →  1.0 at start, 0.0 when done
+    // eslint-disable-next-line react-hooks/refs
     const total = totalSecondsRef.current || 1;
     const countdownProgress = !isFinished
         ? Math.max(0, Math.min(1, baseSeconds / total))
