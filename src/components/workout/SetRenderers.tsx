@@ -76,7 +76,7 @@ export const NormalSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: n
           <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
           <button
             type="button"
-            onClick={() => toggleNotes(key)}
+            onClick={() => toggleNotes(key)} aria-label="Observações"
             className={
               isNotesOpen || hasNotes
                 ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
@@ -668,7 +668,7 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
         </div>
         <button
           type="button"
-          onClick={() => toggleNotes(key)}
+          onClick={() => toggleNotes(key)} aria-label="Observações"
           className={
             isNotesOpen || hasNotes
               ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
@@ -777,7 +777,7 @@ export const StrippingSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
         </div>
         <button
           type="button"
-          onClick={() => toggleNotes(key)}
+          onClick={() => toggleNotes(key)} aria-label="Observações"
           className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
         >
           <MessageSquare size={14} />
@@ -844,7 +844,7 @@ export const FST7Set = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: num
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">FST-7</span>
           <span className="text-xs text-neutral-400 truncate">7 blocos • {intraSec}s intra • {total || 0} reps total</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -906,7 +906,7 @@ export const HeavyDutySet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Heavy Duty</span>
           <span className="text-xs text-neutral-400 truncate">{summary}</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -962,7 +962,7 @@ export const PontoZeroSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Ponto Zero</span>
           <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • ${reps} reps • ${holdSec}s hold` : 'Abra o modal para preencher'}</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -1018,7 +1018,7 @@ export const ForcedRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exId
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">R. Forçadas</span>
           <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • ${repsFailure} falha + ${forcedCount} forçadas` : 'Abra o modal para preencher'}</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -1074,7 +1074,7 @@ export const NegativeRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; ex
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Negativas</span>
           <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • ${reps} reps • ${eccentricSec}s/rep` : 'Abra o modal para preencher'}</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -1130,7 +1130,7 @@ export const PartialRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Parciais</span>
           <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • ${fullReps} full + ${partialCount} parciais` : 'Abra o modal para preencher'}</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -1188,7 +1188,7 @@ export const Sistema21Set = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Sistema 21</span>
           <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • P1:${phase1} + P2:${phase2} + P3:${phase3} = ${total} reps` : 'Abra o modal para preencher'}</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -1252,7 +1252,7 @@ export const WaveSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: num
           <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Onda</span>
           <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • ${wavesRaw.length} ondas` : 'Abra o modal para preencher'}</span>
         </div>
-        <button type="button" onClick={() => toggleNotes(key)} className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+        <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
           <MessageSquare size={14} />
         </button>
         <button
@@ -1347,7 +1347,7 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
         </button>
         <button
           type="button"
-          onClick={() => toggleNotes(key)}
+          onClick={() => toggleNotes(key)} aria-label="Observações"
           className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
         >
           <Pencil size={14} />
