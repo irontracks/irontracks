@@ -8,8 +8,8 @@
  * - Outros              → network-first com fallback
  */
 
-const CACHE_NAME = 'irontracks-v2'
-const STATIC_CACHE = 'irontracks-static-v2'
+const CACHE_NAME = 'irontracks-v3'
+const STATIC_CACHE = 'irontracks-static-v3'
 
 // Páginas críticas pré-cacheadas na instalação
 const PRECACHE_URLS = [
