@@ -3,11 +3,10 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { requireRole } from '@/utils/auth/route'
-import type { ActionResult } from '@/types/actions'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { sendPushToUsers } from '@/lib/push/apns'
 
-type AdminActionResult<T = Record<string, unknown>> = ActionResult<T> & { success?: boolean; error?: string; data?: unknown }
+type AdminResult = { success: true; [key: string]: unknown } | { success?: never; error: string; [key: string]: unknown }
 
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -17,7 +16,7 @@ async function checkAdmin() {
     return auth.user
 }
 
-export async function sendBroadcastMessage(title: string, message: string): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function sendBroadcastMessage(title: string, message: string): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
@@ -54,13 +53,13 @@ export async function sendBroadcastMessage(title: string, message: string): Prom
             void sendPushToUsers(allUserIds, title, message).catch(() => { })
         }
 
-        return { success: true, count: notifications.length } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true, count: notifications.length }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function registerStudent(email: string, password: string, name: string): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function registerStudent(email: string, password: string, name: string): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
@@ -87,9 +86,9 @@ export async function registerStudent(email: string, password: string, name: str
 
         if (pError) logError('error', "Profile creation warning:", pError)
 
-        return { success: true, user: data.user } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true, user: data.user }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
@@ -99,7 +98,7 @@ export async function addTeacher(
     phone: string,
     birth_date: string,
     status = 'pending',
-): Promise<AdminActionResult<Record<string, unknown>>> {
+): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
@@ -140,49 +139,49 @@ export async function addTeacher(
                 throw err
             }
         }
-        return { success: true } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function clearAllStudents(): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function clearAllStudents(): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
         const { error } = await adminDb.from('profiles').delete().neq('role', 'admin')
         if (error) throw error
-        return { success: true } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function clearAllTeachers(): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function clearAllTeachers(): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
         const { error } = await adminDb.from('teachers').delete().gte('created_at', '1900-01-01')
         if (error) throw error
-        return { success: true } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function clearAllWorkouts(): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function clearAllWorkouts(): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
         const { error } = await adminDb.from('workouts').delete().gte('created_at', '1900-01-01')
         if (error) throw error
-        return { success: true } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function updateTeacher(id: unknown, data: Record<string, unknown>): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function updateTeacher(id: unknown, data: Record<string, unknown>): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
@@ -250,13 +249,13 @@ export async function updateTeacher(id: unknown, data: Record<string, unknown>):
             }
         }
 
-        return { success: true } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function deleteTeacher(id: unknown): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function deleteTeacher(id: unknown): Promise<AdminResult> {
     try {
         const adminUser = await checkAdmin()
         const adminDb = createAdminClient()
@@ -269,28 +268,28 @@ export async function deleteTeacher(id: unknown): Promise<AdminActionResult<Reco
             p_actor_role: 'admin',
         })
         if (error) throw error
-        return { success: true, report: data ?? null } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true, report: data ?? null }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function clearPublicRegistry(): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function clearPublicRegistry(): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
         const { error } = await adminDb.from('notifications').delete().gte('created_at', '1900-01-01')
         if (error) throw error
-        return { success: true } as unknown as AdminActionResult<Record<string, unknown>>
+        return { success: true }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>
+        return { error: getErrorMessage(e) }
     }
 }
 
 export async function assignWorkoutToStudent(
     studentId: string,
     template: Record<string, unknown>,
-): Promise<AdminActionResult<Record<string, unknown>>> {
+): Promise<AdminResult> {
     try {
         const adminUser = await checkAdmin();
         const adminDb = createAdminClient();
@@ -422,13 +421,13 @@ export async function assignWorkoutToStudent(
             }
         }
 
-        return { success: true, workoutId: newWorkout.id, workout: newWorkout } as unknown as AdminActionResult<Record<string, unknown>>;
+        return { success: true, workoutId: newWorkout.id, workout: newWorkout };
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>;
+        return { error: getErrorMessage(e) };
     }
 }
 
-export async function getStudentWorkouts(studentId: string): Promise<ActionResult<unknown[]> & { error?: string; data?: unknown[] }> {
+export async function getStudentWorkouts(studentId: string): Promise<AdminResult & { data?: unknown[] }> {
     try {
         await checkAdmin();
         const adminDb = createAdminClient();
@@ -462,13 +461,13 @@ export async function getStudentWorkouts(studentId: string): Promise<ActionResul
             .order('name');
 
         if (error) throw error;
-        return { data } as unknown as ActionResult<unknown[]> & { error?: string; data?: unknown[] };
+        return { data };
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as ActionResult<unknown[]> & { error?: string; data?: unknown[] };
+        return { error: getErrorMessage(e) };
     }
 }
 
-export async function removeWorkoutFromStudent(workoutId: string): Promise<AdminActionResult<Record<string, unknown>>> {
+export async function removeWorkoutFromStudent(workoutId: string): Promise<AdminResult> {
     try {
         await checkAdmin();
         const adminDb = createAdminClient();
@@ -476,13 +475,13 @@ export async function removeWorkoutFromStudent(workoutId: string): Promise<Admin
         if (!safeWorkoutId) throw new Error('Missing workout id')
         const { error } = await adminDb.from('workouts').delete().eq('id', safeWorkoutId);
         if (error) throw error;
-        return { success: true } as unknown as AdminActionResult<Record<string, unknown>>;
+        return { success: true };
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as AdminActionResult<Record<string, unknown>>;
+        return { error: getErrorMessage(e) };
     }
 }
 
-export async function exportAllData(): Promise<ActionResult<{ url: string } | { data: unknown }> & { error?: string; data?: unknown }> {
+export async function exportAllData(): Promise<AdminResult & { data?: unknown }> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
@@ -542,13 +541,13 @@ export async function exportAllData(): Promise<ActionResult<{ url: string } | { 
             }))
         }
 
-        return { success: true, data: payload } as unknown as ActionResult<{ url: string } | { data: unknown }> & { error?: string; data?: unknown }
+        return { success: true, data: payload }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as ActionResult<{ url: string } | { data: unknown }> & { error?: string; data?: unknown }
+        return { error: getErrorMessage(e) }
     }
 }
 
-export async function importAllData(json: Record<string, unknown>): Promise<ActionResult<{ imported: number }> & { error?: string; success?: boolean }> {
+export async function importAllData(json: Record<string, unknown>): Promise<AdminResult> {
     try {
         await checkAdmin()
         const adminDb = createAdminClient()
@@ -779,8 +778,8 @@ export async function importAllData(json: Record<string, unknown>): Promise<Acti
             }
         }
 
-        return { success: true } as unknown as ActionResult<{ imported: number }> & { error?: string; success?: boolean }
+        return { success: true }
     } catch (e) {
-        return { error: getErrorMessage(e) } as unknown as ActionResult<{ imported: number }> & { error?: string; success?: boolean }
+        return { error: getErrorMessage(e) }
     }
 }
