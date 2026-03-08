@@ -193,6 +193,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistoryStatusRef.current = reportHistoryStatus && typeof reportHistoryStatus === 'object' ? reportHistoryStatus : { status: 'idle', error: '', source: '' };
   }, [reportHistoryStatus]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     reportHistoryUpdatedAtRef.current = Number(reportHistoryUpdatedAt || 0);
   }, [reportHistoryUpdatedAt]);

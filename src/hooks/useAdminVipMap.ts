@@ -55,6 +55,7 @@ export function useAdminVipMap(userIds: string[]) {
 
         const ids = stableKey.split(',')
         let cancelled = false
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true)
 
         fetch('/api/admin/vip/batch-status', {
