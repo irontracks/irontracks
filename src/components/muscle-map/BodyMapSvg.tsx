@@ -117,7 +117,6 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected, calibrat
       try {
         const savedFront = window.localStorage.getItem('calibration_front')
         const savedBack = window.localStorage.getItem('calibration_back')
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (savedFront) setFrontOffsets((prev) => ({ ...prev, ...JSON.parse(savedFront) }))
         if (savedBack) setBackOffsets((prev) => ({ ...prev, ...JSON.parse(savedBack) }))
       } catch { }

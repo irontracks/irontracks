@@ -211,7 +211,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         initialRole,
     })
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         try {
             const flag = sessionStorage.getItem('irontracks_open_vip')

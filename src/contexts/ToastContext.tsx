@@ -26,7 +26,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   // Cancel all pending timers when the provider unmounts
   useEffect(() => {
     return () => {
-            // eslint-disable-next-line react-hooks/exhaustive-deps
       timers.current.forEach((t) => clearTimeout(t))
       timers.current.clear()
     }

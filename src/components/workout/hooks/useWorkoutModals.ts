@@ -72,7 +72,6 @@ export function useWorkoutModals(collapsedKey: string | null) {
     const organizeBaseKeysRef = useRef<string[]>([]);
 
     const organizeDirty = useMemo(() => {
-        // eslint-disable-next-line react-hooks/refs
         const baseKeys = Array.isArray(organizeBaseKeysRef.current) ? organizeBaseKeysRef.current : [];
         const draftKeys = draftOrderKeys(organizeDraft);
         if (draftKeys.length !== baseKeys.length) return true;

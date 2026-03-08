@@ -51,12 +51,10 @@ export const useCheckins = ({
   sessionCompletedAt,
   originWorkoutId,
 }: UseCheckinsParams): UseCheckinsReturn => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   const [checkinsByKind, setCheckinsByKind] = useState<{ pre: AnyObj | null; post: AnyObj | null }>({ pre: null, post: null })
 
   useEffect(() => {
     const id = workoutId ? String(workoutId) : ''
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!id || !supabase) { setCheckinsByKind({ pre: null, post: null }); return }
 
     const baseMs = toDateMs(sessionDate) ?? toDateMs(sessionCompletedAt) ?? Date.now()

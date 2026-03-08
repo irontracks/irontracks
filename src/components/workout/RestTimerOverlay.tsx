@@ -184,7 +184,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         };
     }, [isFinished]);
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (!targetTime) {
             setIdleTimerDisabled(false);
