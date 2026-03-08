@@ -434,7 +434,7 @@ export function PremiumAvatar({
         >
             {photo ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={photo} alt="" width={size} height={size} className="w-full h-full object-cover" />
+                <img src={photo} alt="" width={size} height={size} loading="lazy" className="w-full h-full object-cover" />
             ) : (
                 <span className="font-black text-yellow-500/80" style={{ fontSize: size * 0.36 }}>
                     {initials || '?'}
