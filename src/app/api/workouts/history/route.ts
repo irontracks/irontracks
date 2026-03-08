@@ -22,9 +22,11 @@ export async function GET(req: Request) {
     if (response) return response
     if (!q) return NextResponse.json({ ok: false, error: 'invalid_query' }, { status: 400 })
 
-    const { limits, tier } = await getVipPlanLimits(supabase, user.id)
+    // Parallel: fetch VIP limits while building the query
+    const vipPromise = getVipPlanLimits(supabase, user.id)
 
-    let query = supabase
+    // Start building the base query immediately
+    let baseQuery = supabase
       .from('workouts')
       .select('id, name, user_id, date, created_at, completed_at, notes, is_template')
       .eq('user_id', user.id)
@@ -32,17 +34,20 @@ export async function GET(req: Request) {
       .order('date', { ascending: false })
       .limit(q.limit)
 
+    // Wait for VIP limits (runs in parallel with query build)
+    const { limits, tier } = await vipPromise
+
     const historyDays = limits.history_days
     if (typeof historyDays === 'number' && Number.isFinite(historyDays) && historyDays > 0) {
       const cutoff = new Date(Date.now() - historyDays * 24 * 60 * 60 * 1000).toISOString()
-      query = query.gte('date', cutoff)
+      baseQuery = baseQuery.gte('date', cutoff)
     }
 
     const cacheKey = `workouts:history:${user.id}:${q.limit}:${historyDays ?? 'all'}:${tier}`
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
 
-    const { data, error } = await query
+    const { data, error } = await baseQuery
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     const payload = {
@@ -52,7 +57,7 @@ export async function GET(req: Request) {
       rows: data || [],
     }
 
-    await cacheSet(cacheKey, payload, 30)
+    await cacheSet(cacheKey, payload, 120)
 
     return NextResponse.json(payload)
   } catch (e: unknown) {
