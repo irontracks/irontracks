@@ -597,15 +597,16 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
 
     // --- Data Fetchers (extracted) ---
     useAdminDataFetchers({
-      user, isAdmin, isTeacher, selectedStudent, tab, subTab,
-      getAdminAuthHeaders, loadedStudentInfo,
-      setUsersList, setTeachersList, setTemplates, setStudentWorkouts,
-      setSyncedWorkouts, setAssessments, setPendingProfiles,
-      setSelectedStudent, setLoading, setDebugError,
-      setErrorReports, setErrorsLoading,
-      setVideoQueue, setVideoLoading, setVideoMissingCount, setVideoMissingLoading,
-      setExerciseAliasesReview, setExerciseAliasesLoading, setExerciseAliasesError,
-      setTab,
+        user, isAdmin, isTeacher, selectedStudent, tab, subTab,
+        registering, teachersList, addingTeacher, editingTeacher,
+        getAdminAuthHeaders, loadedStudentInfo,
+        setUsersList, setTeachersList, setTemplates, setStudentWorkouts,
+        setSyncedWorkouts, setAssessments, setPendingProfiles,
+        setSelectedStudent, setLoading, setDebugError,
+        setErrorReports, setErrorsLoading,
+        setVideoQueue, setVideoLoading, setVideoMissingCount, setVideoMissingLoading,
+        setExerciseAliasesReview, setExerciseAliasesLoading, setExerciseAliasesError,
+        setTab,
     })
 
     // execution videos

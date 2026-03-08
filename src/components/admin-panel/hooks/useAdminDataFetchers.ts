@@ -1,38 +1,48 @@
 import { useCallback, useEffect } from 'react'
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 import { logError, logWarn } from '@/lib/logger'
-import type { AdminUser, AdminTeacher } from '@/types/admin'
+import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admin'
 import type { UnknownRecord } from '@/types/app'
+import type { WorkoutExercise } from '@/types/workout'
+import { adminFetchJson } from '@/utils/admin/adminFetch'
+import { workoutTitleKey, normalizeWorkoutTitle } from '@/utils/workoutTitle'
+import { getErrorMessage } from '@/utils/errorMessage'
+import { z } from 'zod'
+import { parseJsonWithSchema } from '@/utils/zod'
 
 interface AdminDataFetchersDeps {
-  user: AdminUser
-  isAdmin: boolean
-  isTeacher: boolean
-  selectedStudent: AdminUser | null
-  tab: string
-  subTab: string
-  getAdminAuthHeaders: () => Record<string, string>
-  loadedStudentInfo: React.MutableRefObject<Record<string, boolean>>
-  setUsersList: (v: AdminUser[]) => void
-  setTeachersList: (v: AdminTeacher[]) => void
-  setTemplates: (v: unknown[]) => void
-  setStudentWorkouts: (v: unknown[]) => void
-  setSyncedWorkouts: (v: unknown[]) => void
-  setAssessments: (v: unknown[]) => void
-  setPendingProfiles: (v: unknown[]) => void
-  setSelectedStudent: (v: AdminUser | null) => void
-  setLoading: (v: boolean) => void
-  setDebugError: (v: string) => void
-  setErrorReports: (v: unknown[]) => void
-  setErrorsLoading: (v: boolean) => void
-  setVideoQueue: (v: unknown[]) => void
-  setVideoLoading: (v: boolean) => void
-  setVideoMissingCount: (v: number) => void
-  setVideoMissingLoading: (v: boolean) => void
-  setExerciseAliasesReview: (v: unknown[]) => void
-  setExerciseAliasesLoading: (v: boolean) => void
-  setExerciseAliasesError: (v: string) => void
-  setTab: (v: string) => void
+    user: AdminUser
+    isAdmin: boolean
+    isTeacher: boolean
+    registering: boolean
+    teachersList: AdminTeacher[]
+    addingTeacher: boolean
+    editingTeacher: AdminTeacher | null
+    selectedStudent: AdminUser | null
+    tab: string
+    subTab: string
+    getAdminAuthHeaders: () => Record<string, string>
+    loadedStudentInfo: React.MutableRefObject<Record<string, boolean>>
+    setUsersList: (v: AdminUser[]) => void
+    setTeachersList: (v: AdminTeacher[]) => void
+    setTemplates: (v: unknown[]) => void
+    setStudentWorkouts: (v: unknown[]) => void
+    setSyncedWorkouts: (v: unknown[]) => void
+    setAssessments: (v: unknown[]) => void
+    setPendingProfiles: (v: unknown[]) => void
+    setSelectedStudent: (v: AdminUser | null) => void
+    setLoading: (v: boolean) => void
+    setDebugError: (v: string) => void
+    setErrorReports: (v: unknown[]) => void
+    setErrorsLoading: (v: boolean) => void
+    setVideoQueue: (v: unknown[]) => void
+    setVideoLoading: (v: boolean) => void
+    setVideoMissingCount: (v: number) => void
+    setVideoMissingLoading: (v: boolean) => void
+    setExerciseAliasesReview: (v: unknown[]) => void
+    setExerciseAliasesLoading: (v: boolean) => void
+    setExerciseAliasesError: (v: string) => void
+    setTab: (v: string) => void
 }
 
 /**
@@ -41,18 +51,19 @@ interface AdminDataFetchersDeps {
  * fetchMissing, fetchVideos, fetchErrors, fetchAliases, fetchDetails.
  */
 export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
-  const supabase = useStableSupabaseClient()
-  const {
-    user, isAdmin, isTeacher, selectedStudent, tab, subTab,
-    getAdminAuthHeaders, loadedStudentInfo,
-    setUsersList, setTeachersList, setTemplates, setStudentWorkouts,
-    setSyncedWorkouts, setAssessments, setPendingProfiles,
-    setSelectedStudent, setLoading, setDebugError,
-    setErrorReports, setErrorsLoading,
-    setVideoQueue, setVideoLoading, setVideoMissingCount, setVideoMissingLoading,
-    setExerciseAliasesReview, setExerciseAliasesLoading, setExerciseAliasesError,
-    setTab,
-  } = deps
+    const supabase = useStableSupabaseClient()
+    const {
+        user, isAdmin, isTeacher, selectedStudent, tab, subTab,
+        registering, teachersList, addingTeacher, editingTeacher,
+        getAdminAuthHeaders, loadedStudentInfo,
+        setUsersList, setTeachersList, setTemplates, setStudentWorkouts,
+        setSyncedWorkouts, setAssessments, setPendingProfiles,
+        setSelectedStudent, setLoading, setDebugError,
+        setErrorReports, setErrorsLoading,
+        setVideoQueue, setVideoLoading, setVideoMissingCount, setVideoMissingLoading,
+        setExerciseAliasesReview, setExerciseAliasesLoading, setExerciseAliasesError,
+        setTab,
+    } = deps
 
     // ─── useEffects moved from AdminPanelV2 ────────────────────────────────────
 
@@ -321,7 +332,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                     const resLegacy = await fetch('/api/workouts/list');
                     const jsonLegacy = await resLegacy.json();
                     if (jsonLegacy.ok) {
-                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as Exercise[] }));
+                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as WorkoutExercise[] }));
                         list = [...list, ...legacy];
                     }
                 } catch { }
@@ -625,7 +636,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                         for (const r of (jsonLegacy.rows || [])) {
                             const key = workoutTitleKey(r.name);
                             const prev = tMap.get(key);
-                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as Exercise[] };
+                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as WorkoutExercise[] };
                             const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                             if (!prev || prevExs.length < 1) tMap.set(key, candidate);
                         }
