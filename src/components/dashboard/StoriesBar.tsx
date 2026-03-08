@@ -1,5 +1,5 @@
-import dynamic from 'next/dynamic'
 'use client'
+import dynamic from 'next/dynamic'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'

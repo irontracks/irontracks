@@ -148,7 +148,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     postCheckinOpen, setPostCheckinOpen,
     postCheckinDraft, setPostCheckinDraft,
     postCheckinResolveRef,
-    deloadModal, setDeloadModal,
     clusterModal, setClusterModal,
     restPauseModal, setRestPauseModal,
     dropSetModal, setDropSetModal,
