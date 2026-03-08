@@ -28,7 +28,23 @@ const LoginScreen = () => {
     const router = useRouter();
     useNativeAppSetup(null)
     const appVersionLabel = useMemo(() => 'v1.0', []);
-    const [isLoading, setIsLoading] = useState(false);
+    // Lazy initializer: verifica sessão existente SINCRONAMENTE no primeiro render.
+    // Se houver flag de login OU backup no localStorage, começa com
+    // isLoading=true para exibir o LoadingScreen — elimina o flash da tela de login.
+    const [isLoading, setIsLoading] = useState(() => {
+        if (typeof window === 'undefined') return false
+        try {
+            // 1. Check for logged-in flag (set on successful login)
+            if (localStorage.getItem('it.logged_in') === '1') return true
+            // 2. Check for session backup (iOS cookie wipe recovery)
+            const raw = localStorage.getItem('it.session.backup')
+            if (raw) {
+                const backup = JSON.parse(raw) as Record<string, unknown>
+                if (backup?.access_token && backup?.refresh_token) return true
+            }
+        } catch { }
+        return false
+    });
     const [errorMsg, setErrorMsg] = useState('');
     const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0);
     const [cooldownTick, setCooldownTick] = useState(0);
@@ -36,6 +52,7 @@ const LoginScreen = () => {
     const [recoveryPassword2, setRecoveryPassword2] = useState('');
 
     // Auth Mode: 'login', 'signup', 'recover', 'recover_code'
+    // Default to 'login' to skip menu if Google is removed
     const [authMode, setAuthMode] = useState('login');
     const [showNoAccountModal, setShowNoAccountModal] = useState(false);
 
@@ -79,36 +96,48 @@ const LoginScreen = () => {
 
     const clearValidation = useCallback(() => setValidationErrors({}), []);
 
-    // Carregar e-mail salvo + restaurar sessão de backup iOS
+    // Carregar e-mail salvo e tentar restaurar sessão de backup (iOS PWA Killed State)
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined') return
+
         const savedEmail = localStorage.getItem('it_remembered_email');
         if (savedEmail) {
             setEmailData(prev => ({ ...prev, email: savedEmail }));
             setRememberMe(true);
         }
-        // iOS session backup restore
+
+        // If logged-in flag is set, redirect immediately without waiting for server
+        if (localStorage.getItem('it.logged_in') === '1') {
+            setIsLoading(true)
+            window.location.replace('/dashboard')
+            return
+        }
+
+        // Tentar restaurar a sessão do localStorage (fallback para cookies dropados pela Apple)
         try {
-            const backupRaw = localStorage.getItem('it.session.backup');
+            const backupRaw = localStorage.getItem('it.session.backup')
             if (backupRaw) {
-                const backup = JSON.parse(backupRaw);
+                const backup = JSON.parse(backupRaw)
                 if (backup?.access_token && backup?.refresh_token) {
-                    setIsLoading(true);
-                    const supabase = createClient();
-                    supabase.auth.setSession({ access_token: backup.access_token, refresh_token: backup.refresh_token })
-                        .then(({ error, data }) => {
-                            if (!error && data?.session) {
-                                fetch('/api/auth/session', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
-                                }).then(() => {
-                                    router.replace('/dashboard');
-                                }).catch(() => setIsLoading(false));
-                            } else {
-                                setIsLoading(false);
-                            }
-                        }).catch(() => setIsLoading(false));
+                    setIsLoading(true)
+                    const supabase = createClient()
+                    supabase.auth.setSession({
+                        access_token: backup.access_token,
+                        refresh_token: backup.refresh_token
+                    }).then(({ error, data }) => {
+                        if (!error && data?.session) {
+                            fetch('/api/auth/session', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
+                            }).then(() => {
+                                try { localStorage.setItem('it.logged_in', '1') } catch { }
+                                window.location.replace('/dashboard')
+                            }).catch(() => setIsLoading(false))
+                        } else {
+                            setIsLoading(false)
+                        }
+                    }).catch(() => setIsLoading(false))
                 }
             }
         } catch { }
