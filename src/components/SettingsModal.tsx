@@ -134,7 +134,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const canSave = isOpen && !saving
 
   const title = useMemo(() => 'Configurações', [])
-  const focusTrapRef = useFocusTrap(isOpen, onClose)
+  const focusTrapRef = useFocusTrap(isOpen, props?.onClose)
 
   useEffect(() => {
     if (!isOpen) return
