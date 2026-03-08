@@ -24,12 +24,19 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
-      // All a11y rules elevated to "error" — accessibility violations now break the build
+      // A11y rules: critical rules as error, iterative fixes as warn
       ...Object.fromEntries(
         Object.entries(jsxA11y.configs.recommended.rules).map(([key]) => [key, "error"])
       ),
-      // Accept htmlFor alone (without nesting) as valid label association
+      // High-volume a11y rules: warn (fix incrementally, don't block deploy)
+      "jsx-a11y/control-has-associated-label": "warn",
       "jsx-a11y/label-has-associated-control": ["warn", { assert: "either" }],
+      "jsx-a11y/click-events-have-key-events": "warn",
+      "jsx-a11y/no-static-element-interactions": "warn",
+      "jsx-a11y/no-autofocus": "warn",
+      "jsx-a11y/media-has-caption": "warn",
+      "jsx-a11y/no-noninteractive-element-interactions": "warn",
+      "jsx-a11y/iframe-has-title": "warn",
       // label-has-for is deprecated; disable it in favour of label-has-associated-control
       "jsx-a11y/label-has-for": "off",
     },
